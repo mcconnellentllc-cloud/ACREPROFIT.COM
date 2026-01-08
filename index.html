@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Acre Profit - Calculate your land investment returns and maximize your property profits">
-    <title>Acre Profit - Land Investment Calculator</title>
+    <meta name="description" content="Acre Profit - Farmers helping farmers. Join our bulk buying co-op for farm chemistry and products.">
+    <title>Acre Profit - Farmers Helping Farmers</title>
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,10 +19,10 @@
                 <img src="logo.svg" alt="Acre Profit">
             </a>
             <ul class="nav-links">
-                <li><a href="#calculator">Calculator</a></li>
-                <li><a href="#features">Features</a></li>
-                <li><a href="#about">About</a></li>
-                <li><a href="#contact" class="btn btn-primary">Get Started</a></li>
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#products">Products</a></li>
+                <li><a href="#about">About Us</a></li>
+                <li><a href="#contact">Contact</a></li>
             </ul>
             <button class="mobile-menu-btn" aria-label="Menu">
                 <span></span>
@@ -36,205 +36,124 @@
     <header class="hero">
         <div class="container">
             <div class="hero-content">
-                <h1>Maximize Your <span class="highlight">Land Investment</span> Returns</h1>
-                <p class="hero-subtitle">Calculate potential profits, analyze ROI, and make smarter decisions with your acre investments.</p>
-                <div class="hero-cta">
-                    <a href="#calculator" class="btn btn-primary btn-lg">Calculate Now</a>
-                    <a href="#features" class="btn btn-outline btn-lg">Learn More</a>
-                </div>
+                <span class="hero-tag">Farmers Helping Farmers</span>
+                <h1>Buy Smarter. <span class="highlight">Save Together.</span></h1>
+                <p class="hero-subtitle">We're farmers just like you. By pooling our orders, we fill trucks and get bulk pricing on the chemistry and products we all need. Join us and keep more profit in your pocket.</p>
             </div>
-            <div class="hero-visual">
-                <div class="stat-card">
-                    <span class="stat-number">$2.4M+</span>
-                    <span class="stat-label">Profits Calculated</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-number">15K+</span>
-                    <span class="stat-label">Properties Analyzed</span>
-                </div>
-                <div class="stat-card">
-                    <span class="stat-number">98%</span>
-                    <span class="stat-label">Accuracy Rate</span>
-                </div>
+
+            <!-- Main CTA Card -->
+            <div class="acre-card" id="acre-card">
+                <a href="/enter-acres" class="acre-card-link">
+                    <div class="acre-card-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                        </svg>
+                    </div>
+                    <h2>Enter Your Acres</h2>
+                    <p>Tell us your acreage and see what products are available for the next bulk order.</p>
+                    <span class="acre-card-btn">Get Started →</span>
+                </a>
             </div>
         </div>
     </header>
 
-    <!-- Calculator Section -->
-    <section id="calculator" class="calculator-section">
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-it-works-section">
         <div class="container">
             <div class="section-header">
-                <h2>Acre Profit Calculator</h2>
-                <p>Enter your land details to calculate potential returns</p>
+                <h2>How It Works</h2>
+                <p>Simple bulk buying that saves you money</p>
             </div>
 
-            <div class="calculator-wrapper">
-                <div class="calculator-form">
-                    <div class="form-group">
-                        <label for="acreage">Total Acreage</label>
-                        <div class="input-group">
-                            <input type="number" id="acreage" placeholder="10" min="0.1" step="0.1" value="10">
-                            <span class="input-suffix">acres</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="purchasePrice">Purchase Price</label>
-                        <div class="input-group">
-                            <span class="input-prefix">$</span>
-                            <input type="number" id="purchasePrice" placeholder="50000" min="0" step="100" value="50000">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="currentValue">Current/Expected Value</label>
-                        <div class="input-group">
-                            <span class="input-prefix">$</span>
-                            <input type="number" id="currentValue" placeholder="75000" min="0" step="100" value="75000">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="holdingPeriod">Holding Period</label>
-                        <div class="input-group">
-                            <input type="number" id="holdingPeriod" placeholder="5" min="1" step="1" value="5">
-                            <span class="input-suffix">years</span>
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="annualIncome">Annual Income (rent, crops, etc.)</label>
-                        <div class="input-group">
-                            <span class="input-prefix">$</span>
-                            <input type="number" id="annualIncome" placeholder="2000" min="0" step="100" value="2000">
-                        </div>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="annualExpenses">Annual Expenses (taxes, maintenance)</label>
-                        <div class="input-group">
-                            <span class="input-prefix">$</span>
-                            <input type="number" id="annualExpenses" placeholder="500" min="0" step="100" value="500">
-                        </div>
-                    </div>
-
-                    <button type="button" id="calculateBtn" class="btn btn-primary btn-block">
-                        Calculate Profit
-                    </button>
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Enter Your Acres</h3>
+                    <p>Tell us how many acres you're farming and what crops you're growing.</p>
                 </div>
 
-                <div class="calculator-results">
-                    <h3>Investment Analysis</h3>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>See Available Products</h3>
+                    <p>Browse the chemistry and products we're ordering in bulk this season.</p>
+                </div>
 
-                    <div class="result-item highlight-result">
-                        <span class="result-label">Total Profit</span>
-                        <span class="result-value" id="totalProfit">$32,500</span>
-                    </div>
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Join the Order</h3>
+                    <p>Add your quantities to the group order. The more farmers join, the better the price.</p>
+                </div>
 
-                    <div class="results-grid">
-                        <div class="result-item">
-                            <span class="result-label">Price Per Acre</span>
-                            <span class="result-value" id="pricePerAcre">$5,000</span>
-                        </div>
-
-                        <div class="result-item">
-                            <span class="result-label">Value Per Acre</span>
-                            <span class="result-value" id="valuePerAcre">$7,500</span>
-                        </div>
-
-                        <div class="result-item">
-                            <span class="result-label">Capital Gain</span>
-                            <span class="result-value" id="capitalGain">$25,000</span>
-                        </div>
-
-                        <div class="result-item">
-                            <span class="result-label">Net Operating Income</span>
-                            <span class="result-value" id="netIncome">$7,500</span>
-                        </div>
-
-                        <div class="result-item">
-                            <span class="result-label">Total ROI</span>
-                            <span class="result-value" id="totalROI">65.0%</span>
-                        </div>
-
-                        <div class="result-item">
-                            <span class="result-label">Annual ROI</span>
-                            <span class="result-value" id="annualROI">13.0%</span>
-                        </div>
-                    </div>
-
-                    <div class="profit-breakdown">
-                        <h4>Profit Breakdown</h4>
-                        <div class="breakdown-bar">
-                            <div class="bar-segment capital-gain" id="capitalGainBar" style="width: 77%">
-                                <span>Capital Gain</span>
-                            </div>
-                            <div class="bar-segment income" id="incomeBar" style="width: 23%">
-                                <span>Net Income</span>
-                            </div>
-                        </div>
-                    </div>
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h3>We Fill the Truck</h3>
+                    <p>Once we hit volume, we lock in bulk pricing and coordinate delivery.</p>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Features Section -->
-    <section id="features" class="features-section">
+    <!-- Products Section -->
+    <section id="products" class="products-section">
         <div class="container">
             <div class="section-header">
-                <h2>Why Choose Acre Profit</h2>
-                <p>The smart way to analyze your land investments</p>
+                <h2>What We're Buying</h2>
+                <p>The same products we use on our own farms</p>
             </div>
 
-            <div class="features-grid">
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+            <div class="products-grid">
+                <div class="product-card">
+                    <div class="product-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 21h10"/><path d="M12 21a9 9 0 0 0 9-9H3a9 9 0 0 0 9 9Z"/><path d="M11.38 12a2.4 2.4 0 0 1-.4-4.77 2.4 2.4 0 0 1 3.2-2.77 2.4 2.4 0 0 1 3.47-.63 2.4 2.4 0 0 1 3.37 3.37 2.4 2.4 0 0 1-1.1 3.7 2.51 2.51 0 0 1 .03 1.1"/><path d="m13 12-4-4"/><path d="M10.5 9.5 8 12"/></svg>
                     </div>
-                    <h3>ROI Analysis</h3>
-                    <p>Calculate comprehensive return on investment including capital gains and ongoing income streams.</p>
+                    <h3>Herbicides</h3>
+                    <p>Pre-emergent and post-emergent weed control</p>
                 </div>
 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                <div class="product-card">
+                    <div class="product-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c4.97 0 9-2.24 9-5v-3"/><path d="M12 22c-4.97 0-9-2.24-9-5v-3"/><path d="M21 9c0 2.76-4.03 5-9 5s-9-2.24-9-5"/><path d="M3 9c0-2.76 4.03-5 9-5s9 2.24 9 5"/><path d="M12 12v5"/><path d="M12 2v5"/></svg>
                     </div>
-                    <h3>Growth Tracking</h3>
-                    <p>Monitor land value appreciation and track your investment performance over time.</p>
+                    <h3>Fertilizers</h3>
+                    <p>Nitrogen, phosphorus, potassium, and micronutrients</p>
                 </div>
 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+                <div class="product-card">
+                    <div class="product-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M11 15h2a2 2 0 1 0 0-4h-3c-.6 0-1.1.2-1.4.6L3 17"/><path d="m7 21 1.6-1.4c.3-.4.8-.6 1.4-.6h4c1.1 0 2.1-.4 2.8-1.2l4.6-4.4a2 2 0 0 0-2.75-2.91l-4.2 3.9"/><path d="m2 16 6 6"/><circle cx="16" cy="9" r="2.9"/><circle cx="6" cy="5" r="3"/></svg>
                     </div>
-                    <h3>Per-Acre Metrics</h3>
-                    <p>Break down costs and values on a per-acre basis for easy comparison across properties.</p>
+                    <h3>Insecticides</h3>
+                    <p>Protect your crops from pests and insects</p>
                 </div>
 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h5"/><path d="M17 12h5"/><path d="M12 2v5"/><path d="M12 17v5"/><circle cx="12" cy="12" r="4"/></svg>
+                <div class="product-card">
+                    <div class="product-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>
                     </div>
-                    <h3>Income Factoring</h3>
-                    <p>Include rental income, agricultural revenue, and other cash flows in your calculations.</p>
+                    <h3>Fungicides</h3>
+                    <p>Disease prevention and treatment</p>
                 </div>
 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-9-9c2.52 0 4.93 1 6.74 2.74L21 8"/><path d="M21 3v5h-5"/></svg>
+                <div class="product-card">
+                    <div class="product-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg>
                     </div>
-                    <h3>Instant Results</h3>
-                    <p>Get immediate calculations with real-time updates as you adjust your inputs.</p>
+                    <h3>Seed Treatments</h3>
+                    <p>Give your seeds the best start</p>
                 </div>
 
-                <div class="feature-card">
-                    <div class="feature-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10"/><path d="m9 12 2 2 4-4"/></svg>
+                <div class="product-card">
+                    <div class="product-icon">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m8 11 4 4 4-4"/><path d="M8 5H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-4"/></svg>
                     </div>
-                    <h3>Accurate Data</h3>
-                    <p>Reliable calculations using industry-standard formulas for land investment analysis.</p>
+                    <h3>Adjuvants</h3>
+                    <p>Surfactants and additives for better application</p>
                 </div>
+            </div>
+
+            <div class="products-cta">
+                <a href="/enter-acres" class="btn btn-primary btn-lg">See Current Orders →</a>
             </div>
         </div>
     </section>
@@ -244,20 +163,29 @@
         <div class="container">
             <div class="about-content">
                 <div class="about-text">
-                    <h2>About Acre Profit</h2>
-                    <p>Acre Profit was built for land investors, farmers, ranchers, and real estate professionals who need a straightforward way to analyze property investments.</p>
-                    <p>Whether you're evaluating raw land, agricultural property, or development opportunities, our calculator helps you understand the true potential of your investment.</p>
-                    <ul class="about-list">
-                        <li>Calculate returns on land investments</li>
-                        <li>Factor in ongoing income and expenses</li>
-                        <li>Compare multiple properties easily</li>
-                        <li>Make data-driven investment decisions</li>
-                    </ul>
+                    <h2>We're Farmers Too</h2>
+                    <p>Acre Profit started with a simple idea: if we're all buying the same products, why aren't we buying them together?</p>
+                    <p>We're not a corporation or a middleman. We're working farmers who got tired of paying retail prices while watching semi-trucks deliver to the big operations down the road.</p>
+                    <p>By combining our orders, we fill those same trucks and get the same bulk pricing. No markup, no mystery fees—just farmers helping farmers.</p>
+                    <div class="about-stats">
+                        <div class="about-stat">
+                            <span class="stat-value">50+</span>
+                            <span class="stat-label">Farmers in Network</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="stat-value">15-30%</span>
+                            <span class="stat-label">Average Savings</span>
+                        </div>
+                        <div class="about-stat">
+                            <span class="stat-value">10K+</span>
+                            <span class="stat-label">Acres Represented</span>
+                        </div>
+                    </div>
                 </div>
                 <div class="about-image">
                     <div class="image-placeholder">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                        <span>Land Investment Made Simple</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                        <span>Farmers Helping Farmers</span>
                     </div>
                 </div>
             </div>
@@ -265,12 +193,28 @@
     </section>
 
     <!-- CTA Section -->
-    <section id="contact" class="cta-section">
+    <section class="cta-section">
         <div class="container">
             <div class="cta-content">
-                <h2>Ready to Maximize Your Land Profits?</h2>
-                <p>Start calculating your investment returns today.</p>
-                <a href="#calculator" class="btn btn-white btn-lg">Use Calculator</a>
+                <h2>Ready to Save on Your Next Order?</h2>
+                <p>Join the co-op and start buying smarter.</p>
+                <a href="/enter-acres" class="btn btn-white btn-lg">Enter Your Acres →</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Contact Section -->
+    <section id="contact" class="contact-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>Get In Touch</h2>
+                <p>Questions? Want to learn more? Reach out.</p>
+            </div>
+            <div class="contact-content">
+                <div class="contact-info">
+                    <p><strong>Email:</strong> <a href="mailto:info@acreprofit.com">info@acreprofit.com</a></p>
+                    <p>We'll get back to you within 24 hours.</p>
+                </div>
             </div>
         </div>
     </section>
@@ -281,28 +225,22 @@
             <div class="footer-content">
                 <div class="footer-brand">
                     <img src="logo-dark.svg" alt="Acre Profit" class="footer-logo">
-                    <p>Smart land investment analysis for better returns.</p>
+                    <p>Farmers helping farmers through bulk buying.</p>
                 </div>
                 <div class="footer-links">
                     <h4>Quick Links</h4>
                     <ul>
-                        <li><a href="#calculator">Calculator</a></li>
-                        <li><a href="#features">Features</a></li>
-                        <li><a href="#about">About</a></li>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="#products">Products</a></li>
+                        <li><a href="#about">About Us</a></li>
+                        <li><a href="#contact">Contact</a></li>
                     </ul>
                 </div>
                 <div class="footer-links">
-                    <h4>Resources</h4>
+                    <h4>Get Started</h4>
                     <ul>
-                        <li><a href="#">Land Investment Guide</a></li>
-                        <li><a href="#">ROI Basics</a></li>
-                        <li><a href="#">FAQ</a></li>
-                    </ul>
-                </div>
-                <div class="footer-links">
-                    <h4>Contact</h4>
-                    <ul>
-                        <li><a href="mailto:info@acreprofit.com">info@acreprofit.com</a></li>
+                        <li><a href="/enter-acres">Enter Acres</a></li>
+                        <li><a href="/login">Login</a></li>
                     </ul>
                 </div>
             </div>

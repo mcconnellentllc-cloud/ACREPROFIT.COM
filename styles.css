@@ -738,3 +738,268 @@ h4 {
         padding: 24px;
     }
 }
+
+/* ===== Hero Tag ===== */
+.hero-tag {
+    display: inline-block;
+    background: var(--primary);
+    color: var(--white);
+    padding: 8px 16px;
+    border-radius: 50px;
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    letter-spacing: 0.5px;
+}
+
+/* ===== Acre Card (Main CTA) ===== */
+.acre-card {
+    background: var(--white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    overflow: hidden;
+    transition: var(--transition);
+    border: 3px solid transparent;
+}
+
+.acre-card:hover {
+    transform: translateY(-8px);
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    border-color: var(--primary);
+}
+
+.acre-card-link {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 48px 40px;
+}
+
+.acre-card-icon {
+    width: 100px;
+    height: 100px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+    margin-bottom: 24px;
+}
+
+.acre-card h2 {
+    font-size: 1.75rem;
+    margin-bottom: 12px;
+    color: var(--text);
+}
+
+.acre-card p {
+    color: var(--text-light);
+    margin-bottom: 24px;
+    max-width: 280px;
+}
+
+.acre-card-btn {
+    display: inline-block;
+    background: var(--primary);
+    color: var(--white);
+    padding: 14px 32px;
+    border-radius: var(--radius);
+    font-weight: 600;
+    transition: var(--transition);
+}
+
+.acre-card:hover .acre-card-btn {
+    background: var(--primary-dark);
+}
+
+/* ===== How It Works Section ===== */
+.how-it-works-section {
+    padding: 100px 0;
+    background: var(--white);
+}
+
+.steps-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 30px;
+}
+
+.step-card {
+    text-align: center;
+    padding: 32px 24px;
+}
+
+.step-number {
+    width: 60px;
+    height: 60px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 800;
+    margin: 0 auto 20px;
+}
+
+.step-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 12px;
+}
+
+.step-card p {
+    color: var(--text-light);
+    font-size: 0.9375rem;
+}
+
+/* ===== Products Section ===== */
+.products-section {
+    padding: 100px 0;
+    background: var(--secondary);
+}
+
+.products-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 24px;
+}
+
+.product-card {
+    background: var(--white);
+    padding: 28px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    transition: var(--transition);
+    display: flex;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.product-card:hover {
+    transform: translateY(-4px);
+    box-shadow: var(--shadow-lg);
+}
+
+.product-icon {
+    width: 56px;
+    height: 56px;
+    min-width: 56px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--white);
+}
+
+.product-card h3 {
+    font-size: 1.125rem;
+    margin-bottom: 6px;
+}
+
+.product-card p {
+    color: var(--text-light);
+    font-size: 0.875rem;
+    margin: 0;
+}
+
+.products-cta {
+    text-align: center;
+    margin-top: 48px;
+}
+
+/* ===== About Stats ===== */
+.about-stats {
+    display: flex;
+    gap: 32px;
+    margin-top: 32px;
+    padding-top: 32px;
+    border-top: 2px solid var(--border);
+}
+
+.about-stat {
+    display: flex;
+    flex-direction: column;
+}
+
+.about-stat .stat-value {
+    font-size: 2rem;
+    font-weight: 800;
+    color: var(--primary);
+}
+
+.about-stat .stat-label {
+    font-size: 0.875rem;
+    color: var(--text-muted);
+}
+
+/* ===== Contact Section ===== */
+.contact-section {
+    padding: 80px 0;
+    background: var(--secondary);
+}
+
+.contact-content {
+    text-align: center;
+}
+
+.contact-info {
+    display: inline-block;
+    background: var(--white);
+    padding: 32px 48px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+}
+
+.contact-info a {
+    color: var(--primary);
+    font-weight: 600;
+}
+
+.contact-info a:hover {
+    text-decoration: underline;
+}
+
+/* ===== Responsive Updates ===== */
+@media (max-width: 1024px) {
+    .steps-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .products-grid {
+        grid-template-columns: repeat(2, 1fr);
+    }
+
+    .about-stats {
+        flex-wrap: wrap;
+    }
+}
+
+@media (max-width: 768px) {
+    .steps-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .products-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .about-stats {
+        justify-content: center;
+        text-align: center;
+    }
+
+    .acre-card-link {
+        padding: 32px 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .about-stats {
+        flex-direction: column;
+        align-items: center;
+    }
+}

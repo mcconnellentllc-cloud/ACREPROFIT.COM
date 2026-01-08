@@ -1,0 +1,28 @@
+# Render Blueprint for Acre Profit
+# Deploy at: https://dashboard.render.com/blueprints
+
+services:
+  # API Server
+  - type: web
+    name: acreprofit-api
+    env: node
+    region: oregon
+    plan: free
+    rootDir: server
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: MONGODB_URI
+        sync: false
+      - key: NODE_ENV
+        value: production
+
+  # Static Site (optional - if not using GitHub Pages)
+  # - type: web
+  #   name: acreprofit-web
+  #   env: static
+  #   staticPublishPath: ./
+  #   headers:
+  #     - path: /*
+  #       name: Cache-Control
+  #       value: public, max-age=31536000
