@@ -4,8 +4,12 @@ const cors = require('cors');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const Stripe = require('stripe');
 
 const app = express();
+
+// Initialize Stripe (will be configured per-request for Connect)
+const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const PORT = process.env.PORT || 3001;
 const JWT_SECRET = process.env.JWT_SECRET || 'acreprofit-secret-key-change-in-production';
 
@@ -44,11 +48,25 @@ const userSchema = new mongoose.Schema({
         default: 'customer'
     },
     representative: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For customers - their rep
+    representativeId: String, // kyle, ty, or chad - for quick lookup
+    // Stripe Connect for representatives
+    stripeAccountId: String, // Connected Stripe account ID
+    stripeAccountStatus: { type: String, enum: ['pending', 'active', 'inactive'], default: 'pending' },
+    // Check payment info for representatives
+    checkPayableTo: String,
+    checkMailingAddress: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
     farm: {
         name: String,
         acres: Number,
         state: String,
-        county: String
+        county: String,
+        address: String,
+        zip: String
     },
     crops: [String],
     createdAt: { type: Date, default: Date.now }
@@ -104,11 +122,31 @@ const orderSchema = new mongoose.Schema({
         pricePerUnit: Number,
         totalPrice: Number
     }],
-    totalPrice: Number,
+    additionalProducts: {
+        hydrovant: { type: Number, default: 0 },
+        multiseal: { type: Number, default: 0 },
+        pump: { type: Number, default: 0 }
+    },
+    totalCost: Number,
     costPerAcre: Number,
+    // Payment information
+    paymentMethod: {
+        type: String,
+        enum: ['stripe_ach', 'stripe_card', 'check', 'pending'],
+        default: 'pending'
+    },
+    paymentStatus: {
+        type: String,
+        enum: ['pending', 'processing', 'paid', 'failed', 'refunded'],
+        default: 'pending'
+    },
+    stripePaymentIntentId: String,
+    checkNumber: String,
+    checkReceivedDate: Date,
+    paidAt: Date,
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'bundled', 'ordered', 'delivered'],
+        enum: ['draft', 'submitted', 'confirmed', 'bundled', 'ordered', 'shipped', 'delivered'],
         default: 'draft'
     },
     bundleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bundle' },
@@ -1285,6 +1323,346 @@ app.post('/api/webhooks/printify', async (req, res) => {
         }
 
         res.json({ received: true });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- STRIPE PAYMENT ROUTES ----
+
+// Get representative's payment info (for check payments)
+app.get('/api/representatives/:repId/payment-info', async (req, res) => {
+    try {
+        const { repId } = req.params;
+
+        // Map rep IDs to emails
+        const repEmails = {
+            kyle: 'kyle@togoag.com',
+            ty: 'tymollohan77@gmail.com',
+            chad: 'ckbamford@yahoo.com'
+        };
+
+        const rep = await User.findOne({ email: repEmails[repId] });
+        if (!rep) {
+            return res.status(404).json({ error: 'Representative not found' });
+        }
+
+        res.json({
+            name: rep.name,
+            phone: rep.phone,
+            checkPayableTo: rep.checkPayableTo || rep.name,
+            checkMailingAddress: rep.checkMailingAddress || null,
+            stripeEnabled: !!rep.stripeAccountId && rep.stripeAccountStatus === 'active'
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create Stripe Connect onboarding link for representative
+app.post('/api/stripe/connect/onboard', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.status(400).json({ error: 'Stripe not configured' });
+        }
+
+        // Check if rep already has a Stripe account
+        if (req.user.stripeAccountId) {
+            // Create login link for existing account
+            const loginLink = await stripe.accounts.createLoginLink(req.user.stripeAccountId);
+            return res.json({ url: loginLink.url });
+        }
+
+        // Create new Connect account
+        const account = await stripe.accounts.create({
+            type: 'express',
+            country: 'US',
+            email: req.user.email,
+            capabilities: {
+                card_payments: { requested: true },
+                transfers: { requested: true },
+                us_bank_account_ach_payments: { requested: true }
+            },
+            business_type: 'individual',
+            business_profile: {
+                name: req.user.name,
+                product_description: 'Agricultural products and chemicals'
+            }
+        });
+
+        // Save account ID
+        req.user.stripeAccountId = account.id;
+        req.user.stripeAccountStatus = 'pending';
+        await req.user.save();
+
+        // Create onboarding link
+        const accountLink = await stripe.accountLinks.create({
+            account: account.id,
+            refresh_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/admin.html?stripe=refresh`,
+            return_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/admin.html?stripe=success`,
+            type: 'account_onboarding'
+        });
+
+        res.json({ url: accountLink.url });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Check Stripe Connect account status
+app.get('/api/stripe/connect/status', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (!stripe || !req.user.stripeAccountId) {
+            return res.json({ connected: false, status: 'not_started' });
+        }
+
+        const account = await stripe.accounts.retrieve(req.user.stripeAccountId);
+
+        // Update status in DB
+        if (account.charges_enabled && account.payouts_enabled) {
+            req.user.stripeAccountStatus = 'active';
+        } else {
+            req.user.stripeAccountStatus = 'pending';
+        }
+        await req.user.save();
+
+        res.json({
+            connected: true,
+            status: req.user.stripeAccountStatus,
+            chargesEnabled: account.charges_enabled,
+            payoutsEnabled: account.payouts_enabled,
+            detailsSubmitted: account.details_submitted
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create payment intent for an order (ACH or Card)
+app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
+    try {
+        const { orderId, paymentMethod } = req.body;
+
+        if (!stripe) {
+            return res.status(400).json({ error: 'Stripe not configured' });
+        }
+
+        const order = await Order.findById(orderId).populate('representativeId');
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (order.userId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const rep = order.representativeId;
+        if (!rep.stripeAccountId || rep.stripeAccountStatus !== 'active') {
+            return res.status(400).json({
+                error: 'Representative has not set up payment processing. Please pay by check.',
+                checkPayableTo: rep.checkPayableTo || rep.name,
+                checkMailingAddress: rep.checkMailingAddress
+            });
+        }
+
+        // Calculate platform fee (optional - 0% for now, can add later)
+        const platformFeePercent = 0;
+        const applicationFee = Math.round(order.totalCost * 100 * platformFeePercent);
+
+        // Create payment intent with Stripe Connect
+        const paymentIntentParams = {
+            amount: Math.round(order.totalCost * 100), // Convert to cents
+            currency: 'usd',
+            payment_method_types: paymentMethod === 'ach' ? ['us_bank_account'] : ['card'],
+            transfer_data: {
+                destination: rep.stripeAccountId
+            },
+            metadata: {
+                orderId: order._id.toString(),
+                customerId: req.user._id.toString(),
+                customerName: req.user.name,
+                repName: rep.name
+            }
+        };
+
+        if (applicationFee > 0) {
+            paymentIntentParams.application_fee_amount = applicationFee;
+        }
+
+        // For ACH, add specific options
+        if (paymentMethod === 'ach') {
+            paymentIntentParams.payment_method_options = {
+                us_bank_account: {
+                    financial_connections: {
+                        permissions: ['payment_method', 'balances']
+                    }
+                }
+            };
+        }
+
+        const paymentIntent = await stripe.paymentIntents.create(paymentIntentParams);
+
+        // Update order with payment intent
+        order.stripePaymentIntentId = paymentIntent.id;
+        order.paymentMethod = paymentMethod === 'ach' ? 'stripe_ach' : 'stripe_card';
+        order.paymentStatus = 'processing';
+        await order.save();
+
+        res.json({
+            clientSecret: paymentIntent.client_secret,
+            paymentIntentId: paymentIntent.id
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Mark order as paid by check
+app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { orderId, checkNumber } = req.body;
+
+        const order = await Order.findById(orderId);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Verify the rep owns this order (unless superadmin)
+        if (req.user.role !== 'superadmin' &&
+            order.representativeId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        order.paymentMethod = 'check';
+        order.paymentStatus = 'paid';
+        order.checkNumber = checkNumber;
+        order.checkReceivedDate = new Date();
+        order.paidAt = new Date();
+        order.status = 'confirmed';
+        order.updatedAt = new Date();
+        await order.save();
+
+        // Add merch credit for the customer
+        const orderAmount = order.totalCost || 0;
+        if (orderAmount > 0) {
+            let credit = await MerchCredit.findOne({ userId: order.userId });
+            if (!credit) {
+                credit = await MerchCredit.create({ userId: order.userId });
+            }
+
+            const previousTotal = credit.totalSpent;
+            const newTotal = previousTotal + orderAmount;
+            const previousCredits = Math.floor(previousTotal / 2000) * 50;
+            const newCredits = Math.floor(newTotal / 2000) * 50;
+            const creditToAdd = newCredits - previousCredits;
+
+            if (creditToAdd > 0) {
+                credit.history.push({
+                    type: 'earned',
+                    amount: creditToAdd,
+                    orderId: order._id,
+                    description: `Earned $${creditToAdd} merch credit from order`
+                });
+            }
+
+            credit.totalSpent = newTotal;
+            credit.creditEarned += creditToAdd;
+            credit.creditAvailable += creditToAdd;
+            credit.updatedAt = new Date();
+            await credit.save();
+        }
+
+        res.json({ message: 'Payment recorded', order });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Stripe webhook for payment confirmations
+app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+    const sig = req.headers['stripe-signature'];
+    const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+    let event;
+    try {
+        event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
+    } catch (err) {
+        return res.status(400).send(`Webhook Error: ${err.message}`);
+    }
+
+    if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object;
+        const orderId = paymentIntent.metadata.orderId;
+
+        if (orderId) {
+            const order = await Order.findById(orderId);
+            if (order) {
+                order.paymentStatus = 'paid';
+                order.paidAt = new Date();
+                order.status = 'confirmed';
+                order.updatedAt = new Date();
+                await order.save();
+
+                // Add merch credit
+                const orderAmount = order.totalCost || 0;
+                if (orderAmount > 0) {
+                    let credit = await MerchCredit.findOne({ userId: order.userId });
+                    if (!credit) {
+                        credit = await MerchCredit.create({ userId: order.userId });
+                    }
+
+                    const previousTotal = credit.totalSpent;
+                    const newTotal = previousTotal + orderAmount;
+                    const previousCredits = Math.floor(previousTotal / 2000) * 50;
+                    const newCredits = Math.floor(newTotal / 2000) * 50;
+                    const creditToAdd = newCredits - previousCredits;
+
+                    if (creditToAdd > 0) {
+                        credit.history.push({
+                            type: 'earned',
+                            amount: creditToAdd,
+                            orderId: order._id,
+                            description: `Earned $${creditToAdd} merch credit from order`
+                        });
+                    }
+
+                    credit.totalSpent = newTotal;
+                    credit.creditEarned += creditToAdd;
+                    credit.creditAvailable += creditToAdd;
+                    credit.updatedAt = new Date();
+                    await credit.save();
+                }
+            }
+        }
+    }
+
+    if (event.type === 'payment_intent.payment_failed') {
+        const paymentIntent = event.data.object;
+        const orderId = paymentIntent.metadata.orderId;
+
+        if (orderId) {
+            const order = await Order.findById(orderId);
+            if (order) {
+                order.paymentStatus = 'failed';
+                order.updatedAt = new Date();
+                await order.save();
+            }
+        }
+    }
+
+    res.json({ received: true });
+});
+
+// Update representative's check payment info
+app.put('/api/representatives/check-info', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { checkPayableTo, checkMailingAddress } = req.body;
+
+        req.user.checkPayableTo = checkPayableTo;
+        req.user.checkMailingAddress = checkMailingAddress;
+        await req.user.save();
+
+        res.json({ message: 'Check payment info updated' });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
