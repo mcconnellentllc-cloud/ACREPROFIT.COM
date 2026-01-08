@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit - Crop Inputs Pool Orders">
+    <title>Crop Inputs - Acre Profit</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2D5A27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <ul class="nav-links">
+                <li><a href="/dashboard.html">Dashboard</a></li>
+                <li><a href="/my-orders.html">My Orders</a></li>
+                <li><a href="/merch.html">Merch</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="category-page">
+        <div class="container">
+            <!-- Category Header -->
+            <div class="category-header">
+                <a href="/dashboard.html" class="back-link">← Back to Dashboard</a>
+                <div class="category-title">
+                    <span class="category-icon-lg">🌱</span>
+                    <div>
+                        <h1>Crop Inputs</h1>
+                        <p>Herbicides, fungicides, insecticides, seed treatments & adjuvants</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Filter/Search Bar -->
+            <div class="filter-bar">
+                <div class="search-input">
+                    <input type="text" placeholder="Search products..." id="searchInput">
+                </div>
+                <div class="filter-tabs">
+                    <button class="filter-tab active" data-filter="all">All Products</button>
+                    <button class="filter-tab" data-filter="pooling">Pooling Now</button>
+                    <button class="filter-tab" data-filter="bidding">Awaiting Bids</button>
+                    <button class="filter-tab" data-filter="ready">Ready to Buy</button>
+                </div>
+            </div>
+
+            <!-- Products List -->
+            <div class="products-list">
+                <!-- Product: Pooling Status -->
+                <div class="product-pool-card" data-status="pooling">
+                    <div class="product-header">
+                        <div class="product-info">
+                            <h3>Roundup PowerMax 3</h3>
+                            <p class="product-desc">Glyphosate 540 g/L • 2.5 gal jugs</p>
+                        </div>
+                        <div class="product-status status-pooling">Pooling</div>
+                    </div>
+
+                    <div class="pool-stats">
+                        <div class="pool-progress-large">
+                            <div class="progress-info">
+                                <span>Pool Progress</span>
+                                <span><strong>7,200</strong> / 10,000 gal</span>
+                            </div>
+                            <div class="progress-bar-large">
+                                <div class="progress-fill" style="width: 72%"></div>
+                            </div>
+                            <div class="progress-meta">
+                                <span>23 farmers joined</span>
+                                <span class="threshold-note">2,800 gal to threshold</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="product-pricing">
+                        <div class="price-estimate">
+                            <span class="price-label">Est. Price Range</span>
+                            <span class="price-value">$14.50 - $16.00 <small>/gal</small></span>
+                        </div>
+                        <div class="price-savings">
+                            <span class="savings-badge">Save ~18%</span>
+                            <span class="retail-price">vs $18.50/gal retail</span>
+                        </div>
+                    </div>
+
+                    <div class="product-actions">
+                        <div class="quantity-input">
+                            <label>Your Quantity (gallons)</label>
+                            <input type="number" placeholder="0" min="0" step="2.5">
+                        </div>
+                        <button class="btn btn-primary" onclick="joinPool(this)">Join This Pool</button>
+                    </div>
+                </div>
+
+                <!-- Product: Almost at Threshold -->
+                <div class="product-pool-card" data-status="pooling">
+                    <div class="product-header">
+                        <div class="product-info">
+                            <h3>Atrazine 4L</h3>
+                            <p class="product-desc">Atrazine 42.6% • 2.5 gal jugs</p>
+                        </div>
+                        <div class="product-status status-almost">Almost There!</div>
+                    </div>
+
+                    <div class="pool-stats">
+                        <div class="pool-progress-large">
+                            <div class="progress-info">
+                                <span>Pool Progress</span>
+                                <span><strong>4,750</strong> / 5,000 gal</span>
+                            </div>
+                            <div class="progress-bar-large almost">
+                                <div class="progress-fill" style="width: 95%"></div>
+                            </div>
+                            <div class="progress-meta">
+                                <span>18 farmers joined</span>
+                                <span class="threshold-note urgent">Only 250 gal needed!</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="product-pricing">
+                        <div class="price-estimate">
+                            <span class="price-label">Est. Price Range</span>
+                            <span class="price-value">$12.00 - $13.50 <small>/gal</small></span>
+                        </div>
+                        <div class="price-savings">
+                            <span class="savings-badge">Save ~22%</span>
+                            <span class="retail-price">vs $16.00/gal retail</span>
+                        </div>
+                    </div>
+
+                    <div class="product-actions">
+                        <div class="quantity-input">
+                            <label>Your Quantity (gallons)</label>
+                            <input type="number" placeholder="0" min="0" step="2.5">
+                        </div>
+                        <button class="btn btn-primary" onclick="joinPool(this)">Join This Pool</button>
+                    </div>
+                </div>
+
+                <!-- Product: Bidding in Progress -->
+                <div class="product-pool-card" data-status="bidding">
+                    <div class="product-header">
+                        <div class="product-info">
+                            <h3>Dual II Magnum</h3>
+                            <p class="product-desc">S-metolachlor 83.7% • 2.5 gal jugs</p>
+                        </div>
+                        <div class="product-status status-bidding">Bidding Open</div>
+                    </div>
+
+                    <div class="pool-stats">
+                        <div class="bidding-info">
+                            <div class="bid-stat">
+                                <span class="bid-label">Pool Size</span>
+                                <span class="bid-value">12,500 gal</span>
+                            </div>
+                            <div class="bid-stat">
+                                <span class="bid-label">Bids Received</span>
+                                <span class="bid-value">3 of 5</span>
+                            </div>
+                            <div class="bid-stat">
+                                <span class="bid-label">Bidding Closes</span>
+                                <span class="bid-value countdown">23h 45m</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="product-pricing">
+                        <div class="price-estimate">
+                            <span class="price-label">Current Best Bid</span>
+                            <span class="price-value best-bid">$42.75 <small>/gal</small></span>
+                        </div>
+                        <div class="price-savings">
+                            <span class="savings-badge">Save ~25%</span>
+                            <span class="retail-price">vs $57.00/gal retail</span>
+                        </div>
+                    </div>
+
+                    <div class="product-actions bidding-actions">
+                        <p class="bidding-note">You're in this pool for <strong>100 gal</strong>. Waiting for bidding to close.</p>
+                        <button class="btn btn-outline" onclick="viewBids(this)">View All Bids</button>
+                    </div>
+                </div>
+
+                <!-- Product: Ready to Approve -->
+                <div class="product-pool-card" data-status="ready">
+                    <div class="product-header">
+                        <div class="product-info">
+                            <h3>Bicep II Magnum</h3>
+                            <p class="product-desc">S-metolachlor + Atrazine • 2.5 gal jugs</p>
+                        </div>
+                        <div class="product-status status-ready">Ready for Approval</div>
+                    </div>
+
+                    <div class="pool-stats">
+                        <div class="winning-bid-info">
+                            <div class="winner-badge">🏆 Winning Supplier: AgriChem Supply Co.</div>
+                            <div class="bid-details">
+                                <div class="bid-stat">
+                                    <span class="bid-label">Final Price</span>
+                                    <span class="bid-value final-price">$38.25 <small>/gal</small></span>
+                                </div>
+                                <div class="bid-stat">
+                                    <span class="bid-label">Your Quantity</span>
+                                    <span class="bid-value">75 gal</span>
+                                </div>
+                                <div class="bid-stat">
+                                    <span class="bid-label">Your Total</span>
+                                    <span class="bid-value">$2,868.75</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="product-pricing">
+                        <div class="price-estimate">
+                            <span class="price-label">Approval Deadline</span>
+                            <span class="price-value deadline">47h 12m remaining</span>
+                        </div>
+                        <div class="price-savings">
+                            <span class="savings-badge large">You Save $956.25</span>
+                            <span class="retail-price">vs $51.00/gal retail</span>
+                        </div>
+                    </div>
+
+                    <div class="product-actions approval-actions">
+                        <button class="btn btn-outline" onclick="declineOrder(this)">Decline</button>
+                        <button class="btn btn-primary btn-lg" onclick="approveOrder(this)">Approve & Pay $2,868.75</button>
+                    </div>
+                </div>
+
+                <!-- Request New Product -->
+                <div class="product-pool-card request-card">
+                    <div class="request-content">
+                        <h3>Don't see what you need?</h3>
+                        <p>Request a product and we'll find suppliers and start a new pool.</p>
+                        <button class="btn btn-primary" onclick="requestProduct()">Request a Product</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Request Product Modal -->
+    <div class="modal-overlay" id="requestModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeRequestModal()">&times;</button>
+            <h2>Request a New Product</h2>
+            <p class="modal-subtitle">We'll find suppliers and notify you when we have enough farmers to start bidding.</p>
+
+            <form id="requestForm" onsubmit="submitRequest(event)">
+                <div class="form-group">
+                    <label>Product Name</label>
+                    <input type="text" placeholder="e.g., Warrant Herbicide" required>
+                </div>
+                <div class="form-group">
+                    <label>Quantity You Need</label>
+                    <div class="input-with-unit">
+                        <input type="number" placeholder="0" required>
+                        <select>
+                            <option>gallons</option>
+                            <option>cases</option>
+                            <option>bags</option>
+                            <option>tons</option>
+                            <option>units</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea placeholder="Any specific brand, formulation, or requirements..."></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary btn-lg btn-block">Submit Request</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <span class="chat-icon">💬</span>
+            <span class="chat-label">Help</span>
+        </button>
+        <div class="chatbot-window" id="chatbotWindow">
+            <div class="chatbot-header">
+                <h4>Acre Profit Help</h4>
+                <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
+            </div>
+            <div class="chatbot-messages" id="chatMessages">
+                <div class="chat-message bot">
+                    <p>Need help with crop inputs? I'm here!</p>
+                </div>
+                <div class="quick-questions">
+                    <button onclick="askQuestion('join-pool')">How do I join a pool?</button>
+                    <button onclick="askQuestion('threshold')">What's a threshold?</button>
+                    <button onclick="askQuestion('approval')">How does approval work?</button>
+                    <button onclick="askQuestion('contact')">Talk to a rep</button>
+                </div>
+            </div>
+            <div class="chatbot-input">
+                <input type="text" id="chatInput" placeholder="Type a question..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+                <p>&copy; 2026 AcreProfit.com. Farmers Helping Farmers.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = 'https://acreprofit-api.onrender.com';
+
+        // Check auth
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+        if (!token || !user) {
+            window.location.href = '/login.html';
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        });
+
+        // Filter tabs
+        document.querySelectorAll('.filter-tab').forEach(tab => {
+            tab.addEventListener('click', function() {
+                document.querySelectorAll('.filter-tab').forEach(t => t.classList.remove('active'));
+                this.classList.add('active');
+                const filter = this.dataset.filter;
+                filterProducts(filter);
+            });
+        });
+
+        function filterProducts(filter) {
+            const cards = document.querySelectorAll('.product-pool-card:not(.request-card)');
+            cards.forEach(card => {
+                if (filter === 'all' || card.dataset.status === filter) {
+                    card.style.display = 'block';
+                } else {
+                    card.style.display = 'none';
+                }
+            });
+        }
+
+        // Search
+        document.getElementById('searchInput').addEventListener('input', function() {
+            const query = this.value.toLowerCase();
+            document.querySelectorAll('.product-pool-card:not(.request-card)').forEach(card => {
+                const name = card.querySelector('h3').textContent.toLowerCase();
+                card.style.display = name.includes(query) ? 'block' : 'none';
+            });
+        });
+
+        // Pool actions
+        function joinPool(btn) {
+            const card = btn.closest('.product-pool-card');
+            const qty = card.querySelector('input[type="number"]').value;
+            if (!qty || qty <= 0) {
+                alert('Please enter a quantity to join the pool.');
+                return;
+            }
+            btn.textContent = 'Joining...';
+            btn.disabled = true;
+            setTimeout(() => {
+                alert(`You've joined the pool for ${qty} gallons! We'll notify you when bidding begins.`);
+                btn.textContent = 'Joined ✓';
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline');
+            }, 1000);
+        }
+
+        function viewBids(btn) {
+            alert('Bids:\n\n1. AgriChem Supply: $42.75/gal\n2. FarmCorp Direct: $43.50/gal\n3. Midwest Ag Supply: $44.25/gal\n\nWaiting for 2 more suppliers...');
+        }
+
+        function approveOrder(btn) {
+            if (confirm('Approve this order for $2,868.75?\n\nYour payment method on file will be charged.')) {
+                btn.textContent = 'Processing...';
+                btn.disabled = true;
+                setTimeout(() => {
+                    alert('Order approved! You\'ll receive a confirmation email with delivery details.');
+                    location.reload();
+                }, 1500);
+            }
+        }
+
+        function declineOrder(btn) {
+            if (confirm('Decline this order?\n\nYour spot in the pool will be released.')) {
+                alert('Order declined. Your spot has been released to other farmers.');
+                btn.closest('.product-pool-card').style.display = 'none';
+            }
+        }
+
+        // Request product
+        function requestProduct() {
+            document.getElementById('requestModal').classList.add('active');
+        }
+
+        function closeRequestModal() {
+            document.getElementById('requestModal').classList.remove('active');
+        }
+
+        function submitRequest(e) {
+            e.preventDefault();
+            alert('Request submitted! We\'ll find suppliers and notify you when we have enough interest to start a pool.');
+            closeRequestModal();
+        }
+
+        // Chatbot
+        const chatAnswers = {
+            'join-pool': "To join a pool:<br><br>1. Find the product you need<br>2. Enter your quantity<br>3. Click 'Join This Pool'<br><br>Your order joins other farmers. When we hit the threshold, suppliers start bidding!",
+            'threshold': "Each product has a minimum quantity (threshold) before suppliers will compete.<br><br>Higher volumes = better pricing power. Watch the progress bar to see how close we are!",
+            'approval': "When bidding closes:<br><br>1. We select the best bid<br>2. You get a notification<br>3. You have 48 hours to approve or decline<br>4. If approved, payment is processed<br>5. Product ships to your rep for pickup",
+            'contact': "Need help? Contact your rep!<br><br>• Kyle: (970) 571-1015<br>• Ty: (970) 520-2340<br>• Chad: (970) 520-3716"
+        };
+
+        function toggleChatbot() {
+            document.getElementById('chatbotWindow').classList.toggle('active');
+        }
+
+        function askQuestion(id) {
+            const messages = document.getElementById('chatMessages');
+            const text = event.target.textContent;
+            messages.innerHTML += `<div class="chat-message user"><p>${text}</p></div>`;
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${chatAnswers[id]}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 300);
+        }
+
+        function handleChatKeypress(e) { if (e.key === 'Enter') sendChatMessage(); }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const msg = input.value.trim();
+            if (!msg) return;
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="chat-message user"><p>${msg}</p></div>`;
+            input.value = '';
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>Try clicking one of the quick questions or contact your rep for help!</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 500);
+        }
+    </script>
+
+    <style>
+        .category-page {
+            padding: 100px 0 60px;
+            background: var(--secondary);
+            min-height: 100vh;
+        }
+
+        .category-header {
+            margin-bottom: 32px;
+        }
+
+        .back-link {
+            display: inline-block;
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+        }
+
+        .back-link:hover {
+            color: var(--primary);
+        }
+
+        .category-title {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .category-icon-lg {
+            font-size: 4rem;
+        }
+
+        .category-title h1 {
+            font-size: 2rem;
+            margin-bottom: 4px;
+        }
+
+        .category-title p {
+            color: var(--text-light);
+        }
+
+        /* Filter Bar */
+        .filter-bar {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 24px;
+            display: flex;
+            gap: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+            box-shadow: var(--shadow);
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 200px;
+        }
+
+        .search-input input {
+            width: 100%;
+            padding: 12px 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+        }
+
+        .filter-tabs {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .filter-tab {
+            padding: 8px 16px;
+            border: 1px solid var(--border);
+            background: var(--white);
+            border-radius: 20px;
+            font-size: 0.875rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-tab:hover {
+            border-color: var(--primary);
+        }
+
+        .filter-tab.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        /* Product Pool Cards */
+        .product-pool-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 20px;
+            box-shadow: var(--shadow);
+        }
+
+        .product-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 20px;
+        }
+
+        .product-info h3 {
+            font-size: 1.25rem;
+            margin-bottom: 4px;
+        }
+
+        .product-desc {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .product-status {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-pooling { background: #dbeafe; color: #1e40af; }
+        .status-almost { background: #fef3c7; color: #92400e; }
+        .status-bidding { background: #dcfce7; color: #166534; }
+        .status-ready { background: #f3e8ff; color: #7c3aed; }
+
+        /* Pool Progress */
+        .pool-progress-large {
+            margin-bottom: 20px;
+        }
+
+        .progress-info {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+            font-size: 0.875rem;
+        }
+
+        .progress-bar-large {
+            height: 12px;
+            background: var(--border);
+            border-radius: 6px;
+            overflow: hidden;
+            margin-bottom: 8px;
+        }
+
+        .progress-bar-large.almost {
+            background: #fef3c7;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: var(--primary);
+            border-radius: 6px;
+            transition: width 0.5s ease;
+        }
+
+        .progress-bar-large.almost .progress-fill {
+            background: #f59e0b;
+        }
+
+        .progress-meta {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .threshold-note {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .threshold-note.urgent {
+            color: #f59e0b;
+        }
+
+        /* Bidding Info */
+        .bidding-info, .winning-bid-info .bid-details {
+            display: flex;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .bid-stat {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .bid-label {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .bid-value {
+            font-size: 1.125rem;
+            font-weight: 700;
+        }
+
+        .countdown {
+            color: #f59e0b;
+        }
+
+        .winning-bid-info {
+            margin-bottom: 20px;
+        }
+
+        .winner-badge {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        .final-price {
+            color: var(--primary);
+        }
+
+        /* Product Pricing */
+        .product-pricing {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px 0;
+            border-top: 1px solid var(--border);
+            border-bottom: 1px solid var(--border);
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            gap: 16px;
+        }
+
+        .price-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .price-value {
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .price-value small {
+            font-size: 0.875rem;
+            font-weight: 400;
+            color: var(--text-muted);
+        }
+
+        .best-bid {
+            color: var(--primary);
+        }
+
+        .deadline {
+            color: #f59e0b;
+        }
+
+        .price-savings {
+            text-align: right;
+        }
+
+        .savings-badge {
+            display: inline-block;
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .savings-badge.large {
+            font-size: 1rem;
+            padding: 8px 16px;
+        }
+
+        .retail-price {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        /* Product Actions */
+        .product-actions {
+            display: flex;
+            gap: 16px;
+            align-items: flex-end;
+        }
+
+        .quantity-input {
+            flex: 1;
+        }
+
+        .quantity-input label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .quantity-input input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+        }
+
+        .quantity-input input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .bidding-actions, .approval-actions {
+            flex-direction: column;
+            align-items: stretch;
+        }
+
+        .bidding-note {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-bottom: 12px;
+        }
+
+        .approval-actions {
+            display: flex;
+            flex-direction: row;
+            gap: 12px;
+        }
+
+        .approval-actions .btn-outline {
+            flex: 1;
+        }
+
+        .approval-actions .btn-primary {
+            flex: 2;
+        }
+
+        /* Request Card */
+        .request-card {
+            background: var(--primary);
+            color: var(--white);
+            text-align: center;
+            padding: 48px;
+        }
+
+        .request-content h3 {
+            margin-bottom: 8px;
+        }
+
+        .request-content p {
+            opacity: 0.9;
+            margin-bottom: 20px;
+        }
+
+        .request-card .btn-primary {
+            background: var(--white);
+            color: var(--primary);
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px; right: 16px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-subtitle {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-group label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+        }
+
+        .form-group input, .form-group select, .form-group textarea {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .form-group textarea {
+            min-height: 80px;
+            resize: vertical;
+        }
+
+        .input-with-unit {
+            display: flex;
+            gap: 8px;
+        }
+
+        .input-with-unit input {
+            flex: 2;
+        }
+
+        .input-with-unit select {
+            flex: 1;
+        }
+
+        /* Chatbot */
+        .chatbot-widget { position: fixed; bottom: 24px; right: 24px; z-index: 150; }
+        .chatbot-toggle { background: var(--primary); color: var(--white); border: none; border-radius: 50px; padding: 12px 20px; display: flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .chat-icon { font-size: 1.25rem; }
+        .chat-label { font-weight: 600; }
+        .chatbot-window { display: none; position: absolute; bottom: 60px; right: 0; width: 350px; max-height: 450px; background: var(--white); border-radius: var(--radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.2); overflow: hidden; }
+        .chatbot-window.active { display: flex; flex-direction: column; }
+        .chatbot-header { background: var(--primary); color: var(--white); padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .chatbot-header h4 { margin: 0; }
+        .chatbot-close { background: none; border: none; color: var(--white); font-size: 1.5rem; cursor: pointer; }
+        .chatbot-messages { flex: 1; padding: 16px; overflow-y: auto; max-height: 300px; }
+        .chat-message { margin-bottom: 12px; }
+        .chat-message p { padding: 12px 16px; border-radius: 16px; font-size: 0.875rem; line-height: 1.5; }
+        .chat-message.bot p { background: var(--secondary); border-bottom-left-radius: 4px; }
+        .chat-message.user p { background: var(--primary); color: var(--white); border-bottom-right-radius: 4px; margin-left: auto; max-width: 80%; }
+        .quick-questions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .quick-questions button { background: var(--white); border: 1px solid var(--border); border-radius: 20px; padding: 8px 12px; font-size: 0.75rem; cursor: pointer; }
+        .quick-questions button:hover { border-color: var(--primary); color: var(--primary); }
+        .chatbot-input { display: flex; padding: 12px; border-top: 1px solid var(--border); }
+        .chatbot-input input { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem; }
+        .chatbot-input button { background: var(--primary); color: var(--white); border: none; padding: 10px 16px; border-radius: var(--radius); margin-left: 8px; cursor: pointer; }
+
+        @media (max-width: 768px) {
+            .category-title { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .category-icon-lg { font-size: 3rem; }
+            .filter-bar { flex-direction: column; }
+            .product-actions { flex-direction: column; }
+            .approval-actions { flex-direction: column; }
+            .bidding-info { flex-direction: column; gap: 16px; }
+            .chatbot-window { width: calc(100vw - 48px); }
+        }
+    </style>
+</body>
+</html>

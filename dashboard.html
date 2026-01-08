@@ -3,8 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Acre Profit Dashboard - Manage your orders">
+    <meta name="description" content="Acre Profit - Your Buying Group Dashboard">
     <title>Dashboard - Acre Profit</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2D5A27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,106 +28,211 @@
             </a>
             <ul class="nav-links">
                 <li><a href="/dashboard.html" class="active">Dashboard</a></li>
-                <li><a href="/calculator.html">New Order</a></li>
+                <li><a href="/my-orders.html">My Orders</a></li>
                 <li><a href="/merch.html">Merch</a></li>
-                <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a></li>
             </ul>
         </div>
     </nav>
 
-    <main class="dashboard-page">
+    <main class="dashboard-main">
         <div class="container">
+            <!-- Welcome Header -->
             <div class="dashboard-header">
-                <div class="welcome-section">
-                    <h1>Welcome, <span id="userName">Farmer</span></h1>
-                    <p id="farmInfo">Loading farm info...</p>
+                <div class="welcome-text">
+                    <h1>Welcome back, <span id="userName">Farmer</span></h1>
+                    <p>What are you buying today? Pool your orders with other farmers to unlock bulk pricing.</p>
                 </div>
-                <a href="/calculator.html" class="btn btn-primary btn-lg">
-                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-                    Create New Order
+                <div class="merch-credit-badge">
+                    <span class="credit-icon">🎁</span>
+                    <div class="credit-info">
+                        <span class="credit-label">Merch Credit</span>
+                        <span class="credit-amount" id="merchCredit">$0.00</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Category Grid -->
+            <div class="category-grid">
+                <a href="/crop-inputs.html" class="category-card">
+                    <div class="category-icon">🌱</div>
+                    <h2>Crop Inputs</h2>
+                    <p>Herbicides, fungicides, insecticides, seed treatments, adjuvants</p>
+                    <div class="category-stats">
+                        <span class="stat"><strong id="cropInputsOrders">12</strong> active orders</span>
+                        <span class="stat-highlight">3 near threshold</span>
+                    </div>
+                </a>
+
+                <a href="/fertilizer.html" class="category-card">
+                    <div class="category-icon">🧪</div>
+                    <h2>Fertilizer</h2>
+                    <p>Nitrogen, phosphorus, potassium, micronutrients, liquid & dry</p>
+                    <div class="category-stats">
+                        <span class="stat"><strong>8</strong> active orders</span>
+                        <span class="stat-highlight">2 near threshold</span>
+                    </div>
+                </a>
+
+                <a href="/fuel.html" class="category-card">
+                    <div class="category-icon">⛽</div>
+                    <h2>Fuel</h2>
+                    <p>Diesel, gasoline, propane, DEF, bulk tank delivery</p>
+                    <div class="category-stats">
+                        <span class="stat"><strong>5</strong> active orders</span>
+                        <span class="stat-highlight">1 near threshold</span>
+                    </div>
+                </a>
+
+                <a href="/equipment.html" class="category-card">
+                    <div class="category-icon">🚜</div>
+                    <h2>Equipment</h2>
+                    <p>Parts, tires, filters, lubricants, tools, GPS/precision ag</p>
+                    <div class="category-stats">
+                        <span class="stat"><strong>15</strong> active orders</span>
+                        <span class="stat-highlight">5 near threshold</span>
+                    </div>
+                </a>
+
+                <a href="/farm-products.html" class="category-card">
+                    <div class="category-icon">🏪</div>
+                    <h2>Farm Products</h2>
+                    <p>Fencing, irrigation supplies, storage, safety equipment</p>
+                    <div class="category-stats">
+                        <span class="stat"><strong>7</strong> active orders</span>
+                        <span class="stat-highlight">2 near threshold</span>
+                    </div>
+                </a>
+
+                <a href="/request-product.html" class="category-card category-card-cta">
+                    <div class="category-icon">➕</div>
+                    <h2>Request a Product</h2>
+                    <p>Don't see what you need? Request it and we'll find suppliers.</p>
+                    <div class="category-stats">
+                        <span class="stat-cta">Start a new group buy →</span>
+                    </div>
                 </a>
             </div>
 
-            <div class="dashboard-grid">
-                <!-- Stats Cards -->
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalAcres">0</span>
-                            <span class="stat-label">Total Acres</span>
-                        </div>
+            <!-- How It Works (Quick Reminder) -->
+            <div class="how-it-works-reminder">
+                <h3>How Acre Profit Works</h3>
+                <div class="steps-mini">
+                    <div class="step-mini">
+                        <span class="step-num">1</span>
+                        <p><strong>Add Your Need</strong><br>Enter the quantity you need for any product</p>
                     </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalOrders">0</span>
-                            <span class="stat-label">Orders Placed</span>
-                        </div>
+                    <div class="step-mini">
+                        <span class="step-num">2</span>
+                        <p><strong>Pool Together</strong><br>Your order joins other farmers to build volume</p>
                     </div>
-
-                    <div class="stat-card">
-                        <div class="stat-icon">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalSavings">$0</span>
-                            <span class="stat-label">Est. Savings</span>
-                        </div>
+                    <div class="step-mini">
+                        <span class="step-num">3</span>
+                        <p><strong>Suppliers Bid</strong><br>When we hit threshold, suppliers compete for our business</p>
+                    </div>
+                    <div class="step-mini">
+                        <span class="step-num">4</span>
+                        <p><strong>You Approve</strong><br>Review the price and confirm your order</p>
                     </div>
                 </div>
+            </div>
 
-                <!-- Recent Orders -->
-                <div class="orders-section">
-                    <div class="section-title">
-                        <h2>Your Orders</h2>
-                    </div>
-
-                    <div id="ordersContainer" class="orders-list">
-                        <div class="empty-state">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                            <h3>No Orders Yet</h3>
-                            <p>Create your first order to start saving with bulk pricing.</p>
-                            <a href="/calculator.html" class="btn btn-primary">Create Order</a>
-                        </div>
-                    </div>
+            <!-- Active Orders Preview -->
+            <div class="orders-preview">
+                <div class="section-header">
+                    <h3>Your Active Pool Orders</h3>
+                    <a href="/my-orders.html" class="view-all">View All →</a>
                 </div>
-
-                <!-- Representative Info -->
-                <div class="rep-section">
-                    <div class="section-title">
-                        <h2>Your Representative</h2>
+                <div class="orders-list" id="activeOrdersList">
+                    <div class="order-preview-card">
+                        <div class="order-product">
+                            <span class="product-category">Crop Inputs</span>
+                            <h4>Roundup PowerMax 3</h4>
+                        </div>
+                        <div class="order-details">
+                            <span class="your-qty">Your qty: <strong>50 gal</strong></span>
+                            <span class="pool-progress">
+                                <span class="progress-bar" style="--progress: 72%"></span>
+                                <span class="progress-text">72% to threshold</span>
+                            </span>
+                        </div>
+                        <div class="order-status status-pooling">Pooling</div>
                     </div>
-                    <div class="rep-info-card" id="repInfo">
-                        <p>Loading representative info...</p>
+
+                    <div class="order-preview-card">
+                        <div class="order-product">
+                            <span class="product-category">Fuel</span>
+                            <h4>Off-Road Diesel</h4>
+                        </div>
+                        <div class="order-details">
+                            <span class="your-qty">Your qty: <strong>1,000 gal</strong></span>
+                            <span class="pool-progress">
+                                <span class="progress-bar" style="--progress: 95%"></span>
+                                <span class="progress-text">95% to threshold</span>
+                            </span>
+                        </div>
+                        <div class="order-status status-almost">Almost There!</div>
+                    </div>
+
+                    <div class="order-preview-card">
+                        <div class="order-product">
+                            <span class="product-category">Fertilizer</span>
+                            <h4>Anhydrous Ammonia</h4>
+                        </div>
+                        <div class="order-details">
+                            <span class="your-qty">Your qty: <strong>20 tons</strong></span>
+                            <span class="pool-progress">
+                                <span class="progress-bar" style="--progress: 100%"></span>
+                                <span class="progress-text">Bidding in progress</span>
+                            </span>
+                        </div>
+                        <div class="order-status status-bidding">Awaiting Bids</div>
                     </div>
                 </div>
             </div>
         </div>
     </main>
 
+    <!-- Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <span class="chat-icon">💬</span>
+            <span class="chat-label">Help</span>
+        </button>
+        <div class="chatbot-window" id="chatbotWindow">
+            <div class="chatbot-header">
+                <h4>Acre Profit Help</h4>
+                <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
+            </div>
+            <div class="chatbot-messages" id="chatMessages">
+                <div class="chat-message bot">
+                    <p>Hi! How can I help you today?</p>
+                </div>
+                <div class="quick-questions">
+                    <button onclick="askQuestion('how-pooling')">How does pooling work?</button>
+                    <button onclick="askQuestion('threshold')">What's a threshold?</button>
+                    <button onclick="askQuestion('bidding')">How do suppliers bid?</button>
+                    <button onclick="askQuestion('approval')">When do I approve?</button>
+                    <button onclick="askQuestion('contact')">Talk to a rep</button>
+                </div>
+            </div>
+            <div class="chatbot-input">
+                <input type="text" id="chatInput" placeholder="Type a question..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
     <footer class="footer">
         <div class="container">
             <div class="footer-bottom" style="border-top: none; padding-top: 0;">
-                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
+                <p>&copy; 2026 AcreProfit.com. Farmers Helping Farmers.</p>
             </div>
         </div>
     </footer>
 
     <script>
         const API_URL = 'https://acreprofit-api.onrender.com';
-
-        // Representatives data
-        const representatives = {
-            kyle: { name: 'Kyle McConnell', phone: '(970) 571-1015', email: 'Kyle@togoag.com' },
-            ty: { name: 'Ty Mollohan', phone: '(970) 520-2340', email: 'Tymollohan77@gmail.com' },
-            chad: { name: 'Chad Bamford', phone: '(970) 520-3716', email: 'Ckbamford@yahoo.com' }
-        };
 
         // Check auth
         const token = localStorage.getItem('token');
@@ -130,34 +244,14 @@
 
         const userData = JSON.parse(user);
 
-        // Redirect admins to admin page
+        // Redirect admins
         if (userData.role === 'superadmin' || userData.role === 'admin') {
             window.location.href = '/admin.html';
         }
 
         // Populate user info
         document.getElementById('userName').textContent = userData.name.split(' ')[0];
-
-        if (userData.farm) {
-            document.getElementById('farmInfo').textContent =
-                `${userData.farm.name || 'Your Farm'} • ${userData.farm.acres} acres • ${userData.farm.state}`;
-            document.getElementById('totalAcres').textContent = userData.farm.acres.toLocaleString();
-        }
-
-        // Show representative info
-        if (userData.representativeId && representatives[userData.representativeId]) {
-            const rep = representatives[userData.representativeId];
-            document.getElementById('repInfo').innerHTML = `
-                <div class="rep-card-info">
-                    <div class="rep-avatar">${rep.name.split(' ').map(n => n[0]).join('')}</div>
-                    <div class="rep-details">
-                        <h3>${rep.name}</h3>
-                        <a href="tel:${rep.phone.replace(/\D/g, '')}">${rep.phone}</a>
-                        <a href="mailto:${rep.email}">${rep.email}</a>
-                    </div>
-                </div>
-            `;
-        }
+        document.getElementById('merchCredit').textContent = `$${(userData.merchCredit || 0).toFixed(2)}`;
 
         // Logout handler
         document.getElementById('logoutBtn').addEventListener('click', function(e) {
@@ -167,52 +261,57 @@
             window.location.href = '/';
         });
 
-        // Load orders
-        async function loadOrders() {
-            try {
-                const response = await fetch(`${API_URL}/api/orders/my-orders`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
+        // Chatbot
+        const chatAnswers = {
+            'how-pooling': "When you add a product to your order, it joins a pool with other farmers who need the same thing.<br><br>As more farmers join, we build volume. More volume = better pricing power when we negotiate with suppliers.",
+            'threshold': "Each product has a threshold - the minimum quantity needed to trigger supplier bidding.<br><br>For example, we might need 10,000 gallons of herbicide before suppliers will compete for our business. Once we hit that number, the bidding begins!",
+            'bidding': "When a pool reaches its threshold, we automatically notify our approved suppliers.<br><br>They have a set time to submit their best price. You'll see all bids and can compare before approving your portion of the order.",
+            'approval': "After suppliers bid, you'll get a notification with the winning price.<br><br>You then have 48 hours to approve or decline your portion. If you approve, your payment is processed and the order ships.",
+            'contact': "Your representatives are here to help!<br><br>• Kyle McConnell: (970) 571-1015<br>• Ty Mollohan: (970) 520-2340<br>• Chad Bamford: (970) 520-3716<br><br>Call, text, or email anytime!"
+        };
 
-                if (!response.ok) {
-                    throw new Error('Failed to load orders');
-                }
-
-                const orders = await response.json();
-
-                document.getElementById('totalOrders').textContent = orders.length;
-
-                if (orders.length > 0) {
-                    const ordersHtml = orders.map(order => `
-                        <div class="order-card">
-                            <div class="order-header">
-                                <span class="order-date">${new Date(order.createdAt).toLocaleDateString()}</span>
-                                <span class="order-status status-${order.status}">${order.status}</span>
-                            </div>
-                            <div class="order-details">
-                                <p><strong>Crop:</strong> ${order.crop}</p>
-                                <p><strong>Program:</strong> ${order.program}</p>
-                                <p><strong>Acres:</strong> ${order.acres}</p>
-                            </div>
-                            <div class="order-footer">
-                                <span class="order-total">Total: $${order.totalCost?.toLocaleString() || '0'}</span>
-                                <a href="/spray-sheet.html?id=${order._id}" class="btn btn-sm btn-outline">View Spray Sheet</a>
-                            </div>
-                        </div>
-                    `).join('');
-
-                    document.getElementById('ordersContainer').innerHTML = ordersHtml;
-                }
-            } catch (error) {
-                console.error('Error loading orders:', error);
-            }
+        function toggleChatbot() {
+            document.getElementById('chatbotWindow').classList.toggle('active');
         }
 
-        loadOrders();
+        function askQuestion(questionId) {
+            const messages = document.getElementById('chatMessages');
+            const answer = chatAnswers[questionId];
+            const questionText = event.target.textContent;
+            messages.innerHTML += `<div class="chat-message user"><p>${questionText}</p></div>`;
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${answer}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 300);
+        }
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') sendChatMessage();
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="chat-message user"><p>${message}</p></div>`;
+            input.value = '';
+            let response = "I'm not sure about that. Try one of the quick questions or contact your representative!";
+            const lowerMsg = message.toLowerCase();
+            if (lowerMsg.includes('pool')) response = chatAnswers['how-pooling'];
+            else if (lowerMsg.includes('threshold') || lowerMsg.includes('minimum')) response = chatAnswers['threshold'];
+            else if (lowerMsg.includes('bid') || lowerMsg.includes('supplier')) response = chatAnswers['bidding'];
+            else if (lowerMsg.includes('approve') || lowerMsg.includes('confirm')) response = chatAnswers['approval'];
+            else if (lowerMsg.includes('contact') || lowerMsg.includes('call') || lowerMsg.includes('rep')) response = chatAnswers['contact'];
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${response}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 500);
+        }
     </script>
 
     <style>
-        .dashboard-page {
+        .dashboard-main {
             padding: 100px 0 60px;
             background: var(--secondary);
             min-height: 100vh;
@@ -227,237 +326,327 @@
             gap: 20px;
         }
 
-        .welcome-section h1 {
+        .welcome-text h1 {
             font-size: 2rem;
             margin-bottom: 8px;
         }
 
-        .welcome-section p {
+        .welcome-text p {
             color: var(--text-light);
+            font-size: 1.125rem;
         }
 
-        .dashboard-header .btn {
+        .merch-credit-badge {
             display: flex;
             align-items: center;
-            gap: 8px;
-        }
-
-        .stats-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 20px;
-            margin-bottom: 40px;
-        }
-
-        .stat-card {
-            background: var(--white);
+            gap: 12px;
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            padding: 16px 24px;
             border-radius: var(--radius-lg);
-            padding: 24px;
-            display: flex;
-            align-items: center;
-            gap: 16px;
             box-shadow: var(--shadow);
         }
 
-        .stat-icon {
-            width: 56px;
-            height: 56px;
-            background: rgba(45, 90, 39, 0.1);
-            border-radius: var(--radius);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--primary);
+        .merch-credit-badge .credit-icon {
+            font-size: 2rem;
         }
 
-        .stat-content {
-            display: flex;
-            flex-direction: column;
+        .merch-credit-badge .credit-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
         }
 
-        .stat-value {
-            font-size: 1.75rem;
+        .merch-credit-badge .credit-amount {
+            font-size: 1.5rem;
             font-weight: 700;
-            color: var(--text);
+            color: #92400e;
         }
 
-        .stat-label {
+        /* Category Grid */
+        .category-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            margin-bottom: 48px;
+        }
+
+        .category-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            box-shadow: var(--shadow);
+            transition: all 0.3s ease;
+            border: 2px solid transparent;
+            text-decoration: none;
+            color: inherit;
+        }
+
+        .category-card:hover {
+            transform: translateY(-4px);
+            box-shadow: var(--shadow-lg);
+            border-color: var(--primary);
+        }
+
+        .category-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .category-card h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .category-card p {
+            color: var(--text-light);
+            font-size: 0.9375rem;
+            margin-bottom: 16px;
+        }
+
+        .category-stats {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .category-stats .stat {
             font-size: 0.875rem;
             color: var(--text-muted);
         }
 
-        .section-title {
-            margin-bottom: 20px;
-        }
-
-        .section-title h2 {
-            font-size: 1.25rem;
-        }
-
-        .orders-section {
-            margin-bottom: 40px;
-        }
-
-        .orders-list {
-            background: var(--white);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow);
-            overflow: hidden;
-        }
-
-        .empty-state {
-            text-align: center;
-            padding: 60px 20px;
-            color: var(--text-light);
-        }
-
-        .empty-state svg {
-            margin-bottom: 20px;
-            opacity: 0.5;
-        }
-
-        .empty-state h3 {
-            margin-bottom: 8px;
+        .category-stats .stat strong {
             color: var(--text);
         }
 
-        .empty-state p {
-            margin-bottom: 20px;
-        }
-
-        .order-card {
-            padding: 20px 24px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .order-card:last-child {
-            border-bottom: none;
-        }
-
-        .order-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 12px;
-        }
-
-        .order-date {
+        .stat-highlight {
+            font-size: 0.75rem;
+            background: #dcfce7;
+            color: #166534;
+            padding: 4px 10px;
+            border-radius: 20px;
             font-weight: 600;
         }
 
+        .category-card-cta {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        .category-card-cta p {
+            color: rgba(255,255,255,0.8);
+        }
+
+        .category-card-cta .category-stats {
+            border-top-color: rgba(255,255,255,0.2);
+        }
+
+        .stat-cta {
+            color: rgba(255,255,255,0.9);
+            font-weight: 600;
+        }
+
+        /* How It Works Reminder */
+        .how-it-works-reminder {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            margin-bottom: 48px;
+            box-shadow: var(--shadow);
+        }
+
+        .how-it-works-reminder h3 {
+            text-align: center;
+            margin-bottom: 24px;
+            font-size: 1.25rem;
+        }
+
+        .steps-mini {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 24px;
+        }
+
+        .step-mini {
+            text-align: center;
+        }
+
+        .step-num {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: var(--white);
+            border-radius: 50%;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+
+        .step-mini p {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .step-mini strong {
+            color: var(--text);
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        /* Orders Preview */
+        .orders-preview {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            box-shadow: var(--shadow);
+        }
+
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 24px;
+        }
+
+        .section-header h3 {
+            font-size: 1.25rem;
+        }
+
+        .view-all {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .order-preview-card {
+            display: flex;
+            align-items: center;
+            gap: 24px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+        }
+
+        .order-preview-card:last-child {
+            margin-bottom: 0;
+        }
+
+        .order-product {
+            flex: 1;
+        }
+
+        .product-category {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .order-product h4 {
+            font-size: 1rem;
+            margin-top: 4px;
+        }
+
+        .order-details {
+            flex: 2;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .your-qty {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .pool-progress {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .progress-bar {
+            flex: 1;
+            height: 8px;
+            background: var(--border);
+            border-radius: 4px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .progress-bar::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            height: 100%;
+            width: var(--progress);
+            background: var(--primary);
+            border-radius: 4px;
+        }
+
+        .progress-text {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
         .order-status {
-            padding: 4px 12px;
+            padding: 6px 12px;
             border-radius: 20px;
             font-size: 0.75rem;
             font-weight: 600;
             text-transform: uppercase;
+            white-space: nowrap;
         }
 
-        .status-pending {
-            background: #fef3c7;
-            color: #92400e;
-        }
-
-        .status-confirmed {
-            background: #d1fae5;
-            color: #065f46;
-        }
-
-        .status-shipped {
+        .status-pooling {
             background: #dbeafe;
             color: #1e40af;
         }
 
-        .status-delivered {
+        .status-almost {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-bidding {
             background: #dcfce7;
             color: #166534;
         }
 
-        .order-details {
-            display: flex;
-            gap: 24px;
-            color: var(--text-light);
-            font-size: 0.875rem;
-            margin-bottom: 12px;
-        }
-
-        .order-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .order-total {
-            font-size: 1.125rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .btn-sm {
-            padding: 8px 16px;
-            font-size: 0.875rem;
-        }
-
-        .rep-section {
-            margin-bottom: 40px;
-        }
-
-        .rep-info-card {
-            background: var(--white);
-            border-radius: var(--radius-lg);
-            padding: 24px;
-            box-shadow: var(--shadow);
-        }
-
-        .rep-card-info {
-            display: flex;
-            align-items: center;
-            gap: 20px;
-        }
-
-        .rep-avatar {
-            width: 64px;
-            height: 64px;
-            background: var(--primary);
-            color: var(--white);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 1.25rem;
-            font-weight: 700;
-        }
-
-        .rep-details h3 {
-            margin-bottom: 8px;
-        }
-
-        .rep-details a {
-            display: block;
-            color: var(--text-light);
-            font-size: 0.875rem;
-        }
-
-        .rep-details a:hover {
-            color: var(--primary);
-        }
+        /* Chatbot (copied from index) */
+        .chatbot-widget { position: fixed; bottom: 24px; right: 24px; z-index: 150; }
+        .chatbot-toggle { background: var(--primary); color: var(--white); border: none; border-radius: 50px; padding: 12px 20px; display: flex; align-items: center; gap: 8px; cursor: pointer; box-shadow: 0 4px 12px rgba(0,0,0,0.2); }
+        .chat-icon { font-size: 1.25rem; }
+        .chat-label { font-weight: 600; }
+        .chatbot-window { display: none; position: absolute; bottom: 60px; right: 0; width: 350px; max-height: 450px; background: var(--white); border-radius: var(--radius-lg); box-shadow: 0 4px 20px rgba(0,0,0,0.2); overflow: hidden; }
+        .chatbot-window.active { display: flex; flex-direction: column; }
+        .chatbot-header { background: var(--primary); color: var(--white); padding: 16px; display: flex; justify-content: space-between; align-items: center; }
+        .chatbot-header h4 { margin: 0; }
+        .chatbot-close { background: none; border: none; color: var(--white); font-size: 1.5rem; cursor: pointer; }
+        .chatbot-messages { flex: 1; padding: 16px; overflow-y: auto; max-height: 300px; }
+        .chat-message { margin-bottom: 12px; }
+        .chat-message p { padding: 12px 16px; border-radius: 16px; font-size: 0.875rem; line-height: 1.5; }
+        .chat-message.bot p { background: var(--secondary); border-bottom-left-radius: 4px; }
+        .chat-message.user p { background: var(--primary); color: var(--white); border-bottom-right-radius: 4px; margin-left: auto; max-width: 80%; }
+        .quick-questions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+        .quick-questions button { background: var(--white); border: 1px solid var(--border); border-radius: 20px; padding: 8px 12px; font-size: 0.75rem; cursor: pointer; }
+        .quick-questions button:hover { border-color: var(--primary); color: var(--primary); }
+        .chatbot-input { display: flex; padding: 12px; border-top: 1px solid var(--border); }
+        .chatbot-input input { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem; }
+        .chatbot-input button { background: var(--primary); color: var(--white); border: none; padding: 10px 16px; border-radius: var(--radius); margin-left: 8px; cursor: pointer; }
 
         @media (max-width: 768px) {
-            .dashboard-header {
-                flex-direction: column;
-                align-items: flex-start;
-            }
-
-            .order-details {
-                flex-direction: column;
-                gap: 4px;
-            }
-
-            .order-footer {
-                flex-direction: column;
-                align-items: flex-start;
-                gap: 12px;
-            }
+            .dashboard-header { flex-direction: column; align-items: flex-start; }
+            .order-preview-card { flex-direction: column; align-items: flex-start; gap: 12px; }
+            .order-details { width: 100%; }
+            .chatbot-window { width: calc(100vw - 48px); }
         }
     </style>
 </body>
