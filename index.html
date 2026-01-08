@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Acre Profit - Farmers helping farmers. Join our bulk buying co-op for farm chemistry and products.">
     <title>Acre Profit - Farmers Helping Farmers</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2D5A27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -22,7 +31,8 @@
                 <li><a href="#how-it-works">How It Works</a></li>
                 <li><a href="#products">Products</a></li>
                 <li><a href="#about">About Us</a></li>
-                <li><a href="#contact">Contact</a></li>
+                <li><a href="/login.html" class="btn btn-outline btn-sm">Sign In</a></li>
+                <li><a href="/signup.html" class="btn btn-primary btn-sm">Sign Up</a></li>
             </ul>
             <button class="mobile-menu-btn" aria-label="Menu">
                 <span></span>
@@ -41,19 +51,18 @@
                 <p class="hero-subtitle">We're farmers just like you. By pooling our orders, we fill trucks and get bulk pricing on the chemistry and products we all need. Join us and keep more profit in your pocket.</p>
             </div>
 
-            <!-- Main CTA Card -->
-            <div class="acre-card" id="acre-card">
-                <a href="/enter-acres" class="acre-card-link">
-                    <div class="acre-card-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                        </svg>
-                    </div>
-                    <h2>Enter Your Acres</h2>
-                    <p>Tell us your acreage and see what products are available for the next bulk order.</p>
-                    <span class="acre-card-btn">Get Started →</span>
-                </a>
+            <!-- Auth CTA Cards -->
+            <div class="auth-cards">
+                <div class="auth-card">
+                    <h2>New to Acre Profit?</h2>
+                    <p>Join our farmer co-op and start saving on bulk orders.</p>
+                    <a href="/signup.html" class="btn btn-primary btn-lg">Create Account →</a>
+                </div>
+                <div class="auth-card auth-card-alt">
+                    <h2>Already a Member?</h2>
+                    <p>Sign in to view your orders and enter your acres.</p>
+                    <a href="/login.html" class="btn btn-white btn-lg">Sign In →</a>
+                </div>
             </div>
         </div>
     </header>
@@ -153,7 +162,7 @@
             </div>
 
             <div class="products-cta">
-                <a href="/enter-acres" class="btn btn-primary btn-lg">See Current Orders →</a>
+                <a href="/signup.html" class="btn btn-primary btn-lg">Join the Co-op →</a>
             </div>
         </div>
     </section>
@@ -240,7 +249,7 @@
             <div class="cta-content">
                 <h2>Ready to Save on Your Next Order?</h2>
                 <p>Join the co-op and start buying smarter.</p>
-                <a href="/enter-acres" class="btn btn-white btn-lg">Enter Your Acres →</a>
+                <a href="/signup.html" class="btn btn-white btn-lg">Get Started Free →</a>
             </div>
         </div>
     </section>
@@ -281,8 +290,8 @@
                 <div class="footer-links">
                     <h4>Get Started</h4>
                     <ul>
-                        <li><a href="/enter-acres">Enter Acres</a></li>
-                        <li><a href="/login.html">Login</a></li>
+                        <li><a href="/signup.html">Create Account</a></li>
+                        <li><a href="/login.html">Sign In</a></li>
                         <li><a href="/apply-rep.html">Become a Rep</a></li>
                     </ul>
                 </div>
@@ -293,6 +302,286 @@
         </div>
     </footer>
 
+    <!-- Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <span class="chat-icon">💬</span>
+            <span class="chat-label">Questions?</span>
+        </button>
+        <div class="chatbot-window" id="chatbotWindow">
+            <div class="chatbot-header">
+                <h4>Acre Profit Help</h4>
+                <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
+            </div>
+            <div class="chatbot-messages" id="chatMessages">
+                <div class="chat-message bot">
+                    <p>Hi! I can answer questions about Acre Profit. What would you like to know?</p>
+                </div>
+                <div class="quick-questions">
+                    <button onclick="askQuestion('how-it-works')">How does bulk buying work?</button>
+                    <button onclick="askQuestion('pricing')">How is pricing determined?</button>
+                    <button onclick="askQuestion('delivery')">When will I get my order?</button>
+                    <button onclick="askQuestion('merch-credit')">How do merch credits work?</button>
+                    <button onclick="askQuestion('payment')">What payment methods?</button>
+                    <button onclick="askQuestion('contact')">Talk to a representative</button>
+                </div>
+            </div>
+            <div class="chatbot-input">
+                <input type="text" id="chatInput" placeholder="Type a question..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        /* Chatbot Widget Styles */
+        .chatbot-widget {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 150;
+        }
+
+        .chatbot-toggle {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        .chatbot-toggle:hover {
+            transform: scale(1.05);
+        }
+
+        .chat-icon {
+            font-size: 1.25rem;
+        }
+
+        .chat-label {
+            font-weight: 600;
+        }
+
+        .chatbot-window {
+            display: none;
+            position: absolute;
+            bottom: 60px;
+            right: 0;
+            width: 350px;
+            max-height: 450px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .chatbot-window.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chatbot-header {
+            background: var(--primary);
+            color: var(--white);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chatbot-header h4 {
+            margin: 0;
+        }
+
+        .chatbot-close {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+
+        .chat-message {
+            margin-bottom: 12px;
+        }
+
+        .chat-message p {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .chat-message.bot p {
+            background: var(--secondary);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.user p {
+            background: var(--primary);
+            color: var(--white);
+            border-bottom-right-radius: 4px;
+            margin-left: auto;
+            max-width: 80%;
+        }
+
+        .quick-questions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .quick-questions button {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-questions button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .chatbot-input {
+            display: flex;
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .chatbot-input input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+        }
+
+        .chatbot-input button {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 10px 16px;
+            border-radius: var(--radius);
+            margin-left: 8px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .chatbot-window {
+                width: calc(100vw - 48px);
+                right: 0;
+            }
+        }
+    </style>
+
     <script src="app.js"></script>
+    <script>
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
+
+        // Check if user is already logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            // Update nav for logged-in users
+            const navLinks = document.querySelector('.nav-links');
+            navLinks.innerHTML = `
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="#products">Products</a></li>
+                <li><a href="/order.html" class="btn btn-primary btn-sm">My Orders</a></li>
+            `;
+        }
+
+        // Chatbot functions
+        const chatAnswers = {
+            'how-it-works': "Here's how bulk buying works:<br><br>1. Create an account and enter your acres for each crop<br>2. We calculate the products you need<br>3. Your order joins other farmers' orders<br>4. When we fill a truck, everyone gets bulk pricing<br>5. Products are delivered to your representative for pickup<br><br>The more farmers that join, the better the pricing!",
+            'pricing': "Our pricing is based on bulk truck loads. When we combine enough orders to fill a truck, everyone gets the same per-unit price that big operations pay.<br><br>Typically this saves 15-30% compared to retail prices. The exact price depends on current market rates and order volume.",
+            'delivery': "Delivery timing depends on when we fill a truck load for your products. Typically:<br><br>• Spring products: Order by Feb 1, delivery by March<br>• Fall products: Order by Aug 1, delivery by September<br><br>Your representative will contact you with exact delivery dates once the truck is ordered.",
+            'merch-credit': "For every $2,000 you spend on products, you earn $50 in merch credit!<br><br>You can:<br>• Use it immediately in our merch store<br>• Bank it for later (it never expires)<br><br>Merch includes quality farm workwear: jackets, hats, shirts, and more.",
+            'payment': "We accept:<br><br>• ACH bank transfer (lowest fees - 0.8% capped at $5)<br>• Credit/debit card (2.9% + $0.30)<br>• Check (mail to your representative)<br><br>Payment is due when the truck order is confirmed. Your representative will send an invoice.",
+            'contact': "Your representatives are here to help!<br><br>• Kyle McConnell: (970) 571-1015, Kyle@togoag.com<br>• Ty Mollohan: (970) 520-2340, Tymollohan77@gmail.com<br>• Chad Bamford: (970) 520-3716, Ckbamford@yahoo.com<br><br>Call, text, or email anytime!"
+        };
+
+        function toggleChatbot() {
+            document.getElementById('chatbotWindow').classList.toggle('active');
+        }
+
+        function askQuestion(questionId) {
+            const messages = document.getElementById('chatMessages');
+            const answer = chatAnswers[questionId];
+
+            // Add user question
+            const questionText = event.target.textContent;
+            messages.innerHTML += `<div class="chat-message user"><p>${questionText}</p></div>`;
+
+            // Add bot answer
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${answer}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 300);
+        }
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="chat-message user"><p>${message}</p></div>`;
+            input.value = '';
+
+            // Simple keyword matching
+            let response = "I'm not sure about that. Try clicking one of the common questions above, or contact your representative for help!";
+
+            const lowerMsg = message.toLowerCase();
+            if (lowerMsg.includes('price') || lowerMsg.includes('cost') || lowerMsg.includes('how much')) {
+                response = chatAnswers['pricing'];
+            } else if (lowerMsg.includes('deliver') || lowerMsg.includes('ship') || lowerMsg.includes('when')) {
+                response = chatAnswers['delivery'];
+            } else if (lowerMsg.includes('pay') || lowerMsg.includes('credit card') || lowerMsg.includes('check')) {
+                response = chatAnswers['payment'];
+            } else if (lowerMsg.includes('merch') || lowerMsg.includes('credit') || lowerMsg.includes('reward')) {
+                response = chatAnswers['merch-credit'];
+            } else if (lowerMsg.includes('work') || lowerMsg.includes('how')) {
+                response = chatAnswers['how-it-works'];
+            } else if (lowerMsg.includes('contact') || lowerMsg.includes('call') || lowerMsg.includes('phone') || lowerMsg.includes('rep')) {
+                response = chatAnswers['contact'];
+            }
+
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${response}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 500);
+        }
+    </script>
 </body>
 </html>

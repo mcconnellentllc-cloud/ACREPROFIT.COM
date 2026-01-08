@@ -1,0 +1,1178 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit - Enter your acres and calculate your order">
+    <title>Create Order - Acre Profit</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2D5A27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <ul class="nav-links">
+                <li><a href="/order.html" class="active">My Order</a></li>
+                <li><a href="/merch.html">Merch Store</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="order-page">
+        <div class="container">
+            <!-- Year Selection -->
+            <div class="year-selection" id="yearSection">
+                <h1>Select Growing Season</h1>
+                <p>Choose the year you're ordering products for</p>
+                <div class="year-buttons">
+                    <button class="year-btn" data-year="2025">2025</button>
+                    <button class="year-btn active" data-year="2026">2026</button>
+                    <button class="year-btn" data-year="2027">2027</button>
+                </div>
+            </div>
+
+            <!-- Crop Entry Sections -->
+            <div class="crops-container" id="cropsContainer">
+                <h2>Enter Your Acres by Crop</h2>
+                <p class="crops-subtitle">Tell us how many acres of each crop you're planting. We'll calculate the products you need.</p>
+
+                <!-- Irrigated Corn -->
+                <div class="crop-section" data-crop="irrigated-corn">
+                    <div class="crop-header" onclick="toggleCrop('irrigated-corn')">
+                        <div class="crop-title">
+                            <span class="crop-icon">🌽</span>
+                            <h3>Irrigated Corn</h3>
+                        </div>
+                        <div class="crop-summary">
+                            <span class="acre-display" id="irrigated-corn-acres">0 acres</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="crop-body" id="irrigated-corn-body">
+                        <div class="acre-input-group">
+                            <label>How many acres of irrigated corn?</label>
+                            <div class="acre-input-wrapper">
+                                <input type="number" class="acre-input" data-crop="irrigated-corn" placeholder="0" min="0">
+                                <span class="acre-suffix">acres</span>
+                            </div>
+                        </div>
+                        <div class="product-recommendations" id="irrigated-corn-products">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Dryland Corn -->
+                <div class="crop-section" data-crop="dryland-corn">
+                    <div class="crop-header" onclick="toggleCrop('dryland-corn')">
+                        <div class="crop-title">
+                            <span class="crop-icon">🌾</span>
+                            <h3>Dryland Corn</h3>
+                        </div>
+                        <div class="crop-summary">
+                            <span class="acre-display" id="dryland-corn-acres">0 acres</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="crop-body" id="dryland-corn-body">
+                        <div class="acre-input-group">
+                            <label>How many acres of dryland corn?</label>
+                            <div class="acre-input-wrapper">
+                                <input type="number" class="acre-input" data-crop="dryland-corn" placeholder="0" min="0">
+                                <span class="acre-suffix">acres</span>
+                            </div>
+                        </div>
+                        <div class="product-recommendations" id="dryland-corn-products">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Milo (Grain Sorghum) -->
+                <div class="crop-section" data-crop="milo">
+                    <div class="crop-header" onclick="toggleCrop('milo')">
+                        <div class="crop-title">
+                            <span class="crop-icon">🌿</span>
+                            <h3>Milo (Grain Sorghum)</h3>
+                        </div>
+                        <div class="crop-summary">
+                            <span class="acre-display" id="milo-acres">0 acres</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="crop-body" id="milo-body">
+                        <div class="acre-input-group">
+                            <label>How many acres of milo?</label>
+                            <div class="acre-input-wrapper">
+                                <input type="number" class="acre-input" data-crop="milo" placeholder="0" min="0">
+                                <span class="acre-suffix">acres</span>
+                            </div>
+                        </div>
+                        <div class="product-recommendations" id="milo-products">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Millet -->
+                <div class="crop-section" data-crop="millet">
+                    <div class="crop-header" onclick="toggleCrop('millet')">
+                        <div class="crop-title">
+                            <span class="crop-icon">🌱</span>
+                            <h3>Millet</h3>
+                        </div>
+                        <div class="crop-summary">
+                            <span class="acre-display" id="millet-acres">0 acres</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="crop-body" id="millet-body">
+                        <div class="acre-input-group">
+                            <label>How many acres of millet?</label>
+                            <div class="acre-input-wrapper">
+                                <input type="number" class="acre-input" data-crop="millet" placeholder="0" min="0">
+                                <span class="acre-suffix">acres</span>
+                            </div>
+                        </div>
+                        <div class="product-recommendations" id="millet-products">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Summer Fallow -->
+                <div class="crop-section" data-crop="summer-fallow">
+                    <div class="crop-header" onclick="toggleCrop('summer-fallow')">
+                        <div class="crop-title">
+                            <span class="crop-icon">🏜️</span>
+                            <h3>Summer Fallow</h3>
+                        </div>
+                        <div class="crop-summary">
+                            <span class="acre-display" id="summer-fallow-acres">0 acres</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="crop-body" id="summer-fallow-body">
+                        <div class="acre-input-group">
+                            <label>How many acres of summer fallow?</label>
+                            <div class="acre-input-wrapper">
+                                <input type="number" class="acre-input" data-crop="summer-fallow" placeholder="0" min="0">
+                                <span class="acre-suffix">acres</span>
+                            </div>
+                        </div>
+                        <div class="product-recommendations" id="summer-fallow-products">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Wheat -->
+                <div class="crop-section" data-crop="wheat">
+                    <div class="crop-header" onclick="toggleCrop('wheat')">
+                        <div class="crop-title">
+                            <span class="crop-icon">🌾</span>
+                            <h3>Wheat</h3>
+                        </div>
+                        <div class="crop-summary">
+                            <span class="acre-display" id="wheat-acres">0 acres</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="crop-body" id="wheat-body">
+                        <div class="acre-input-group">
+                            <label>How many acres of wheat?</label>
+                            <div class="acre-input-wrapper">
+                                <input type="number" class="acre-input" data-crop="wheat" placeholder="0" min="0">
+                                <span class="acre-suffix">acres</span>
+                            </div>
+                        </div>
+                        <div class="product-recommendations" id="wheat-products">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Order Summary (Sticky at bottom) -->
+            <div class="order-summary" id="orderSummary">
+                <div class="summary-content">
+                    <div class="summary-row">
+                        <span class="summary-label">Total Acres:</span>
+                        <span class="summary-value" id="totalAcresDisplay">0</span>
+                    </div>
+                    <div class="summary-row">
+                        <span class="summary-label">Products Needed:</span>
+                        <span class="summary-value" id="totalProductsDisplay">0 items</span>
+                    </div>
+                    <div class="summary-row total-row">
+                        <span class="summary-label">Order Total:</span>
+                        <span class="summary-value" id="totalCostDisplay">$0.00</span>
+                    </div>
+                    <div class="merch-credit-display">
+                        <div class="credit-info">
+                            <span class="credit-icon">🎁</span>
+                            <div class="credit-text">
+                                <span class="credit-label">Your Merch Credit</span>
+                                <span class="credit-amount" id="merchCreditDisplay">$0.00</span>
+                            </div>
+                        </div>
+                        <p class="credit-note">Earn $50 for every $2,000 spent!</p>
+                    </div>
+                    <div class="summary-actions">
+                        <button class="btn btn-outline" onclick="openMerchModal()">Use Merch Credit</button>
+                        <button class="btn btn-primary" onclick="submitOrder()">Submit Order</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Merch Credit Modal -->
+    <div class="modal-overlay" id="merchModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeMerchModal()">&times;</button>
+            <h2>Use Your Merch Credit</h2>
+            <p class="modal-subtitle">Available credit: <strong id="modalCreditAmount">$0.00</strong></p>
+
+            <div class="merch-options">
+                <div class="merch-option" onclick="selectMerchOption('bank')">
+                    <span class="option-icon">🏦</span>
+                    <h3>Bank It</h3>
+                    <p>Save your credit for later. It never expires!</p>
+                </div>
+                <div class="merch-option" onclick="selectMerchOption('shop')">
+                    <span class="option-icon">🛍️</span>
+                    <h3>Shop Now</h3>
+                    <p>Browse our merch store and pick out some gear.</p>
+                </div>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn btn-outline" onclick="closeMerchModal()">Cancel</button>
+                <button class="btn btn-primary" id="merchActionBtn" onclick="confirmMerchChoice()">Confirm</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <span class="chat-icon">💬</span>
+            <span class="chat-label">Help</span>
+        </button>
+        <div class="chatbot-window" id="chatbotWindow">
+            <div class="chatbot-header">
+                <h4>Acre Profit Help</h4>
+                <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
+            </div>
+            <div class="chatbot-messages" id="chatMessages">
+                <div class="chat-message bot">
+                    <p>Hi! I'm here to help. What would you like to know?</p>
+                </div>
+                <div class="quick-questions">
+                    <button onclick="askQuestion('how-it-works')">How does bulk buying work?</button>
+                    <button onclick="askQuestion('pricing')">How is pricing determined?</button>
+                    <button onclick="askQuestion('delivery')">When will I get my order?</button>
+                    <button onclick="askQuestion('merch-credit')">How do merch credits work?</button>
+                    <button onclick="askQuestion('payment')">What payment methods?</button>
+                    <button onclick="askQuestion('contact')">Talk to a representative</button>
+                </div>
+            </div>
+            <div class="chatbot-input">
+                <input type="text" id="chatInput" placeholder="Type a question..." onkeypress="handleChatKeypress(event)">
+                <button onclick="sendChatMessage()">Send</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = 'https://acreprofit-api.onrender.com';
+
+        // Check auth
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+
+        if (!token || !user) {
+            window.location.href = '/login.html';
+        }
+
+        const userData = JSON.parse(user);
+        let selectedYear = 2026;
+        let selectedMerchOption = null;
+        let orderData = {
+            crops: {},
+            products: [],
+            totalAcres: 0,
+            totalCost: 0,
+            merchCredit: 0,
+            bankedCredit: parseFloat(userData.merchCredit || 0)
+        };
+
+        // Product recommendations per crop (with rates per acre)
+        const cropProducts = {
+            'irrigated-corn': [
+                { name: 'Roundup PowerMax 3', rate: 32, unit: 'oz', pricePerUnit: 0.18, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Atrazine 4L', rate: 1.5, unit: 'qt', pricePerUnit: 3.50, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Dual II Magnum', rate: 1.5, unit: 'pt', pricePerUnit: 12.50, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Pivot Bio PROVEN40', rate: 1, unit: 'unit', pricePerUnit: 14.00, packageSize: 1, packageUnit: 'unit' }
+            ],
+            'dryland-corn': [
+                { name: 'Roundup PowerMax 3', rate: 32, unit: 'oz', pricePerUnit: 0.18, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Atrazine 4L', rate: 1, unit: 'qt', pricePerUnit: 3.50, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Bicep II Magnum', rate: 1.6, unit: 'qt', pricePerUnit: 9.00, packageSize: 2.5, packageUnit: 'gal' }
+            ],
+            'milo': [
+                { name: 'Roundup PowerMax 3', rate: 32, unit: 'oz', pricePerUnit: 0.18, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Atrazine 4L', rate: 1, unit: 'qt', pricePerUnit: 3.50, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Dual II Magnum', rate: 1, unit: 'pt', pricePerUnit: 12.50, packageSize: 2.5, packageUnit: 'gal' }
+            ],
+            'millet': [
+                { name: 'Roundup PowerMax 3', rate: 22, unit: 'oz', pricePerUnit: 0.18, packageSize: 2.5, packageUnit: 'gal' },
+                { name: '2,4-D Amine', rate: 1, unit: 'pt', pricePerUnit: 2.50, packageSize: 2.5, packageUnit: 'gal' }
+            ],
+            'summer-fallow': [
+                { name: 'Roundup PowerMax 3', rate: 22, unit: 'oz', pricePerUnit: 0.18, packageSize: 2.5, packageUnit: 'gal' },
+                { name: '2,4-D Amine', rate: 1, unit: 'pt', pricePerUnit: 2.50, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Sharpen', rate: 1, unit: 'oz', pricePerUnit: 5.00, packageSize: 1, packageUnit: 'gal' }
+            ],
+            'wheat': [
+                { name: 'Roundup PowerMax 3', rate: 22, unit: 'oz', pricePerUnit: 0.18, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Huskie Complete', rate: 13.5, unit: 'oz', pricePerUnit: 0.65, packageSize: 2.5, packageUnit: 'gal' },
+                { name: 'Prosaro', rate: 6.5, unit: 'oz', pricePerUnit: 2.20, packageSize: 2.5, packageUnit: 'gal' }
+            ]
+        };
+
+        // Year selection
+        document.querySelectorAll('.year-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.year-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                selectedYear = parseInt(this.dataset.year);
+            });
+        });
+
+        // Toggle crop section
+        function toggleCrop(cropId) {
+            const body = document.getElementById(`${cropId}-body`);
+            const section = body.closest('.crop-section');
+            section.classList.toggle('expanded');
+        }
+
+        // Handle acre input changes
+        document.querySelectorAll('.acre-input').forEach(input => {
+            input.addEventListener('input', function() {
+                const crop = this.dataset.crop;
+                const acres = parseInt(this.value) || 0;
+
+                // Update display
+                document.getElementById(`${crop}-acres`).textContent = `${acres.toLocaleString()} acres`;
+
+                // Store and calculate
+                orderData.crops[crop] = acres;
+                calculateProducts(crop, acres);
+                updateTotals();
+            });
+        });
+
+        // Calculate products needed for a crop
+        function calculateProducts(cropId, acres) {
+            const products = cropProducts[cropId] || [];
+            const container = document.getElementById(`${cropId}-products`);
+
+            if (acres === 0) {
+                container.innerHTML = '<p class="no-products">Enter acres to see recommended products</p>';
+                return;
+            }
+
+            let html = '<div class="product-list">';
+            html += '<h4>Recommended Products</h4>';
+
+            products.forEach(product => {
+                const totalNeeded = product.rate * acres;
+                const packagesNeeded = Math.ceil(totalNeeded / (product.packageSize * (product.unit === 'oz' ? 128 : product.unit === 'pt' ? 16 : product.unit === 'qt' ? 4 : 1)));
+                const cost = totalNeeded * product.pricePerUnit;
+
+                html += `
+                    <div class="product-row">
+                        <div class="product-info">
+                            <span class="product-name">${product.name}</span>
+                            <span class="product-rate">${product.rate} ${product.unit}/acre</span>
+                        </div>
+                        <div class="product-quantity">
+                            <span class="quantity-needed">${packagesNeeded} × ${product.packageSize} ${product.packageUnit}</span>
+                            <span class="quantity-cost">$${cost.toFixed(2)}</span>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += '</div>';
+            container.innerHTML = html;
+        }
+
+        // Update order totals
+        function updateTotals() {
+            let totalAcres = 0;
+            let totalCost = 0;
+            let productCount = 0;
+
+            Object.entries(orderData.crops).forEach(([cropId, acres]) => {
+                totalAcres += acres;
+
+                const products = cropProducts[cropId] || [];
+                products.forEach(product => {
+                    if (acres > 0) {
+                        productCount++;
+                        totalCost += product.rate * acres * product.pricePerUnit;
+                    }
+                });
+            });
+
+            orderData.totalAcres = totalAcres;
+            orderData.totalCost = totalCost;
+
+            // Calculate merch credit earned ($50 per $2000)
+            const newCredit = Math.floor(totalCost / 2000) * 50;
+            orderData.merchCredit = newCredit + orderData.bankedCredit;
+
+            // Update displays
+            document.getElementById('totalAcresDisplay').textContent = totalAcres.toLocaleString();
+            document.getElementById('totalProductsDisplay').textContent = `${productCount} items`;
+            document.getElementById('totalCostDisplay').textContent = `$${totalCost.toFixed(2)}`;
+            document.getElementById('merchCreditDisplay').textContent = `$${orderData.merchCredit.toFixed(2)}`;
+            document.getElementById('modalCreditAmount').textContent = `$${orderData.merchCredit.toFixed(2)}`;
+        }
+
+        // Merch modal functions
+        function openMerchModal() {
+            document.getElementById('merchModal').classList.add('active');
+        }
+
+        function closeMerchModal() {
+            document.getElementById('merchModal').classList.remove('active');
+        }
+
+        function selectMerchOption(option) {
+            selectedMerchOption = option;
+            document.querySelectorAll('.merch-option').forEach(el => el.classList.remove('selected'));
+            event.currentTarget.classList.add('selected');
+        }
+
+        function confirmMerchChoice() {
+            if (selectedMerchOption === 'shop') {
+                window.location.href = '/merch.html';
+            } else if (selectedMerchOption === 'bank') {
+                alert('Credit banked! It will be available for your next order.');
+                closeMerchModal();
+            }
+        }
+
+        // Submit order
+        async function submitOrder() {
+            if (orderData.totalAcres === 0) {
+                alert('Please enter acres for at least one crop.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        year: selectedYear,
+                        crops: orderData.crops,
+                        totalAcres: orderData.totalAcres,
+                        totalCost: orderData.totalCost,
+                        merchCredit: orderData.merchCredit
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Order submitted successfully! Your representative will contact you soon.');
+                    window.location.href = '/dashboard.html';
+                } else {
+                    throw new Error('Failed to submit order');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                alert('Order saved locally. Please contact your representative to confirm.');
+            }
+        }
+
+        // Chatbot functions
+        const chatAnswers = {
+            'how-it-works': "Here's how bulk buying works:\n\n1. Enter your acres for each crop\n2. We calculate the products you need\n3. Your order joins other farmers' orders\n4. When we fill a truck, everyone gets bulk pricing\n5. Products are delivered to your representative for pickup\n\nThe more farmers that join, the better the pricing!",
+            'pricing': "Our pricing is based on bulk truck loads. When we combine enough orders to fill a truck, everyone gets the same per-unit price that big operations pay.\n\nTypically this saves 15-30% compared to retail prices. The exact price depends on current market rates and order volume.",
+            'delivery': "Delivery timing depends on when we fill a truck load for your products. Typically:\n\n• Spring products: Order by Feb 1, delivery by March\n• Fall products: Order by Aug 1, delivery by September\n\nYour representative will contact you with exact delivery dates once the truck is ordered.",
+            'merch-credit': "For every $2,000 you spend on products, you earn $50 in merch credit!\n\nYou can:\n• Use it immediately in our merch store\n• Bank it for later (it never expires)\n\nMerch includes quality farm workwear: jackets, hats, shirts, and more.",
+            'payment': "We accept:\n\n• ACH bank transfer (lowest fees - 0.8% capped at $5)\n• Credit/debit card (2.9% + $0.30)\n• Check (mail to your representative)\n\nPayment is due when the truck order is confirmed. Your representative will send an invoice.",
+            'contact': "Your representatives are here to help!\n\n• Kyle McConnell: (970) 571-1015, Kyle@togoag.com\n• Ty Mollohan: (970) 520-2340, Tymollohan77@gmail.com\n• Chad Bamford: (970) 520-3716, Ckbamford@yahoo.com\n\nCall, text, or email anytime!"
+        };
+
+        function toggleChatbot() {
+            const window = document.getElementById('chatbotWindow');
+            window.classList.toggle('active');
+        }
+
+        function askQuestion(questionId) {
+            const messages = document.getElementById('chatMessages');
+            const answer = chatAnswers[questionId];
+
+            // Add user question
+            const questionText = event.target.textContent;
+            messages.innerHTML += `<div class="chat-message user"><p>${questionText}</p></div>`;
+
+            // Add bot answer
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${answer.replace(/\n/g, '<br>')}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 300);
+        }
+
+        function handleChatKeypress(event) {
+            if (event.key === 'Enter') {
+                sendChatMessage();
+            }
+        }
+
+        function sendChatMessage() {
+            const input = document.getElementById('chatInput');
+            const message = input.value.trim();
+            if (!message) return;
+
+            const messages = document.getElementById('chatMessages');
+            messages.innerHTML += `<div class="chat-message user"><p>${message}</p></div>`;
+            input.value = '';
+
+            // Simple keyword matching
+            let response = "I'm not sure about that. Try clicking one of the common questions above, or contact your representative for help!";
+
+            const lowerMsg = message.toLowerCase();
+            if (lowerMsg.includes('price') || lowerMsg.includes('cost') || lowerMsg.includes('how much')) {
+                response = chatAnswers['pricing'];
+            } else if (lowerMsg.includes('deliver') || lowerMsg.includes('ship') || lowerMsg.includes('when')) {
+                response = chatAnswers['delivery'];
+            } else if (lowerMsg.includes('pay') || lowerMsg.includes('credit card') || lowerMsg.includes('check')) {
+                response = chatAnswers['payment'];
+            } else if (lowerMsg.includes('merch') || lowerMsg.includes('credit') || lowerMsg.includes('reward')) {
+                response = chatAnswers['merch-credit'];
+            } else if (lowerMsg.includes('work') || lowerMsg.includes('how')) {
+                response = chatAnswers['how-it-works'];
+            } else if (lowerMsg.includes('contact') || lowerMsg.includes('call') || lowerMsg.includes('phone') || lowerMsg.includes('rep')) {
+                response = chatAnswers['contact'];
+            }
+
+            setTimeout(() => {
+                messages.innerHTML += `<div class="chat-message bot"><p>${response.replace(/\n/g, '<br>')}</p></div>`;
+                messages.scrollTop = messages.scrollHeight;
+            }, 500);
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        });
+
+        // Initialize
+        updateTotals();
+    </script>
+
+    <style>
+        .order-page {
+            padding: 100px 0 200px;
+            background: var(--secondary);
+            min-height: 100vh;
+        }
+
+        /* Year Selection */
+        .year-selection {
+            text-align: center;
+            margin-bottom: 40px;
+        }
+
+        .year-selection h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .year-selection p {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .year-buttons {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+        }
+
+        .year-btn {
+            padding: 12px 32px;
+            font-size: 1.125rem;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            background: var(--white);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .year-btn:hover {
+            border-color: var(--primary);
+        }
+
+        .year-btn.active {
+            background: var(--primary);
+            color: var(--white);
+            border-color: var(--primary);
+        }
+
+        /* Crops Container */
+        .crops-container {
+            margin-bottom: 40px;
+        }
+
+        .crops-container > h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .crops-subtitle {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        /* Crop Section */
+        .crop-section {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            margin-bottom: 16px;
+            box-shadow: var(--shadow);
+            overflow: hidden;
+        }
+
+        .crop-header {
+            padding: 20px 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .crop-header:hover {
+            background: var(--secondary);
+        }
+
+        .crop-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .crop-icon {
+            font-size: 1.5rem;
+        }
+
+        .crop-title h3 {
+            font-size: 1.125rem;
+            margin: 0;
+        }
+
+        .crop-summary {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .acre-display {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .chevron {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            transition: transform 0.2s;
+        }
+
+        .crop-section.expanded .chevron {
+            transform: rotate(180deg);
+        }
+
+        .crop-body {
+            display: none;
+            padding: 0 24px 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .crop-section.expanded .crop-body {
+            display: block;
+        }
+
+        .acre-input-group {
+            padding-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .acre-input-group label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .acre-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .acre-input {
+            width: 150px;
+            padding: 12px 16px;
+            font-size: 1.25rem;
+            font-weight: 600;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .acre-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .acre-suffix {
+            color: var(--text-muted);
+            font-size: 1rem;
+        }
+
+        /* Product Recommendations */
+        .product-recommendations {
+            background: var(--secondary);
+            border-radius: var(--radius);
+            padding: 16px;
+        }
+
+        .product-list h4 {
+            font-size: 0.875rem;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .product-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .product-row:last-child {
+            border-bottom: none;
+        }
+
+        .product-name {
+            font-weight: 600;
+            display: block;
+        }
+
+        .product-rate {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .product-quantity {
+            text-align: right;
+        }
+
+        .quantity-needed {
+            display: block;
+            font-weight: 500;
+        }
+
+        .quantity-cost {
+            font-size: 0.875rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .no-products {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 20px;
+        }
+
+        /* Order Summary */
+        .order-summary {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border-top: 1px solid var(--border);
+            box-shadow: 0 -4px 20px rgba(0,0,0,0.1);
+            z-index: 100;
+        }
+
+        .summary-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+            display: flex;
+            align-items: center;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .summary-row {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .summary-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .summary-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+        }
+
+        .total-row .summary-value {
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .merch-credit-display {
+            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            padding: 12px 20px;
+            border-radius: var(--radius);
+            flex: 1;
+        }
+
+        .credit-info {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .credit-icon {
+            font-size: 1.5rem;
+        }
+
+        .credit-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .credit-amount {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: #92400e;
+        }
+
+        .credit-note {
+            font-size: 0.75rem;
+            color: #92400e;
+            margin-top: 4px;
+        }
+
+        .summary-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        /* Modal */
+        .modal-overlay {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0,0,0,0.5);
+            z-index: 200;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .modal-overlay.active {
+            display: flex;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            max-width: 500px;
+            width: 90%;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--text-muted);
+        }
+
+        .modal-content h2 {
+            margin-bottom: 8px;
+        }
+
+        .modal-subtitle {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .merch-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .merch-option {
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .merch-option:hover {
+            border-color: var(--primary);
+        }
+
+        .merch-option.selected {
+            border-color: var(--primary);
+            background: rgba(45, 90, 39, 0.05);
+        }
+
+        .option-icon {
+            font-size: 2rem;
+            display: block;
+            margin-bottom: 8px;
+        }
+
+        .merch-option h3 {
+            font-size: 1rem;
+            margin-bottom: 4px;
+        }
+
+        .merch-option p {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .modal-actions {
+            display: flex;
+            gap: 12px;
+            justify-content: flex-end;
+        }
+
+        /* Chatbot */
+        .chatbot-widget {
+            position: fixed;
+            bottom: 200px;
+            right: 24px;
+            z-index: 150;
+        }
+
+        .chatbot-toggle {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+
+        .chatbot-toggle:hover {
+            transform: scale(1.05);
+        }
+
+        .chat-icon {
+            font-size: 1.25rem;
+        }
+
+        .chat-label {
+            font-weight: 600;
+        }
+
+        .chatbot-window {
+            display: none;
+            position: absolute;
+            bottom: 60px;
+            right: 0;
+            width: 350px;
+            max-height: 450px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+
+        .chatbot-window.active {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .chatbot-header {
+            background: var(--primary);
+            color: var(--white);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .chatbot-header h4 {
+            margin: 0;
+        }
+
+        .chatbot-close {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        .chatbot-messages {
+            flex: 1;
+            padding: 16px;
+            overflow-y: auto;
+            max-height: 300px;
+        }
+
+        .chat-message {
+            margin-bottom: 12px;
+        }
+
+        .chat-message p {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+
+        .chat-message.bot p {
+            background: var(--secondary);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-message.user p {
+            background: var(--primary);
+            color: var(--white);
+            border-bottom-right-radius: 4px;
+            margin-left: auto;
+            max-width: 80%;
+        }
+
+        .quick-questions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+
+        .quick-questions button {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .quick-questions button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        .chatbot-input {
+            display: flex;
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .chatbot-input input {
+            flex: 1;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+        }
+
+        .chatbot-input button {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            padding: 10px 16px;
+            border-radius: var(--radius);
+            margin-left: 8px;
+            cursor: pointer;
+        }
+
+        @media (max-width: 768px) {
+            .summary-content {
+                flex-direction: column;
+                align-items: stretch;
+                gap: 16px;
+            }
+
+            .summary-row {
+                flex-direction: row;
+                justify-content: space-between;
+            }
+
+            .summary-actions {
+                flex-direction: column;
+            }
+
+            .chatbot-window {
+                width: calc(100vw - 48px);
+                right: -12px;
+            }
+
+            .merch-options {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</body>
+</html>
