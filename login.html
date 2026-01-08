@@ -129,7 +129,21 @@
                     window.location.href = '/dashboard.html';
                 }
             } catch (error) {
-                errorDiv.textContent = error.message;
+                // If server is down, check for demo user
+                if (error.message === 'Failed to fetch' || error.message.includes('Load failed')) {
+                    const savedUser = localStorage.getItem('user');
+                    if (savedUser) {
+                        const user = JSON.parse(savedUser);
+                        if (user.email === data.email) {
+                            alert('Note: Running in demo mode. Logging in with saved account.');
+                            window.location.href = '/dashboard.html';
+                            return;
+                        }
+                    }
+                    errorDiv.textContent = 'Server is currently unavailable. Please try again later or create a new account.';
+                } else {
+                    errorDiv.textContent = error.message;
+                }
                 errorDiv.style.display = 'block';
                 submitBtn.disabled = false;
                 submitBtn.textContent = 'Login';

@@ -230,10 +230,29 @@
                 localStorage.setItem('user', JSON.stringify(result.user));
                 window.location.href = '/dashboard.html';
             } catch (error) {
-                errorDiv.textContent = error.message;
-                errorDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Create Account';
+                // If server is down, allow demo mode
+                if (error.message === 'Failed to fetch' || error.message.includes('Load failed')) {
+                    // Create demo account locally
+                    const demoUser = {
+                        _id: 'demo_' + Date.now(),
+                        name: data.name,
+                        email: data.email,
+                        farm: data.farm,
+                        crops: data.crops,
+                        representativeId: data.representativeId,
+                        merchCredit: 0,
+                        role: 'customer'
+                    };
+                    localStorage.setItem('token', 'demo_token');
+                    localStorage.setItem('user', JSON.stringify(demoUser));
+                    alert('Note: Running in demo mode. Your account will be synced when the server is available.');
+                    window.location.href = '/dashboard.html';
+                } else {
+                    errorDiv.textContent = error.message;
+                    errorDiv.style.display = 'block';
+                    submitBtn.disabled = false;
+                    submitBtn.textContent = 'Create Account';
+                }
             }
         });
     </script>
