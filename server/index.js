@@ -272,6 +272,13 @@ async function initializeAdmins() {
             password: 'Farm2026!',
             phone: '970-520-3716',
             role: 'admin'
+        },
+        {
+            name: 'Seth Rolfs',
+            email: 'seth@acreprofit.com',
+            password: 'Farm2026!',
+            phone: '785-531-0680',
+            role: 'admin'
         }
     ];
 
@@ -1339,7 +1346,8 @@ app.get('/api/representatives/:repId/payment-info', async (req, res) => {
         const repEmails = {
             kyle: 'kyle@togoag.com',
             ty: 'tymollohan77@gmail.com',
-            chad: 'ckbamford@yahoo.com'
+            chad: 'ckbamford@yahoo.com',
+            seth: 'seth@acreprofit.com'
         };
 
         const rep = await User.findOne({ email: repEmails[repId] });
