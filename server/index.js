@@ -271,6 +271,56 @@ const pivotBioProducts = [
     }
 ];
 
+// Additional Products (standalone items)
+const additionalProducts = {
+    hydrovant: {
+        id: 'hydrovant',
+        name: 'Hydrovant',
+        description: 'Water conditioning agent',
+        unit: 'gal',
+        pricing: [
+            { minQty: 1, maxQty: 9, pricePerUnit: 165 },
+            { minQty: 10, maxQty: 60, pricePerUnit: 135 },
+            { minQty: 61, maxQty: 180, pricePerUnit: 125 }
+        ]
+    },
+    multiseal: {
+        id: 'multiseal',
+        name: 'Multi Seal',
+        description: 'Sealant product',
+        unit: 'bucket',
+        pricePerUnit: 300
+    },
+    pump: {
+        id: 'pump',
+        name: 'Pump',
+        description: 'Transfer pump',
+        unit: 'each',
+        pricePerUnit: 130
+    }
+};
+
+// Helper function to calculate Hydrovant price
+function calculateHydrovantPrice(quantity) {
+    const pricing = additionalProducts.hydrovant.pricing;
+    for (const tier of pricing) {
+        if (quantity >= tier.minQty && quantity <= tier.maxQty) {
+            return {
+                pricePerUnit: tier.pricePerUnit,
+                totalPrice: quantity * tier.pricePerUnit,
+                tier: `${tier.minQty}-${tier.maxQty} gal`
+            };
+        }
+    }
+    // Default to highest tier for quantities over 180
+    const lastTier = pricing[pricing.length - 1];
+    return {
+        pricePerUnit: lastTier.pricePerUnit,
+        totalPrice: quantity * lastTier.pricePerUnit,
+        tier: `${lastTier.minQty}+ gal`
+    };
+}
+
 // ============ AUTH MIDDLEWARE ============
 
 const authMiddleware = async (req, res, next) => {
@@ -512,6 +562,52 @@ app.post('/api/seeds/calculate', authMiddleware, (req, res) => {
 
 app.get('/api/pivot-bio', (req, res) => {
     res.json(pivotBioProducts);
+});
+
+// ---- ADDITIONAL PRODUCTS ROUTES ----
+
+app.get('/api/products', (req, res) => {
+    res.json(additionalProducts);
+});
+
+app.post('/api/products/hydrovant/calculate', (req, res) => {
+    const { quantity } = req.body;
+    if (!quantity || quantity < 1) {
+        return res.status(400).json({ error: 'Quantity must be at least 1' });
+    }
+    const result = calculateHydrovantPrice(quantity);
+    res.json({
+        product: 'Hydrovant',
+        quantity,
+        ...result
+    });
+});
+
+app.post('/api/products/calculate', (req, res) => {
+    const { productId, quantity } = req.body;
+    const product = additionalProducts[productId];
+
+    if (!product) {
+        return res.status(404).json({ error: 'Product not found' });
+    }
+
+    if (productId === 'hydrovant') {
+        const result = calculateHydrovantPrice(quantity);
+        return res.json({
+            product: product.name,
+            quantity,
+            unit: product.unit,
+            ...result
+        });
+    }
+
+    res.json({
+        product: product.name,
+        quantity,
+        unit: product.unit,
+        pricePerUnit: product.pricePerUnit,
+        totalPrice: quantity * product.pricePerUnit
+    });
 });
 
 // ---- ORDER/CALCULATION ROUTES ----
