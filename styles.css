@@ -936,10 +936,79 @@ h4 {
     color: var(--text-muted);
 }
 
+/* ===== Team Section ===== */
+.team-section {
+    padding: 100px 0;
+    background: var(--secondary);
+}
+
+.team-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 30px;
+    max-width: 900px;
+    margin: 0 auto;
+}
+
+.team-card {
+    background: var(--white);
+    padding: 32px;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow);
+    text-align: center;
+    transition: var(--transition);
+}
+
+.team-card:hover {
+    transform: translateY(-5px);
+    box-shadow: var(--shadow-lg);
+}
+
+.team-avatar {
+    width: 80px;
+    height: 80px;
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-light) 100%);
+    color: var(--white);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin: 0 auto 20px;
+}
+
+.team-card h3 {
+    font-size: 1.25rem;
+    margin-bottom: 4px;
+}
+
+.team-role {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+    margin-bottom: 16px;
+}
+
+.team-contact {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.team-contact a {
+    color: var(--primary);
+    font-size: 0.875rem;
+    font-weight: 500;
+}
+
+.team-contact a:hover {
+    text-decoration: underline;
+}
+
 /* ===== Contact Section ===== */
 .contact-section {
     padding: 80px 0;
-    background: var(--secondary);
+    background: var(--white);
 }
 
 .contact-content {
@@ -994,6 +1063,11 @@ h4 {
 
     .acre-card-link {
         padding: 32px 24px;
+    }
+
+    .team-grid {
+        grid-template-columns: 1fr;
+        max-width: 350px;
     }
 }
 
