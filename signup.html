@@ -228,7 +228,7 @@
                 // Store token and redirect to dashboard
                 localStorage.setItem('token', result.token);
                 localStorage.setItem('user', JSON.stringify(result.user));
-                window.location.href = '/order.html';
+                window.location.href = '/dashboard.html';
             } catch (error) {
                 errorDiv.textContent = error.message;
                 errorDiv.style.display = 'block';
