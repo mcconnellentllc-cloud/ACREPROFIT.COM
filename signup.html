@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Enter your acres to join Acre Profit bulk buying orders">
-    <title>Enter Your Acres - Acre Profit</title>
+    <meta name="description" content="Create your Acre Profit account">
+    <title>Sign Up - Acre Profit</title>
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -12,7 +12,6 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Navigation -->
     <nav class="navbar">
         <div class="container">
             <a href="/" class="logo">
@@ -21,44 +20,50 @@
             <ul class="nav-links">
                 <li><a href="/#how-it-works">How It Works</a></li>
                 <li><a href="/#products">Products</a></li>
-                <li><a href="/#about">About Us</a></li>
-                <li><a href="/#contact">Contact</a></li>
+                <li><a href="/login.html" class="btn btn-outline">Login</a></li>
             </ul>
-            <button class="mobile-menu-btn" aria-label="Menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
         </div>
     </nav>
 
-    <!-- Enter Acres Form -->
-    <main class="enter-acres-page">
+    <main class="auth-page">
         <div class="container">
-            <div class="form-wrapper">
-                <div class="form-header">
-                    <h1>Enter Your Acres</h1>
-                    <p>Tell us about your operation and see available bulk orders.</p>
+            <div class="auth-wrapper">
+                <div class="auth-header">
+                    <h1>Create Your Account</h1>
+                    <p>Join the co-op and start saving on bulk orders.</p>
                 </div>
 
-                <form id="acreForm" class="acre-form">
+                <form id="signupForm" class="auth-form">
                     <div class="form-section">
-                        <h3>Your Information</h3>
+                        <h3>Account Information</h3>
 
                         <div class="form-group">
                             <label for="name">Your Name *</label>
                             <input type="text" id="name" name="name" required placeholder="John Smith">
                         </div>
 
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="email">Email *</label>
-                                <input type="email" id="email" name="email" required placeholder="john@farm.com">
-                            </div>
-                            <div class="form-group">
-                                <label for="phone">Phone</label>
-                                <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567">
-                            </div>
+                        <div class="form-group">
+                            <label for="email">Email *</label>
+                            <input type="email" id="email" name="email" required placeholder="john@farm.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="password">Password *</label>
+                            <input type="password" id="password" name="password" required minlength="6" placeholder="Min 6 characters">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">Phone</label>
+                            <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567">
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Your Farm</h3>
+
+                        <div class="form-group">
+                            <label for="farmName">Farm Name</label>
+                            <input type="text" id="farmName" name="farmName" placeholder="Smith Family Farm">
                         </div>
 
                         <div class="form-row">
@@ -76,10 +81,6 @@
                                 <input type="text" id="county" name="county" placeholder="Your County">
                             </div>
                         </div>
-                    </div>
-
-                    <div class="form-section">
-                        <h3>Your Operation</h3>
 
                         <div class="form-group">
                             <label for="acres">Total Acres *</label>
@@ -105,73 +106,65 @@
                                     <span>Wheat</span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="cotton">
-                                    <span>Cotton</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="rice">
-                                    <span>Rice</span>
-                                </label>
-                                <label class="checkbox-label">
                                     <input type="checkbox" name="crops" value="sorghum">
                                     <span>Sorghum</span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="hay">
-                                    <span>Hay/Forage</span>
+                                    <input type="checkbox" name="crops" value="millet">
+                                    <span>Millet</span>
                                 </label>
                                 <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="other">
-                                    <span>Other</span>
+                                    <input type="checkbox" name="crops" value="hay">
+                                    <span>Hay/Forage</span>
                                 </label>
                             </div>
                         </div>
                     </div>
 
                     <div class="form-section">
-                        <h3>Products You're Interested In</h3>
+                        <h3>Choose Your Representative *</h3>
+                        <p class="section-note">Select the representative who will service your account.</p>
 
-                        <div class="checkbox-grid products-interest">
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="products" value="herbicides">
-                                <span>Herbicides</span>
+                        <div class="rep-grid" id="repGrid">
+                            <!-- Representatives loaded dynamically -->
+                            <label class="rep-card">
+                                <input type="radio" name="representative" value="kyle" required>
+                                <div class="rep-info">
+                                    <span class="rep-name">Kyle McConnell</span>
+                                    <span class="rep-contact">(970) 571-1015</span>
+                                </div>
                             </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="products" value="fertilizers">
-                                <span>Fertilizers</span>
+                            <label class="rep-card">
+                                <input type="radio" name="representative" value="ty">
+                                <div class="rep-info">
+                                    <span class="rep-name">Ty Mollohan</span>
+                                    <span class="rep-contact">(970) 520-2340</span>
+                                </div>
                             </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="products" value="insecticides">
-                                <span>Insecticides</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="products" value="fungicides">
-                                <span>Fungicides</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="products" value="seed-treatments">
-                                <span>Seed Treatments</span>
-                            </label>
-                            <label class="checkbox-label">
-                                <input type="checkbox" name="products" value="adjuvants">
-                                <span>Adjuvants</span>
+                            <label class="rep-card">
+                                <input type="radio" name="representative" value="chad">
+                                <div class="rep-info">
+                                    <span class="rep-name">Chad Bamford</span>
+                                    <span class="rep-contact">(970) 520-3716</span>
+                                </div>
                             </label>
                         </div>
                     </div>
 
-                    <button type="submit" class="btn btn-primary btn-lg btn-block">
-                        See Available Orders
+                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
+                        Create Account
                     </button>
 
-                    <p class="form-note">
-                        By submitting, you'll be added to our network and notified when bulk orders are available for your area.
+                    <p class="auth-switch">
+                        Already have an account? <a href="/login.html">Login</a>
                     </p>
                 </form>
             </div>
         </div>
     </main>
 
-    <!-- Footer -->
     <footer class="footer">
         <div class="container">
             <div class="footer-bottom" style="border-top: none; padding-top: 0;">
@@ -180,48 +173,71 @@
         </div>
     </footer>
 
-    <script src="app.js"></script>
     <script>
-        // Form submission
-        document.getElementById('acreForm').addEventListener('submit', async function(e) {
+        const API_URL = 'https://acreprofit-api.onrender.com'; // Update with your Render URL
+
+        document.getElementById('signupForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
+            const submitBtn = document.getElementById('submitBtn');
+            const errorDiv = document.getElementById('errorMessage');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Creating Account...';
+            errorDiv.style.display = 'none';
+
             const formData = new FormData(this);
+
             const data = {
                 name: formData.get('name'),
                 email: formData.get('email'),
+                password: formData.get('password'),
                 phone: formData.get('phone'),
-                acres: parseInt(formData.get('acres')),
-                crops: formData.getAll('crops'),
-                products: formData.getAll('products'),
-                location: {
+                farm: {
+                    name: formData.get('farmName'),
+                    acres: parseInt(formData.get('acres')),
                     state: formData.get('state'),
                     county: formData.get('county')
-                }
+                },
+                crops: formData.getAll('crops'),
+                representativeId: formData.get('representative')
             };
 
-            // For now, show a success message
-            // Later this will connect to the API
-            alert('Thanks for signing up! We\'ll notify you when bulk orders are available in your area.');
+            try {
+                const response = await fetch(`${API_URL}/api/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
 
-            // TODO: Send to API
-            // const response = await fetch('/api/farmers', {
-            //     method: 'POST',
-            //     headers: { 'Content-Type': 'application/json' },
-            //     body: JSON.stringify(data)
-            // });
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Signup failed');
+                }
+
+                // Store token and redirect to dashboard
+                localStorage.setItem('token', result.token);
+                localStorage.setItem('user', JSON.stringify(result.user));
+                window.location.href = '/dashboard.html';
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Account';
+            }
         });
     </script>
 
     <style>
-        .enter-acres-page {
+        .auth-page {
             padding: 120px 0 80px;
             background: var(--secondary);
             min-height: 100vh;
         }
 
-        .form-wrapper {
-            max-width: 700px;
+        .auth-wrapper {
+            max-width: 600px;
             margin: 0 auto;
             background: var(--white);
             border-radius: var(--radius-lg);
@@ -229,17 +245,17 @@
             padding: 48px;
         }
 
-        .form-header {
+        .auth-header {
             text-align: center;
             margin-bottom: 40px;
         }
 
-        .form-header h1 {
+        .auth-header h1 {
             font-size: 2rem;
             margin-bottom: 12px;
         }
 
-        .form-header p {
+        .auth-header p {
             color: var(--text-light);
         }
 
@@ -256,15 +272,21 @@
 
         .form-section h3 {
             font-size: 1.125rem;
-            margin-bottom: 20px;
+            margin-bottom: 16px;
             color: var(--primary);
         }
 
-        .acre-form .form-group {
+        .section-note {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin-bottom: 16px;
+        }
+
+        .auth-form .form-group {
             margin-bottom: 20px;
         }
 
-        .acre-form label {
+        .auth-form label {
             display: block;
             font-weight: 600;
             font-size: 0.875rem;
@@ -272,8 +294,8 @@
             color: var(--text);
         }
 
-        .acre-form input,
-        .acre-form select {
+        .auth-form input,
+        .auth-form select {
             width: 100%;
             padding: 14px 16px;
             border: 2px solid var(--border);
@@ -283,8 +305,8 @@
             transition: var(--transition);
         }
 
-        .acre-form input:focus,
-        .acre-form select:focus {
+        .auth-form input:focus,
+        .auth-form select:focus {
             outline: none;
             border-color: var(--primary);
             box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
@@ -340,19 +362,75 @@
             accent-color: var(--primary);
         }
 
-        .checkbox-label input:checked + span {
-            color: var(--primary);
+        .rep-grid {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 12px;
         }
 
-        .form-note {
-            text-align: center;
+        .rep-card {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 16px 20px;
+            background: var(--secondary);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: var(--transition);
+            border: 2px solid transparent;
+        }
+
+        .rep-card:hover {
+            background: #e8e8e0;
+        }
+
+        .rep-card:has(input:checked) {
+            background: rgba(45, 90, 39, 0.1);
+            border-color: var(--primary);
+        }
+
+        .rep-card input {
+            width: auto;
+            accent-color: var(--primary);
+        }
+
+        .rep-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .rep-name {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .rep-contact {
             font-size: 0.875rem;
             color: var(--text-muted);
-            margin-top: 16px;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            font-size: 0.875rem;
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--text-light);
+        }
+
+        .auth-switch a {
+            color: var(--primary);
+            font-weight: 600;
         }
 
         @media (max-width: 768px) {
-            .form-wrapper {
+            .auth-wrapper {
                 padding: 32px 24px;
             }
 

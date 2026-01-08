@@ -134,6 +134,49 @@ const bundleSchema = new mongoose.Schema({
 
 const Bundle = mongoose.model('Bundle', bundleSchema);
 
+// Rep Application Model
+const repApplicationSchema = new mongoose.Schema({
+    firstName: { type: String, required: true },
+    lastName: { type: String, required: true },
+    email: { type: String, required: true },
+    phone: { type: String, required: true },
+    city: { type: String, required: true },
+    state: { type: String, required: true },
+    farming: { type: String, required: true },
+    acres: Number,
+    experience: { type: String, required: true },
+    network: String,
+    why: { type: String, required: true },
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+    },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const RepApplication = mongoose.model('RepApplication', repApplicationSchema);
+
+// Merch Credit Model
+const merchCreditSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    totalSpent: { type: Number, default: 0 },
+    creditEarned: { type: Number, default: 0 },
+    creditUsed: { type: Number, default: 0 },
+    creditAvailable: { type: Number, default: 0 },
+    history: [{
+        type: { type: String, enum: ['earned', 'used'] },
+        amount: Number,
+        orderId: mongoose.Schema.Types.ObjectId,
+        description: String,
+        date: { type: Date, default: Date.now }
+    }],
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const MerchCredit = mongoose.model('MerchCredit', merchCreditSchema);
+
 // ============ INITIALIZE ADMIN USERS ============
 
 async function initializeAdmins() {
@@ -904,6 +947,162 @@ app.get('/api/admin/bundles', authMiddleware, superAdminMiddleware, async (req, 
             })
             .sort({ createdAt: -1 });
         res.json(bundles);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- REP APPLICATION ROUTES ----
+
+// Submit rep application (public)
+app.post('/api/rep-applications', async (req, res) => {
+    try {
+        const application = new RepApplication(req.body);
+        await application.save();
+        res.status(201).json({ message: 'Application submitted successfully', id: application._id });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all rep applications (superadmin only)
+app.get('/api/rep-applications', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const applications = await RepApplication.find().sort({ createdAt: -1 });
+        res.json(applications);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update rep application status (superadmin only)
+app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const { status } = req.body;
+        const application = await RepApplication.findByIdAndUpdate(
+            req.params.id,
+            { status },
+            { new: true }
+        );
+
+        if (!application) {
+            return res.status(404).json({ error: 'Application not found' });
+        }
+
+        // If approved, create admin user
+        if (status === 'approved') {
+            const existingUser = await User.findOne({ email: application.email.toLowerCase() });
+            if (!existingUser) {
+                const tempPassword = 'Farm2026!'; // They should change this
+                await User.create({
+                    name: `${application.firstName} ${application.lastName}`,
+                    email: application.email,
+                    password: tempPassword,
+                    phone: application.phone,
+                    role: 'admin'
+                });
+            }
+        }
+
+        res.json(application);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- MERCH CREDIT ROUTES ----
+
+// Get user's merch credit
+app.get('/api/merch-credit', authMiddleware, async (req, res) => {
+    try {
+        let credit = await MerchCredit.findOne({ userId: req.user._id });
+
+        if (!credit) {
+            credit = await MerchCredit.create({ userId: req.user._id });
+        }
+
+        res.json({
+            totalSpent: credit.totalSpent,
+            creditEarned: credit.creditEarned,
+            creditUsed: credit.creditUsed,
+            creditAvailable: credit.creditAvailable,
+            history: credit.history
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Calculate and add merch credit after order completion
+app.post('/api/merch-credit/add', authMiddleware, async (req, res) => {
+    try {
+        const { orderId, orderAmount } = req.body;
+
+        let credit = await MerchCredit.findOne({ userId: req.user._id });
+        if (!credit) {
+            credit = await MerchCredit.create({ userId: req.user._id });
+        }
+
+        // Calculate new credit: $50 for every $2000 spent
+        const previousTotal = credit.totalSpent;
+        const newTotal = previousTotal + orderAmount;
+
+        const previousCredits = Math.floor(previousTotal / 2000) * 50;
+        const newCredits = Math.floor(newTotal / 2000) * 50;
+        const creditToAdd = newCredits - previousCredits;
+
+        if (creditToAdd > 0) {
+            credit.history.push({
+                type: 'earned',
+                amount: creditToAdd,
+                orderId,
+                description: `Earned $${creditToAdd} merch credit from order`
+            });
+        }
+
+        credit.totalSpent = newTotal;
+        credit.creditEarned += creditToAdd;
+        credit.creditAvailable += creditToAdd;
+        credit.updatedAt = new Date();
+
+        await credit.save();
+
+        res.json({
+            totalSpent: credit.totalSpent,
+            creditEarned: credit.creditEarned,
+            creditAvailable: credit.creditAvailable,
+            newCreditAdded: creditToAdd
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Use merch credit
+app.post('/api/merch-credit/use', authMiddleware, async (req, res) => {
+    try {
+        const { amount, description } = req.body;
+
+        const credit = await MerchCredit.findOne({ userId: req.user._id });
+        if (!credit || credit.creditAvailable < amount) {
+            return res.status(400).json({ error: 'Insufficient merch credit' });
+        }
+
+        credit.creditUsed += amount;
+        credit.creditAvailable -= amount;
+        credit.history.push({
+            type: 'used',
+            amount,
+            description: description || 'Merch purchase'
+        });
+        credit.updatedAt = new Date();
+
+        await credit.save();
+
+        res.json({
+            creditUsed: amount,
+            creditAvailable: credit.creditAvailable
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

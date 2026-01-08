@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Apply to become an Acre Profit representative">
+    <title>Become a Representative - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <ul class="nav-links">
+                <li><a href="/#how-it-works">How It Works</a></li>
+                <li><a href="/#products">Products</a></li>
+                <li><a href="/login.html" class="btn btn-outline">Login</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="apply-page">
+        <div class="container">
+            <div class="apply-wrapper">
+                <div class="apply-header">
+                    <h1>Become a Representative</h1>
+                    <p>Join our network and help farmers in your area save on bulk orders.</p>
+                </div>
+
+                <div class="apply-benefits">
+                    <h3>Why Become a Rep?</h3>
+                    <div class="benefits-grid">
+                        <div class="benefit-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                            <span>Earn commission on orders</span>
+                        </div>
+                        <div class="benefit-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                            <span>Help local farmers save money</span>
+                        </div>
+                        <div class="benefit-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                            <span>Access to admin dashboard</span>
+                        </div>
+                        <div class="benefit-item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                            <span>Flexible, work your own area</span>
+                        </div>
+                    </div>
+                </div>
+
+                <form id="applyForm" class="apply-form">
+                    <div class="form-section">
+                        <h3>Your Information</h3>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="firstName">First Name *</label>
+                                <input type="text" id="firstName" name="firstName" required placeholder="John">
+                            </div>
+                            <div class="form-group">
+                                <label for="lastName">Last Name *</label>
+                                <input type="text" id="lastName" name="lastName" required placeholder="Smith">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="email">Email *</label>
+                            <input type="email" id="email" name="email" required placeholder="john@example.com">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="phone">Phone *</label>
+                            <input type="tel" id="phone" name="phone" required placeholder="(555) 123-4567">
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="city">City *</label>
+                                <input type="text" id="city" name="city" required placeholder="Denver">
+                            </div>
+                            <div class="form-group">
+                                <label for="state">State *</label>
+                                <select id="state" name="state" required>
+                                    <option value="">Select State</option>
+                                    <option value="CO">Colorado</option>
+                                    <option value="KS">Kansas</option>
+                                    <option value="NE">Nebraska</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-section">
+                        <h3>Your Background</h3>
+
+                        <div class="form-group">
+                            <label for="farming">Do you farm? *</label>
+                            <select id="farming" name="farming" required>
+                                <option value="">Select</option>
+                                <option value="yes-active">Yes, I actively farm</option>
+                                <option value="yes-family">Yes, family farm</option>
+                                <option value="no-ag">No, but I work in agriculture</option>
+                                <option value="no">No</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="acres">If you farm, how many acres?</label>
+                            <input type="number" id="acres" name="acres" placeholder="500">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="experience">Describe your experience with farming or agricultural sales *</label>
+                            <textarea id="experience" name="experience" required rows="4" placeholder="Tell us about your background..."></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="network">How many farmers do you know in your area that might be interested?</label>
+                            <select id="network" name="network">
+                                <option value="">Select</option>
+                                <option value="1-10">1-10 farmers</option>
+                                <option value="11-25">11-25 farmers</option>
+                                <option value="26-50">26-50 farmers</option>
+                                <option value="50+">50+ farmers</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="why">Why do you want to become a representative? *</label>
+                            <textarea id="why" name="why" required rows="4" placeholder="Tell us why you'd be a great fit..."></textarea>
+                        </div>
+                    </div>
+
+                    <div id="successMessage" class="success-message" style="display: none;">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path><path d="m9 12 2 2 4-4"></path></svg>
+                        <div>
+                            <strong>Application Submitted!</strong>
+                            <p>Thank you for your interest. We'll review your application and be in touch soon.</p>
+                        </div>
+                    </div>
+
+                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
+                        Submit Application
+                    </button>
+                </form>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = 'https://acreprofit-api.onrender.com';
+
+        document.getElementById('applyForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const errorDiv = document.getElementById('errorMessage');
+            const successDiv = document.getElementById('successMessage');
+
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Submitting...';
+            errorDiv.style.display = 'none';
+
+            const formData = new FormData(this);
+
+            const data = {
+                firstName: formData.get('firstName'),
+                lastName: formData.get('lastName'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                city: formData.get('city'),
+                state: formData.get('state'),
+                farming: formData.get('farming'),
+                acres: formData.get('acres') ? parseInt(formData.get('acres')) : null,
+                experience: formData.get('experience'),
+                network: formData.get('network'),
+                why: formData.get('why')
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/rep-applications`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to submit application');
+                }
+
+                // Show success message
+                successDiv.style.display = 'flex';
+                submitBtn.style.display = 'none';
+                this.reset();
+
+                // Scroll to success message
+                successDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            } catch (error) {
+                errorDiv.textContent = error.message;
+                errorDiv.style.display = 'block';
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Submit Application';
+            }
+        });
+    </script>
+
+    <style>
+        .apply-page {
+            padding: 120px 0 80px;
+            background: var(--secondary);
+            min-height: 100vh;
+        }
+
+        .apply-wrapper {
+            max-width: 700px;
+            margin: 0 auto;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow-xl);
+            padding: 48px;
+        }
+
+        .apply-header {
+            text-align: center;
+            margin-bottom: 32px;
+        }
+
+        .apply-header h1 {
+            font-size: 2rem;
+            margin-bottom: 12px;
+        }
+
+        .apply-header p {
+            color: var(--text-light);
+        }
+
+        .apply-benefits {
+            background: rgba(45, 90, 39, 0.05);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .apply-benefits h3 {
+            font-size: 1rem;
+            margin-bottom: 16px;
+            color: var(--primary);
+        }
+
+        .benefits-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .benefit-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.875rem;
+            color: var(--text);
+        }
+
+        .benefit-item svg {
+            color: var(--primary);
+            flex-shrink: 0;
+        }
+
+        .form-section {
+            margin-bottom: 32px;
+            padding-bottom: 32px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .form-section:last-of-type {
+            border-bottom: none;
+            padding-bottom: 0;
+        }
+
+        .form-section h3 {
+            font-size: 1.125rem;
+            margin-bottom: 20px;
+            color: var(--primary);
+        }
+
+        .apply-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .apply-form label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .apply-form input,
+        .apply-form select,
+        .apply-form textarea {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: var(--transition);
+        }
+
+        .apply-form textarea {
+            resize: vertical;
+            min-height: 100px;
+        }
+
+        .apply-form input:focus,
+        .apply-form select:focus,
+        .apply-form textarea:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+        }
+
+        .success-message {
+            background: #d1fae5;
+            color: #065f46;
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+        }
+
+        .success-message svg {
+            flex-shrink: 0;
+            margin-top: 2px;
+        }
+
+        .success-message strong {
+            display: block;
+            margin-bottom: 4px;
+        }
+
+        .success-message p {
+            font-size: 0.875rem;
+            margin: 0;
+        }
+
+        .error-message {
+            background: #fee2e2;
+            color: #dc2626;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 768px) {
+            .apply-wrapper {
+                padding: 32px 24px;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .benefits-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</body>
+</html>

@@ -1,0 +1,546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spray Sheet - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background: #fff;
+            color: #1a1a1a;
+            line-height: 1.5;
+        }
+
+        .spray-sheet {
+            max-width: 8.5in;
+            margin: 0 auto;
+            padding: 0.5in;
+        }
+
+        .sheet-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 3px solid #2D5A27;
+        }
+
+        .sheet-logo {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .sheet-logo svg {
+            width: 48px;
+            height: 48px;
+        }
+
+        .sheet-logo-text {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #2D5A27;
+        }
+
+        .sheet-title {
+            text-align: right;
+        }
+
+        .sheet-title h1 {
+            font-size: 1.5rem;
+            color: #2D5A27;
+            margin-bottom: 4px;
+        }
+
+        .sheet-title p {
+            color: #666;
+            font-size: 0.875rem;
+        }
+
+        .info-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .info-section {
+            background: #f5f5f0;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .info-section h3 {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            margin-bottom: 12px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            border-bottom: 1px solid #e0e0d8;
+        }
+
+        .info-row:last-child {
+            border-bottom: none;
+        }
+
+        .info-label {
+            color: #666;
+        }
+
+        .info-value {
+            font-weight: 600;
+        }
+
+        .program-header {
+            background: #2D5A27;
+            color: #fff;
+            padding: 16px 20px;
+            border-radius: 8px 8px 0 0;
+            margin-top: 32px;
+        }
+
+        .program-header h2 {
+            font-size: 1.25rem;
+            margin-bottom: 4px;
+        }
+
+        .program-header p {
+            font-size: 0.875rem;
+            opacity: 0.9;
+        }
+
+        .chemicals-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: #fff;
+            border: 1px solid #e0e0d8;
+            border-top: none;
+        }
+
+        .chemicals-table th,
+        .chemicals-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid #e0e0d8;
+        }
+
+        .chemicals-table th {
+            background: #f5f5f0;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: #666;
+            font-weight: 600;
+        }
+
+        .chemicals-table tbody tr:nth-child(even) {
+            background: #fafaf8;
+        }
+
+        .chemicals-table .chemical-name {
+            font-weight: 600;
+        }
+
+        .chemicals-table .rate {
+            color: #2D5A27;
+            font-weight: 600;
+        }
+
+        .totals-section {
+            margin-top: 32px;
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 24px;
+        }
+
+        .notes-box {
+            background: #f5f5f0;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .notes-box h3 {
+            font-size: 0.875rem;
+            margin-bottom: 12px;
+        }
+
+        .notes-box .notes-content {
+            min-height: 80px;
+            border: 1px dashed #ccc;
+            border-radius: 4px;
+            padding: 12px;
+            background: #fff;
+        }
+
+        .cost-summary {
+            background: #2D5A27;
+            color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+        }
+
+        .cost-summary h3 {
+            font-size: 0.875rem;
+            opacity: 0.9;
+            margin-bottom: 16px;
+        }
+
+        .cost-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.2);
+        }
+
+        .cost-row:last-child {
+            border-bottom: none;
+        }
+
+        .cost-row.total {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-top: 8px;
+            padding-top: 16px;
+            border-top: 2px solid rgba(255,255,255,0.3);
+        }
+
+        .sheet-footer {
+            margin-top: 40px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0d8;
+            display: flex;
+            justify-content: space-between;
+            color: #666;
+            font-size: 0.75rem;
+        }
+
+        .print-actions {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            display: flex;
+            gap: 12px;
+        }
+
+        .print-btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .print-btn-primary {
+            background: #2D5A27;
+            color: #fff;
+        }
+
+        .print-btn-primary:hover {
+            background: #234820;
+        }
+
+        .print-btn-secondary {
+            background: #f5f5f0;
+            color: #333;
+        }
+
+        .print-btn-secondary:hover {
+            background: #e8e8e0;
+        }
+
+        @media print {
+            .print-actions {
+                display: none;
+            }
+
+            body {
+                print-color-adjust: exact;
+                -webkit-print-color-adjust: exact;
+            }
+
+            .spray-sheet {
+                padding: 0;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="spray-sheet">
+        <div class="sheet-header">
+            <div class="sheet-logo">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+                    <rect fill="#2D5A27" width="100" height="100" rx="8"/>
+                    <text x="50" y="42" font-family="Inter, sans-serif" font-weight="900" font-size="24" fill="white" text-anchor="middle">ACRE</text>
+                    <text x="50" y="68" font-family="Inter, sans-serif" font-weight="600" font-size="18" fill="white" text-anchor="middle">PROFIT</text>
+                </svg>
+                <span class="sheet-logo-text">ACRE PROFIT</span>
+            </div>
+            <div class="sheet-title">
+                <h1>Spray Program Sheet</h1>
+                <p id="printDate">Generated: --</p>
+            </div>
+        </div>
+
+        <div class="info-grid">
+            <div class="info-section">
+                <h3>Customer Information</h3>
+                <div class="info-row">
+                    <span class="info-label">Name</span>
+                    <span class="info-value" id="customerName">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Farm</span>
+                    <span class="info-value" id="farmName">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Location</span>
+                    <span class="info-value" id="farmLocation">--</span>
+                </div>
+            </div>
+            <div class="info-section">
+                <h3>Order Details</h3>
+                <div class="info-row">
+                    <span class="info-label">Crop</span>
+                    <span class="info-value" id="cropType">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Acres</span>
+                    <span class="info-value" id="totalAcres">--</span>
+                </div>
+                <div class="info-row">
+                    <span class="info-label">Representative</span>
+                    <span class="info-value" id="repName">--</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="program-header">
+            <h2 id="programName">--</h2>
+            <p id="programDesc">--</p>
+        </div>
+
+        <table class="chemicals-table">
+            <thead>
+                <tr>
+                    <th>Product</th>
+                    <th>Rate</th>
+                    <th>Total Needed</th>
+                    <th>Packages</th>
+                    <th>Package Size</th>
+                </tr>
+            </thead>
+            <tbody id="chemicalsBody">
+                <!-- Filled dynamically -->
+            </tbody>
+        </table>
+
+        <div id="additionalProducts" style="display: none;">
+            <div class="program-header" style="margin-top: 24px; background: #4a7c44;">
+                <h2>Additional Products</h2>
+            </div>
+            <table class="chemicals-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Quantity</th>
+                        <th>Unit Price</th>
+                        <th>Total</th>
+                    </tr>
+                </thead>
+                <tbody id="additionalBody">
+                    <!-- Filled dynamically -->
+                </tbody>
+            </table>
+        </div>
+
+        <div class="totals-section">
+            <div class="notes-box">
+                <h3>Application Notes</h3>
+                <div class="notes-content" id="notesContent">
+                    <!-- Notes can be added here -->
+                </div>
+            </div>
+            <div class="cost-summary">
+                <h3>Cost Summary</h3>
+                <div class="cost-row">
+                    <span>Chemicals</span>
+                    <span id="chemicalsCost">$0</span>
+                </div>
+                <div class="cost-row">
+                    <span>Additional</span>
+                    <span id="additionalCost">$0</span>
+                </div>
+                <div class="cost-row total">
+                    <span>Total</span>
+                    <span id="totalCost">$0</span>
+                </div>
+                <div class="cost-row">
+                    <span>Per Acre</span>
+                    <span id="perAcreCost">$0/acre</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="sheet-footer">
+            <span>AcreProfit.com - Farmers Helping Farmers</span>
+            <span id="orderRef">Order Ref: --</span>
+        </div>
+    </div>
+
+    <div class="print-actions">
+        <button class="print-btn print-btn-secondary" onclick="window.close()">Close</button>
+        <button class="print-btn print-btn-primary" onclick="window.print()">Print Sheet</button>
+    </div>
+
+    <script>
+        const representatives = {
+            kyle: { name: 'Kyle McConnell', phone: '(970) 571-1015' },
+            ty: { name: 'Ty Mollohan', phone: '(970) 520-2340' },
+            chad: { name: 'Chad Bamford', phone: '(970) 520-3716' }
+        };
+
+        const sprayPrograms = {
+            corn: {
+                '2-pass': { name: '2-Pass Corn Program', description: 'Pre-emerge + Post-emerge' },
+                '3-pass': { name: '3-Pass Corn Program', description: 'Pre-emerge + Early Post + Late Post' }
+            },
+            soybeans: {
+                '2-pass': { name: '2-Pass Soybean Program', description: 'Pre-emerge + Post-emerge' },
+                '3-pass': { name: '3-Pass Soybean Program', description: 'Burndown + Pre-emerge + Post-emerge' }
+            },
+            wheat: {
+                '2-pass': { name: '2-Pass Wheat Program', description: 'Fall + Spring applications' }
+            },
+            sorghum: {
+                '2-pass': { name: '2-Pass Sorghum Program', description: 'Pre-emerge + Post-emerge' }
+            }
+        };
+
+        // Get data from localStorage or URL params
+        const orderData = JSON.parse(localStorage.getItem('currentOrder') || '{}');
+        const userData = JSON.parse(localStorage.getItem('user') || '{}');
+
+        // Set date
+        document.getElementById('printDate').textContent = 'Generated: ' + new Date().toLocaleDateString();
+
+        // Customer info
+        document.getElementById('customerName').textContent = userData.name || 'N/A';
+        document.getElementById('farmName').textContent = userData.farm?.name || 'N/A';
+        document.getElementById('farmLocation').textContent = userData.farm ? `${userData.farm.county || ''}, ${userData.farm.state}` : 'N/A';
+
+        // Rep info
+        if (userData.representativeId && representatives[userData.representativeId]) {
+            document.getElementById('repName').textContent = representatives[userData.representativeId].name;
+        }
+
+        // Order info
+        if (orderData.crop) {
+            document.getElementById('cropType').textContent = orderData.crop.charAt(0).toUpperCase() + orderData.crop.slice(1);
+            document.getElementById('totalAcres').textContent = orderData.acres?.toLocaleString() + ' acres';
+
+            // Program info
+            const program = sprayPrograms[orderData.crop]?.[orderData.program];
+            if (program) {
+                document.getElementById('programName').textContent = program.name;
+                document.getElementById('programDesc').textContent = program.description;
+            }
+
+            // Chemicals table
+            let chemicalsCost = 0;
+            if (orderData.chemicals) {
+                const tbody = document.getElementById('chemicalsBody');
+                tbody.innerHTML = orderData.chemicals.map(chem => {
+                    const totalNeeded = calculateTotalNeeded(chem.rate, chem.unit, orderData.acres);
+                    const packages = Math.ceil(totalNeeded / chem.packageSize);
+                    const cost = packages * (chem.pricePerUnit || 0) * chem.packageSize;
+                    chemicalsCost += cost;
+
+                    return `
+                        <tr>
+                            <td class="chemical-name">${chem.name}</td>
+                            <td class="rate">${chem.rate} ${chem.unit}</td>
+                            <td>${totalNeeded.toFixed(1)} gal</td>
+                            <td>${packages}</td>
+                            <td>${chem.packageSize} ${chem.packageUnit}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+
+            // Additional products
+            let additionalCost = 0;
+            const additionalBody = document.getElementById('additionalBody');
+            const additionalSection = document.getElementById('additionalProducts');
+            let additionalHtml = '';
+
+            if (orderData.additionalProducts?.hydrovant > 0) {
+                const gal = orderData.additionalProducts.hydrovant;
+                let price = 165;
+                if (gal >= 61) price = 125;
+                else if (gal >= 10) price = 135;
+                const total = gal * price;
+                additionalCost += total;
+                additionalHtml += `<tr><td>Hydrovant</td><td>${gal} gal</td><td>$${price}</td><td>$${total.toLocaleString()}</td></tr>`;
+            }
+
+            if (orderData.additionalProducts?.multiseal > 0) {
+                const qty = orderData.additionalProducts.multiseal;
+                const total = qty * 300;
+                additionalCost += total;
+                additionalHtml += `<tr><td>Multi Seal</td><td>${qty} bucket${qty > 1 ? 's' : ''}</td><td>$300</td><td>$${total.toLocaleString()}</td></tr>`;
+            }
+
+            if (orderData.additionalProducts?.pump > 0) {
+                const qty = orderData.additionalProducts.pump;
+                const total = qty * 130;
+                additionalCost += total;
+                additionalHtml += `<tr><td>Pump</td><td>${qty}</td><td>$130</td><td>$${total.toLocaleString()}</td></tr>`;
+            }
+
+            if (additionalHtml) {
+                additionalBody.innerHTML = additionalHtml;
+                additionalSection.style.display = 'block';
+            }
+
+            // Totals
+            const totalCost = chemicalsCost + additionalCost;
+            document.getElementById('chemicalsCost').textContent = '$' + chemicalsCost.toLocaleString();
+            document.getElementById('additionalCost').textContent = '$' + additionalCost.toLocaleString();
+            document.getElementById('totalCost').textContent = '$' + totalCost.toLocaleString();
+            document.getElementById('perAcreCost').textContent = '$' + (totalCost / orderData.acres).toFixed(2) + '/acre';
+        }
+
+        // Order ref
+        document.getElementById('orderRef').textContent = 'Order Ref: AP-' + Date.now().toString(36).toUpperCase();
+
+        function calculateTotalNeeded(rate, unit, acres) {
+            if (unit.includes('oz/acre')) {
+                return (rate * acres) / 128;
+            } else if (unit.includes('pt/acre')) {
+                return (rate * acres) / 8;
+            }
+            return rate * acres;
+        }
+    </script>
+</body>
+</html>
