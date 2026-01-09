@@ -12,8 +12,8 @@
   <!-- ACRE text - big white block letters -->
   <text x="120" y="68" font-family="Arial Black, Helvetica, sans-serif" font-size="52" font-weight="900" fill="#FFFFFF" text-anchor="middle" letter-spacing="2">ACRE</text>
 
-  <!-- PROFIT text - P bigger and bold in black, ROFIT in green -->
-  <text x="295" y="68" font-family="Arial Black, Helvetica, sans-serif" font-size="52" font-weight="900" text-anchor="middle" letter-spacing="1"><tspan fill="#000000" font-size="60" font-weight="900">P</tspan><tspan fill="#2d5a27">ROFIT</tspan></text>
+  <!-- PROFIT text - P much bigger in Impact font, ROFIT in green -->
+  <text x="295" y="68" font-family="Arial Black, Helvetica, sans-serif" font-size="52" font-weight="900" text-anchor="middle" letter-spacing="1"><tspan fill="#000000" font-size="72" font-family="Impact, Arial Black, sans-serif" font-weight="900">P</tspan><tspan fill="#2d5a27">ROFIT</tspan></text>
 
   <!-- Tagline / domain -->
   <text x="200" y="105" font-family="Arial, Helvetica, sans-serif" font-size="14" fill="#666666" text-anchor="middle" letter-spacing="3">ACREPROFIT.COM</text>
