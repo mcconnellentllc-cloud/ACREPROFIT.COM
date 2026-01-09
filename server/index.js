@@ -484,6 +484,39 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', message: 'Acre Profit API is running' });
 });
 
+// Reset/reinitialize admin users (use this if login fails)
+app.post('/api/admin/reset-admins', async (req, res) => {
+    try {
+        const { secretKey } = req.body;
+
+        // Simple secret key protection
+        if (secretKey !== 'acreprofit2026reset') {
+            return res.status(403).json({ error: 'Invalid secret key' });
+        }
+
+        const admins = [
+            { name: 'Kyle McConnell', email: 'kyle@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
+            { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'admin' },
+            { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'admin' },
+            { name: 'Seth Rolfs', email: 'seth@acreprofit.com', password: 'Farm2026!', phone: '785-531-0680', role: 'admin' }
+        ];
+
+        const results = [];
+        for (const admin of admins) {
+            // Delete existing user if exists
+            await User.deleteOne({ email: admin.email.toLowerCase() });
+            // Create fresh
+            const user = new User(admin);
+            await user.save();
+            results.push(`Created/reset: ${admin.email}`);
+        }
+
+        res.json({ message: 'Admin users reset successfully', results });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ---- AUTH ROUTES ----
 
 app.post('/api/auth/signup', async (req, res) => {
