@@ -1,0 +1,611 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Payment Settings - Acre Profit">
+    <title>Payment Settings - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <ul class="nav-links">
+                <li><a href="/dashboard.html">Dashboard</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="settings-page">
+        <div class="container">
+            <div class="settings-header">
+                <a href="/dashboard.html" class="back-link">← Back to Dashboard</a>
+                <h1>Payment Settings</h1>
+                <p>Manage your payment methods and preferences</p>
+            </div>
+
+            <!-- Rep Section (only shown to admins/reps) -->
+            <div id="repSection" class="settings-section" style="display: none;">
+                <div class="section-header">
+                    <h2>Receive Payments (Representatives)</h2>
+                    <p>Set up your Stripe account to receive ACH payments from customers</p>
+                </div>
+
+                <div class="payment-card">
+                    <div class="payment-card-header">
+                        <div class="payment-icon">🏦</div>
+                        <div class="payment-info">
+                            <h3>Stripe Connect Account</h3>
+                            <p id="stripeConnectStatus">Not connected</p>
+                        </div>
+                        <span class="status-badge" id="connectStatusBadge">Not Set Up</span>
+                    </div>
+                    <div class="payment-card-body">
+                        <p>Connect your bank account through Stripe to receive direct ACH deposits from customer orders.</p>
+                        <ul class="benefits-list">
+                            <li>✓ Receive payments directly to your bank</li>
+                            <li>✓ Automatic transfers within 2-3 business days</li>
+                            <li>✓ Track all payments in Stripe dashboard</li>
+                        </ul>
+                        <button id="setupStripeConnect" class="btn btn-primary">
+                            Set Up Stripe Account
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Check Payment Info -->
+                <div class="payment-card">
+                    <div class="payment-card-header">
+                        <div class="payment-icon">📝</div>
+                        <div class="payment-info">
+                            <h3>Check Payment Info</h3>
+                            <p>For customers who pay by check</p>
+                        </div>
+                    </div>
+                    <div class="payment-card-body">
+                        <form id="checkInfoForm">
+                            <div class="form-group">
+                                <label for="checkPayableTo">Make Checks Payable To</label>
+                                <input type="text" id="checkPayableTo" placeholder="Your Name or Business Name">
+                            </div>
+                            <div class="form-group">
+                                <label for="checkAddress">Mailing Address</label>
+                                <input type="text" id="checkStreet" placeholder="Street Address">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <input type="text" id="checkCity" placeholder="City">
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" id="checkState" placeholder="State">
+                                </div>
+                                <div class="form-group">
+                                    <input type="text" id="checkZip" placeholder="ZIP">
+                                </div>
+                            </div>
+                            <button type="submit" class="btn btn-secondary">Save Check Info</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Customer Section -->
+            <div id="customerSection" class="settings-section">
+                <div class="section-header">
+                    <h2>Pay for Orders (Customers)</h2>
+                    <p>Set up your payment method for ordering products</p>
+                </div>
+
+                <!-- ACH Bank Account -->
+                <div class="payment-card">
+                    <div class="payment-card-header">
+                        <div class="payment-icon">🏦</div>
+                        <div class="payment-info">
+                            <h3>Bank Account (ACH)</h3>
+                            <p id="achStatus">No bank account saved</p>
+                        </div>
+                        <span class="status-badge" id="achStatusBadge">Not Set Up</span>
+                    </div>
+                    <div class="payment-card-body">
+                        <!-- IMPORTANT: Save Preference Option -->
+                        <div class="save-preference-box">
+                            <h4>🔒 Your Privacy Choice</h4>
+                            <p class="preference-description">Choose whether to save your bank information for future orders:</p>
+
+                            <div class="preference-options">
+                                <label class="preference-option">
+                                    <input type="radio" name="savePreference" value="save" id="prefSave">
+                                    <div class="option-content">
+                                        <div class="option-header">
+                                            <strong>Save for Future Orders</strong>
+                                            <span class="option-badge recommended">Convenient</span>
+                                        </div>
+                                        <p>Your bank account will be securely saved with Stripe. You won't need to re-enter it for future orders.</p>
+                                    </div>
+                                </label>
+
+                                <label class="preference-option">
+                                    <input type="radio" name="savePreference" value="no-save" id="prefNoSave" checked>
+                                    <div class="option-content">
+                                        <div class="option-header">
+                                            <strong>Don't Save - Enter Each Time</strong>
+                                            <span class="option-badge">More Private</span>
+                                        </div>
+                                        <p>Your bank information will NOT be stored. You'll need to enter it each time you make a payment.</p>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div id="savedBankAccounts" class="saved-accounts" style="display: none;">
+                            <!-- Populated by JS -->
+                        </div>
+
+                        <button id="addBankAccount" class="btn btn-primary">
+                            <span id="addBankText">Add Bank Account</span>
+                        </button>
+
+                        <div class="security-note">
+                            <span class="security-icon">🔐</span>
+                            <p><strong>Secure & Encrypted:</strong> Your bank information is handled securely by Stripe. Acre Profit never sees or stores your full account numbers.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Saved Payment Methods -->
+                <div class="payment-card" id="savedMethodsCard" style="display: none;">
+                    <div class="payment-card-header">
+                        <div class="payment-icon">💳</div>
+                        <div class="payment-info">
+                            <h3>Saved Payment Methods</h3>
+                            <p>Manage your saved accounts</p>
+                        </div>
+                    </div>
+                    <div class="payment-card-body">
+                        <div id="paymentMethodsList">
+                            <!-- Populated by JS -->
+                        </div>
+                        <button id="removeAllBtn" class="btn btn-danger-outline" style="display: none;">
+                            Remove All Saved Payment Methods
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = 'https://acreprofit-com.onrender.com';
+
+        // Check auth
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Show appropriate sections based on role
+        const isRep = user.role === 'admin' || user.role === 'superadmin';
+        if (isRep) {
+            document.getElementById('repSection').style.display = 'block';
+        }
+
+        // Initialize Stripe
+        let stripe = null;
+        const stripePublicKey = 'pk_test_your_key'; // Will need to be configured
+
+        // ============ REP FUNCTIONS ============
+
+        // Setup Stripe Connect for reps
+        document.getElementById('setupStripeConnect')?.addEventListener('click', async () => {
+            try {
+                const response = await fetch(`${API_URL}/api/stripe/connect/onboard`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await response.json();
+
+                if (result.url) {
+                    window.location.href = result.url;
+                } else {
+                    alert(result.error || 'Failed to start Stripe setup');
+                }
+            } catch (error) {
+                alert('Error setting up Stripe: ' + error.message);
+            }
+        });
+
+        // Check Stripe Connect status
+        async function checkStripeConnectStatus() {
+            if (!isRep) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/stripe/connect/status`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                const result = await response.json();
+
+                const statusBadge = document.getElementById('connectStatusBadge');
+                const statusText = document.getElementById('stripeConnectStatus');
+                const setupBtn = document.getElementById('setupStripeConnect');
+
+                if (result.connected && result.status === 'active') {
+                    statusBadge.textContent = 'Active';
+                    statusBadge.classList.add('status-active');
+                    statusText.textContent = 'Ready to receive payments';
+                    setupBtn.textContent = 'Manage Stripe Account';
+                } else if (result.connected) {
+                    statusBadge.textContent = 'Pending';
+                    statusBadge.classList.add('status-pending');
+                    statusText.textContent = 'Setup incomplete - click to continue';
+                    setupBtn.textContent = 'Complete Setup';
+                }
+            } catch (error) {
+                console.log('Could not check Stripe status');
+            }
+        }
+
+        // Save check payment info
+        document.getElementById('checkInfoForm')?.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            try {
+                const response = await fetch(`${API_URL}/api/representatives/check-info`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        checkPayableTo: document.getElementById('checkPayableTo').value,
+                        checkMailingAddress: {
+                            street: document.getElementById('checkStreet').value,
+                            city: document.getElementById('checkCity').value,
+                            state: document.getElementById('checkState').value,
+                            zip: document.getElementById('checkZip').value
+                        }
+                    })
+                });
+
+                if (response.ok) {
+                    alert('Check payment info saved!');
+                } else {
+                    const result = await response.json();
+                    alert(result.error || 'Failed to save');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // ============ CUSTOMER FUNCTIONS ============
+
+        // Get save preference
+        function getSavePreference() {
+            return document.querySelector('input[name="savePreference"]:checked')?.value === 'save';
+        }
+
+        // Add bank account
+        document.getElementById('addBankAccount')?.addEventListener('click', async () => {
+            const shouldSave = getSavePreference();
+
+            // Show confirmation based on choice
+            let confirmMsg = shouldSave
+                ? 'You chose to SAVE your bank account for future orders. Continue?'
+                : 'You chose NOT to save your bank account. You will need to enter it again for each order. Continue?';
+
+            if (!confirm(confirmMsg)) return;
+
+            alert(`Bank account setup would open here.\n\nSave preference: ${shouldSave ? 'YES - Save for future' : 'NO - One-time only'}\n\nNote: Stripe integration needs your publishable key to be configured.`);
+
+            // TODO: Implement actual Stripe bank account setup
+            // This requires:
+            // 1. STRIPE_PUBLISHABLE_KEY in environment
+            // 2. Stripe.js loaded
+            // 3. Financial Connections or manual bank entry
+        });
+
+        // Update button text based on preference
+        document.querySelectorAll('input[name="savePreference"]').forEach(radio => {
+            radio.addEventListener('change', () => {
+                const addBankText = document.getElementById('addBankText');
+                if (getSavePreference()) {
+                    addBankText.textContent = 'Add & Save Bank Account';
+                } else {
+                    addBankText.textContent = 'Add Bank Account (One-Time)';
+                }
+            });
+        });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        });
+
+        // Initialize
+        checkStripeConnectStatus();
+    </script>
+
+    <style>
+        .settings-page {
+            padding: 120px 0 80px;
+            background: var(--secondary);
+            min-height: 100vh;
+        }
+
+        .settings-header {
+            margin-bottom: 40px;
+        }
+
+        .settings-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 8px;
+        }
+
+        .settings-header p {
+            color: var(--text-light);
+            font-size: 1.1rem;
+        }
+
+        .back-link {
+            color: var(--primary);
+            font-weight: 500;
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        .settings-section {
+            margin-bottom: 48px;
+        }
+
+        .section-header {
+            margin-bottom: 24px;
+        }
+
+        .section-header h2 {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+        }
+
+        .section-header p {
+            color: var(--text-light);
+        }
+
+        .payment-card {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+            overflow: hidden;
+        }
+
+        .payment-card-header {
+            display: flex;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+            gap: 16px;
+        }
+
+        .payment-icon {
+            font-size: 2rem;
+        }
+
+        .payment-info {
+            flex: 1;
+        }
+
+        .payment-info h3 {
+            font-size: 1.1rem;
+            margin-bottom: 2px;
+        }
+
+        .payment-info p {
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        .status-badge {
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            background: var(--border);
+            color: var(--text-light);
+        }
+
+        .status-badge.status-active {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-badge.status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .payment-card-body {
+            padding: 24px;
+        }
+
+        .benefits-list {
+            list-style: none;
+            margin: 16px 0 24px;
+        }
+
+        .benefits-list li {
+            padding: 8px 0;
+            color: var(--text-light);
+        }
+
+        /* Save Preference Box - IMPORTANT STYLING */
+        .save-preference-box {
+            background: linear-gradient(135deg, #f0fdf4 0%, #ecfeff 100%);
+            border: 2px solid var(--primary);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 24px;
+        }
+
+        .save-preference-box h4 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .preference-description {
+            color: var(--text);
+            margin-bottom: 16px;
+            font-weight: 500;
+        }
+
+        .preference-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .preference-option {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 16px;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .preference-option:hover {
+            border-color: var(--primary);
+        }
+
+        .preference-option input[type="radio"] {
+            margin-top: 4px;
+            width: 20px;
+            height: 20px;
+            accent-color: var(--primary);
+        }
+
+        .preference-option input[type="radio"]:checked + .option-content {
+            color: var(--primary);
+        }
+
+        .preference-option:has(input:checked) {
+            border-color: var(--primary);
+            background: #f0fdf4;
+        }
+
+        .option-content {
+            flex: 1;
+        }
+
+        .option-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 4px;
+        }
+
+        .option-badge {
+            font-size: 0.7rem;
+            padding: 2px 8px;
+            border-radius: 10px;
+            background: var(--border);
+            color: var(--text-light);
+            text-transform: uppercase;
+            font-weight: 600;
+        }
+
+        .option-badge.recommended {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .option-content p {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        .security-note {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            background: #f8fafc;
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 20px;
+        }
+
+        .security-icon {
+            font-size: 1.5rem;
+        }
+
+        .security-note p {
+            font-size: 0.875rem;
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 12px;
+        }
+
+        .btn-danger-outline {
+            color: #dc2626;
+            border: 2px solid #dc2626;
+            background: transparent;
+        }
+
+        .btn-danger-outline:hover {
+            background: #dc2626;
+            color: white;
+        }
+
+        @media (max-width: 768px) {
+            .payment-card-header {
+                flex-wrap: wrap;
+            }
+
+            .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .preference-options {
+                gap: 8px;
+            }
+        }
+    </style>
+</body>
+</html>

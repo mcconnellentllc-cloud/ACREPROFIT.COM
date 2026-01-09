@@ -52,6 +52,9 @@ const userSchema = new mongoose.Schema({
     // Stripe Connect for representatives
     stripeAccountId: String, // Connected Stripe account ID
     stripeAccountStatus: { type: String, enum: ['pending', 'active', 'inactive'], default: 'pending' },
+    // Stripe Customer for customers (to save payment methods)
+    stripeCustomerId: String, // Stripe Customer ID for saving payment methods
+    savePaymentMethod: { type: Boolean, default: false }, // User preference to save or not
     // Check payment info for representatives
     checkPayableTo: String,
     checkMailingAddress: {
@@ -1474,6 +1477,154 @@ app.get('/api/stripe/connect/status', authMiddleware, adminMiddleware, async (re
             payoutsEnabled: account.payouts_enabled,
             detailsSubmitted: account.details_submitted
         });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- CUSTOMER PAYMENT METHOD ROUTES ----
+
+// Update customer's save payment preference
+app.put('/api/payments/save-preference', authMiddleware, async (req, res) => {
+    try {
+        const { savePaymentMethod } = req.body;
+
+        req.user.savePaymentMethod = savePaymentMethod;
+        await req.user.save();
+
+        res.json({
+            message: 'Preference updated',
+            savePaymentMethod: req.user.savePaymentMethod
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get customer's payment methods
+app.get('/api/payments/methods', authMiddleware, async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.json({ paymentMethods: [], savePreference: req.user.savePaymentMethod });
+        }
+
+        // If no Stripe customer, return empty
+        if (!req.user.stripeCustomerId) {
+            return res.json({
+                paymentMethods: [],
+                savePreference: req.user.savePaymentMethod
+            });
+        }
+
+        // Get saved payment methods
+        const paymentMethods = await stripe.paymentMethods.list({
+            customer: req.user.stripeCustomerId,
+            type: 'us_bank_account'
+        });
+
+        res.json({
+            paymentMethods: paymentMethods.data.map(pm => ({
+                id: pm.id,
+                last4: pm.us_bank_account.last4,
+                bankName: pm.us_bank_account.bank_name,
+                accountType: pm.us_bank_account.account_type
+            })),
+            savePreference: req.user.savePaymentMethod
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create setup intent for adding payment method
+app.post('/api/payments/setup-intent', authMiddleware, async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.status(400).json({ error: 'Stripe not configured' });
+        }
+
+        // Create or get Stripe Customer
+        let customerId = req.user.stripeCustomerId;
+
+        if (!customerId) {
+            const customer = await stripe.customers.create({
+                email: req.user.email,
+                name: req.user.name,
+                metadata: {
+                    userId: req.user._id.toString()
+                }
+            });
+            customerId = customer.id;
+            req.user.stripeCustomerId = customerId;
+            await req.user.save();
+        }
+
+        // Create setup intent for bank account
+        const setupIntent = await stripe.setupIntents.create({
+            customer: customerId,
+            payment_method_types: ['us_bank_account'],
+            payment_method_options: {
+                us_bank_account: {
+                    financial_connections: {
+                        permissions: ['payment_method', 'balances']
+                    }
+                }
+            }
+        });
+
+        res.json({
+            clientSecret: setupIntent.client_secret,
+            customerId: customerId
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete a saved payment method
+app.delete('/api/payments/methods/:paymentMethodId', authMiddleware, async (req, res) => {
+    try {
+        if (!stripe) {
+            return res.status(400).json({ error: 'Stripe not configured' });
+        }
+
+        const { paymentMethodId } = req.params;
+
+        // Verify the payment method belongs to this customer
+        const paymentMethod = await stripe.paymentMethods.retrieve(paymentMethodId);
+
+        if (paymentMethod.customer !== req.user.stripeCustomerId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        // Detach the payment method
+        await stripe.paymentMethods.detach(paymentMethodId);
+
+        res.json({ message: 'Payment method removed' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete all saved payment methods
+app.delete('/api/payments/methods', authMiddleware, async (req, res) => {
+    try {
+        if (!stripe || !req.user.stripeCustomerId) {
+            return res.json({ message: 'No payment methods to remove' });
+        }
+
+        // Get all payment methods
+        const paymentMethods = await stripe.paymentMethods.list({
+            customer: req.user.stripeCustomerId,
+            type: 'us_bank_account'
+        });
+
+        // Detach all
+        for (const pm of paymentMethods.data) {
+            await stripe.paymentMethods.detach(pm.id);
+        }
+
+        res.json({ message: 'All payment methods removed', count: paymentMethods.data.length });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
