@@ -1157,12 +1157,12 @@ app.post('/api/merch-credit/add', authMiddleware, async (req, res) => {
             credit = await MerchCredit.create({ userId: req.user._id });
         }
 
-        // Calculate new credit: $50 for every $2000 spent
+        // Calculate new credit: $20 for every $2000 spent
         const previousTotal = credit.totalSpent;
         const newTotal = previousTotal + orderAmount;
 
-        const previousCredits = Math.floor(previousTotal / 2000) * 50;
-        const newCredits = Math.floor(newTotal / 2000) * 50;
+        const previousCredits = Math.floor(previousTotal / 2000) * 20;
+        const newCredits = Math.floor(newTotal / 2000) * 20;
         const creditToAdd = newCredits - previousCredits;
 
         if (creditToAdd > 0) {
@@ -1744,8 +1744,8 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
 
             const previousTotal = credit.totalSpent;
             const newTotal = previousTotal + orderAmount;
-            const previousCredits = Math.floor(previousTotal / 2000) * 50;
-            const newCredits = Math.floor(newTotal / 2000) * 50;
+            const previousCredits = Math.floor(previousTotal / 2000) * 20;
+            const newCredits = Math.floor(newTotal / 2000) * 20;
             const creditToAdd = newCredits - previousCredits;
 
             if (creditToAdd > 0) {
@@ -1805,8 +1805,8 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
 
                     const previousTotal = credit.totalSpent;
                     const newTotal = previousTotal + orderAmount;
-                    const previousCredits = Math.floor(previousTotal / 2000) * 50;
-                    const newCredits = Math.floor(newTotal / 2000) * 50;
+                    const previousCredits = Math.floor(previousTotal / 2000) * 20;
+                    const newCredits = Math.floor(newTotal / 2000) * 20;
                     const creditToAdd = newCredits - previousCredits;
 
                     if (creditToAdd > 0) {
