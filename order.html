@@ -442,8 +442,8 @@
             orderData.totalAcres = totalAcres;
             orderData.totalCost = totalCost;
 
-            // Calculate merch credit earned ($50 per $2000)
-            const newCredit = Math.floor(totalCost / 2000) * 50;
+            // Calculate merch credit earned ($20 per $2000)
+            const newCredit = Math.floor(totalCost / 2000) * 20;
             orderData.merchCredit = newCredit + orderData.bankedCredit;
 
             // Update displays
