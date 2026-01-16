@@ -218,6 +218,60 @@ const merchCreditSchema = new mongoose.Schema({
 
 const MerchCredit = mongoose.model('MerchCredit', merchCreditSchema);
 
+// Chemical Pricing Model
+const chemicalSchema = new mongoose.Schema({
+    // Product info
+    productName: { type: String, required: true }, // e.g., "Dicamba DMA", "LV 6"
+    supplier: { type: String, required: true }, // e.g., "CPD", "Agri-Star", "AgSaver"
+
+    // Packaging
+    packSize: { type: String, required: true }, // e.g., "2x2.5", "Shuttle", "4x5", "20"
+    unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
+
+    // Pricing
+    price: { type: Number, required: true },
+
+    // Version/date tracking
+    priceDate: { type: Date, default: Date.now },
+    priceVersion: { type: String }, // Optional identifier like "2026-Q1" or "v1"
+
+    // Comparison data
+    equivalentProduct: String, // Product name this is equivalent to
+    equivalentSupplier: String, // Supplier of equivalent product
+    notes: String, // e.g., "Formulation equiv -11%", "Need to get equivalents"
+
+    // Status
+    isActive: { type: Boolean, default: true },
+
+    // Metadata
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Index for quick lookups
+chemicalSchema.index({ productName: 1, supplier: 1, packSize: 1 });
+chemicalSchema.index({ supplier: 1 });
+chemicalSchema.index({ priceDate: -1 });
+
+const Chemical = mongoose.model('Chemical', chemicalSchema);
+
+// Chemical Price History Model (for tracking price changes over time)
+const chemicalPriceHistorySchema = new mongoose.Schema({
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical', required: true },
+    productName: String,
+    supplier: String,
+    packSize: String,
+    unit: String,
+    price: { type: Number, required: true },
+    priceDate: { type: Date, default: Date.now },
+    priceVersion: String,
+    changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
+
 // Merch Order Model
 const merchOrderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -1855,6 +1909,322 @@ app.put('/api/representatives/check-info', authMiddleware, adminMiddleware, asyn
         await req.user.save();
 
         res.json({ message: 'Check payment info updated' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- CHEMICAL PRICING ROUTES ----
+
+// Get all chemicals (with optional filters)
+app.get('/api/chemicals', async (req, res) => {
+    try {
+        const { supplier, productName, activeOnly } = req.query;
+        let query = {};
+
+        if (supplier) query.supplier = new RegExp(supplier, 'i');
+        if (productName) query.productName = new RegExp(productName, 'i');
+        if (activeOnly === 'true') query.isActive = true;
+
+        const chemicals = await Chemical.find(query)
+            .sort({ productName: 1, supplier: 1, packSize: 1 });
+
+        res.json(chemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get unique suppliers list
+app.get('/api/chemicals/suppliers', async (req, res) => {
+    try {
+        const suppliers = await Chemical.distinct('supplier');
+        res.json(suppliers.sort());
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get unique product names list
+app.get('/api/chemicals/products', async (req, res) => {
+    try {
+        const products = await Chemical.distinct('productName');
+        res.json(products.sort());
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get chemical price comparison (same product from different suppliers)
+app.get('/api/chemicals/compare/:productName', async (req, res) => {
+    try {
+        const { productName } = req.params;
+
+        const chemicals = await Chemical.find({
+            productName: new RegExp(`^${productName}$`, 'i'),
+            isActive: true
+        }).sort({ price: 1 });
+
+        if (chemicals.length === 0) {
+            return res.status(404).json({ error: 'Product not found' });
+        }
+
+        // Calculate savings compared to highest price
+        const highestPrice = Math.max(...chemicals.map(c => c.price));
+        const comparison = chemicals.map(c => ({
+            ...c.toObject(),
+            savings: Math.round((highestPrice - c.price) * 100) / 100,
+            savingsPercent: Math.round(((highestPrice - c.price) / highestPrice) * 100 * 10) / 10
+        }));
+
+        res.json(comparison);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get price history for a chemical
+app.get('/api/chemicals/:id/history', async (req, res) => {
+    try {
+        const history = await ChemicalPriceHistory.find({ chemicalId: req.params.id })
+            .sort({ priceDate: -1 })
+            .populate('changedBy', 'name email');
+
+        res.json(history);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Add new chemical (admin only)
+app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { productName, supplier, packSize, unit, price, priceVersion, equivalentProduct, equivalentSupplier, notes } = req.body;
+
+        const chemical = new Chemical({
+            productName,
+            supplier,
+            packSize,
+            unit,
+            price,
+            priceVersion: priceVersion || new Date().toISOString().slice(0, 10),
+            equivalentProduct,
+            equivalentSupplier,
+            notes,
+            createdBy: req.user._id
+        });
+
+        await chemical.save();
+
+        // Add to price history
+        await ChemicalPriceHistory.create({
+            chemicalId: chemical._id,
+            productName,
+            supplier,
+            packSize,
+            unit,
+            price,
+            priceVersion: chemical.priceVersion,
+            changedBy: req.user._id
+        });
+
+        res.status(201).json(chemical);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update chemical price (admin only)
+app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { price, priceVersion, notes, equivalentProduct, equivalentSupplier, isActive } = req.body;
+
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) {
+            return res.status(404).json({ error: 'Chemical not found' });
+        }
+
+        // If price changed, save to history
+        if (price !== undefined && price !== chemical.price) {
+            await ChemicalPriceHistory.create({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                supplier: chemical.supplier,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                price: price,
+                priceVersion: priceVersion || new Date().toISOString().slice(0, 10),
+                changedBy: req.user._id
+            });
+
+            chemical.price = price;
+            chemical.priceDate = new Date();
+        }
+
+        if (priceVersion !== undefined) chemical.priceVersion = priceVersion;
+        if (notes !== undefined) chemical.notes = notes;
+        if (equivalentProduct !== undefined) chemical.equivalentProduct = equivalentProduct;
+        if (equivalentSupplier !== undefined) chemical.equivalentSupplier = equivalentSupplier;
+        if (isActive !== undefined) chemical.isActive = isActive;
+
+        chemical.updatedAt = new Date();
+        await chemical.save();
+
+        res.json(chemical);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Bulk import chemicals (admin only)
+app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { chemicals, supplier, priceVersion } = req.body;
+
+        if (!Array.isArray(chemicals)) {
+            return res.status(400).json({ error: 'chemicals must be an array' });
+        }
+
+        const results = [];
+        const version = priceVersion || new Date().toISOString().slice(0, 10);
+
+        for (const chem of chemicals) {
+            // Check if chemical already exists
+            let existing = await Chemical.findOne({
+                productName: chem.productName,
+                supplier: supplier || chem.supplier,
+                packSize: chem.packSize
+            });
+
+            if (existing) {
+                // Update price if different
+                if (existing.price !== chem.price) {
+                    await ChemicalPriceHistory.create({
+                        chemicalId: existing._id,
+                        productName: existing.productName,
+                        supplier: existing.supplier,
+                        packSize: existing.packSize,
+                        unit: existing.unit,
+                        price: chem.price,
+                        priceVersion: version,
+                        changedBy: req.user._id
+                    });
+
+                    existing.price = chem.price;
+                    existing.priceDate = new Date();
+                    existing.priceVersion = version;
+                    existing.updatedAt = new Date();
+                    await existing.save();
+
+                    results.push({ action: 'updated', chemical: existing });
+                } else {
+                    results.push({ action: 'unchanged', chemical: existing });
+                }
+            } else {
+                // Create new
+                const newChemical = new Chemical({
+                    productName: chem.productName,
+                    supplier: supplier || chem.supplier,
+                    packSize: chem.packSize,
+                    unit: chem.unit,
+                    price: chem.price,
+                    priceVersion: version,
+                    equivalentProduct: chem.equivalentProduct,
+                    equivalentSupplier: chem.equivalentSupplier,
+                    notes: chem.notes,
+                    createdBy: req.user._id
+                });
+
+                await newChemical.save();
+
+                await ChemicalPriceHistory.create({
+                    chemicalId: newChemical._id,
+                    productName: newChemical.productName,
+                    supplier: newChemical.supplier,
+                    packSize: newChemical.packSize,
+                    unit: newChemical.unit,
+                    price: newChemical.price,
+                    priceVersion: version,
+                    changedBy: req.user._id
+                });
+
+                results.push({ action: 'created', chemical: newChemical });
+            }
+        }
+
+        const summary = {
+            total: results.length,
+            created: results.filter(r => r.action === 'created').length,
+            updated: results.filter(r => r.action === 'updated').length,
+            unchanged: results.filter(r => r.action === 'unchanged').length
+        };
+
+        res.json({ summary, results });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete chemical (admin only)
+app.delete('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const chemical = await Chemical.findByIdAndDelete(req.params.id);
+        if (!chemical) {
+            return res.status(404).json({ error: 'Chemical not found' });
+        }
+
+        // Keep history for audit trail
+        res.json({ message: 'Chemical deleted', chemical });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get full price comparison report
+app.get('/api/chemicals/report/comparison', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // Get all unique products
+        const products = await Chemical.distinct('productName', { isActive: true });
+
+        const report = [];
+
+        for (const productName of products) {
+            const suppliers = await Chemical.find({
+                productName,
+                isActive: true
+            }).sort({ price: 1 });
+
+            if (suppliers.length > 1) {
+                const lowest = suppliers[0];
+                const highest = suppliers[suppliers.length - 1];
+
+                report.push({
+                    productName,
+                    supplierCount: suppliers.length,
+                    lowestPrice: {
+                        supplier: lowest.supplier,
+                        packSize: lowest.packSize,
+                        price: lowest.price
+                    },
+                    highestPrice: {
+                        supplier: highest.supplier,
+                        packSize: highest.packSize,
+                        price: highest.price
+                    },
+                    potentialSavings: Math.round((highest.price - lowest.price) * 100) / 100,
+                    allSuppliers: suppliers.map(s => ({
+                        supplier: s.supplier,
+                        packSize: s.packSize,
+                        price: s.price
+                    }))
+                });
+            }
+        }
+
+        // Sort by potential savings
+        report.sort((a, b) => b.potentialSavings - a.potentialSavings);
+
+        res.json(report);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
