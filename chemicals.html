@@ -807,8 +807,8 @@
                                 <td><strong>$${totalCost.toFixed(2)}</strong></td>
                             </tr>
                             <tr>
-                                <td colspan="4">Merch Credit Earned ($20 per $2,000)</td>
-                                <td>$${(Math.floor(totalCost / 2000) * 20).toFixed(2)}</td>
+                                <td colspan="4">Merch Credit Earned ($10 per $1,000)</td>
+                                <td>$${(Math.floor(totalCost / 1000) * 10).toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -1029,8 +1029,8 @@
                                 <td>$${(totalCost / acres).toFixed(2)}</td>
                             </tr>
                             <tr>
-                                <td colspan="3">Merch Credit Earned ($20 per $2,000)</td>
-                                <td>$${(Math.floor(totalCost / 2000) * 20).toFixed(2)}</td>
+                                <td colspan="3">Merch Credit Earned ($10 per $1,000)</td>
+                                <td>$${(Math.floor(totalCost / 1000) * 10).toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -1197,7 +1197,7 @@
 
             itemCount.textContent = `${orderItems.length} items`;
             orderTotal.textContent = `$${total.toFixed(2)}`;
-            merchCredit.textContent = `$${(Math.floor(total / 2000) * 20).toFixed(2)}`;
+            merchCredit.textContent = `$${(Math.floor(total / 1000) * 10).toFixed(2)}`;
             submitBtn.disabled = false;
         }
 
