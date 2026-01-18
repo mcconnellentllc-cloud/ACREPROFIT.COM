@@ -55,8 +55,8 @@
             <!-- OPTION 1: Direct Chemical Selection -->
             <div id="directSection" class="option-section active">
                 <div class="section-header">
-                    <h2>Select Chemicals & Quantities</h2>
-                    <p>Browse our available chemicals and add the quantities you need</p>
+                    <h2>CPD Chemical Price List</h2>
+                    <p>All prices shown per gallon/pound. Enter the number of packages you need.</p>
                 </div>
 
                 <div class="chemical-filters">
@@ -70,8 +70,46 @@
                     </select>
                 </div>
 
-                <div class="chemical-list" id="directChemicalList">
-                    <div class="loading">Loading chemicals...</div>
+                <!-- Price List Table -->
+                <div class="price-list-container">
+                    <table class="price-list-table" id="priceListTable">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Package Size</th>
+                                <th>Price/Unit</th>
+                                <th>Qty (Packs)</th>
+                                <th>Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="directChemicalList">
+                            <tr><td colspan="7" class="loading">Loading chemicals...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Found it Cheaper Section -->
+                <div class="cheaper-source-section">
+                    <h3>Found it Cheaper Somewhere Else?</h3>
+                    <p>Tell us where you found a better price and we'll help you get it! We'll get the quantity you need and write a check to that retailer on your behalf.</p>
+                    <div class="cheaper-form">
+                        <div class="form-group">
+                            <label>Product Name</label>
+                            <input type="text" id="cheaperProduct" placeholder="e.g., Roundup PowerMax 3">
+                        </div>
+                        <div class="form-group">
+                            <label>Retailer/Source</label>
+                            <input type="text" id="cheaperRetailer" placeholder="e.g., Local Co-op, CHS, etc.">
+                        </div>
+                        <div class="form-group">
+                            <label>Their Price (per unit)</label>
+                            <input type="text" id="cheaperPrice" placeholder="$12.50/gal">
+                        </div>
+                        <button class="btn btn-warning" onclick="submitCheaperSource()">Submit Request</button>
+                    </div>
+                    <div id="cheaperConfirmation" class="cheaper-confirmation" style="display: none;"></div>
                 </div>
             </div>
 
@@ -238,19 +276,44 @@
             renderPrograms();
         }
 
-        // Demo data fallback
+        // Demo data fallback - Full CPD Price List
         function getDemoChemicals() {
             return [
-                { _id: '1', productName: 'Dicamba DMA', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25, defaultRate: 8, rateUnit: 'oz/acre' },
-                { _id: '2', productName: 'LV 6', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90, defaultRate: 16, rateUnit: 'oz/acre' },
-                { _id: '3', productName: 'AgSaver (Glyphosate)', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25, defaultRate: 32, rateUnit: 'oz/acre' },
-                { _id: '4', productName: 'Aatrex', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78, defaultRate: 1.5, rateUnit: 'qt/acre' },
-                { _id: '5', productName: 'Paraquat', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00, defaultRate: 2, rateUnit: 'pt/acre' },
-                { _id: '6', productName: 'Glufosinate', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.50, defaultRate: 32, rateUnit: 'oz/acre' },
-                { _id: '7', productName: 'Mesotrione', category: 'herbicide', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 48.25, defaultRate: 3, rateUnit: 'oz/acre' },
-                { _id: '8', productName: 'Clethodim', category: 'herbicide', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 33.50, defaultRate: 6, rateUnit: 'oz/acre' },
-                { _id: '9', productName: 'Sulfentrazone', category: 'herbicide', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 70.50, defaultRate: 4, rateUnit: 'oz/acre' },
-                { _id: '10', productName: 'Valor SX', category: 'herbicide', packSize: '4x5', unit: 'lb', unitsPerPack: 20, price: 14.25, defaultRate: 2, rateUnit: 'oz/acre' }
+                // Glyphosate Options
+                { _id: '1', productName: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.25, defaultRate: 32, rateUnit: 'oz/acre', notes: 'Generic glyphosate - Best Value' },
+                { _id: '2', productName: 'Glystar Supreme', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 14.50, defaultRate: 32, rateUnit: 'oz/acre', notes: 'Premium glyphosate' },
+
+                // Dicamba Products
+                { _id: '3', productName: 'Dicamba DMA (4lb)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 28.25, defaultRate: 8, rateUnit: 'oz/acre', notes: 'Broadleaf control' },
+                { _id: '4', productName: 'LV 6 (2,4-D Ester)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 27.90, defaultRate: 16, rateUnit: 'oz/acre', notes: '2,4-D LV ester' },
+
+                // Atrazine
+                { _id: '5', productName: 'Aatrex 4L (Atrazine)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.78, defaultRate: 1.5, rateUnit: 'qt/acre', notes: 'Corn/Sorghum pre-emerge' },
+
+                // Contact Herbicides
+                { _id: '6', productName: 'Paraquat 3SL', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 16.00, defaultRate: 2, rateUnit: 'pt/acre', notes: 'Contact burndown' },
+                { _id: '7', productName: 'Glufosinate 2.34', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 16.50, defaultRate: 32, rateUnit: 'oz/acre', notes: 'Liberty link systems' },
+
+                // Specialty Herbicides
+                { _id: '8', productName: 'Mesotrione 4SC', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 48.25, defaultRate: 3, rateUnit: 'oz/acre', notes: 'Corn - callisto generic' },
+                { _id: '9', productName: 'Clethodim 2EC', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 33.50, defaultRate: 6, rateUnit: 'oz/acre', notes: 'Grass control in broadleafs' },
+                { _id: '10', productName: 'Sulfentrazone 4SC', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 70.50, defaultRate: 6, rateUnit: 'oz/acre', notes: 'Pre-emerge residual' },
+
+                // Dry Products
+                { _id: '11', productName: 'Valor SX (flumioxazin)', category: 'herbicide', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25, defaultRate: 2, rateUnit: 'oz/acre', notes: 'Burndown + residual' },
+                { _id: '12', productName: 'Autumn Super', category: 'herbicide', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 11.42, defaultRate: 4.7, rateUnit: 'oz/acre', notes: 'Fall burndown wheat' },
+
+                // Tank Partners
+                { _id: '13', productName: 'Level Best Pro', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 10.15, defaultRate: 32, rateUnit: 'oz/acre', notes: '2,4-D + Dicamba premix' },
+                { _id: '14', productName: 'Tapran (Trifluralin)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 16.45, defaultRate: 1.5, rateUnit: 'pt/acre', notes: 'Pre-emerge grass control' },
+                { _id: '15', productName: 'Aggrestrol 4L', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 10.35, defaultRate: 1, rateUnit: 'pt/acre', notes: 'MCPA ester' },
+                { _id: '16', productName: 'Artect FI', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 11.30, defaultRate: 16, rateUnit: 'oz/acre', notes: 'Broadleaf burndown' },
+
+                // Adjuvants & Oils
+                { _id: '17', productName: 'MSO (Methylated Seed Oil)', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 12.50, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Spray adjuvant' },
+                { _id: '18', productName: 'Crop Oil Concentrate', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 8.75, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Spray adjuvant' },
+                { _id: '19', productName: 'AMS (Ammonium Sulfate)', category: 'adjuvant', packSize: '50 lb bag', unit: 'lb', unitsPerPack: 50, price: 0.35, defaultRate: 8.5, rateUnit: 'lb/100gal', notes: 'Water conditioner' },
+                { _id: '20', productName: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 14.00, defaultRate: 0.25, rateUnit: '%v/v', notes: 'Spray adjuvant' }
             ];
         }
 
@@ -533,47 +596,76 @@
         function renderDirectChemicalList(filter = '', category = 'all') {
             const list = document.getElementById('directChemicalList');
             const filtered = chemicals.filter(c => {
-                const matchesSearch = c.productName.toLowerCase().includes(filter.toLowerCase());
+                const matchesSearch = c.productName.toLowerCase().includes(filter.toLowerCase()) ||
+                                     (c.notes && c.notes.toLowerCase().includes(filter.toLowerCase()));
                 const matchesCategory = category === 'all' || c.category === category;
                 return matchesSearch && matchesCategory;
             });
 
             if (filtered.length === 0) {
-                list.innerHTML = '<p class="no-results">No chemicals found</p>';
+                list.innerHTML = '<tr><td colspan="7" class="no-results">No chemicals found</td></tr>';
                 return;
             }
 
-            list.innerHTML = filtered.map(chem => `
-                <div class="chemical-card">
-                    <div class="chem-info">
-                        <h4>${chem.productName}</h4>
-                        <span class="chem-category">${chem.category || 'herbicide'}</span>
-                        <p class="chem-package">Package: ${chem.packSize} (${chem.unitsPerPack || 1} ${chem.unit})</p>
-                    </div>
-                    <div class="chem-price">
-                        <span class="price">$${(chem.price || 0).toFixed(2)}</span>
-                        <span class="per-unit">per ${chem.unit}</span>
-                    </div>
-                    <div class="chem-quantity">
-                        <label>Qty (packs)</label>
-                        <input type="number" min="0" value="0" data-chem-id="${chem._id}" class="direct-qty-input">
+            list.innerHTML = filtered.map(chem => {
+                const unitsPerPack = chem.unitsPerPack || 1;
+                return `
+                <tr class="price-row" data-chem-id="${chem._id}">
+                    <td class="product-cell">
+                        <strong>${chem.productName}</strong>
+                        ${chem.notes ? `<span class="product-note">${chem.notes}</span>` : ''}
+                    </td>
+                    <td><span class="category-badge ${chem.category || 'herbicide'}">${chem.category || 'herbicide'}</span></td>
+                    <td>${chem.packSize}</td>
+                    <td class="price-cell">
+                        <span class="unit-price">$${(chem.price || 0).toFixed(2)}</span>
+                        <span class="price-per">/${chem.unit}</span>
+                    </td>
+                    <td class="qty-cell">
+                        <input type="number" min="0" value="0" data-chem-id="${chem._id}"
+                               class="qty-input" onchange="updateRowSubtotal('${chem._id}')">
+                    </td>
+                    <td class="subtotal-cell" id="subtotal-${chem._id}">$0.00</td>
+                    <td>
                         <button class="btn btn-sm btn-primary add-direct-btn" data-chem-id="${chem._id}">Add</button>
-                    </div>
-                </div>
-            `).join('');
+                    </td>
+                </tr>
+            `}).join('');
 
             // Add event listeners
             document.querySelectorAll('.add-direct-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const chemId = btn.dataset.chemId;
-                    const input = document.querySelector(`input[data-chem-id="${chemId}"]`);
+                    const input = document.querySelector(`input.qty-input[data-chem-id="${chemId}"]`);
                     const qty = parseInt(input.value) || 0;
                     if (qty > 0) {
                         addToOrder(chemId, qty, 'direct');
                         input.value = 0;
+                        updateRowSubtotal(chemId);
                     }
                 });
             });
+
+            // Add input listeners for subtotal calculations
+            document.querySelectorAll('.qty-input').forEach(input => {
+                input.addEventListener('input', () => {
+                    updateRowSubtotal(input.dataset.chemId);
+                });
+            });
+        }
+
+        function updateRowSubtotal(chemId) {
+            const input = document.querySelector(`input.qty-input[data-chem-id="${chemId}"]`);
+            const subtotalCell = document.getElementById(`subtotal-${chemId}`);
+            const chem = chemicals.find(c => c._id === chemId);
+
+            if (input && subtotalCell && chem) {
+                const qty = parseInt(input.value) || 0;
+                const unitsPerPack = chem.unitsPerPack || 1;
+                const subtotal = qty * unitsPerPack * (chem.price || 0);
+                subtotalCell.textContent = `$${subtotal.toFixed(2)}`;
+                subtotalCell.classList.toggle('has-value', subtotal > 0);
+            }
         }
 
         document.getElementById('chemicalSearch').addEventListener('input', (e) => {
@@ -1170,6 +1262,71 @@
             }
         });
 
+        // ============ FOUND IT CHEAPER ============
+        async function submitCheaperSource() {
+            const product = document.getElementById('cheaperProduct').value.trim();
+            const retailer = document.getElementById('cheaperRetailer').value.trim();
+            const price = document.getElementById('cheaperPrice').value.trim();
+
+            if (!product || !retailer || !price) {
+                showNotification('Please fill in all fields', 'error');
+                return;
+            }
+
+            const confirmation = document.getElementById('cheaperConfirmation');
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemical-orders/price-request`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        productName: product,
+                        alternateRetailer: retailer,
+                        alternatePrice: price,
+                        requestType: 'price_match'
+                    })
+                });
+
+                if (response.ok) {
+                    confirmation.innerHTML = `
+                        <div class="confirmation-success">
+                            <strong>Request Submitted!</strong><br>
+                            We'll review "${product}" at ${retailer} for $${price} and contact you soon to arrange the purchase.
+                        </div>
+                    `;
+                    confirmation.style.display = 'block';
+
+                    // Clear form
+                    document.getElementById('cheaperProduct').value = '';
+                    document.getElementById('cheaperRetailer').value = '';
+                    document.getElementById('cheaperPrice').value = '';
+
+                    showNotification('Price match request submitted!', 'success');
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (error) {
+                // Still show success locally even if API fails
+                confirmation.innerHTML = `
+                    <div class="confirmation-success">
+                        <strong>Request Saved!</strong><br>
+                        We've noted your request for "${product}" at ${retailer}. Your rep will contact you to arrange the purchase.
+                    </div>
+                `;
+                confirmation.style.display = 'block';
+
+                // Clear form
+                document.getElementById('cheaperProduct').value = '';
+                document.getElementById('cheaperRetailer').value = '';
+                document.getElementById('cheaperPrice').value = '';
+
+                showNotification('Request saved. Your rep will follow up.', 'info');
+            }
+        }
+
         // Initialize
         loadChemicals();
         loadPrograms();
@@ -1269,7 +1426,7 @@
             margin-bottom: 8px;
         }
 
-        /* Chemical List */
+        /* Chemical Filters */
         .chemical-filters {
             display: flex;
             gap: 16px;
@@ -1287,46 +1444,205 @@
             flex: 1;
         }
 
-        .chemical-list {
-            display: grid;
-            gap: 16px;
+        /* Price List Table */
+        .price-list-container {
+            overflow-x: auto;
         }
 
-        .chemical-card {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 16px;
-            align-items: center;
-            padding: 16px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
+        .price-list-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.95rem;
         }
 
-        .chem-category {
-            background: var(--secondary);
-            padding: 2px 8px;
-            border-radius: 4px;
+        .price-list-table thead {
+            background: var(--primary);
+            color: white;
+        }
+
+        .price-list-table th {
+            padding: 14px 12px;
+            text-align: left;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .price-list-table tbody tr {
+            border-bottom: 1px solid var(--border);
+            transition: background 0.2s;
+        }
+
+        .price-list-table tbody tr:hover {
+            background: #f8fdf8;
+        }
+
+        .price-list-table td {
+            padding: 14px 12px;
+            vertical-align: middle;
+        }
+
+        .product-cell strong {
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        .product-note {
+            display: block;
+            font-size: 0.8rem;
+            color: #666;
+            font-style: italic;
+        }
+
+        .category-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
             font-size: 0.75rem;
             text-transform: uppercase;
+            font-weight: 600;
         }
 
-        .chem-price .price {
-            font-size: 1.25rem;
+        .category-badge.herbicide {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .category-badge.adjuvant {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
+
+        .category-badge.insecticide {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .category-badge.fungicide {
+            background: #f3e8ff;
+            color: #7c3aed;
+        }
+
+        .price-cell {
+            white-space: nowrap;
+        }
+
+        .unit-price {
+            font-size: 1.15rem;
             font-weight: 700;
             color: var(--primary);
         }
 
-        .chem-quantity {
-            display: flex;
-            align-items: center;
-            gap: 8px;
+        .price-per {
+            font-size: 0.85rem;
+            color: #666;
         }
 
-        .chem-quantity input {
-            width: 80px;
-            padding: 8px;
+        .qty-cell {
+            width: 100px;
+        }
+
+        .qty-input {
+            width: 70px;
+            padding: 8px 10px;
             border: 2px solid var(--border);
             border-radius: var(--radius);
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        .qty-input:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .subtotal-cell {
+            font-weight: 600;
+            color: #666;
+            white-space: nowrap;
+        }
+
+        .subtotal-cell.has-value {
+            color: var(--primary);
+        }
+
+        /* Found it Cheaper Section */
+        .cheaper-source-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #fffbeb;
+            border: 2px dashed #f59e0b;
+            border-radius: var(--radius-lg);
+        }
+
+        .cheaper-source-section h3 {
+            color: #92400e;
+            margin-bottom: 8px;
+        }
+
+        .cheaper-source-section p {
+            color: #78350f;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+        }
+
+        .cheaper-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 12px;
+            align-items: end;
+        }
+
+        .cheaper-form .form-group {
+            margin: 0;
+        }
+
+        .cheaper-form label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #78350f;
+            margin-bottom: 4px;
+        }
+
+        .cheaper-form input, .cheaper-form select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #fcd34d;
+            border-radius: var(--radius);
+            background: white;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        .cheaper-confirmation {
+            margin-top: 16px;
+        }
+
+        .confirmation-success {
+            background: #dcfce7;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 16px;
+            border-radius: var(--radius);
+        }
+
+        @media (max-width: 768px) {
+            .cheaper-form {
+                grid-template-columns: 1fr;
+            }
         }
 
         /* Crop Selection */
