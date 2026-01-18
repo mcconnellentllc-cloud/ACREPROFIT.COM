@@ -1916,6 +1916,146 @@ app.put('/api/representatives/check-info', authMiddleware, adminMiddleware, asyn
 
 // ---- CHEMICAL PRICING ROUTES ----
 
+// Seed initial chemical pricing data
+app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { secretKey } = req.body;
+
+        // Protection to prevent accidental re-seeding
+        if (secretKey !== 'acreprofit2026seed') {
+            return res.status(403).json({ error: 'Invalid secret key' });
+        }
+
+        const priceVersion = '2026-01-18';
+
+        // Acre Profit prices
+        const acreProfit = [
+            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', price: 31.24 },
+            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', price: 30.89 },
+            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', price: 35.31 },
+            { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', price: 32.43 },
+            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', price: 30.14 },
+            { productName: 'RT3', packSize: 'Shuttle', unit: 'gl', price: 17.50 },
+            { productName: 'Glystar Supreme', packSize: 'Shuttle', unit: 'gl', price: 15.53 },
+            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', price: 12.78 },
+            { productName: 'Level Best Pro', packSize: '2x2.5', unit: 'gl', price: 43.83 },
+            { productName: 'Level Best Pro', packSize: 'Shuttle', unit: 'gl', price: 42.42 },
+            { productName: 'Tapran', packSize: '2x2.5', unit: 'gl', price: 28.71 },
+            { productName: 'Tapran', packSize: 'Shuttle', unit: 'gl', price: 28.16 },
+            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', price: 33.81 },
+            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', price: 32.37 },
+            { productName: 'Artect FI', packSize: '2x2.5', unit: 'gl', price: 84.71 },
+            { productName: 'Artect FI', packSize: 'Shuttle', unit: 'gl', price: 84.71 },
+            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', price: 75.20 },
+            { productName: 'Autumn Super', packSize: '20', unit: 'oz', price: 22.58 },
+            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', price: 15.06 }
+        ];
+
+        // CPD prices (competitor/alternate)
+        const cpdPrices = [
+            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', price: 30.25 },
+            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', price: 28.25 },
+            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', price: 30.57 },
+            { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', price: 29.90 },
+            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', price: 27.90 },
+            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', price: 13.25, equivalentProduct: 'RT3', notes: 'Formulation equiv -11%' },
+            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', price: 13.25, equivalentProduct: 'Glystar Supreme', notes: 'Formulation equiv +25%' },
+            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', price: 13.35 },
+            { productName: 'Agri-Star', packSize: '2x2.5', unit: 'gl', price: 39.25, equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
+            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gl', price: 38.13, equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
+            { productName: 'Agri-Star Tapran', packSize: '2x2.5', unit: 'gl', price: 19.00, equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
+            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gl', price: 18.00, equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
+            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', price: 21.00, notes: 'Need to get equivalents' },
+            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', price: 20.00, notes: 'Need to get equivalents' },
+            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', price: 70.50 },
+            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', price: 14.25 },
+            // CPD-only products
+            { productName: 'CPD Glufosinate', packSize: 'Shuttle', unit: 'gl', price: 16.50 },
+            { productName: 'CPD Paraquat', packSize: 'Shuttle', unit: 'gl', price: 16.00 },
+            { productName: 'CPD Mesotrione', packSize: '2x2.5', unit: 'gl', price: 48.25 },
+            { productName: 'CPD Clethodim', packSize: '2x2.5', unit: 'gl', price: 33.50 },
+            { productName: 'CPD Clethodim', packSize: '135', unit: 'gl', price: 33.00 }
+        ];
+
+        const results = { acreProfit: [], cpd: [] };
+
+        // Insert Acre Profit prices
+        for (const chem of acreProfit) {
+            const existing = await Chemical.findOne({
+                productName: chem.productName,
+                supplier: 'Acre Profit',
+                packSize: chem.packSize
+            });
+
+            if (!existing) {
+                const newChem = await Chemical.create({
+                    ...chem,
+                    supplier: 'Acre Profit',
+                    priceVersion,
+                    createdBy: req.user._id
+                });
+                await ChemicalPriceHistory.create({
+                    chemicalId: newChem._id,
+                    ...chem,
+                    supplier: 'Acre Profit',
+                    priceVersion,
+                    changedBy: req.user._id
+                });
+                results.acreProfit.push({ action: 'created', product: chem.productName });
+            } else {
+                results.acreProfit.push({ action: 'exists', product: chem.productName });
+            }
+        }
+
+        // Insert CPD prices
+        for (const chem of cpdPrices) {
+            const existing = await Chemical.findOne({
+                productName: chem.productName,
+                supplier: 'CPD',
+                packSize: chem.packSize
+            });
+
+            if (!existing) {
+                const newChem = await Chemical.create({
+                    ...chem,
+                    supplier: 'CPD',
+                    priceVersion,
+                    createdBy: req.user._id
+                });
+                await ChemicalPriceHistory.create({
+                    chemicalId: newChem._id,
+                    productName: chem.productName,
+                    supplier: 'CPD',
+                    packSize: chem.packSize,
+                    unit: chem.unit,
+                    price: chem.price,
+                    priceVersion,
+                    changedBy: req.user._id
+                });
+                results.cpd.push({ action: 'created', product: chem.productName });
+            } else {
+                results.cpd.push({ action: 'exists', product: chem.productName });
+            }
+        }
+
+        res.json({
+            message: 'Seed data loaded',
+            summary: {
+                acreProfit: {
+                    created: results.acreProfit.filter(r => r.action === 'created').length,
+                    existed: results.acreProfit.filter(r => r.action === 'exists').length
+                },
+                cpd: {
+                    created: results.cpd.filter(r => r.action === 'created').length,
+                    existed: results.cpd.filter(r => r.action === 'exists').length
+                }
+            }
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Get all chemicals (with optional filters)
 app.get('/api/chemicals', async (req, res) => {
     try {

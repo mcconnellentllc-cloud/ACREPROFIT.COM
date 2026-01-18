@@ -417,6 +417,7 @@
             </a>
             <div class="header-actions">
                 <a href="admin.html" class="btn btn-secondary">Back to Admin</a>
+                <button class="btn btn-secondary" onclick="seedData()">Load Initial Data</button>
                 <button class="btn btn-primary" onclick="showAddModal()">+ Add Chemical</button>
             </div>
         </header>
@@ -1046,19 +1047,67 @@ LV 6,2x2.5,gl,32.43,"></textarea>
             setTimeout(() => alert.remove(), 5000);
         }
 
+        // Seed initial data
+        async function seedData() {
+            if (!confirm('This will load the initial chemical pricing data (Acre Profit and CPD prices). Continue?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals/seed`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ secretKey: 'acreprofit2026seed' })
+                });
+
+                if (response.ok) {
+                    const result = await response.json();
+                    showAlert(`Data loaded! Acre Profit: ${result.summary.acreProfit.created} created. CPD: ${result.summary.cpd.created} created.`, 'success');
+                    loadChemicals();
+                    loadSuppliers();
+                } else {
+                    const error = await response.json();
+                    showAlert(error.error || 'Failed to seed data', 'error');
+                }
+            } catch (error) {
+                showAlert('Network error. Make sure the API is running.', 'error');
+            }
+        }
+
         // Demo data when API is unavailable
         function getDemoChemicals() {
             return [
+                // Acre Profit prices
                 { _id: '1', productName: 'Dicamba DMA', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 31.24, priceDate: new Date(), notes: '' },
-                { _id: '2', productName: 'Dicamba DMA', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 30.25, priceDate: new Date(), notes: '' },
-                { _id: '3', productName: 'Dicamba DMA', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 30.89, priceDate: new Date(), notes: '' },
-                { _id: '4', productName: 'Dicamba DMA', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 28.25, priceDate: new Date(), notes: '' },
-                { _id: '5', productName: 'LV 6', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 32.43, priceDate: new Date(), notes: '' },
-                { _id: '6', productName: 'LV 6', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 29.90, priceDate: new Date(), notes: '' },
-                { _id: '7', productName: 'RT3', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 17.50, priceDate: new Date(), notes: '' },
-                { _id: '8', productName: 'AgSaver', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 13.25, priceDate: new Date(), notes: 'Formulation equiv -11%' },
-                { _id: '9', productName: 'Glystar Supreme', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 15.53, priceDate: new Date(), notes: '' },
-                { _id: '10', productName: 'AgSaver', supplier: 'CPD (Glystar equiv)', packSize: 'Shuttle', unit: 'gl', price: 13.25, priceDate: new Date(), notes: 'Formulation equiv +25%' }
+                { _id: '2', productName: 'Dicamba DMA', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 30.89, priceDate: new Date(), notes: '' },
+                { _id: '3', productName: 'Dicamba HD', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 35.31, priceDate: new Date(), notes: '' },
+                { _id: '4', productName: 'LV 6', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 32.43, priceDate: new Date(), notes: '' },
+                { _id: '5', productName: 'LV 6', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 30.14, priceDate: new Date(), notes: '' },
+                { _id: '6', productName: 'RT3', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 17.50, priceDate: new Date(), notes: '' },
+                { _id: '7', productName: 'Glystar Supreme', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 15.53, priceDate: new Date(), notes: '' },
+                { _id: '8', productName: 'Aatrex', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 12.78, priceDate: new Date(), notes: '' },
+                { _id: '9', productName: 'Level Best Pro', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 43.83, priceDate: new Date(), notes: '' },
+                { _id: '10', productName: 'Tapran', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 28.71, priceDate: new Date(), notes: '' },
+                { _id: '11', productName: 'Aggrestrol', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 33.81, priceDate: new Date(), notes: '' },
+                { _id: '12', productName: 'Sulfentrazone', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 75.20, priceDate: new Date(), notes: '' },
+                { _id: '13', productName: 'Valor SX', supplier: 'Acre Profit', packSize: '4x5', unit: 'lb', price: 15.06, priceDate: new Date(), notes: '' },
+                // CPD prices
+                { _id: '14', productName: 'Dicamba DMA', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 30.25, priceDate: new Date(), notes: '' },
+                { _id: '15', productName: 'Dicamba DMA', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 28.25, priceDate: new Date(), notes: '' },
+                { _id: '16', productName: 'Dicamba HD', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 30.57, priceDate: new Date(), notes: '' },
+                { _id: '17', productName: 'LV 6', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 29.90, priceDate: new Date(), notes: '' },
+                { _id: '18', productName: 'LV 6', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 27.90, priceDate: new Date(), notes: '' },
+                { _id: '19', productName: 'AgSaver', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 13.25, priceDate: new Date(), notes: 'Formulation equiv -11% (RT3 equiv)' },
+                { _id: '20', productName: 'Aatrex', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 13.35, priceDate: new Date(), notes: '' },
+                { _id: '21', productName: 'Aggrestrol', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 21.00, priceDate: new Date(), notes: 'Need to get equivalents' },
+                { _id: '22', productName: 'Sulfentrazone', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 70.50, priceDate: new Date(), notes: '' },
+                { _id: '23', productName: 'Valor SX', supplier: 'CPD', packSize: '4x5', unit: 'lb', price: 14.25, priceDate: new Date(), notes: '' },
+                { _id: '24', productName: 'CPD Glufosinate', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 16.50, priceDate: new Date(), notes: '' },
+                { _id: '25', productName: 'CPD Paraquat', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 16.00, priceDate: new Date(), notes: '' },
+                { _id: '26', productName: 'CPD Mesotrione', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 48.25, priceDate: new Date(), notes: '' }
             ];
         }
 
