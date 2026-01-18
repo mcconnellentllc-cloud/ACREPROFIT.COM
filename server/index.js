@@ -222,26 +222,40 @@ const MerchCredit = mongoose.model('MerchCredit', merchCreditSchema);
 const chemicalSchema = new mongoose.Schema({
     // Product info
     productName: { type: String, required: true }, // e.g., "Dicamba DMA", "LV 6"
-    supplier: { type: String, required: true }, // e.g., "CPD", "Agri-Star", "AgSaver"
+    sourceSupplier: { type: String, required: true }, // Where we buy from: "CPD", "Agri-Star"
+
+    // Category and crop info
+    category: { type: String, enum: ['herbicide', 'fungicide', 'insecticide', 'adjuvant', 'fertilizer', 'other'], default: 'herbicide' },
+    crops: [String], // Which crops this can be used on: ['corn', 'soybeans', 'wheat']
 
     // Packaging
     packSize: { type: String, required: true }, // e.g., "2x2.5", "Shuttle", "4x5", "20"
     unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
+    unitsPerPack: { type: Number }, // e.g., 250 for a Shuttle (250 gal)
 
-    // Pricing
-    price: { type: Number, required: true },
+    // Pricing - COST is what Acre Profit pays, SELL is customer price
+    costPrice: { type: Number, required: true }, // What we pay the supplier (per unit)
+    sellPrice: { type: Number, required: true }, // What we charge customers (per unit)
+    margin: { type: Number }, // Calculated: (sellPrice - costPrice) / sellPrice * 100
+
+    // Application info (for program building)
+    defaultRate: { type: Number }, // Default application rate
+    rateUnit: { type: String }, // e.g., "oz/acre", "pt/acre", "qt/acre"
+    minRate: { type: Number },
+    maxRate: { type: Number },
 
     // Version/date tracking
     priceDate: { type: Date, default: Date.now },
     priceVersion: { type: String }, // Optional identifier like "2026-Q1" or "v1"
 
-    // Comparison data
+    // Comparison/equivalent data
     equivalentProduct: String, // Product name this is equivalent to
     equivalentSupplier: String, // Supplier of equivalent product
     notes: String, // e.g., "Formulation equiv -11%", "Need to get equivalents"
 
     // Status
     isActive: { type: Boolean, default: true },
+    availableForOrder: { type: Boolean, default: true },
 
     // Metadata
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -249,9 +263,19 @@ const chemicalSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// Auto-calculate margin before save
+chemicalSchema.pre('save', function(next) {
+    if (this.sellPrice && this.costPrice) {
+        this.margin = Math.round(((this.sellPrice - this.costPrice) / this.sellPrice) * 100 * 100) / 100;
+    }
+    next();
+});
+
 // Index for quick lookups
-chemicalSchema.index({ productName: 1, supplier: 1, packSize: 1 });
-chemicalSchema.index({ supplier: 1 });
+chemicalSchema.index({ productName: 1, sourceSupplier: 1, packSize: 1 });
+chemicalSchema.index({ sourceSupplier: 1 });
+chemicalSchema.index({ category: 1 });
+chemicalSchema.index({ crops: 1 });
 chemicalSchema.index({ priceDate: -1 });
 
 const Chemical = mongoose.model('Chemical', chemicalSchema);
@@ -260,10 +284,11 @@ const Chemical = mongoose.model('Chemical', chemicalSchema);
 const chemicalPriceHistorySchema = new mongoose.Schema({
     chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical', required: true },
     productName: String,
-    supplier: String,
+    sourceSupplier: String,
     packSize: String,
     unit: String,
-    price: { type: Number, required: true },
+    costPrice: { type: Number },
+    sellPrice: { type: Number },
     priceDate: { type: Date, default: Date.now },
     priceVersion: String,
     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -271,6 +296,118 @@ const chemicalPriceHistorySchema = new mongoose.Schema({
 });
 
 const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
+
+// Chemical Order Model
+const chemicalOrderSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // Order details
+    orderNumber: { type: String, unique: true },
+    orderType: { type: String, enum: ['direct', 'program', 'custom'], default: 'direct' },
+
+    // Items ordered
+    items: [{
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        productName: String,
+        packSize: String,
+        unit: String,
+        quantity: Number, // Number of packs
+        unitPrice: Number, // Price per unit at time of order
+        totalPrice: Number,
+        // For program orders
+        acres: Number,
+        rate: Number,
+        rateUnit: String,
+        calculatedAmount: Number // Total amount needed before rounding to packs
+    }],
+
+    // Program reference (if ordering from a program)
+    programId: { type: mongoose.Schema.Types.ObjectId, ref: 'SprayProgram' },
+    programName: String,
+    totalAcres: Number,
+
+    // Totals
+    subtotal: Number,
+    discount: { type: Number, default: 0 },
+    discountReason: String,
+    total: Number,
+
+    // Status tracking
+    status: {
+        type: String,
+        enum: ['draft', 'submitted', 'confirmed', 'ordered_from_supplier', 'received', 'ready_for_pickup', 'delivered', 'cancelled'],
+        default: 'draft'
+    },
+
+    // Payment
+    paymentStatus: { type: String, enum: ['pending', 'paid', 'partial'], default: 'pending' },
+    paymentMethod: String,
+
+    // Dates
+    submittedAt: Date,
+    confirmedAt: Date,
+    orderedFromSupplierAt: Date,
+    receivedAt: Date,
+    deliveredAt: Date,
+
+    // Notes
+    customerNotes: String,
+    internalNotes: String,
+
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Auto-generate order number
+chemicalOrderSchema.pre('save', async function(next) {
+    if (!this.orderNumber) {
+        const count = await mongoose.model('ChemicalOrder').countDocuments();
+        this.orderNumber = `CO-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+    }
+    next();
+});
+
+const ChemicalOrder = mongoose.model('ChemicalOrder', chemicalOrderSchema);
+
+// Spray Program Model (saved custom programs)
+const sprayProgramSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    description: String,
+
+    // Program type
+    type: { type: String, enum: ['recommended', 'custom', 'template'], default: 'custom' },
+    isPublic: { type: Boolean, default: false }, // Recommended programs are public
+
+    // Target crop
+    crop: { type: String, required: true }, // corn, soybeans, wheat, etc.
+
+    // Program passes/applications
+    applications: [{
+        name: String, // e.g., "Burndown", "Pre-emergent", "Post-emergent"
+        timing: String, // e.g., "14 days before planting", "At planting", "V4-V6"
+        chemicals: [{
+            chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+            productName: String,
+            rate: Number,
+            rateUnit: String,
+            packSize: String,
+            unit: String
+        }]
+    }],
+
+    // Cost estimate per acre
+    estimatedCostPerAcre: Number,
+
+    // Owner
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // Metadata
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const SprayProgram = mongoose.model('SprayProgram', sprayProgramSchema);
 
 // Merch Order Model
 const merchOrderSchema = new mongoose.Schema({
@@ -1928,8 +2065,35 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
 
         const priceVersion = '2026-01-18';
 
-        // Acre Profit prices
-        const acreProfit = [
+        // Products that Acre Profit will sell (sourced from CPD)
+        // costPrice = what we pay CPD, sellPrice = what we charge customers (matching CHS for now)
+        const acreProfit_CPD_Products = [
+            // Product, Pack, Unit, CPD Cost, CHS Price (our sell price to beat), Notes
+            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 30.25, sellPrice: 31.24, category: 'herbicide' },
+            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 28.25, sellPrice: 30.89, category: 'herbicide' },
+            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 30.57, sellPrice: 35.31, category: 'herbicide' },
+            { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 29.90, sellPrice: 32.43, category: 'herbicide' },
+            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 27.90, sellPrice: 30.14, category: 'herbicide' },
+            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 13.25, sellPrice: 15.00, category: 'herbicide', equivalentProduct: 'RT3/Glystar Supreme', notes: 'Glyphosate - Formulation equiv' },
+            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 13.35, sellPrice: 12.78, category: 'herbicide', notes: 'CPD higher than CHS' },
+            { productName: 'Agri-Star', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 39.25, sellPrice: 43.83, category: 'herbicide', equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
+            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 38.13, sellPrice: 42.42, category: 'herbicide', equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
+            { productName: 'Agri-Star Tapran', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 19.00, sellPrice: 28.71, category: 'herbicide', equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
+            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 18.00, sellPrice: 28.16, category: 'herbicide', equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
+            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 21.00, sellPrice: 33.81, category: 'herbicide', notes: 'Need to get equivalents' },
+            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 20.00, sellPrice: 32.37, category: 'herbicide', notes: 'Need to get equivalents' },
+            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 70.50, sellPrice: 75.20, category: 'herbicide' },
+            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, sellPrice: 15.06, category: 'herbicide' },
+            // CPD-only products (no CHS equivalent)
+            { productName: 'Glufosinate', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 16.50, sellPrice: 18.00, category: 'herbicide' },
+            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 16.00, sellPrice: 18.00, category: 'herbicide' },
+            { productName: 'Mesotrione', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 48.25, sellPrice: 52.00, category: 'herbicide' },
+            { productName: 'Clethodim', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 33.50, sellPrice: 36.00, category: 'herbicide' },
+            { productName: 'Clethodim', packSize: '135', unit: 'gl', unitsPerPack: 135, costPrice: 33.00, sellPrice: 35.50, category: 'herbicide' }
+        ];
+
+        // CHS prices for reference/comparison
+        const chsPrices = [
             { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', price: 31.24 },
             { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', price: 30.89 },
             { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', price: 35.31 },
@@ -1951,90 +2115,37 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'Valor SX', packSize: '4x5', unit: 'lb', price: 15.06 }
         ];
 
-        // CPD prices (competitor/alternate)
-        const cpdPrices = [
-            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', price: 30.25 },
-            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', price: 28.25 },
-            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', price: 30.57 },
-            { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', price: 29.90 },
-            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', price: 27.90 },
-            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', price: 13.25, equivalentProduct: 'RT3', notes: 'Formulation equiv -11%' },
-            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', price: 13.25, equivalentProduct: 'Glystar Supreme', notes: 'Formulation equiv +25%' },
-            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', price: 13.35 },
-            { productName: 'Agri-Star', packSize: '2x2.5', unit: 'gl', price: 39.25, equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
-            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gl', price: 38.13, equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
-            { productName: 'Agri-Star Tapran', packSize: '2x2.5', unit: 'gl', price: 19.00, equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
-            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gl', price: 18.00, equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
-            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', price: 21.00, notes: 'Need to get equivalents' },
-            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', price: 20.00, notes: 'Need to get equivalents' },
-            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', price: 70.50 },
-            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', price: 14.25 },
-            // CPD-only products
-            { productName: 'CPD Glufosinate', packSize: 'Shuttle', unit: 'gl', price: 16.50 },
-            { productName: 'CPD Paraquat', packSize: 'Shuttle', unit: 'gl', price: 16.00 },
-            { productName: 'CPD Mesotrione', packSize: '2x2.5', unit: 'gl', price: 48.25 },
-            { productName: 'CPD Clethodim', packSize: '2x2.5', unit: 'gl', price: 33.50 },
-            { productName: 'CPD Clethodim', packSize: '135', unit: 'gl', price: 33.00 }
-        ];
+        const results = { acreProfit: [], chs: [] };
 
-        const results = { acreProfit: [], cpd: [] };
-
-        // Insert Acre Profit prices
-        for (const chem of acreProfit) {
+        // Insert Acre Profit products (sourced from CPD)
+        for (const chem of acreProfit_CPD_Products) {
             const existing = await Chemical.findOne({
                 productName: chem.productName,
-                supplier: 'Acre Profit',
+                sourceSupplier: 'CPD',
                 packSize: chem.packSize
             });
 
             if (!existing) {
                 const newChem = await Chemical.create({
                     ...chem,
-                    supplier: 'Acre Profit',
-                    priceVersion,
-                    createdBy: req.user._id
-                });
-                await ChemicalPriceHistory.create({
-                    chemicalId: newChem._id,
-                    ...chem,
-                    supplier: 'Acre Profit',
-                    priceVersion,
-                    changedBy: req.user._id
-                });
-                results.acreProfit.push({ action: 'created', product: chem.productName });
-            } else {
-                results.acreProfit.push({ action: 'exists', product: chem.productName });
-            }
-        }
-
-        // Insert CPD prices
-        for (const chem of cpdPrices) {
-            const existing = await Chemical.findOne({
-                productName: chem.productName,
-                supplier: 'CPD',
-                packSize: chem.packSize
-            });
-
-            if (!existing) {
-                const newChem = await Chemical.create({
-                    ...chem,
-                    supplier: 'CPD',
+                    sourceSupplier: 'CPD',
                     priceVersion,
                     createdBy: req.user._id
                 });
                 await ChemicalPriceHistory.create({
                     chemicalId: newChem._id,
                     productName: chem.productName,
-                    supplier: 'CPD',
+                    sourceSupplier: 'CPD',
                     packSize: chem.packSize,
                     unit: chem.unit,
-                    price: chem.price,
+                    costPrice: chem.costPrice,
+                    sellPrice: chem.sellPrice,
                     priceVersion,
                     changedBy: req.user._id
                 });
-                results.cpd.push({ action: 'created', product: chem.productName });
+                results.acreProfit.push({ action: 'created', product: chem.productName });
             } else {
-                results.cpd.push({ action: 'exists', product: chem.productName });
+                results.acreProfit.push({ action: 'exists', product: chem.productName });
             }
         }
 
@@ -2045,10 +2156,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                     created: results.acreProfit.filter(r => r.action === 'created').length,
                     existed: results.acreProfit.filter(r => r.action === 'exists').length
                 },
-                cpd: {
-                    created: results.cpd.filter(r => r.action === 'created').length,
-                    existed: results.cpd.filter(r => r.action === 'exists').length
-                }
+                totalProducts: acreProfit_CPD_Products.length,
+                chsReferenceProducts: chsPrices.length
             }
         });
     } catch (error) {
@@ -2056,18 +2165,57 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
-// Get all chemicals (with optional filters)
+// Get all chemicals (with optional filters) - PUBLIC for customer ordering
 app.get('/api/chemicals', async (req, res) => {
     try {
-        const { supplier, productName, activeOnly } = req.query;
+        const { sourceSupplier, productName, category, crop, activeOnly, availableOnly } = req.query;
         let query = {};
 
-        if (supplier) query.supplier = new RegExp(supplier, 'i');
+        if (sourceSupplier) query.sourceSupplier = new RegExp(sourceSupplier, 'i');
         if (productName) query.productName = new RegExp(productName, 'i');
+        if (category) query.category = category;
+        if (crop) query.crops = crop;
         if (activeOnly === 'true') query.isActive = true;
+        if (availableOnly === 'true') query.availableForOrder = true;
 
         const chemicals = await Chemical.find(query)
-            .sort({ productName: 1, supplier: 1, packSize: 1 });
+            .sort({ productName: 1, packSize: 1 });
+
+        // For public view, show sellPrice not costPrice
+        const publicChemicals = chemicals.map(c => ({
+            _id: c._id,
+            productName: c.productName,
+            category: c.category,
+            crops: c.crops,
+            packSize: c.packSize,
+            unit: c.unit,
+            unitsPerPack: c.unitsPerPack,
+            price: c.sellPrice, // Customer sees sell price
+            defaultRate: c.defaultRate,
+            rateUnit: c.rateUnit,
+            notes: c.notes,
+            isActive: c.isActive,
+            availableForOrder: c.availableForOrder
+        }));
+
+        res.json(publicChemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all chemicals with FULL pricing (admin only)
+app.get('/api/chemicals/admin', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { sourceSupplier, productName, category } = req.query;
+        let query = {};
+
+        if (sourceSupplier) query.sourceSupplier = new RegExp(sourceSupplier, 'i');
+        if (productName) query.productName = new RegExp(productName, 'i');
+        if (category) query.category = category;
+
+        const chemicals = await Chemical.find(query)
+            .sort({ productName: 1, packSize: 1 });
 
         res.json(chemicals);
     } catch (error) {
@@ -2078,7 +2226,7 @@ app.get('/api/chemicals', async (req, res) => {
 // Get unique suppliers list
 app.get('/api/chemicals/suppliers', async (req, res) => {
     try {
-        const suppliers = await Chemical.distinct('supplier');
+        const suppliers = await Chemical.distinct('sourceSupplier');
         res.json(suppliers.sort());
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -2095,29 +2243,44 @@ app.get('/api/chemicals/products', async (req, res) => {
     }
 });
 
-// Get chemical price comparison (same product from different suppliers)
-app.get('/api/chemicals/compare/:productName', async (req, res) => {
+// Get chemicals by category
+app.get('/api/chemicals/category/:category', async (req, res) => {
     try {
-        const { productName } = req.params;
-
         const chemicals = await Chemical.find({
-            productName: new RegExp(`^${productName}$`, 'i'),
-            isActive: true
-        }).sort({ price: 1 });
+            category: req.params.category,
+            isActive: true,
+            availableForOrder: true
+        }).sort({ productName: 1 });
 
-        if (chemicals.length === 0) {
-            return res.status(404).json({ error: 'Product not found' });
-        }
+        res.json(chemicals.map(c => ({
+            _id: c._id,
+            productName: c.productName,
+            packSize: c.packSize,
+            unit: c.unit,
+            price: c.sellPrice,
+            defaultRate: c.defaultRate,
+            rateUnit: c.rateUnit
+        })));
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
 
-        // Calculate savings compared to highest price
-        const highestPrice = Math.max(...chemicals.map(c => c.price));
-        const comparison = chemicals.map(c => ({
-            ...c.toObject(),
-            savings: Math.round((highestPrice - c.price) * 100) / 100,
-            savingsPercent: Math.round(((highestPrice - c.price) / highestPrice) * 100 * 10) / 10
+// Get margin report (admin only)
+app.get('/api/chemicals/report/margins', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const chemicals = await Chemical.find({ isActive: true }).sort({ margin: -1 });
+
+        const report = chemicals.map(c => ({
+            productName: c.productName,
+            packSize: c.packSize,
+            costPrice: c.costPrice,
+            sellPrice: c.sellPrice,
+            margin: c.margin,
+            profitPerUnit: Math.round((c.sellPrice - c.costPrice) * 100) / 100
         }));
 
-        res.json(comparison);
+        res.json(report);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -2139,17 +2302,23 @@ app.get('/api/chemicals/:id/history', async (req, res) => {
 // Add new chemical (admin only)
 app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { productName, supplier, packSize, unit, price, priceVersion, equivalentProduct, equivalentSupplier, notes } = req.body;
+        const { productName, sourceSupplier, packSize, unit, unitsPerPack, costPrice, sellPrice,
+                category, crops, defaultRate, rateUnit, priceVersion, equivalentProduct, notes } = req.body;
 
         const chemical = new Chemical({
             productName,
-            supplier,
+            sourceSupplier,
             packSize,
             unit,
-            price,
+            unitsPerPack,
+            costPrice,
+            sellPrice,
+            category: category || 'herbicide',
+            crops: crops || [],
+            defaultRate,
+            rateUnit,
             priceVersion: priceVersion || new Date().toISOString().slice(0, 10),
             equivalentProduct,
-            equivalentSupplier,
             notes,
             createdBy: req.user._id
         });
@@ -2160,10 +2329,11 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
         await ChemicalPriceHistory.create({
             chemicalId: chemical._id,
             productName,
-            supplier,
+            sourceSupplier,
             packSize,
             unit,
-            price,
+            costPrice,
+            sellPrice,
             priceVersion: chemical.priceVersion,
             changedBy: req.user._id
         });
@@ -2177,7 +2347,8 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
 // Update chemical price (admin only)
 app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { price, priceVersion, notes, equivalentProduct, equivalentSupplier, isActive } = req.body;
+        const { costPrice, sellPrice, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
+                category, crops, defaultRate, rateUnit, unitsPerPack } = req.body;
 
         const chemical = await Chemical.findById(req.params.id);
         if (!chemical) {
@@ -2185,27 +2356,35 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
         }
 
         // If price changed, save to history
-        if (price !== undefined && price !== chemical.price) {
+        if ((costPrice !== undefined && costPrice !== chemical.costPrice) ||
+            (sellPrice !== undefined && sellPrice !== chemical.sellPrice)) {
             await ChemicalPriceHistory.create({
                 chemicalId: chemical._id,
                 productName: chemical.productName,
-                supplier: chemical.supplier,
+                sourceSupplier: chemical.sourceSupplier,
                 packSize: chemical.packSize,
                 unit: chemical.unit,
-                price: price,
+                costPrice: costPrice || chemical.costPrice,
+                sellPrice: sellPrice || chemical.sellPrice,
                 priceVersion: priceVersion || new Date().toISOString().slice(0, 10),
                 changedBy: req.user._id
             });
 
-            chemical.price = price;
+            if (costPrice !== undefined) chemical.costPrice = costPrice;
+            if (sellPrice !== undefined) chemical.sellPrice = sellPrice;
             chemical.priceDate = new Date();
         }
 
         if (priceVersion !== undefined) chemical.priceVersion = priceVersion;
         if (notes !== undefined) chemical.notes = notes;
         if (equivalentProduct !== undefined) chemical.equivalentProduct = equivalentProduct;
-        if (equivalentSupplier !== undefined) chemical.equivalentSupplier = equivalentSupplier;
         if (isActive !== undefined) chemical.isActive = isActive;
+        if (availableForOrder !== undefined) chemical.availableForOrder = availableForOrder;
+        if (category !== undefined) chemical.category = category;
+        if (crops !== undefined) chemical.crops = crops;
+        if (defaultRate !== undefined) chemical.defaultRate = defaultRate;
+        if (rateUnit !== undefined) chemical.rateUnit = rateUnit;
+        if (unitsPerPack !== undefined) chemical.unitsPerPack = unitsPerPack;
 
         chemical.updatedAt = new Date();
         await chemical.save();
@@ -2219,7 +2398,7 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
 // Bulk import chemicals (admin only)
 app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { chemicals, supplier, priceVersion } = req.body;
+        const { chemicals, sourceSupplier, priceVersion } = req.body;
 
         if (!Array.isArray(chemicals)) {
             return res.status(400).json({ error: 'chemicals must be an array' });
@@ -2229,28 +2408,28 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
         const version = priceVersion || new Date().toISOString().slice(0, 10);
 
         for (const chem of chemicals) {
-            // Check if chemical already exists
             let existing = await Chemical.findOne({
                 productName: chem.productName,
-                supplier: supplier || chem.supplier,
+                sourceSupplier: sourceSupplier || chem.sourceSupplier,
                 packSize: chem.packSize
             });
 
             if (existing) {
-                // Update price if different
-                if (existing.price !== chem.price) {
+                if (existing.costPrice !== chem.costPrice || existing.sellPrice !== chem.sellPrice) {
                     await ChemicalPriceHistory.create({
                         chemicalId: existing._id,
                         productName: existing.productName,
-                        supplier: existing.supplier,
+                        sourceSupplier: existing.sourceSupplier,
                         packSize: existing.packSize,
                         unit: existing.unit,
-                        price: chem.price,
+                        costPrice: chem.costPrice,
+                        sellPrice: chem.sellPrice,
                         priceVersion: version,
                         changedBy: req.user._id
                     });
 
-                    existing.price = chem.price;
+                    existing.costPrice = chem.costPrice;
+                    existing.sellPrice = chem.sellPrice;
                     existing.priceDate = new Date();
                     existing.priceVersion = version;
                     existing.updatedAt = new Date();
@@ -2261,16 +2440,17 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
                     results.push({ action: 'unchanged', chemical: existing });
                 }
             } else {
-                // Create new
                 const newChemical = new Chemical({
                     productName: chem.productName,
-                    supplier: supplier || chem.supplier,
+                    sourceSupplier: sourceSupplier || chem.sourceSupplier,
                     packSize: chem.packSize,
                     unit: chem.unit,
-                    price: chem.price,
+                    unitsPerPack: chem.unitsPerPack,
+                    costPrice: chem.costPrice,
+                    sellPrice: chem.sellPrice,
+                    category: chem.category || 'herbicide',
                     priceVersion: version,
                     equivalentProduct: chem.equivalentProduct,
-                    equivalentSupplier: chem.equivalentSupplier,
                     notes: chem.notes,
                     createdBy: req.user._id
                 });
@@ -2280,10 +2460,11 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
                 await ChemicalPriceHistory.create({
                     chemicalId: newChemical._id,
                     productName: newChemical.productName,
-                    supplier: newChemical.supplier,
+                    sourceSupplier: newChemical.sourceSupplier,
                     packSize: newChemical.packSize,
                     unit: newChemical.unit,
-                    price: newChemical.price,
+                    costPrice: newChemical.costPrice,
+                    sellPrice: newChemical.sellPrice,
                     priceVersion: version,
                     changedBy: req.user._id
                 });
@@ -2312,59 +2493,323 @@ app.delete('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, re
         if (!chemical) {
             return res.status(404).json({ error: 'Chemical not found' });
         }
-
-        // Keep history for audit trail
         res.json({ message: 'Chemical deleted', chemical });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
 
-// Get full price comparison report
-app.get('/api/chemicals/report/comparison', authMiddleware, adminMiddleware, async (req, res) => {
+// ---- CHEMICAL ORDER ROUTES ----
+
+// Create chemical order (customer)
+app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
-        // Get all unique products
-        const products = await Chemical.distinct('productName', { isActive: true });
+        const { items, programId, programName, totalAcres, customerNotes } = req.body;
 
-        const report = [];
+        // Calculate totals
+        let subtotal = 0;
+        const orderItems = [];
 
-        for (const productName of products) {
-            const suppliers = await Chemical.find({
-                productName,
-                isActive: true
-            }).sort({ price: 1 });
+        for (const item of items) {
+            const chemical = await Chemical.findById(item.chemicalId);
+            if (!chemical) continue;
 
-            if (suppliers.length > 1) {
-                const lowest = suppliers[0];
-                const highest = suppliers[suppliers.length - 1];
+            const totalPrice = item.quantity * chemical.sellPrice;
+            subtotal += totalPrice;
 
-                report.push({
-                    productName,
-                    supplierCount: suppliers.length,
-                    lowestPrice: {
-                        supplier: lowest.supplier,
-                        packSize: lowest.packSize,
-                        price: lowest.price
-                    },
-                    highestPrice: {
-                        supplier: highest.supplier,
-                        packSize: highest.packSize,
-                        price: highest.price
-                    },
-                    potentialSavings: Math.round((highest.price - lowest.price) * 100) / 100,
-                    allSuppliers: suppliers.map(s => ({
-                        supplier: s.supplier,
-                        packSize: s.packSize,
-                        price: s.price
-                    }))
+            orderItems.push({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                quantity: item.quantity,
+                unitPrice: chemical.sellPrice,
+                totalPrice,
+                acres: item.acres,
+                rate: item.rate,
+                rateUnit: item.rateUnit,
+                calculatedAmount: item.calculatedAmount
+            });
+        }
+
+        const order = new ChemicalOrder({
+            userId: req.user._id,
+            representativeId: req.user.representative,
+            orderType: programId ? 'program' : 'direct',
+            items: orderItems,
+            programId,
+            programName,
+            totalAcres,
+            subtotal,
+            total: subtotal,
+            customerNotes,
+            status: 'draft'
+        });
+
+        await order.save();
+        res.status(201).json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get customer's chemical orders
+app.get('/api/chemical-orders', authMiddleware, async (req, res) => {
+    try {
+        const orders = await ChemicalOrder.find({ userId: req.user._id })
+            .sort({ createdAt: -1 });
+        res.json(orders);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single chemical order
+app.get('/api/chemical-orders/:id', authMiddleware, async (req, res) => {
+    try {
+        const order = await ChemicalOrder.findOne({
+            _id: req.params.id,
+            userId: req.user._id
+        }).populate('items.chemicalId');
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+        res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Submit chemical order
+app.put('/api/chemical-orders/:id/submit', authMiddleware, async (req, res) => {
+    try {
+        const order = await ChemicalOrder.findOne({
+            _id: req.params.id,
+            userId: req.user._id
+        });
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        order.status = 'submitted';
+        order.submittedAt = new Date();
+        order.updatedAt = new Date();
+        await order.save();
+
+        res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Get all chemical orders
+app.get('/api/admin/chemical-orders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        let query = {};
+        if (req.user.role === 'admin') {
+            query.representativeId = req.user._id;
+        }
+
+        const orders = await ChemicalOrder.find(query)
+            .populate('userId', 'name email phone farm')
+            .sort({ createdAt: -1 });
+
+        res.json(orders);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Update chemical order status
+app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, internalNotes } = req.body;
+
+        const order = await ChemicalOrder.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        order.status = status;
+        if (internalNotes) order.internalNotes = internalNotes;
+
+        // Update timestamps based on status
+        if (status === 'confirmed') order.confirmedAt = new Date();
+        if (status === 'ordered_from_supplier') order.orderedFromSupplierAt = new Date();
+        if (status === 'received') order.receivedAt = new Date();
+        if (status === 'delivered') order.deliveredAt = new Date();
+
+        order.updatedAt = new Date();
+        await order.save();
+
+        res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- SPRAY PROGRAM ROUTES ----
+
+// Get all public/recommended programs
+app.get('/api/spray-programs', async (req, res) => {
+    try {
+        const { crop, type } = req.query;
+        let query = { isPublic: true };
+
+        if (crop) query.crop = crop;
+        if (type) query.type = type;
+
+        const programs = await SprayProgram.find(query)
+            .sort({ crop: 1, name: 1 });
+
+        res.json(programs);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get user's custom programs
+app.get('/api/spray-programs/my', authMiddleware, async (req, res) => {
+    try {
+        const programs = await SprayProgram.find({
+            createdBy: req.user._id
+        }).sort({ createdAt: -1 });
+
+        res.json(programs);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single program with chemical details
+app.get('/api/spray-programs/:id', async (req, res) => {
+    try {
+        const program = await SprayProgram.findById(req.params.id);
+        if (!program) {
+            return res.status(404).json({ error: 'Program not found' });
+        }
+        res.json(program);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create spray program (admin for recommended, customer for custom)
+app.post('/api/spray-programs', authMiddleware, async (req, res) => {
+    try {
+        const { name, description, crop, applications, type } = req.body;
+
+        // Only admins can create recommended programs
+        const programType = (req.user.role === 'admin' || req.user.role === 'superadmin') ? (type || 'template') : 'custom';
+        const isPublic = programType === 'recommended';
+
+        const program = new SprayProgram({
+            name,
+            description,
+            crop,
+            applications,
+            type: programType,
+            isPublic,
+            createdBy: req.user._id
+        });
+
+        // Calculate estimated cost per acre
+        let totalCost = 0;
+        for (const app of applications) {
+            for (const chem of app.chemicals) {
+                const chemical = await Chemical.findById(chem.chemicalId);
+                if (chemical && chemical.sellPrice && chem.rate) {
+                    // Convert rate to gallons and multiply by price
+                    totalCost += (chem.rate / 128) * chemical.sellPrice; // Assuming oz to gal
+                }
+            }
+        }
+        program.estimatedCostPerAcre = Math.round(totalCost * 100) / 100;
+
+        await program.save();
+        res.status(201).json(program);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Calculate order from program (preview before ordering)
+app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) => {
+    try {
+        const { acres } = req.body;
+        const program = await SprayProgram.findById(req.params.id);
+
+        if (!program) {
+            return res.status(404).json({ error: 'Program not found' });
+        }
+
+        const orderItems = [];
+        let totalCost = 0;
+
+        for (const app of program.applications) {
+            for (const chemItem of app.chemicals) {
+                const chemical = await Chemical.findById(chemItem.chemicalId);
+                if (!chemical) continue;
+
+                // Calculate amount needed
+                let amountNeeded = 0;
+                const rate = chemItem.rate;
+
+                // Convert based on rate unit
+                switch (chemItem.rateUnit) {
+                    case 'oz/acre':
+                        amountNeeded = (rate * acres) / 128; // oz to gallons
+                        break;
+                    case 'pt/acre':
+                        amountNeeded = (rate * acres) / 8; // pints to gallons
+                        break;
+                    case 'qt/acre':
+                        amountNeeded = (rate * acres) / 4; // quarts to gallons
+                        break;
+                    case 'gal/acre':
+                        amountNeeded = rate * acres;
+                        break;
+                    case 'lb/acre':
+                        amountNeeded = rate * acres;
+                        break;
+                    default:
+                        amountNeeded = rate * acres;
+                }
+
+                // Round up to nearest package
+                const unitsPerPack = chemical.unitsPerPack || 1;
+                const packsNeeded = Math.ceil(amountNeeded / unitsPerPack);
+                const totalPrice = packsNeeded * chemical.sellPrice * unitsPerPack;
+
+                orderItems.push({
+                    chemicalId: chemical._id,
+                    productName: chemical.productName,
+                    packSize: chemical.packSize,
+                    unit: chemical.unit,
+                    rate,
+                    rateUnit: chemItem.rateUnit,
+                    acres,
+                    calculatedAmount: Math.round(amountNeeded * 100) / 100,
+                    quantity: packsNeeded,
+                    unitPrice: chemical.sellPrice,
+                    totalPrice: Math.round(totalPrice * 100) / 100,
+                    applicationName: app.name
                 });
+
+                totalCost += totalPrice;
             }
         }
 
-        // Sort by potential savings
-        report.sort((a, b) => b.potentialSavings - a.potentialSavings);
-
-        res.json(report);
+        res.json({
+            program: program.name,
+            crop: program.crop,
+            acres,
+            items: orderItems,
+            totalCost: Math.round(totalCost * 100) / 100,
+            costPerAcre: Math.round((totalCost / acres) * 100) / 100
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
