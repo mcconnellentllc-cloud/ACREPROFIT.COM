@@ -204,6 +204,282 @@
                 </div>
             </div>
 
+            <!-- Chemical Ordering by Application Timing -->
+            <div class="chemicals-by-timing" id="chemicalsTiming">
+                <h2>Order Chemicals by Application Timing</h2>
+                <p class="timing-subtitle">Select chemicals for each application window. This helps us coordinate truck deliveries.</p>
+
+                <!-- Early Spring - Burndown -->
+                <div class="timing-section" data-timing="early-spring">
+                    <div class="timing-header" onclick="toggleTiming('early-spring')">
+                        <div class="timing-title">
+                            <span class="timing-icon">🌱</span>
+                            <div>
+                                <h3>Early Spring Burndown</h3>
+                                <span class="timing-date">March - Early April</span>
+                            </div>
+                        </div>
+                        <div class="timing-summary">
+                            <span class="timing-total" id="early-spring-total">$0.00</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="timing-body" id="early-spring-body">
+                        <p class="timing-desc">Clean up winter annuals and existing weeds before planting. First truck delivery.</p>
+                        <table class="chemical-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Package</th>
+                                    <th>Price/Unit</th>
+                                    <th>Qty</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr data-chem="agsaver-es">
+                                    <td><strong>AgSaver (Glyphosate)</strong><br><span class="chem-note">Systemic burndown - Best Value</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$13.25/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="3312.50" data-timing="early-spring" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="dicamba-es">
+                                    <td><strong>Dicamba DMA</strong><br><span class="chem-note">Broadleaf control</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$28.25/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="7062.50" data-timing="early-spring" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="paraquat-es">
+                                    <td><strong>Paraquat 3SL</strong><br><span class="chem-note">Fast contact burndown</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$16.00/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="4000.00" data-timing="early-spring" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="lv6-es">
+                                    <td><strong>LV 6 (2,4-D Ester)</strong><br><span class="chem-note">Broadleaf burndown</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$27.90/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="6975.00" data-timing="early-spring" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Pre-Plant - Residual -->
+                <div class="timing-section" data-timing="pre-plant">
+                    <div class="timing-header" onclick="toggleTiming('pre-plant')">
+                        <div class="timing-title">
+                            <span class="timing-icon">🌿</span>
+                            <div>
+                                <h3>Pre-Plant / Pre-Emerge</h3>
+                                <span class="timing-date">April - May (at planting)</span>
+                            </div>
+                        </div>
+                        <div class="timing-summary">
+                            <span class="timing-total" id="pre-plant-total">$0.00</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="timing-body" id="pre-plant-body">
+                        <p class="timing-desc">Residual herbicides applied at or before planting. Second truck delivery.</p>
+                        <table class="chemical-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Package</th>
+                                    <th>Price/Unit</th>
+                                    <th>Qty</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr data-chem="aatrex-pp">
+                                    <td><strong>Aatrex 4L (Atrazine)</strong><br><span class="chem-note">Corn/Sorghum residual</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$12.78/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="3195.00" data-timing="pre-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="mesotrione-pp">
+                                    <td><strong>Mesotrione 4SC</strong><br><span class="chem-note">Corn pre-emerge (Callisto generic)</span></td>
+                                    <td>2x2.5 gl</td>
+                                    <td>$48.25/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="241.25" data-timing="pre-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="sulfentrazone-pp">
+                                    <td><strong>Sulfentrazone 4SC</strong><br><span class="chem-note">Palmer Amaranth residual control</span></td>
+                                    <td>2x2.5 gl</td>
+                                    <td>$70.50/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="352.50" data-timing="pre-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="valor-pp">
+                                    <td><strong>Valor SX (flumioxazin)</strong><br><span class="chem-note">Burndown + residual</span></td>
+                                    <td>4x5 lb</td>
+                                    <td>$14.25/lb</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="285.00" data-timing="pre-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="tapran-pp">
+                                    <td><strong>Tapran (Trifluralin)</strong><br><span class="chem-note">Pre-emerge grass control</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$16.45/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="4112.50" data-timing="pre-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Post-Plant - Cleanup -->
+                <div class="timing-section" data-timing="post-plant">
+                    <div class="timing-header" onclick="toggleTiming('post-plant')">
+                        <div class="timing-title">
+                            <span class="timing-icon">🌾</span>
+                            <div>
+                                <h3>Post-Emerge / Cleanup</h3>
+                                <span class="timing-date">May - June (Palmer Amaranth control)</span>
+                            </div>
+                        </div>
+                        <div class="timing-summary">
+                            <span class="timing-total" id="post-plant-total">$0.00</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="timing-body" id="post-plant-body">
+                        <p class="timing-desc">Post-emergence control for escapes, especially Palmer Amaranth. Third truck delivery.</p>
+                        <table class="chemical-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Package</th>
+                                    <th>Price/Unit</th>
+                                    <th>Qty</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr data-chem="glufosinate-po">
+                                    <td><strong>Glufosinate 2.34</strong><br><span class="chem-note">Liberty-link & Palmer control</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$16.50/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="4125.00" data-timing="post-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="agsaver-po">
+                                    <td><strong>AgSaver (Glyphosate)</strong><br><span class="chem-note">RR crops post-emerge</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$13.25/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="3312.50" data-timing="post-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="dicamba-po">
+                                    <td><strong>Dicamba DMA</strong><br><span class="chem-note">Xtend crops - broadleaf cleanup</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$28.25/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="7062.50" data-timing="post-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="clethodim-po">
+                                    <td><strong>Clethodim 2EC</strong><br><span class="chem-note">Grass control in broadleaf crops</span></td>
+                                    <td>2x2.5 gl</td>
+                                    <td>$33.50/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="167.50" data-timing="post-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="aatrex-po">
+                                    <td><strong>Aatrex 4L (Atrazine)</strong><br><span class="chem-note">Post-emerge corn/sorghum</span></td>
+                                    <td>Shuttle (250 gl)</td>
+                                    <td>$12.78/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="3195.00" data-timing="post-plant" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Adjuvants -->
+                <div class="timing-section" data-timing="adjuvants">
+                    <div class="timing-header" onclick="toggleTiming('adjuvants')">
+                        <div class="timing-title">
+                            <span class="timing-icon">💧</span>
+                            <div>
+                                <h3>Adjuvants & Additives</h3>
+                                <span class="timing-date">All applications</span>
+                            </div>
+                        </div>
+                        <div class="timing-summary">
+                            <span class="timing-total" id="adjuvants-total">$0.00</span>
+                            <span class="chevron">▼</span>
+                        </div>
+                    </div>
+                    <div class="timing-body" id="adjuvants-body">
+                        <p class="timing-desc">Add to any truck order - essential for spray performance.</p>
+                        <table class="chemical-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Package</th>
+                                    <th>Price/Unit</th>
+                                    <th>Qty</th>
+                                    <th>Subtotal</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr data-chem="mso">
+                                    <td><strong>MSO (Methylated Seed Oil)</strong><br><span class="chem-note">Spray adjuvant</span></td>
+                                    <td>2x2.5 gl</td>
+                                    <td>$12.50/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="62.50" data-timing="adjuvants" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="coc">
+                                    <td><strong>Crop Oil Concentrate</strong><br><span class="chem-note">Spray adjuvant</span></td>
+                                    <td>2x2.5 gl</td>
+                                    <td>$8.75/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="43.75" data-timing="adjuvants" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="ams">
+                                    <td><strong>AMS (Ammonium Sulfate)</strong><br><span class="chem-note">Water conditioner</span></td>
+                                    <td>50 lb bag</td>
+                                    <td>$0.35/lb</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="17.50" data-timing="adjuvants" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                                <tr data-chem="nis">
+                                    <td><strong>NIS (Non-ionic Surfactant)</strong><br><span class="chem-note">Spray adjuvant</span></td>
+                                    <td>2x2.5 gl</td>
+                                    <td>$14.00/gl</td>
+                                    <td><input type="number" min="0" value="0" class="chem-qty" data-price="70.00" data-timing="adjuvants" onchange="updateChemTotal(this)"></td>
+                                    <td class="chem-subtotal">$0.00</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Found it Cheaper -->
+                <div class="cheaper-section">
+                    <h4>Found it Cheaper?</h4>
+                    <p>Tell us where and we'll buy it from them on your behalf!</p>
+                    <div class="cheaper-form-inline">
+                        <input type="text" id="cheaperProduct2" placeholder="Product name">
+                        <input type="text" id="cheaperRetailer2" placeholder="Retailer">
+                        <input type="text" id="cheaperPrice2" placeholder="Their price">
+                        <button class="btn btn-sm btn-warning" onclick="submitCheaperRequest()">Submit</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Order Summary (Sticky at bottom) -->
             <div class="order-summary" id="orderSummary">
                 <div class="summary-content">
@@ -227,7 +503,7 @@
                                 <span class="credit-amount" id="merchCreditDisplay">$0.00</span>
                             </div>
                         </div>
-                        <p class="credit-note">Earn $50 for every $2,000 spent!</p>
+                        <p class="credit-note">Earn $10 for every $1,000 spent!</p>
                     </div>
                     <div class="summary-actions">
                         <button class="btn btn-outline" onclick="openMerchModal()">Use Merch Credit</button>
@@ -442,8 +718,8 @@
             orderData.totalAcres = totalAcres;
             orderData.totalCost = totalCost;
 
-            // Calculate merch credit earned ($20 per $2000)
-            const newCredit = Math.floor(totalCost / 2000) * 20;
+            // Calculate merch credit earned ($10 per $1000)
+            const newCredit = Math.floor(totalCost / 1000) * 10;
             orderData.merchCredit = newCredit + orderData.bankedCredit;
 
             // Update displays
@@ -452,6 +728,73 @@
             document.getElementById('totalCostDisplay').textContent = `$${totalCost.toFixed(2)}`;
             document.getElementById('merchCreditDisplay').textContent = `$${orderData.merchCredit.toFixed(2)}`;
             document.getElementById('modalCreditAmount').textContent = `$${orderData.merchCredit.toFixed(2)}`;
+        }
+
+        // Chemical timing section functions
+        function toggleTiming(timing) {
+            const body = document.getElementById(`${timing}-body`);
+            const section = body.closest('.timing-section');
+            section.classList.toggle('expanded');
+        }
+
+        function updateChemTotal(input) {
+            const qty = parseInt(input.value) || 0;
+            const price = parseFloat(input.dataset.price) || 0;
+            const subtotal = qty * price;
+            const timing = input.dataset.timing;
+
+            // Update row subtotal
+            const row = input.closest('tr');
+            row.querySelector('.chem-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+
+            // Update timing section total
+            let sectionTotal = 0;
+            document.querySelectorAll(`.chem-qty[data-timing="${timing}"]`).forEach(inp => {
+                const q = parseInt(inp.value) || 0;
+                const p = parseFloat(inp.dataset.price) || 0;
+                sectionTotal += q * p;
+            });
+            document.getElementById(`${timing}-total`).textContent = `$${sectionTotal.toFixed(2)}`;
+
+            // Update overall chemical total and order total
+            updateChemicalOrderTotal();
+        }
+
+        function updateChemicalOrderTotal() {
+            let chemTotal = 0;
+            document.querySelectorAll('.chem-qty').forEach(input => {
+                const qty = parseInt(input.value) || 0;
+                const price = parseFloat(input.dataset.price) || 0;
+                chemTotal += qty * price;
+            });
+
+            // Add chemical total to crop total for order total
+            const cropTotal = orderData.totalCost || 0;
+            const grandTotal = cropTotal + chemTotal;
+
+            // Update merch credit
+            const newCredit = Math.floor(grandTotal / 1000) * 10;
+            orderData.merchCredit = newCredit + orderData.bankedCredit;
+
+            document.getElementById('totalCostDisplay').textContent = `$${grandTotal.toFixed(2)}`;
+            document.getElementById('merchCreditDisplay').textContent = `$${orderData.merchCredit.toFixed(2)}`;
+            document.getElementById('modalCreditAmount').textContent = `$${orderData.merchCredit.toFixed(2)}`;
+        }
+
+        function submitCheaperRequest() {
+            const product = document.getElementById('cheaperProduct2').value.trim();
+            const retailer = document.getElementById('cheaperRetailer2').value.trim();
+            const price = document.getElementById('cheaperPrice2').value.trim();
+
+            if (!product || !retailer || !price) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            alert(`Request submitted! We'll check ${product} at ${retailer} for ${price} and contact you.`);
+            document.getElementById('cheaperProduct2').value = '';
+            document.getElementById('cheaperRetailer2').value = '';
+            document.getElementById('cheaperPrice2').value = '';
         }
 
         // Merch modal functions
@@ -518,7 +861,7 @@
             'how-it-works': "Here's how bulk buying works:\n\n1. Enter your acres for each crop\n2. We calculate the products you need\n3. Your order joins other farmers' orders\n4. When we fill a truck, everyone gets bulk pricing\n5. Products are delivered to your representative for pickup\n\nThe more farmers that join, the better the pricing!",
             'pricing': "Our pricing is based on bulk truck loads. When we combine enough orders to fill a truck, everyone gets the same per-unit price that big operations pay.\n\nTypically this saves 15-30% compared to retail prices. The exact price depends on current market rates and order volume.",
             'delivery': "Delivery timing depends on when we fill a truck load for your products. Typically:\n\n• Spring products: Order by Feb 1, delivery by March\n• Fall products: Order by Aug 1, delivery by September\n\nYour representative will contact you with exact delivery dates once the truck is ordered.",
-            'merch-credit': "For every $2,000 you spend on products, you earn $50 in merch credit!\n\nYou can:\n• Use it immediately in our merch store\n• Bank it for later (it never expires)\n\nMerch includes quality farm workwear: jackets, hats, shirts, and more.",
+            'merch-credit': "For every $1,000 you spend on products, you earn $10 in merch credit!\n\nYou can:\n• Use it immediately in our merch store\n• Bank it for later (it never expires)\n\nMerch includes quality farm workwear: jackets, hats, shirts, and more.",
             'payment': "We accept:\n\n• ACH bank transfer (lowest fees - 0.8% capped at $5)\n• Credit/debit card (2.9% + $0.30)\n• Check (mail to your representative)\n\nPayment is due when the truck order is confirmed. Your representative will send an invoice.",
             'contact': "Your representatives are here to help!\n\n• Kyle McConnell: (970) 571-1015, Kyle@togoag.com\n• Ty Mollohan: (970) 520-2340, Tymollohan77@gmail.com\n• Chad Bamford: (970) 520-3716, Ckbamford@yahoo.com\n\nCall, text, or email anytime!"
         };
@@ -1171,6 +1514,208 @@
 
             .merch-options {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* Chemical Timing Sections */
+        .chemicals-by-timing {
+            margin-top: 40px;
+        }
+
+        .chemicals-by-timing h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .timing-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .timing-section {
+            background: white;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+            overflow: hidden;
+        }
+
+        .timing-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+
+        .timing-header:hover {
+            background: #f8fdf8;
+        }
+
+        .timing-title {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .timing-icon {
+            font-size: 1.75rem;
+        }
+
+        .timing-title h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .timing-date {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .timing-summary {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .timing-total {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .timing-section.expanded .chevron {
+            transform: rotate(180deg);
+        }
+
+        .timing-body {
+            display: none;
+            padding: 0 24px 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .timing-section.expanded .timing-body {
+            display: block;
+        }
+
+        .timing-desc {
+            padding: 16px 0;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
+        .chemical-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .chemical-table th {
+            text-align: left;
+            padding: 12px 8px;
+            background: var(--secondary);
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .chemical-table td {
+            padding: 14px 8px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .chemical-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .chem-note {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            font-weight: 400;
+        }
+
+        .chem-qty {
+            width: 60px;
+            padding: 8px;
+            text-align: center;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .chem-qty:focus {
+            border-color: var(--primary);
+            outline: none;
+        }
+
+        .chem-subtotal {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        /* Cheaper Section */
+        .cheaper-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #fffbeb;
+            border: 2px dashed #f59e0b;
+            border-radius: var(--radius-lg);
+        }
+
+        .cheaper-section h4 {
+            color: #92400e;
+            margin-bottom: 4px;
+        }
+
+        .cheaper-section p {
+            color: #78350f;
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .cheaper-form-inline {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .cheaper-form-inline input {
+            flex: 1;
+            min-width: 120px;
+            padding: 10px 12px;
+            border: 2px solid #fcd34d;
+            border-radius: var(--radius);
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+            border: none;
+            padding: 10px 16px;
+            border-radius: var(--radius);
+            font-weight: 600;
+            cursor: pointer;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+        }
+
+        @media (max-width: 768px) {
+            .chemical-table {
+                font-size: 0.85rem;
+            }
+
+            .chemical-table th:nth-child(2),
+            .chemical-table td:nth-child(2) {
+                display: none;
+            }
+
+            .cheaper-form-inline {
+                flex-direction: column;
             }
         }
     </style>
