@@ -287,7 +287,7 @@
                                     <td class="chem-subtotal">$0.00</td>
                                 </tr>
                                 <tr data-chem="paraquat-es">
-                                    <td><strong>Paraquat 3SL</strong><br><span class="chem-note">Fast contact burndown</span></td>
+                                    <td><strong>Paraquat 3SL</strong> <span class="rup-badge">RUP</span><br><span class="chem-note">Fast contact burndown - Purchased from local retailer</span></td>
                                     <td>Shuttle (250 gl)</td>
                                     <td>$16.00/gl</td>
                                     <td><input type="number" min="0" value="0" class="chem-qty" data-price="4000.00" data-timing="early-spring" onchange="updateChemTotal(this)"></td>
@@ -502,10 +502,16 @@
                     </div>
                 </div>
 
+                <!-- RUP & Price Match Section -->
+                <div class="rup-info-section">
+                    <h4>About Restricted Use Pesticides (RUPs)</h4>
+                    <p><span class="rup-badge">RUP</span> products like Paraquat require purchase from a licensed retailer. Tell us the retailer and quantity - we'll coordinate the purchase and send a check directly to them on your behalf.</p>
+                </div>
+
                 <!-- Found it Cheaper -->
                 <div class="cheaper-section">
-                    <h4>Found it Cheaper?</h4>
-                    <p>Tell us where and we'll buy it from them on your behalf!</p>
+                    <h4>Found it Cheaper? Or Need an RUP?</h4>
+                    <p>Tell us where and we'll buy it from them on your behalf - we'll send a check directly to the retailer!</p>
                     <div class="cheaper-form-inline">
                         <input type="text" id="cheaperProduct2" placeholder="Product name">
                         <input type="text" id="cheaperRetailer2" placeholder="Retailer">
@@ -1856,6 +1862,39 @@
         .chem-subtotal {
             font-weight: 600;
             color: var(--primary);
+        }
+
+        /* RUP Badge & Info */
+        .rup-badge {
+            display: inline-block;
+            background: #dc2626;
+            color: white;
+            font-size: 0.65rem;
+            font-weight: 700;
+            padding: 2px 6px;
+            border-radius: 4px;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
+        .rup-info-section {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: var(--radius-lg);
+            padding: 16px 20px;
+            margin-bottom: 16px;
+        }
+
+        .rup-info-section h4 {
+            color: #991b1b;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .rup-info-section p {
+            color: #7f1d1d;
+            font-size: 0.9rem;
+            margin: 0;
         }
 
         /* Cheaper Section */
