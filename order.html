@@ -511,7 +511,7 @@
                 <!-- Found it Cheaper -->
                 <div class="cheaper-section">
                     <h4>Found it Cheaper? Or Need an RUP?</h4>
-                    <p>Tell us where and we'll buy it from them on your behalf - we'll send a check directly to the retailer!</p>
+                    <p>Tell us where you found it and we'll pool orders to negotiate an even better price! No markup - we pass all savings directly to you.</p>
                     <div class="cheaper-form-inline">
                         <input type="text" id="cheaperProduct2" placeholder="Product name">
                         <input type="text" id="cheaperRetailer2" placeholder="Retailer">
@@ -682,6 +682,15 @@
                         </tr>
                         <!-- Adjuvants -->
                         <tr class="section-header-row"><td colspan="7"><strong>Adjuvants</strong></td></tr>
+                        <tr class="product-row" data-product="hydrovant">
+                            <td><strong>Hydrovant</strong><br><span class="product-note">Premium water conditioner & drift control - MAIN ADJUVANT (Retail: $165/gl)</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$132.00/gl</td>
+                            <td>$660.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="660.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
                         <tr class="product-row" data-product="mso">
                             <td><strong>MSO (Methylated Seed Oil)</strong><br><span class="product-note">Spray adjuvant</span></td>
                             <td>2x2.5 gl (5 gl)</td>
