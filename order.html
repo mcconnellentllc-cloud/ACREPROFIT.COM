@@ -521,6 +521,235 @@
                 </div>
             </div>
 
+            <!-- Quick Add Chemical Order List -->
+            <div class="quick-order-section">
+                <h2>Quick Add - Build Your Chemical Order</h2>
+                <p class="quick-order-subtitle">Add chemicals directly to your order. Select product, delivery timing, and quantity to fill trucks.</p>
+
+                <div class="quick-order-form">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Year</label>
+                            <select id="quickYear">
+                                <option value="2025">2025</option>
+                                <option value="2026" selected>2026</option>
+                                <option value="2027">2027</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Pickup Location</label>
+                            <select id="quickLocation">
+                                <option value="">Select location...</option>
+                                <option value="mcconnell">McConnell (Kyle)</option>
+                                <option value="bamford">Bamford (Chad)</option>
+                                <option value="mollohan">Mollohan (Ty)</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Delivery Timing</label>
+                            <select id="quickTiming">
+                                <option value="">Select timing...</option>
+                                <option value="early-spring">Early Spring (March)</option>
+                                <option value="pre-plant">Pre-Plant (April-May)</option>
+                                <option value="post-emerge">Post-Emerge (May-June)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chemical Price List -->
+                <table class="quick-order-table" id="quickOrderTable">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Package</th>
+                            <th>Price/Unit</th>
+                            <th>Pack Price</th>
+                            <th>Qty (Packs)</th>
+                            <th>Subtotal</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <!-- Glyphosate -->
+                        <tr class="product-row" data-product="agsaver">
+                            <td><strong>AgSaver (Glyphosate 4lb)</strong><br><span class="product-note">Best value glyphosate</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$13.25/gl</td>
+                            <td>$3,312.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="3312.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="dicamba">
+                            <td><strong>Dicamba DMA (4lb)</strong><br><span class="product-note">Broadleaf control</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$28.25/gl</td>
+                            <td>$7,062.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="7062.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="lv6">
+                            <td><strong>LV 6 (2,4-D Ester)</strong><br><span class="product-note">2,4-D LV ester</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$27.90/gl</td>
+                            <td>$6,975.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="6975.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="paraquat">
+                            <td><strong>Paraquat 3SL</strong> <span class="rup-badge">RUP</span><br><span class="product-note">Contact burndown - via retailer</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$16.00/gl</td>
+                            <td>$4,000.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="4000.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="aatrex">
+                            <td><strong>Aatrex 4L (Atrazine)</strong><br><span class="product-note">Corn/Sorghum pre-emerge</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$12.78/gl</td>
+                            <td>$3,195.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="3195.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="glufosinate">
+                            <td><strong>Glufosinate 2.34</strong><br><span class="product-note">Liberty-link & Palmer control</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$16.50/gl</td>
+                            <td>$4,125.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="4125.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="mesotrione">
+                            <td><strong>Mesotrione 4SC</strong><br><span class="product-note">Corn - Callisto generic</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$48.25/gl</td>
+                            <td>$241.25</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="241.25" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="sulfentrazone">
+                            <td><strong>Sulfentrazone 4SC</strong><br><span class="product-note">Palmer Amaranth residual</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$70.50/gl</td>
+                            <td>$352.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="352.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="clethodim">
+                            <td><strong>Clethodim 2EC</strong><br><span class="product-note">Grass control in broadleafs</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$33.50/gl</td>
+                            <td>$167.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="167.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="valor">
+                            <td><strong>Valor SX (flumioxazin)</strong><br><span class="product-note">Burndown + residual</span></td>
+                            <td>4x5 lb (20 lb)</td>
+                            <td>$14.25/lb</td>
+                            <td>$285.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="285.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="tapran">
+                            <td><strong>Tapran (Trifluralin)</strong><br><span class="product-note">Pre-emerge grass control</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$16.45/gl</td>
+                            <td>$4,112.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="4112.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="levelbest">
+                            <td><strong>Level Best Pro</strong><br><span class="product-note">2,4-D + Dicamba premix</span></td>
+                            <td>Shuttle (250 gl)</td>
+                            <td>$10.15/gl</td>
+                            <td>$2,537.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="2537.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <!-- Adjuvants -->
+                        <tr class="section-header-row"><td colspan="7"><strong>Adjuvants</strong></td></tr>
+                        <tr class="product-row" data-product="mso">
+                            <td><strong>MSO (Methylated Seed Oil)</strong><br><span class="product-note">Spray adjuvant</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$12.50/gl</td>
+                            <td>$62.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="62.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="coc">
+                            <td><strong>Crop Oil Concentrate</strong><br><span class="product-note">Spray adjuvant</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$8.75/gl</td>
+                            <td>$43.75</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="43.75" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="ams">
+                            <td><strong>AMS (Ammonium Sulfate)</strong><br><span class="product-note">Water conditioner</span></td>
+                            <td>50 lb bag</td>
+                            <td>$0.35/lb</td>
+                            <td>$17.50</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="17.50" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                        <tr class="product-row" data-product="nis">
+                            <td><strong>NIS (Non-ionic Surfactant)</strong><br><span class="product-note">Spray adjuvant</span></td>
+                            <td>2x2.5 gl (5 gl)</td>
+                            <td>$14.00/gl</td>
+                            <td>$70.00</td>
+                            <td><input type="number" min="0" value="0" class="quick-qty" data-price="70.00" onchange="updateQuickSubtotal(this)"></td>
+                            <td class="quick-subtotal">$0.00</td>
+                            <td><button class="btn btn-sm btn-primary" onclick="addQuickItem(this)">Add</button></td>
+                        </tr>
+                    </tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="5"><strong>Quick Add Total</strong></td>
+                            <td id="quickOrderTotal"><strong>$0.00</strong></td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table>
+
+                <!-- Current Order Items -->
+                <div class="order-items-list" id="orderItemsList">
+                    <h3>Your Order Items</h3>
+                    <table class="order-items-table" id="orderItemsTable">
+                        <thead>
+                            <tr>
+                                <th>Year</th>
+                                <th>Location</th>
+                                <th>Timing</th>
+                                <th>Product</th>
+                                <th>Qty</th>
+                                <th>Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="orderItemsBody">
+                            <tr class="empty-row"><td colspan="7">No items added yet. Select options above and add chemicals.</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Order Summary (Sticky at bottom) -->
             <div class="order-summary" id="orderSummary">
                 <div class="summary-content">
@@ -844,9 +1073,15 @@
                 chemTotal += qty * price;
             });
 
+            // Add quick order items total
+            let quickTotal = 0;
+            quickOrderItems.forEach(item => {
+                quickTotal += item.total;
+            });
+
             // Add chemical total to crop total for order total
             const cropTotal = orderData.totalCost || 0;
-            const grandTotal = cropTotal + chemTotal;
+            const grandTotal = cropTotal + chemTotal + quickTotal;
 
             // Update merch credit
             const newCredit = Math.floor(grandTotal / 1000) * 10;
@@ -871,6 +1106,118 @@
             document.getElementById('cheaperProduct2').value = '';
             document.getElementById('cheaperRetailer2').value = '';
             document.getElementById('cheaperPrice2').value = '';
+        }
+
+        // Quick Order Functions
+        let quickOrderItems = [];
+
+        function updateQuickSubtotal(input) {
+            const qty = parseInt(input.value) || 0;
+            const price = parseFloat(input.dataset.price) || 0;
+            const subtotal = qty * price;
+            const row = input.closest('tr');
+            row.querySelector('.quick-subtotal').textContent = `$${subtotal.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+
+            // Update quick order total
+            let total = 0;
+            document.querySelectorAll('.quick-qty').forEach(inp => {
+                const q = parseInt(inp.value) || 0;
+                const p = parseFloat(inp.dataset.price) || 0;
+                total += q * p;
+            });
+            document.getElementById('quickOrderTotal').innerHTML = `<strong>$${total.toLocaleString('en-US', {minimumFractionDigits: 2})}</strong>`;
+        }
+
+        function addQuickItem(btn) {
+            const row = btn.closest('tr');
+            const input = row.querySelector('.quick-qty');
+            const qty = parseInt(input.value) || 0;
+
+            if (qty === 0) {
+                alert('Please enter a quantity');
+                return;
+            }
+
+            const year = document.getElementById('quickYear').value;
+            const location = document.getElementById('quickLocation').value;
+            const timing = document.getElementById('quickTiming').value;
+
+            if (!location) {
+                alert('Please select a pickup location');
+                return;
+            }
+            if (!timing) {
+                alert('Please select a delivery timing');
+                return;
+            }
+
+            const product = row.dataset.product;
+            const productName = row.querySelector('strong').textContent;
+            const price = parseFloat(input.dataset.price) || 0;
+            const total = qty * price;
+
+            // Add to order items
+            quickOrderItems.push({
+                year,
+                location,
+                timing,
+                product,
+                productName,
+                qty,
+                price,
+                total
+            });
+
+            // Reset input
+            input.value = 0;
+            updateQuickSubtotal(input);
+
+            // Update order items display
+            renderOrderItems();
+
+            // Update totals
+            updateChemicalOrderTotal();
+
+            alert(`Added ${qty} pack(s) of ${productName} to your order for ${timing.replace('-', ' ')} delivery at ${location}`);
+        }
+
+        function renderOrderItems() {
+            const tbody = document.getElementById('orderItemsBody');
+
+            if (quickOrderItems.length === 0) {
+                tbody.innerHTML = '<tr class="empty-row"><td colspan="7">No items added yet. Select options above and add chemicals.</td></tr>';
+                return;
+            }
+
+            const timingLabels = {
+                'early-spring': 'Early Spring (Mar)',
+                'pre-plant': 'Pre-Plant (Apr-May)',
+                'post-emerge': 'Post-Emerge (May-Jun)'
+            };
+
+            const locationLabels = {
+                'mcconnell': 'McConnell',
+                'bamford': 'Bamford',
+                'mollohan': 'Mollohan'
+            };
+
+            tbody.innerHTML = quickOrderItems.map((item, idx) => `
+                <tr>
+                    <td>${item.year}</td>
+                    <td>${locationLabels[item.location] || item.location}</td>
+                    <td>${timingLabels[item.timing] || item.timing}</td>
+                    <td>${item.productName}</td>
+                    <td>${item.qty}</td>
+                    <td>$${item.total.toLocaleString('en-US', {minimumFractionDigits: 2})}</td>
+                    <td><button class="btn btn-sm btn-outline" onclick="removeQuickItem(${idx})">Remove</button></td>
+                </tr>
+            `).join('');
+        }
+
+        function removeQuickItem(idx) {
+            quickOrderItems.splice(idx, 1);
+            renderOrderItems();
+            updateChemicalOrderTotal();
         }
 
         // Merch modal functions
@@ -1862,6 +2209,175 @@
         .chem-subtotal {
             font-weight: 600;
             color: var(--primary);
+        }
+
+        /* Quick Order Section */
+        .quick-order-section {
+            margin-top: 40px;
+            padding-top: 40px;
+            border-top: 2px solid var(--border);
+        }
+
+        .quick-order-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .quick-order-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 24px;
+        }
+
+        .quick-order-form {
+            background: white;
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+        }
+
+        .quick-order-form .form-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+        }
+
+        .quick-order-form .form-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .quick-order-form select {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+        }
+
+        .quick-order-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .quick-order-table thead {
+            background: var(--primary);
+            color: white;
+        }
+
+        .quick-order-table th {
+            padding: 14px 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .quick-order-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: middle;
+        }
+
+        .quick-order-table tbody tr:hover {
+            background: #f8fdf8;
+        }
+
+        .quick-order-table .product-note {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .quick-qty {
+            width: 70px;
+            padding: 8px;
+            text-align: center;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .quick-subtotal {
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .quick-order-table tfoot {
+            background: var(--secondary);
+            font-size: 1.1rem;
+        }
+
+        .quick-order-table tfoot td {
+            padding: 16px 12px;
+        }
+
+        .section-header-row {
+            background: #f3f4f6;
+        }
+
+        .section-header-row td {
+            padding: 10px 12px !important;
+            color: var(--text-muted);
+        }
+
+        /* Order Items List */
+        .order-items-list {
+            margin-top: 24px;
+        }
+
+        .order-items-list h3 {
+            margin-bottom: 16px;
+        }
+
+        .order-items-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .order-items-table thead {
+            background: #374151;
+            color: white;
+        }
+
+        .order-items-table th {
+            padding: 12px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .order-items-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .order-items-table .empty-row td {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 24px;
+        }
+
+        @media (max-width: 768px) {
+            .quick-order-form .form-row {
+                grid-template-columns: 1fr;
+            }
+
+            .quick-order-table {
+                font-size: 0.85rem;
+            }
+
+            .quick-order-table th:nth-child(2),
+            .quick-order-table td:nth-child(2),
+            .quick-order-table th:nth-child(3),
+            .quick-order-table td:nth-child(3) {
+                display: none;
+            }
         }
 
         /* RUP Badge & Info */
