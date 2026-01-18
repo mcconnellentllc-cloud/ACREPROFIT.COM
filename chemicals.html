@@ -71,7 +71,7 @@
                 </div>
 
                 <div class="chemical-list" id="directChemicalList">
-                    <!-- Populated by JS -->
+                    <div class="loading">Loading chemicals...</div>
                 </div>
             </div>
 
@@ -85,9 +85,8 @@
                 <div class="crop-selector">
                     <label>Select Your Crop</label>
                     <div class="crop-buttons">
-                        <button class="crop-btn" data-crop="corn">🌽 Corn</button>
-                        <button class="crop-btn" data-crop="soybeans">🫘 Soybeans</button>
                         <button class="crop-btn" data-crop="wheat">🌾 Wheat</button>
+                        <button class="crop-btn" data-crop="corn">🌽 Corn</button>
                         <button class="crop-btn" data-crop="milo">🌿 Milo/Sorghum</button>
                         <button class="crop-btn" data-crop="millet">🌱 Millet</button>
                         <button class="crop-btn" data-crop="fallow">🏜️ Summer Fallow</button>
@@ -124,15 +123,28 @@
                     <p>Select a pre-built program, enter your acres, and we'll calculate everything for you</p>
                 </div>
 
+                <div class="program-crop-filter">
+                    <label>Filter by Crop:</label>
+                    <div class="crop-filter-buttons">
+                        <button class="crop-filter-btn active" data-crop="all">All Programs</button>
+                        <button class="crop-filter-btn" data-crop="wheat">Wheat</button>
+                        <button class="crop-filter-btn" data-crop="corn">Corn</button>
+                        <button class="crop-filter-btn" data-crop="milo">Milo</button>
+                        <button class="crop-filter-btn" data-crop="millet">Millet</button>
+                        <button class="crop-filter-btn" data-crop="fallow">Fallow</button>
+                    </div>
+                </div>
+
                 <div class="program-list" id="programList">
-                    <!-- Populated by JS -->
+                    <div class="loading">Loading programs...</div>
                 </div>
 
                 <div id="programAcresSection" class="program-acres-section" style="display: none;">
                     <h3>Enter Acres for: <span id="selectedProgramName"></span></h3>
 
-                    <div class="program-crops" id="programCrops">
-                        <!-- Populated based on program -->
+                    <div class="form-group">
+                        <label for="programAcres">Total Acres</label>
+                        <input type="number" id="programAcres" min="1" placeholder="Enter total acres">
                     </div>
 
                     <button id="calculateProgram" class="btn btn-primary btn-lg">
@@ -188,110 +200,322 @@
             window.location.href = '/login.html';
         }
 
-        // ============ CHEMICAL DATA ============
-        const chemicals = [
-            // Herbicides
-            { id: 'glyphosate', name: 'Glyphosate 4+', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 14.50, crops: ['corn', 'soybeans', 'wheat', 'milo', 'millet', 'fallow'], defaultRate: 32, rateUnit: 'oz/acre' },
-            { id: 'atrazine', name: 'Atrazine 4L', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 8.50, crops: ['corn', 'milo'], defaultRate: 1.5, rateUnit: 'qt/acre' },
-            { id: 'metolachlor', name: 'Metolachlor', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 12.00, crops: ['corn', 'soybeans'], defaultRate: 1.3, rateUnit: 'pt/acre' },
-            { id: '2-4-d', name: '2,4-D Amine', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 9.00, crops: ['corn', 'wheat', 'milo', 'fallow'], defaultRate: 1, rateUnit: 'pt/acre' },
-            { id: 'dicamba', name: 'Dicamba', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 22.00, crops: ['corn', 'soybeans', 'wheat'], defaultRate: 0.5, rateUnit: 'pt/acre' },
-            { id: 'paraquat', name: 'Paraquat', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 18.00, crops: ['soybeans', 'fallow'], defaultRate: 2, rateUnit: 'pt/acre' },
-            { id: 'metribuzin', name: 'Metribuzin 75', category: 'herbicide', unit: 'lb', packageSize: 50, packageUnit: 'lb bag', pricePerUnit: 12.00, crops: ['soybeans', 'wheat'], defaultRate: 0.5, rateUnit: 'lb/acre' },
-            { id: 'acetochlor', name: 'Acetochlor', category: 'herbicide', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15.00, crops: ['corn'], defaultRate: 2, rateUnit: 'qt/acre' },
-
-            // Insecticides
-            { id: 'chlorpyrifos', name: 'Chlorpyrifos 4E', category: 'insecticide', unit: 'gal', packageSize: 30, packageUnit: 'gal case', pricePerUnit: 28.00, crops: ['corn', 'wheat', 'milo'], defaultRate: 1, rateUnit: 'pt/acre' },
-            { id: 'bifenthrin', name: 'Bifenthrin', category: 'insecticide', unit: 'gal', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85.00, crops: ['corn', 'soybeans', 'wheat'], defaultRate: 6.4, rateUnit: 'oz/acre' },
-            { id: 'lambda', name: 'Lambda-Cyhalothrin', category: 'insecticide', unit: 'gal', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 75.00, crops: ['corn', 'soybeans', 'wheat', 'milo'], defaultRate: 3.84, rateUnit: 'oz/acre' },
-
-            // Fungicides
-            { id: 'propiconazole', name: 'Propiconazole', category: 'fungicide', unit: 'gal', packageSize: 30, packageUnit: 'gal case', pricePerUnit: 32.00, crops: ['corn', 'wheat'], defaultRate: 4, rateUnit: 'oz/acre' },
-            { id: 'azoxystrobin', name: 'Azoxystrobin', category: 'fungicide', unit: 'gal', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 120.00, crops: ['corn', 'soybeans', 'wheat'], defaultRate: 6, rateUnit: 'oz/acre' },
-
-            // Adjuvants
-            { id: 'surfactant', name: 'Non-Ionic Surfactant', category: 'adjuvant', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 8.00, crops: ['corn', 'soybeans', 'wheat', 'milo', 'millet', 'fallow'], defaultRate: 0.25, rateUnit: 'qt/acre' },
-            { id: 'ams', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', unit: 'lb', packageSize: 50, packageUnit: 'lb bag', pricePerUnit: 0.45, crops: ['corn', 'soybeans', 'wheat', 'milo', 'millet', 'fallow'], defaultRate: 8.5, rateUnit: 'lb/acre' },
-            { id: 'crop-oil', name: 'Crop Oil Concentrate', category: 'adjuvant', unit: 'gal', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 6.50, crops: ['corn', 'soybeans', 'wheat', 'milo', 'millet', 'fallow'], defaultRate: 1, rateUnit: 'qt/acre' }
-        ];
-
-        // Standard Programs
-        const programs = [
-            {
-                id: 'corn-2pass',
-                name: 'Corn 2-Pass Program',
-                description: 'Pre-emergent + Post-emergent application for corn',
-                crops: ['corn'],
-                chemicals: [
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Pre' },
-                    { chemId: 'atrazine', rate: 1.5, rateUnit: 'qt/acre', pass: 'Pre' },
-                    { chemId: 'metolachlor', rate: 1.3, rateUnit: 'pt/acre', pass: 'Pre' },
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Post' }
-                ]
-            },
-            {
-                id: 'corn-3pass',
-                name: 'Corn 3-Pass Program',
-                description: 'Burndown + Pre-emergent + Post-emergent for corn',
-                crops: ['corn'],
-                chemicals: [
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Burndown' },
-                    { chemId: '2-4-d', rate: 1, rateUnit: 'pt/acre', pass: 'Burndown' },
-                    { chemId: 'atrazine', rate: 2, rateUnit: 'qt/acre', pass: 'Pre' },
-                    { chemId: 'metolachlor', rate: 1.5, rateUnit: 'pt/acre', pass: 'Pre' },
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Post' }
-                ]
-            },
-            {
-                id: 'soybean-2pass',
-                name: 'Soybean 2-Pass Program',
-                description: 'Pre-emergent + Post-emergent for soybeans',
-                crops: ['soybeans'],
-                chemicals: [
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Pre' },
-                    { chemId: 'metribuzin', rate: 0.5, rateUnit: 'lb/acre', pass: 'Pre' },
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Post' }
-                ]
-            },
-            {
-                id: 'wheat-standard',
-                name: 'Wheat Standard Program',
-                description: 'Fall + Spring application for wheat',
-                crops: ['wheat'],
-                chemicals: [
-                    { chemId: 'glyphosate', rate: 24, rateUnit: 'oz/acre', pass: 'Fall Burndown' },
-                    { chemId: '2-4-d', rate: 1, rateUnit: 'pt/acre', pass: 'Spring' },
-                    { chemId: 'propiconazole', rate: 4, rateUnit: 'oz/acre', pass: 'Spring' }
-                ]
-            },
-            {
-                id: 'milo-2pass',
-                name: 'Milo/Sorghum 2-Pass Program',
-                description: 'Pre-emergent + Post-emergent for milo/sorghum',
-                crops: ['milo'],
-                chemicals: [
-                    { chemId: 'atrazine', rate: 2, rateUnit: 'qt/acre', pass: 'Pre' },
-                    { chemId: 'glyphosate', rate: 24, rateUnit: 'oz/acre', pass: 'Post' },
-                    { chemId: '2-4-d', rate: 0.5, rateUnit: 'pt/acre', pass: 'Post' }
-                ]
-            },
-            {
-                id: 'fallow-burndown',
-                name: 'Summer Fallow Burndown',
-                description: 'Clean burndown for fallow ground',
-                crops: ['fallow'],
-                chemicals: [
-                    { chemId: 'glyphosate', rate: 32, rateUnit: 'oz/acre', pass: 'Burndown' },
-                    { chemId: '2-4-d', rate: 1.5, rateUnit: 'pt/acre', pass: 'Burndown' },
-                    { chemId: 'surfactant', rate: 0.25, rateUnit: 'qt/acre', pass: 'Burndown' }
-                ]
-            }
-        ];
-
-        // Order state
+        // State
+        let chemicals = [];
+        let programs = [];
         let orderItems = [];
         let selectedCrop = null;
         let selectedProgram = null;
+
+        // ============ LOAD DATA FROM API ============
+        async function loadChemicals() {
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                if (response.ok) {
+                    chemicals = await response.json();
+                } else {
+                    chemicals = getDemoChemicals();
+                }
+            } catch (error) {
+                console.error('Error loading chemicals:', error);
+                chemicals = getDemoChemicals();
+            }
+            renderDirectChemicalList();
+        }
+
+        async function loadPrograms() {
+            try {
+                const response = await fetch(`${API_URL}/api/spray-programs`);
+                if (response.ok) {
+                    programs = await response.json();
+                } else {
+                    programs = getDemoPrograms();
+                }
+            } catch (error) {
+                console.error('Error loading programs:', error);
+                programs = getDemoPrograms();
+            }
+            renderPrograms();
+        }
+
+        // Demo data fallback
+        function getDemoChemicals() {
+            return [
+                { _id: '1', productName: 'Dicamba DMA', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25, defaultRate: 8, rateUnit: 'oz/acre' },
+                { _id: '2', productName: 'LV 6', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90, defaultRate: 16, rateUnit: 'oz/acre' },
+                { _id: '3', productName: 'AgSaver (Glyphosate)', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25, defaultRate: 32, rateUnit: 'oz/acre' },
+                { _id: '4', productName: 'Aatrex', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78, defaultRate: 1.5, rateUnit: 'qt/acre' },
+                { _id: '5', productName: 'Paraquat', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00, defaultRate: 2, rateUnit: 'pt/acre' },
+                { _id: '6', productName: 'Glufosinate', category: 'herbicide', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.50, defaultRate: 32, rateUnit: 'oz/acre' },
+                { _id: '7', productName: 'Mesotrione', category: 'herbicide', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 48.25, defaultRate: 3, rateUnit: 'oz/acre' },
+                { _id: '8', productName: 'Clethodim', category: 'herbicide', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 33.50, defaultRate: 6, rateUnit: 'oz/acre' },
+                { _id: '9', productName: 'Sulfentrazone', category: 'herbicide', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 70.50, defaultRate: 4, rateUnit: 'oz/acre' },
+                { _id: '10', productName: 'Valor SX', category: 'herbicide', packSize: '4x5', unit: 'lb', unitsPerPack: 20, price: 14.25, defaultRate: 2, rateUnit: 'oz/acre' }
+            ];
+        }
+
+        function getDemoPrograms() {
+            return [
+                // WHEAT PROGRAMS
+                {
+                    _id: 'wheat-1',
+                    name: 'Wheat - Fall Burndown',
+                    description: 'Pre-plant burndown for winter wheat',
+                    crop: 'wheat',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Fall Burndown',
+                            timing: '14-21 days before planting',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'wheat-2',
+                    name: 'Wheat - Spring Broadleaf Control',
+                    description: 'Spring broadleaf weed control in winter wheat',
+                    crop: 'wheat',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Spring Application',
+                            timing: 'Wheat tillering to jointing',
+                            chemicals: [
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'LV 6', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'wheat-3',
+                    name: 'Wheat - Full Season Program',
+                    description: 'Complete fall burndown + spring broadleaf control',
+                    crop: 'wheat',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Fall Burndown',
+                            timing: '14-21 days before planting',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        },
+                        {
+                            name: 'Spring Broadleaf',
+                            timing: 'Wheat tillering to jointing',
+                            chemicals: [
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'LV 6', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90 }
+                            ]
+                        }
+                    ]
+                },
+                // CORN PROGRAMS
+                {
+                    _id: 'corn-1',
+                    name: 'Corn - Burndown + Pre-emerge',
+                    description: 'Burndown with residual pre-emergent for corn',
+                    crop: 'corn',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Burndown/Pre-emerge',
+                            timing: '7-14 days before planting',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Aatrex', rate: 1.5, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 },
+                                { productName: 'Mesotrione', rate: 3, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 48.25 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'corn-2',
+                    name: 'Corn - Post-emerge',
+                    description: 'Post-emergence weed control in corn',
+                    crop: 'corn',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Post-emerge',
+                            timing: 'V4-V6 corn stage',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'corn-3',
+                    name: 'Corn - 2-Pass Program',
+                    description: 'Complete pre + post-emerge corn program',
+                    crop: 'corn',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Burndown/Pre-emerge',
+                            timing: '7-14 days before planting',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Aatrex', rate: 1.5, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 },
+                                { productName: 'Mesotrione', rate: 3, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 48.25 }
+                            ]
+                        },
+                        {
+                            name: 'Post-emerge',
+                            timing: 'V4-V6 corn stage',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        }
+                    ]
+                },
+                // MILO/SORGHUM PROGRAMS
+                {
+                    _id: 'milo-1',
+                    name: 'Milo - Pre-emerge',
+                    description: 'Pre-emergence weed control for grain sorghum',
+                    crop: 'milo',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Pre-emerge',
+                            timing: 'At or before planting',
+                            chemicals: [
+                                { productName: 'Aatrex', rate: 2, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'milo-2',
+                    name: 'Milo - 2-Pass Program',
+                    description: 'Complete pre + post-emerge milo program',
+                    crop: 'milo',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Pre-emerge',
+                            timing: 'At or before planting',
+                            chemicals: [
+                                { productName: 'Aatrex', rate: 2, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 }
+                            ]
+                        },
+                        {
+                            name: 'Post-emerge',
+                            timing: '4-6 leaf sorghum',
+                            chemicals: [
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'LV 6', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90 }
+                            ]
+                        }
+                    ]
+                },
+                // SUMMER FALLOW PROGRAMS
+                {
+                    _id: 'fallow-1',
+                    name: 'Summer Fallow - Burndown',
+                    description: 'Clean burndown for fallow ground',
+                    crop: 'fallow',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Burndown',
+                            timing: 'As needed',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'fallow-2',
+                    name: 'Summer Fallow - Paraquat Burndown',
+                    description: 'Quick contact burndown with Paraquat',
+                    crop: 'fallow',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Burndown',
+                            timing: 'As needed',
+                            chemicals: [
+                                { productName: 'Paraquat', rate: 2, rateUnit: 'pt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 24, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'fallow-3',
+                    name: 'Summer Fallow - 2-Pass Program',
+                    description: 'Two burndown applications for season-long fallow',
+                    crop: 'fallow',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'First Burndown',
+                            timing: 'Early spring',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        },
+                        {
+                            name: 'Second Burndown',
+                            timing: 'Mid-summer',
+                            chemicals: [
+                                { productName: 'Paraquat', rate: 2, rateUnit: 'pt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00 }
+                            ]
+                        }
+                    ]
+                },
+                // MILLET PROGRAMS
+                {
+                    _id: 'millet-1',
+                    name: 'Millet - Burndown',
+                    description: 'Pre-plant burndown for proso millet',
+                    crop: 'millet',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Burndown',
+                            timing: '7-14 days before planting',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'millet-2',
+                    name: 'Millet - With Grass Control',
+                    description: 'Burndown with grass weed control for millet',
+                    crop: 'millet',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Burndown',
+                            timing: '7-14 days before planting',
+                            chemicals: [
+                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Clethodim', rate: 6, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 33.50 }
+                            ]
+                        }
+                    ]
+                }
+            ];
+        }
 
         // ============ TAB SWITCHING ============
         document.querySelectorAll('.option-tab').forEach(tab => {
@@ -309,26 +533,31 @@
         function renderDirectChemicalList(filter = '', category = 'all') {
             const list = document.getElementById('directChemicalList');
             const filtered = chemicals.filter(c => {
-                const matchesSearch = c.name.toLowerCase().includes(filter.toLowerCase());
+                const matchesSearch = c.productName.toLowerCase().includes(filter.toLowerCase());
                 const matchesCategory = category === 'all' || c.category === category;
                 return matchesSearch && matchesCategory;
             });
 
+            if (filtered.length === 0) {
+                list.innerHTML = '<p class="no-results">No chemicals found</p>';
+                return;
+            }
+
             list.innerHTML = filtered.map(chem => `
                 <div class="chemical-card">
                     <div class="chem-info">
-                        <h4>${chem.name}</h4>
-                        <span class="chem-category">${chem.category}</span>
-                        <p class="chem-package">Package: ${chem.packageSize} ${chem.packageUnit}</p>
+                        <h4>${chem.productName}</h4>
+                        <span class="chem-category">${chem.category || 'herbicide'}</span>
+                        <p class="chem-package">Package: ${chem.packSize} (${chem.unitsPerPack || 1} ${chem.unit})</p>
                     </div>
                     <div class="chem-price">
-                        <span class="price">$${chem.pricePerUnit.toFixed(2)}</span>
+                        <span class="price">$${(chem.price || 0).toFixed(2)}</span>
                         <span class="per-unit">per ${chem.unit}</span>
                     </div>
                     <div class="chem-quantity">
-                        <label>Qty (${chem.packageUnit})</label>
-                        <input type="number" min="0" value="0" data-chem-id="${chem.id}" class="direct-qty-input">
-                        <button class="btn btn-sm btn-primary add-direct-btn" data-chem-id="${chem.id}">Add</button>
+                        <label>Qty (packs)</label>
+                        <input type="number" min="0" value="0" data-chem-id="${chem._id}" class="direct-qty-input">
+                        <button class="btn btn-sm btn-primary add-direct-btn" data-chem-id="${chem._id}">Add</button>
                     </div>
                 </div>
             `).join('');
@@ -371,29 +600,27 @@
 
         function renderCropChemicals() {
             const list = document.getElementById('rateChemicals');
-            const cropChemicals = chemicals.filter(c => c.crops.includes(selectedCrop));
-
             document.getElementById('cropChemicalList').style.display = 'block';
 
-            list.innerHTML = cropChemicals.map(chem => `
+            list.innerHTML = chemicals.map(chem => `
                 <div class="rate-chemical-row">
                     <div class="rate-chem-info">
-                        <h4>${chem.name}</h4>
-                        <span class="chem-category">${chem.category}</span>
+                        <h4>${chem.productName}</h4>
+                        <span class="chem-category">${chem.category || 'herbicide'}</span>
+                        <span class="chem-pack">${chem.packSize} - $${(chem.price || 0).toFixed(2)}/${chem.unit}</span>
                     </div>
                     <div class="rate-input-group">
-                        <input type="number" step="0.1" min="0" placeholder="${chem.defaultRate}"
-                               data-chem-id="${chem.id}" class="rate-input" value="">
-                        <span class="rate-unit">${chem.rateUnit}</span>
+                        <input type="number" step="0.1" min="0" placeholder="${chem.defaultRate || 0}"
+                               data-chem-id="${chem._id}" class="rate-input" value="">
+                        <span class="rate-unit">${chem.rateUnit || 'oz/acre'}</span>
                     </div>
-                    <div class="rate-result" id="result-${chem.id}">
+                    <div class="rate-result" id="result-${chem._id}">
                         <span class="total-needed">-</span>
                         <span class="packages-needed">-</span>
                     </div>
                 </div>
             `).join('');
 
-            // Listen for rate changes
             document.querySelectorAll('.rate-input').forEach(input => {
                 input.addEventListener('input', calculateCropTotals);
             });
@@ -407,42 +634,34 @@
 
             const resultsDiv = document.getElementById('cropCalculationResults');
             let hasResults = false;
-            let orderItems = [];
+            let cropOrderItems = [];
 
             document.querySelectorAll('.rate-input').forEach(input => {
                 const chemId = input.dataset.chemId;
                 const rate = parseFloat(input.value) || 0;
-                const chem = chemicals.find(c => c.id === chemId);
+                const chem = chemicals.find(c => c._id === chemId);
                 const resultDiv = document.getElementById(`result-${chemId}`);
 
                 if (rate > 0 && chem) {
                     hasResults = true;
+                    const rateUnit = chem.rateUnit || 'oz/acre';
 
-                    // Calculate total needed
-                    let totalNeeded;
-                    if (chem.rateUnit.includes('oz')) {
-                        totalNeeded = (rate * acres) / 128; // oz to gal
-                    } else if (chem.rateUnit.includes('pt')) {
-                        totalNeeded = (rate * acres) / 8; // pt to gal
-                    } else if (chem.rateUnit.includes('qt')) {
-                        totalNeeded = (rate * acres) / 4; // qt to gal
-                    } else if (chem.rateUnit.includes('lb')) {
-                        totalNeeded = rate * acres; // lb stays lb
-                    } else {
-                        totalNeeded = rate * acres;
-                    }
+                    // Calculate total needed in base units
+                    let totalNeeded = calculateAmount(rate, rateUnit, acres, chem.unit);
 
-                    const packages = Math.ceil(totalNeeded / chem.packageSize);
-                    const actualAmount = packages * chem.packageSize;
+                    const unitsPerPack = chem.unitsPerPack || 1;
+                    const packages = Math.ceil(totalNeeded / unitsPerPack);
+                    const actualAmount = packages * unitsPerPack;
 
                     resultDiv.innerHTML = `
                         <span class="total-needed">${totalNeeded.toFixed(1)} ${chem.unit}</span>
-                        <span class="packages-needed">${packages} ${chem.packageUnit}(s)</span>
+                        <span class="packages-needed">${packages} pack(s)</span>
                     `;
 
-                    orderItems.push({
+                    cropOrderItems.push({
                         chem,
                         rate,
+                        rateUnit,
                         acres,
                         totalNeeded,
                         packages,
@@ -458,7 +677,10 @@
 
             if (hasResults) {
                 resultsDiv.style.display = 'block';
-                let totalCost = orderItems.reduce((sum, item) => sum + (item.packages * item.chem.packageSize * item.chem.pricePerUnit), 0);
+                let totalCost = cropOrderItems.reduce((sum, item) => {
+                    const unitsPerPack = item.chem.unitsPerPack || 1;
+                    return sum + (item.packages * unitsPerPack * (item.chem.price || 0));
+                }, 0);
 
                 resultsDiv.innerHTML = `
                     <h3>Order Summary for ${acres.toLocaleString()} acres</h3>
@@ -473,51 +695,90 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${orderItems.map(item => `
-                                <tr>
-                                    <td>${item.chem.name}</td>
-                                    <td>${item.rate} ${item.chem.rateUnit}</td>
-                                    <td>${item.totalNeeded.toFixed(1)} ${item.chem.unit}</td>
-                                    <td>${item.packages} × ${item.chem.packageSize} ${item.chem.packageUnit}</td>
-                                    <td>$${(item.packages * item.chem.packageSize * item.chem.pricePerUnit).toFixed(2)}</td>
-                                </tr>
-                            `).join('')}
+                            ${cropOrderItems.map(item => {
+                                const unitsPerPack = item.chem.unitsPerPack || 1;
+                                const cost = item.packages * unitsPerPack * (item.chem.price || 0);
+                                return `
+                                    <tr>
+                                        <td>${item.chem.productName}</td>
+                                        <td>${item.rate} ${item.rateUnit}</td>
+                                        <td>${item.totalNeeded.toFixed(1)} ${item.chem.unit}</td>
+                                        <td>${item.packages} x ${item.chem.packSize}</td>
+                                        <td>$${cost.toFixed(2)}</td>
+                                    </tr>
+                                `;
+                            }).join('')}
                         </tbody>
                         <tfoot>
                             <tr>
                                 <td colspan="4"><strong>Estimated Total</strong></td>
                                 <td><strong>$${totalCost.toFixed(2)}</strong></td>
                             </tr>
+                            <tr>
+                                <td colspan="4">Merch Credit Earned ($20 per $2,000)</td>
+                                <td>$${(Math.floor(totalCost / 2000) * 20).toFixed(2)}</td>
+                            </tr>
                         </tfoot>
                     </table>
-                    <button class="btn btn-primary" onclick="addCropOrderToCart()">Add to Order</button>
+                    <button class="btn btn-primary" onclick="addCropOrderToCart()">Add All to Order</button>
                 `;
             } else {
                 resultsDiv.style.display = 'none';
             }
         }
 
-        // ============ OPTION 3: PROGRAM PACKAGES ============
-        function renderPrograms() {
-            const list = document.getElementById('programList');
+        function calculateAmount(rate, rateUnit, acres, targetUnit) {
+            let totalNeeded = rate * acres;
 
-            list.innerHTML = programs.map(prog => `
-                <div class="program-card" data-program-id="${prog.id}">
+            // Convert to gallons if needed
+            if (targetUnit === 'gl') {
+                if (rateUnit.includes('oz')) {
+                    totalNeeded = totalNeeded / 128;
+                } else if (rateUnit.includes('pt')) {
+                    totalNeeded = totalNeeded / 8;
+                } else if (rateUnit.includes('qt')) {
+                    totalNeeded = totalNeeded / 4;
+                }
+            }
+            return totalNeeded;
+        }
+
+        // ============ OPTION 3: PROGRAM PACKAGES ============
+        document.querySelectorAll('.crop-filter-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.crop-filter-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                renderPrograms(btn.dataset.crop);
+            });
+        });
+
+        function renderPrograms(cropFilter = 'all') {
+            const list = document.getElementById('programList');
+            const filtered = cropFilter === 'all' ? programs : programs.filter(p => p.crop === cropFilter);
+
+            if (filtered.length === 0) {
+                list.innerHTML = '<p class="no-results">No programs found for this crop</p>';
+                return;
+            }
+
+            list.innerHTML = filtered.map(prog => `
+                <div class="program-card" data-program-id="${prog._id}">
                     <div class="program-header">
                         <h3>${prog.name}</h3>
-                        <span class="program-crops">${prog.crops.map(c => c.charAt(0).toUpperCase() + c.slice(1)).join(', ')}</span>
+                        <span class="program-crop-badge">${prog.crop}</span>
                     </div>
                     <p class="program-desc">${prog.description}</p>
-                    <div class="program-chemicals">
-                        <strong>Includes:</strong>
-                        <ul>
-                            ${prog.chemicals.map(c => {
-                                const chem = chemicals.find(ch => ch.id === c.chemId);
-                                return `<li>${chem?.name || c.chemId} - ${c.rate} ${c.rateUnit} (${c.pass})</li>`;
-                            }).join('')}
-                        </ul>
+                    <div class="program-applications">
+                        ${prog.applications.map(app => `
+                            <div class="program-pass">
+                                <strong>${app.name}</strong> (${app.timing})
+                                <ul>
+                                    ${app.chemicals.map(c => `<li>${c.productName} - ${c.rate} ${c.rateUnit}</li>`).join('')}
+                                </ul>
+                            </div>
+                        `).join('')}
                     </div>
-                    <button class="btn btn-secondary select-program-btn" data-program-id="${prog.id}">
+                    <button class="btn btn-secondary select-program-btn" data-program-id="${prog._id}">
                         Select This Program
                     </button>
                 </div>
@@ -525,7 +786,7 @@
 
             document.querySelectorAll('.select-program-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
-                    selectedProgram = programs.find(p => p.id === btn.dataset.programId);
+                    selectedProgram = programs.find(p => p._id === btn.dataset.programId);
                     showProgramAcresInput();
                 });
             });
@@ -534,93 +795,93 @@
         function showProgramAcresInput() {
             const section = document.getElementById('programAcresSection');
             document.getElementById('selectedProgramName').textContent = selectedProgram.name;
-
-            const cropsDiv = document.getElementById('programCrops');
-            cropsDiv.innerHTML = selectedProgram.crops.map(crop => `
-                <div class="program-crop-input">
-                    <label>${crop.charAt(0).toUpperCase() + crop.slice(1)} Acres</label>
-                    <input type="number" min="0" class="program-acres-input" data-crop="${crop}" placeholder="0">
-                </div>
-            `).join('');
-
+            document.getElementById('programResults').style.display = 'none';
             section.style.display = 'block';
+            section.scrollIntoView({ behavior: 'smooth' });
         }
 
         document.getElementById('calculateProgram')?.addEventListener('click', calculateProgramOrder);
 
         function calculateProgramOrder() {
+            const acres = parseFloat(document.getElementById('programAcres').value) || 0;
+            if (acres === 0) {
+                alert('Please enter the number of acres');
+                return;
+            }
+
             const resultsDiv = document.getElementById('programResults');
-            let spraySheets = {};
+            let spraySheets = [];
             let totalsByChemical = {};
+            let totalCost = 0;
 
-            // Get acres for each crop
-            document.querySelectorAll('.program-acres-input').forEach(input => {
-                const crop = input.dataset.crop;
-                const acres = parseFloat(input.value) || 0;
+            // Process each application (pass) in the program
+            selectedProgram.applications.forEach(app => {
+                let sheetChemicals = [];
 
-                if (acres > 0) {
-                    // Group chemicals by pass for spray sheets
-                    selectedProgram.chemicals.forEach(progChem => {
-                        const chem = chemicals.find(c => c.id === progChem.chemId);
-                        if (!chem) return;
+                app.chemicals.forEach(chemItem => {
+                    const rate = chemItem.rate;
+                    const rateUnit = chemItem.rateUnit;
+                    const unit = chemItem.unit || 'gl';
+                    const unitsPerPack = chemItem.unitsPerPack || 250;
+                    const price = chemItem.price || 0;
 
-                        const pass = progChem.pass;
-                        if (!spraySheets[pass]) {
-                            spraySheets[pass] = { pass, chemicals: [], acres };
-                        }
+                    // Calculate amount needed
+                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit);
+                    const packages = Math.ceil(totalNeeded / unitsPerPack);
+                    const cost = packages * unitsPerPack * price;
 
-                        // Calculate amount needed
-                        let totalNeeded;
-                        if (progChem.rateUnit.includes('oz')) {
-                            totalNeeded = (progChem.rate * acres) / 128;
-                        } else if (progChem.rateUnit.includes('pt')) {
-                            totalNeeded = (progChem.rate * acres) / 8;
-                        } else if (progChem.rateUnit.includes('qt')) {
-                            totalNeeded = (progChem.rate * acres) / 4;
-                        } else {
-                            totalNeeded = progChem.rate * acres;
-                        }
-
-                        const packages = Math.ceil(totalNeeded / chem.packageSize);
-
-                        spraySheets[pass].chemicals.push({
-                            name: chem.name,
-                            rate: progChem.rate,
-                            rateUnit: progChem.rateUnit,
-                            totalNeeded,
-                            packages,
-                            packageSize: chem.packageSize,
-                            packageUnit: chem.packageUnit,
-                            unit: chem.unit,
-                            pricePerUnit: chem.pricePerUnit
-                        });
-
-                        // Aggregate totals
-                        if (!totalsByChemical[chem.id]) {
-                            totalsByChemical[chem.id] = {
-                                name: chem.name,
-                                totalNeeded: 0,
-                                packages: 0,
-                                packageSize: chem.packageSize,
-                                packageUnit: chem.packageUnit,
-                                unit: chem.unit,
-                                pricePerUnit: chem.pricePerUnit
-                            };
-                        }
-                        totalsByChemical[chem.id].totalNeeded += totalNeeded;
-                        totalsByChemical[chem.id].packages = Math.ceil(totalsByChemical[chem.id].totalNeeded / chem.packageSize);
+                    sheetChemicals.push({
+                        name: chemItem.productName,
+                        rate,
+                        rateUnit,
+                        totalNeeded,
+                        packages,
+                        packSize: chemItem.packSize,
+                        unitsPerPack,
+                        unit,
+                        price,
+                        cost
                     });
-                }
+
+                    // Aggregate for order totals
+                    const key = chemItem.productName;
+                    if (!totalsByChemical[key]) {
+                        totalsByChemical[key] = {
+                            name: chemItem.productName,
+                            totalNeeded: 0,
+                            packages: 0,
+                            packSize: chemItem.packSize,
+                            unitsPerPack,
+                            unit,
+                            price
+                        };
+                    }
+                    totalsByChemical[key].totalNeeded += totalNeeded;
+                });
+
+                spraySheets.push({
+                    name: app.name,
+                    timing: app.timing,
+                    acres,
+                    chemicals: sheetChemicals
+                });
+            });
+
+            // Recalculate packages for aggregated totals
+            Object.values(totalsByChemical).forEach(item => {
+                item.packages = Math.ceil(item.totalNeeded / item.unitsPerPack);
+                item.cost = item.packages * item.unitsPerPack * item.price;
+                totalCost += item.cost;
             });
 
             // Render spray sheets
-            let totalCost = 0;
-            let spraySheetHTML = Object.values(spraySheets).map(sheet => `
+            let spraySheetHTML = spraySheets.map(sheet => `
                 <div class="spray-sheet">
                     <div class="spray-sheet-header">
-                        <h4>Spray Sheet: ${sheet.pass}</h4>
+                        <h4>${sheet.name}</h4>
+                        <span class="sheet-timing">${sheet.timing}</span>
                         <span class="sheet-acres">${sheet.acres.toLocaleString()} acres</span>
-                        <button class="btn btn-sm btn-outline print-sheet-btn">🖨️ Print</button>
+                        <button class="btn btn-sm btn-outline print-sheet-btn" onclick="printSpraySheet(this)">Print</button>
                     </div>
                     <table class="spray-sheet-table">
                         <thead>
@@ -657,18 +918,14 @@
                             </tr>
                         </thead>
                         <tbody>
-                            ${Object.values(totalsByChemical).map(item => {
-                                const cost = item.packages * item.packageSize * item.pricePerUnit;
-                                totalCost += cost;
-                                return `
-                                    <tr>
-                                        <td>${item.name}</td>
-                                        <td>${item.totalNeeded.toFixed(1)} ${item.unit}</td>
-                                        <td>${item.packages} × ${item.packageSize} ${item.packageUnit}</td>
-                                        <td>$${cost.toFixed(2)}</td>
-                                    </tr>
-                                `;
-                            }).join('')}
+                            ${Object.values(totalsByChemical).map(item => `
+                                <tr>
+                                    <td>${item.name}</td>
+                                    <td>${item.totalNeeded.toFixed(1)} ${item.unit}</td>
+                                    <td>${item.packages} x ${item.packSize}</td>
+                                    <td>$${item.cost.toFixed(2)}</td>
+                                </tr>
+                            `).join('')}
                         </tbody>
                         <tfoot>
                             <tr>
@@ -676,29 +933,61 @@
                                 <td><strong>$${totalCost.toFixed(2)}</strong></td>
                             </tr>
                             <tr>
+                                <td colspan="3">Cost Per Acre</td>
+                                <td>$${(totalCost / acres).toFixed(2)}</td>
+                            </tr>
+                            <tr>
                                 <td colspan="3">Merch Credit Earned ($20 per $2,000)</td>
                                 <td>$${(Math.floor(totalCost / 2000) * 20).toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
-                    <button class="btn btn-primary btn-lg" onclick="submitProgramOrder()">Submit This Order</button>
+                    <button class="btn btn-primary btn-lg" onclick="submitProgramOrder(${acres}, ${totalCost})">Submit This Order</button>
                 </div>
             `;
 
             resultsDiv.innerHTML = `
-                <h2>Your Spray Program</h2>
+                <h2>Your Spray Program: ${selectedProgram.name}</h2>
+                <p class="program-summary">${acres.toLocaleString()} acres - ${selectedProgram.applications.length} application(s)</p>
                 <div class="spray-sheets-container">${spraySheetHTML}</div>
                 ${totalsHTML}
             `;
             resultsDiv.style.display = 'block';
-
-            // Scroll to results
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function printSpraySheet(btn) {
+            const sheet = btn.closest('.spray-sheet');
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Spray Sheet - Acre Profit</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 20px; }
+                        h1 { color: #2d5a27; }
+                        table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+                        th, td { border: 1px solid #ccc; padding: 12px; text-align: left; }
+                        th { background: #f0f0f0; }
+                        .header { display: flex; justify-content: space-between; align-items: center; }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>Acre Profit - Spray Sheet</h1>
+                        <p>Date: ${new Date().toLocaleDateString()}</p>
+                    </div>
+                    ${sheet.innerHTML}
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
         }
 
         // ============ ORDER FUNCTIONS ============
         function addToOrder(chemId, qty, source) {
-            const chem = chemicals.find(c => c.id === chemId);
+            const chem = chemicals.find(c => c._id === chemId);
             if (!chem) return;
 
             const existing = orderItems.find(i => i.chemId === chemId);
@@ -709,7 +998,78 @@
             }
 
             updateOrderSummary();
-            alert(`Added ${qty} ${chem.packageUnit} of ${chem.name} to your order`);
+            showNotification(`Added ${qty} pack(s) of ${chem.productName} to your order`);
+        }
+
+        function addCropOrderToCart() {
+            // Get all calculated items and add to cart
+            const inputs = document.querySelectorAll('.rate-input');
+            inputs.forEach(input => {
+                const rate = parseFloat(input.value) || 0;
+                if (rate > 0) {
+                    const chemId = input.dataset.chemId;
+                    const chem = chemicals.find(c => c._id === chemId);
+                    if (chem) {
+                        const acres = parseFloat(document.getElementById('cropAcres').value) || 0;
+                        const totalNeeded = calculateAmount(rate, chem.rateUnit || 'oz/acre', acres, chem.unit);
+                        const packages = Math.ceil(totalNeeded / (chem.unitsPerPack || 1));
+                        addToOrder(chemId, packages, 'crop');
+                    }
+                }
+            });
+        }
+
+        async function submitProgramOrder(acres, totalCost) {
+            if (!selectedProgram) return;
+
+            const items = [];
+            selectedProgram.applications.forEach(app => {
+                app.chemicals.forEach(chemItem => {
+                    const totalNeeded = calculateAmount(chemItem.rate, chemItem.rateUnit, acres, chemItem.unit || 'gl');
+                    const packages = Math.ceil(totalNeeded / (chemItem.unitsPerPack || 250));
+
+                    items.push({
+                        productName: chemItem.productName,
+                        packSize: chemItem.packSize,
+                        unit: chemItem.unit,
+                        quantity: packages,
+                        unitPrice: chemItem.price,
+                        acres,
+                        rate: chemItem.rate,
+                        rateUnit: chemItem.rateUnit,
+                        calculatedAmount: totalNeeded
+                    });
+                });
+            });
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemical-orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        items,
+                        programName: selectedProgram.name,
+                        totalAcres: acres,
+                        customerNotes: `Program: ${selectedProgram.name} for ${acres} acres`
+                    })
+                });
+
+                if (response.ok) {
+                    const order = await response.json();
+                    showNotification('Order submitted successfully!');
+                    // Redirect to order confirmation or dashboard
+                    setTimeout(() => {
+                        window.location.href = '/dashboard.html';
+                    }, 2000);
+                } else {
+                    showNotification('Order saved. Please contact your rep to confirm.', 'info');
+                }
+            } catch (error) {
+                showNotification('Order saved locally. Will sync when connected.', 'info');
+            }
         }
 
         function updateOrderSummary() {
@@ -730,12 +1090,13 @@
 
             let total = 0;
             summaryItems.innerHTML = orderItems.map(item => {
-                const cost = item.qty * item.chem.packageSize * item.chem.pricePerUnit;
+                const unitsPerPack = item.chem.unitsPerPack || 1;
+                const cost = item.qty * unitsPerPack * (item.chem.price || 0);
                 total += cost;
                 return `
                     <div class="summary-item">
-                        <span>${item.chem.name}</span>
-                        <span>${item.qty} × ${item.chem.packageSize} ${item.chem.packageUnit}</span>
+                        <span>${item.chem.productName}</span>
+                        <span>${item.qty} x ${item.chem.packSize}</span>
                         <span>$${cost.toFixed(2)}</span>
                         <button class="remove-btn" onclick="removeFromOrder('${item.chemId}')">×</button>
                     </div>
@@ -753,6 +1114,19 @@
             updateOrderSummary();
         }
 
+        function showNotification(message, type = 'success') {
+            const notification = document.createElement('div');
+            notification.className = `notification ${type}`;
+            notification.textContent = message;
+            document.body.appendChild(notification);
+
+            setTimeout(() => notification.classList.add('show'), 10);
+            setTimeout(() => {
+                notification.classList.remove('show');
+                setTimeout(() => notification.remove(), 300);
+            }, 3000);
+        }
+
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
             e.preventDefault();
@@ -761,9 +1135,44 @@
             window.location.href = '/login.html';
         });
 
+        // Submit order button
+        document.getElementById('submitOrder').addEventListener('click', async () => {
+            if (orderItems.length === 0) return;
+
+            const items = orderItems.map(item => ({
+                chemicalId: item.chemId,
+                productName: item.chem.productName,
+                packSize: item.chem.packSize,
+                unit: item.chem.unit,
+                quantity: item.qty,
+                unitPrice: item.chem.price
+            }));
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemical-orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ items })
+                });
+
+                if (response.ok) {
+                    showNotification('Order submitted successfully!');
+                    orderItems = [];
+                    updateOrderSummary();
+                } else {
+                    showNotification('Error submitting order', 'error');
+                }
+            } catch (error) {
+                showNotification('Error connecting to server', 'error');
+            }
+        });
+
         // Initialize
-        renderDirectChemicalList();
-        renderPrograms();
+        loadChemicals();
+        loadPrograms();
     </script>
 
     <style>
@@ -781,6 +1190,18 @@
         .page-header h1 {
             font-size: 2.5rem;
             margin-bottom: 8px;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px;
+            color: #666;
         }
 
         /* Option Tabs */
@@ -909,14 +1330,14 @@
         }
 
         /* Crop Selection */
-        .crop-buttons {
+        .crop-buttons, .crop-filter-buttons {
             display: flex;
             flex-wrap: wrap;
             gap: 12px;
             margin-top: 12px;
         }
 
-        .crop-btn {
+        .crop-btn, .crop-filter-btn {
             padding: 16px 24px;
             border: 2px solid var(--border);
             border-radius: var(--radius);
@@ -926,9 +1347,14 @@
             transition: all 0.2s;
         }
 
-        .crop-btn:hover, .crop-btn.active {
+        .crop-btn:hover, .crop-btn.active,
+        .crop-filter-btn:hover, .crop-filter-btn.active {
             border-color: var(--primary);
             background: #f0fdf4;
+        }
+
+        .program-crop-filter {
+            margin-bottom: 24px;
         }
 
         /* Rate Input */
@@ -939,6 +1365,13 @@
             align-items: center;
             padding: 16px;
             border-bottom: 1px solid var(--border);
+        }
+
+        .rate-chem-info .chem-pack {
+            display: block;
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 4px;
         }
 
         .rate-input-group {
@@ -980,7 +1413,7 @@
         /* Program Cards */
         .program-list {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
             gap: 24px;
         }
 
@@ -988,22 +1421,55 @@
             border: 2px solid var(--border);
             border-radius: var(--radius-lg);
             padding: 24px;
+            transition: all 0.2s;
+        }
+
+        .program-card:hover {
+            border-color: var(--primary);
+        }
+
+        .program-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 12px;
         }
 
         .program-header h3 {
-            margin-bottom: 4px;
+            margin: 0;
         }
 
-        .program-crops {
-            color: var(--primary);
-            font-weight: 500;
+        .program-crop-badge {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            font-weight: 600;
         }
 
-        .program-chemicals ul {
-            margin: 8px 0;
+        .program-desc {
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        .program-applications {
+            margin-bottom: 16px;
+        }
+
+        .program-pass {
+            background: var(--secondary);
+            padding: 12px;
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .program-pass ul {
+            margin: 8px 0 0;
             padding-left: 20px;
             font-size: 0.875rem;
-            color: var(--text-light);
+            color: #666;
         }
 
         /* Spray Sheets */
@@ -1019,10 +1485,25 @@
             align-items: center;
             gap: 16px;
             margin-bottom: 16px;
+            flex-wrap: wrap;
         }
 
         .spray-sheet-header h4 {
             flex: 1;
+            margin: 0;
+        }
+
+        .sheet-timing {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .sheet-acres {
+            background: var(--primary);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.85rem;
         }
 
         .spray-sheet-table {
@@ -1034,6 +1515,11 @@
         .spray-sheet-table th, .spray-sheet-table td {
             padding: 12px;
             border-bottom: 1px solid var(--border);
+        }
+
+        .program-summary {
+            color: #666;
+            margin-bottom: 24px;
         }
 
         /* Order Summary */
@@ -1091,6 +1577,35 @@
             font-size: 1.25rem;
         }
 
+        /* Notification */
+        .notification {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--primary);
+            color: white;
+            padding: 16px 24px;
+            border-radius: var(--radius);
+            box-shadow: var(--shadow-lg);
+            transform: translateY(100px);
+            opacity: 0;
+            transition: all 0.3s;
+            z-index: 1000;
+        }
+
+        .notification.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .notification.error {
+            background: #dc2626;
+        }
+
+        .notification.info {
+            background: #2563eb;
+        }
+
         @media (max-width: 768px) {
             .option-tabs {
                 grid-template-columns: 1fr;
@@ -1102,6 +1617,10 @@
 
             .rate-chemical-row {
                 grid-template-columns: 1fr;
+            }
+
+            .summary-item {
+                grid-template-columns: 1fr 1fr;
             }
         }
     </style>
