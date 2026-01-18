@@ -3,25 +3,43 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chemical Pricing - Acre Profit</title>
+    <title>Super Admin - Chemical Pricing | Acre Profit</title>
     <link rel="icon" type="image/svg+xml" href="logo.svg">
     <style>
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, sans-serif;
-            background: linear-gradient(135deg, #1a472a 0%, #2d5a27 100%);
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
             min-height: 100vh;
+            color: #fff;
+        }
+
+        .access-denied {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            text-align: center;
             padding: 20px;
         }
 
-        .container {
-            max-width: 1400px;
+        .access-denied h1 {
+            color: #dc3545;
+            margin-bottom: 16px;
+        }
+
+        .access-denied p {
+            color: #888;
+            margin-bottom: 24px;
+        }
+
+        .admin-container {
+            display: none;
+            max-width: 1600px;
             margin: 0 auto;
+            padding: 20px;
         }
 
         header {
@@ -29,50 +47,62 @@
             justify-content: space-between;
             align-items: center;
             margin-bottom: 30px;
-            flex-wrap: wrap;
-            gap: 15px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #333;
         }
 
-        .logo {
-            height: 60px;
-        }
-
-        .header-actions {
+        .logo-section {
             display: flex;
-            gap: 10px;
-            flex-wrap: wrap;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-section img {
+            height: 50px;
+        }
+
+        .admin-badge {
+            background: #dc3545;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .user-info {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .user-info span {
+            color: #888;
         }
 
         .btn {
             padding: 10px 20px;
             border: none;
-            border-radius: 8px;
+            border-radius: 6px;
             cursor: pointer;
             font-weight: 600;
-            text-decoration: none;
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
             transition: all 0.2s;
         }
 
         .btn-primary {
             background: #D4A017;
-            color: #1a472a;
-        }
-
-        .btn-primary:hover {
-            background: #c49515;
-            transform: translateY(-1px);
+            color: #1a1a2e;
         }
 
         .btn-secondary {
-            background: rgba(255,255,255,0.2);
-            color: white;
+            background: #333;
+            color: #fff;
         }
 
-        .btn-secondary:hover {
-            background: rgba(255,255,255,0.3);
+        .btn-success {
+            background: #28a745;
+            color: white;
         }
 
         .btn-danger {
@@ -80,1045 +110,553 @@
             color: white;
         }
 
-        .btn-danger:hover {
-            background: #c82333;
+        .btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.9;
         }
 
-        .btn-small {
-            padding: 6px 12px;
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+
+        .stat-card {
+            background: #16213e;
+            border-radius: 12px;
+            padding: 20px;
+            border: 1px solid #333;
+        }
+
+        .stat-card h3 {
+            color: #888;
             font-size: 0.85rem;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+
+        .stat-card .value {
+            font-size: 2rem;
+            font-weight: 700;
+            color: #D4A017;
+        }
+
+        .stat-card .subtext {
+            color: #666;
+            font-size: 0.85rem;
+            margin-top: 4px;
         }
 
         .card {
-            background: white;
-            border-radius: 16px;
-            padding: 25px;
-            margin-bottom: 20px;
-            box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+            background: #16213e;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 24px;
+            border: 1px solid #333;
         }
 
         .card h2 {
-            color: #1a472a;
+            color: #D4A017;
             margin-bottom: 20px;
+            font-size: 1.25rem;
+        }
+
+        .margin-controls {
             display: flex;
+            gap: 20px;
             align-items: center;
-            gap: 10px;
-        }
-
-        .tabs {
-            display: flex;
-            gap: 5px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-        }
-
-        .tab {
-            padding: 12px 24px;
-            border: none;
-            background: #e9ecef;
-            border-radius: 8px 8px 0 0;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .tab.active {
-            background: #1a472a;
-            color: white;
-        }
-
-        .tab:hover:not(.active) {
-            background: #dee2e6;
-        }
-
-        .tab-content {
-            display: none;
-        }
-
-        .tab-content.active {
-            display: block;
-        }
-
-        .form-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 15px;
-            margin-bottom: 20px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-        }
-
-        .form-group label {
-            font-weight: 500;
-            color: #495057;
-            font-size: 0.9rem;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            padding: 10px 12px;
-            border: 2px solid #e9ecef;
+            margin-bottom: 24px;
+            padding: 16px;
+            background: #0f3460;
             border-radius: 8px;
-            font-size: 1rem;
-            transition: border-color 0.2s;
         }
 
-        .form-group input:focus,
-        .form-group select:focus,
-        .form-group textarea:focus {
+        .margin-controls label {
+            color: #888;
+            font-weight: 500;
+        }
+
+        .margin-controls input {
+            width: 80px;
+            padding: 8px 12px;
+            border: 2px solid #333;
+            border-radius: 6px;
+            background: #1a1a2e;
+            color: #fff;
+            font-size: 1rem;
+            text-align: center;
+        }
+
+        .margin-controls input:focus {
             outline: none;
-            border-color: #2d5a27;
+            border-color: #D4A017;
+        }
+
+        .table-container {
+            overflow-x: auto;
+            border-radius: 8px;
+            border: 1px solid #333;
         }
 
         table {
             width: 100%;
             border-collapse: collapse;
-            margin-top: 15px;
-        }
-
-        th, td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid #e9ecef;
         }
 
         th {
-            background: #f8f9fa;
+            background: #0f3460;
+            padding: 14px 12px;
+            text-align: left;
             font-weight: 600;
-            color: #495057;
+            color: #D4A017;
             position: sticky;
             top: 0;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 14px 12px;
+            border-bottom: 1px solid #333;
+            color: #ccc;
         }
 
         tr:hover {
-            background: #f8f9fa;
+            background: rgba(212, 160, 23, 0.05);
         }
 
-        .price {
-            font-weight: 600;
-            color: #1a472a;
-        }
-
-        .savings {
-            color: #28a745;
-            font-weight: 500;
-        }
-
-        .savings.negative {
+        .cost-price {
             color: #dc3545;
+            font-weight: 600;
         }
 
-        .supplier-badge {
-            display: inline-block;
-            padding: 4px 10px;
-            border-radius: 20px;
+        .sell-price {
+            color: #28a745;
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .margin-amount {
+            color: #D4A017;
+            font-weight: 600;
+        }
+
+        .margin-pct {
+            color: #888;
+            font-size: 0.85rem;
+        }
+
+        .editable-input {
+            width: 100px;
+            padding: 6px 10px;
+            border: 1px solid #333;
+            border-radius: 4px;
+            background: #1a1a2e;
+            color: #28a745;
+            font-weight: 600;
+            text-align: right;
+        }
+
+        .editable-input:focus {
+            outline: none;
+            border-color: #D4A017;
+        }
+
+        .product-name {
+            font-weight: 600;
+            color: #fff;
+        }
+
+        .product-note {
+            color: #666;
             font-size: 0.8rem;
-            font-weight: 500;
         }
 
-        .supplier-cpd {
-            background: #e3f2fd;
-            color: #1976d2;
+        .category-badge {
+            display: inline-block;
+            padding: 3px 10px;
+            border-radius: 12px;
+            font-size: 0.75rem;
+            font-weight: 600;
         }
 
-        .supplier-other {
-            background: #f3e5f5;
-            color: #7b1fa2;
+        .category-badge.herbicide {
+            background: rgba(40, 167, 69, 0.2);
+            color: #28a745;
         }
 
-        .filters {
+        .category-badge.adjuvant {
+            background: rgba(23, 162, 184, 0.2);
+            color: #17a2b8;
+        }
+
+        .rup-badge {
+            background: #dc3545;
+            color: white;
+            font-size: 0.65rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            margin-left: 6px;
+        }
+
+        .actions-row {
             display: flex;
-            gap: 15px;
-            margin-bottom: 20px;
-            flex-wrap: wrap;
-            align-items: flex-end;
-        }
-
-        .filters .form-group {
-            min-width: 150px;
-        }
-
-        .table-container {
-            max-height: 500px;
-            overflow-y: auto;
-            border: 1px solid #e9ecef;
-            border-radius: 8px;
-        }
-
-        .bulk-import {
-            background: #f8f9fa;
-            padding: 20px;
-            border-radius: 8px;
+            gap: 12px;
             margin-top: 20px;
         }
 
-        .bulk-import h3 {
-            margin-bottom: 15px;
-            color: #495057;
-        }
-
-        .bulk-import textarea {
-            width: 100%;
-            min-height: 200px;
-            font-family: monospace;
-            font-size: 0.9rem;
-        }
-
-        .import-help {
-            background: #fff3cd;
-            padding: 15px;
+        .warning-box {
+            background: rgba(220, 53, 69, 0.1);
+            border: 1px solid #dc3545;
             border-radius: 8px;
-            margin-top: 15px;
-            font-size: 0.9rem;
+            padding: 16px;
+            margin-bottom: 20px;
+            color: #dc3545;
         }
 
-        .import-help code {
-            background: rgba(0,0,0,0.1);
-            padding: 2px 6px;
-            border-radius: 4px;
+        .warning-box strong {
+            display: block;
+            margin-bottom: 4px;
         }
 
-        .comparison-card {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 15px;
-            margin-bottom: 15px;
-        }
-
-        .comparison-card h4 {
-            color: #1a472a;
-            margin-bottom: 10px;
-        }
-
-        .comparison-suppliers {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-        }
-
-        .supplier-price {
-            background: white;
-            padding: 10px 15px;
-            border-radius: 8px;
-            border: 2px solid #e9ecef;
-        }
-
-        .supplier-price.best {
-            border-color: #28a745;
-            background: #d4edda;
-        }
-
-        .history-item {
-            display: flex;
-            justify-content: space-between;
-            padding: 10px;
-            border-bottom: 1px solid #e9ecef;
-        }
-
-        .history-date {
-            color: #6c757d;
-            font-size: 0.9rem;
-        }
-
-        .modal {
+        .success-message {
+            background: rgba(40, 167, 69, 0.1);
+            border: 1px solid #28a745;
+            color: #28a745;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
             display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(0,0,0,0.5);
-            justify-content: center;
-            align-items: center;
-            z-index: 1000;
         }
 
-        .modal.active {
-            display: flex;
-        }
-
-        .modal-content {
-            background: white;
-            border-radius: 16px;
-            padding: 30px;
-            max-width: 600px;
-            width: 90%;
-            max-height: 80vh;
-            overflow-y: auto;
-        }
-
-        .modal-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 20px;
-        }
-
-        .modal-close {
-            background: none;
-            border: none;
-            font-size: 1.5rem;
-            cursor: pointer;
-            color: #6c757d;
-        }
-
-        .alert {
-            padding: 15px;
-            border-radius: 8px;
-            margin-bottom: 20px;
-        }
-
-        .alert-success {
-            background: #d4edda;
-            color: #155724;
-        }
-
-        .alert-error {
-            background: #f8d7da;
-            color: #721c24;
-        }
-
-        .loading {
-            text-align: center;
-            padding: 40px;
-            color: #6c757d;
+        @media (max-width: 1024px) {
+            .stats-row {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         @media (max-width: 768px) {
-            .form-grid {
+            .stats-row {
                 grid-template-columns: 1fr;
             }
 
-            .filters {
+            header {
                 flex-direction: column;
+                gap: 16px;
             }
 
-            .filters .form-group {
-                width: 100%;
-            }
-
-            th, td {
-                padding: 8px;
-                font-size: 0.85rem;
+            .margin-controls {
+                flex-direction: column;
+                align-items: stretch;
             }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Access Denied Screen -->
+    <div class="access-denied" id="accessDenied">
+        <h1>Access Denied</h1>
+        <p>This page is restricted to super administrators only.</p>
+        <a href="/dashboard.html" class="btn btn-primary">Return to Dashboard</a>
+    </div>
+
+    <!-- Admin Container (hidden until verified) -->
+    <div class="admin-container" id="adminContainer">
         <header>
-            <a href="index.html">
-                <img src="logo.svg" alt="Acre Profit" class="logo">
-            </a>
-            <div class="header-actions">
-                <a href="admin.html" class="btn btn-secondary">Back to Admin</a>
-                <button class="btn btn-secondary" onclick="seedData()">Load Initial Data</button>
-                <button class="btn btn-primary" onclick="showAddModal()">+ Add Chemical</button>
+            <div class="logo-section">
+                <img src="logo.svg" alt="Acre Profit">
+                <span class="admin-badge">Super Admin</span>
+            </div>
+            <div class="user-info">
+                <span id="adminEmail"></span>
+                <a href="/dashboard.html" class="btn btn-secondary">Back to Dashboard</a>
+                <button class="btn btn-danger" onclick="logout()">Logout</button>
             </div>
         </header>
 
-        <div id="alertContainer"></div>
+        <div class="warning-box">
+            <strong>Confidential Pricing Data</strong>
+            Cost prices shown are what Acre Profit pays suppliers. This information is not visible to customers or reps.
+        </div>
 
+        <div class="success-message" id="successMessage">
+            Prices updated successfully!
+        </div>
+
+        <!-- Stats Row -->
+        <div class="stats-row">
+            <div class="stat-card">
+                <h3>Total Products</h3>
+                <div class="value" id="totalProducts">20</div>
+                <div class="subtext">In catalog</div>
+            </div>
+            <div class="stat-card">
+                <h3>Avg Margin</h3>
+                <div class="value" id="avgMargin">15%</div>
+                <div class="subtext">Across all products</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Cost Value</h3>
+                <div class="value" id="totalCostValue">$0</div>
+                <div class="subtext">If all sold 1 unit</div>
+            </div>
+            <div class="stat-card">
+                <h3>Total Sell Value</h3>
+                <div class="value" id="totalSellValue">$0</div>
+                <div class="subtext">Potential revenue</div>
+            </div>
+        </div>
+
+        <!-- Global Margin Control -->
         <div class="card">
-            <div class="tabs">
-                <button class="tab active" onclick="switchTab('list')">Chemical List</button>
-                <button class="tab" onclick="switchTab('compare')">Price Comparison</button>
-                <button class="tab" onclick="switchTab('import')">Bulk Import</button>
-            </div>
-
-            <!-- Chemical List Tab -->
-            <div id="tab-list" class="tab-content active">
-                <div class="filters">
-                    <div class="form-group">
-                        <label>Search Product</label>
-                        <input type="text" id="filterProduct" placeholder="Product name..." oninput="filterChemicals()">
-                    </div>
-                    <div class="form-group">
-                        <label>Supplier</label>
-                        <select id="filterSupplier" onchange="filterChemicals()">
-                            <option value="">All Suppliers</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Pack Size</label>
-                        <select id="filterPackSize" onchange="filterChemicals()">
-                            <option value="">All Sizes</option>
-                            <option value="2x2.5">2x2.5</option>
-                            <option value="Shuttle">Shuttle</option>
-                            <option value="4x5">4x5</option>
-                        </select>
-                    </div>
-                    <button class="btn btn-secondary btn-small" onclick="clearFilters()">Clear Filters</button>
-                </div>
-
-                <div class="table-container">
-                    <table id="chemicalsTable">
-                        <thead>
-                            <tr>
-                                <th>Product</th>
-                                <th>Supplier</th>
-                                <th>Pack</th>
-                                <th>Unit</th>
-                                <th>Price</th>
-                                <th>Last Updated</th>
-                                <th>Notes</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="chemicalsBody">
-                            <tr><td colspan="8" class="loading">Loading chemicals...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Price Comparison Tab -->
-            <div id="tab-compare" class="tab-content">
-                <h3 style="margin-bottom: 20px; color: #495057;">Products with Multiple Suppliers</h3>
-                <div id="comparisonContainer">
-                    <div class="loading">Loading comparison data...</div>
-                </div>
-            </div>
-
-            <!-- Bulk Import Tab -->
-            <div id="tab-import" class="tab-content">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Supplier Name</label>
-                        <input type="text" id="importSupplier" placeholder="e.g., CPD, Agri-Star">
-                    </div>
-                    <div class="form-group">
-                        <label>Price Version/Date</label>
-                        <input type="text" id="importVersion" placeholder="e.g., 2026-01-15 or Q1-2026">
-                    </div>
-                </div>
-
-                <div class="bulk-import">
-                    <h3>Paste Chemical Data (CSV or Tab-separated)</h3>
-                    <textarea id="bulkData" placeholder="Product,Pack,Unit,Price,Notes
-Dicamba DMA,2x2.5,gl,31.24,
-Dicamba DMA,Shuttle,gl,30.89,
-LV 6,2x2.5,gl,32.43,"></textarea>
-
-                    <div class="import-help">
-                        <strong>Format:</strong> One chemical per line. Columns: <code>Product, Pack, Unit, Price, Notes</code><br>
-                        <strong>Example from spreadsheet:</strong> Copy the columns directly from Excel and paste here.<br>
-                        <strong>Units:</strong> gl (gallon), oz (ounce), lb (pound)
-                    </div>
-
-                    <div style="margin-top: 15px; display: flex; gap: 10px;">
-                        <button class="btn btn-primary" onclick="previewImport()">Preview Import</button>
-                        <button class="btn btn-secondary" onclick="clearImport()">Clear</button>
-                    </div>
-                </div>
-
-                <div id="importPreview" style="display: none; margin-top: 20px;">
-                    <h3 style="margin-bottom: 15px;">Preview (<span id="previewCount">0</span> items)</h3>
-                    <div class="table-container" style="max-height: 300px;">
-                        <table>
-                            <thead>
-                                <tr>
-                                    <th>Product</th>
-                                    <th>Pack</th>
-                                    <th>Unit</th>
-                                    <th>Price</th>
-                                    <th>Notes</th>
-                                </tr>
-                            </thead>
-                            <tbody id="previewBody"></tbody>
-                        </table>
-                    </div>
-                    <button class="btn btn-primary" style="margin-top: 15px;" onclick="executeImport()">Import All</button>
-                </div>
+            <h2>Global Margin Settings</h2>
+            <div class="margin-controls">
+                <label>Default Margin %:</label>
+                <input type="number" id="defaultMargin" value="15" min="0" max="100" onchange="applyDefaultMargin()">
+                <button class="btn btn-primary" onclick="applyDefaultMargin()">Apply to All Products</button>
+                <span style="color: #666; font-size: 0.9rem;">This sets the margin for all products at once</span>
             </div>
         </div>
-    </div>
 
-    <!-- Add/Edit Modal -->
-    <div id="chemicalModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2 id="modalTitle">Add Chemical</h2>
-                <button class="modal-close" onclick="closeModal()">&times;</button>
-            </div>
-            <form id="chemicalForm" onsubmit="saveChemical(event)">
-                <input type="hidden" id="chemicalId">
-                <div class="form-grid">
-                    <div class="form-group">
-                        <label>Product Name *</label>
-                        <input type="text" id="productName" required placeholder="e.g., Dicamba DMA">
-                    </div>
-                    <div class="form-group">
-                        <label>Supplier *</label>
-                        <input type="text" id="supplier" required placeholder="e.g., CPD">
-                    </div>
-                    <div class="form-group">
-                        <label>Pack Size *</label>
-                        <input type="text" id="packSize" required placeholder="e.g., 2x2.5, Shuttle">
-                    </div>
-                    <div class="form-group">
-                        <label>Unit *</label>
-                        <select id="unit" required>
-                            <option value="gl">Gallon (gl)</option>
-                            <option value="oz">Ounce (oz)</option>
-                            <option value="lb">Pound (lb)</option>
-                        </select>
-                    </div>
-                    <div class="form-group">
-                        <label>Price *</label>
-                        <input type="number" id="price" step="0.01" required placeholder="0.00">
-                    </div>
-                    <div class="form-group">
-                        <label>Price Version</label>
-                        <input type="text" id="priceVersion" placeholder="e.g., 2026-Q1">
-                    </div>
-                </div>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label>Equivalent Product (for comparison)</label>
-                    <input type="text" id="equivalentProduct" placeholder="e.g., Dicamba DMA from another supplier">
-                </div>
-                <div class="form-group" style="margin-bottom: 15px;">
-                    <label>Notes</label>
-                    <textarea id="notes" rows="2" placeholder="Any notes about this product..."></textarea>
-                </div>
-                <div style="display: flex; gap: 10px; justify-content: flex-end;">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                    <button type="submit" class="btn btn-primary">Save Chemical</button>
-                </div>
-            </form>
-        </div>
-    </div>
+        <!-- Pricing Table -->
+        <div class="card">
+            <h2>Product Pricing - Cost & Sell Prices</h2>
+            <p style="color: #666; margin-bottom: 20px;">Edit sell prices directly or adjust margins. Customer-facing pages show SELL prices only.</p>
 
-    <!-- History Modal -->
-    <div id="historyModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>Price History</h2>
-                <button class="modal-close" onclick="closeHistoryModal()">&times;</button>
+            <div class="table-container">
+                <table id="pricingTable">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Category</th>
+                            <th>Package</th>
+                            <th>Our Cost</th>
+                            <th>Sell Price</th>
+                            <th>Margin $</th>
+                            <th>Margin %</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pricingBody">
+                        <!-- Populated by JS -->
+                    </tbody>
+                </table>
             </div>
-            <div id="historyContent">
-                <div class="loading">Loading history...</div>
+
+            <div class="actions-row">
+                <button class="btn btn-success" onclick="savePrices()">Save All Prices</button>
+                <button class="btn btn-secondary" onclick="exportPrices()">Export to CSV</button>
+                <button class="btn btn-secondary" onclick="resetToDefaults()">Reset to Defaults</button>
             </div>
         </div>
     </div>
 
     <script>
-        const API_URL = 'https://acreprofit-com.onrender.com';
-        let chemicals = [];
-        let suppliers = [];
-        let token = localStorage.getItem('token');
-        let pendingImport = [];
+        const SUPER_ADMIN_EMAIL = 'kyle@togoag.com';
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3000'
+            : 'https://acreprofit-com.onrender.com';
 
-        // Check authentication
-        if (!token) {
-            window.location.href = 'login.html';
+        // Default cost prices (what we pay CPD)
+        const defaultProducts = [
+            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 13.25, marginPct: 15, notes: 'Best value glyphosate' },
+            { id: '2', name: 'Glystar Supreme', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 14.50, marginPct: 15, notes: 'Premium glyphosate' },
+            { id: '3', name: 'Dicamba DMA (4lb)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 28.25, marginPct: 15, notes: 'Broadleaf control' },
+            { id: '4', name: 'LV 6 (2,4-D Ester)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 27.90, marginPct: 15, notes: '2,4-D LV ester' },
+            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 12.78, marginPct: 15, notes: 'Corn/Sorghum pre-emerge' },
+            { id: '6', name: 'Paraquat 3SL', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 16.00, marginPct: 15, notes: 'Contact burndown', rup: true },
+            { id: '7', name: 'Glufosinate 2.34', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 16.50, marginPct: 15, notes: 'Liberty-link systems' },
+            { id: '8', name: 'Mesotrione 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 48.25, marginPct: 15, notes: 'Callisto generic' },
+            { id: '9', name: 'Clethodim 2EC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 33.50, marginPct: 15, notes: 'Grass control' },
+            { id: '10', name: 'Sulfentrazone 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 70.50, marginPct: 15, notes: 'Palmer Amaranth residual' },
+            { id: '11', name: 'Valor SX (flumioxazin)', category: 'herbicide', package: '4x5 lb', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, marginPct: 15, notes: 'Burndown + residual' },
+            { id: '12', name: 'Autumn Super', category: 'herbicide', package: '4x5 lb', unit: 'lb', unitsPerPack: 20, costPrice: 11.42, marginPct: 15, notes: 'Fall burndown wheat' },
+            { id: '13', name: 'Level Best Pro', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 10.15, marginPct: 15, notes: '2,4-D + Dicamba premix' },
+            { id: '14', name: 'Tapran (Trifluralin)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 16.45, marginPct: 15, notes: 'Pre-emerge grass' },
+            { id: '15', name: 'Aggrestrol 4L', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 10.35, marginPct: 15, notes: 'MCPA ester' },
+            { id: '16', name: 'Artect FI', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 11.30, marginPct: 15, notes: 'Broadleaf burndown' },
+            { id: '17', name: 'MSO (Methylated Seed Oil)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 12.50, marginPct: 10, notes: 'Spray adjuvant' },
+            { id: '18', name: 'Crop Oil Concentrate', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 8.75, marginPct: 10, notes: 'Spray adjuvant' },
+            { id: '19', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', package: '50 lb bag', unit: 'lb', unitsPerPack: 50, costPrice: 0.35, marginPct: 10, notes: 'Water conditioner' },
+            { id: '20', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 14.00, marginPct: 10, notes: 'Spray adjuvant' }
+        ];
+
+        let products = [];
+
+        // Check authorization
+        function checkAuth() {
+            const token = localStorage.getItem('acreprofit_token');
+            const userStr = localStorage.getItem('acreprofit_user');
+
+            if (!token || !userStr) {
+                document.getElementById('accessDenied').style.display = 'flex';
+                return false;
+            }
+
+            try {
+                const user = JSON.parse(userStr);
+                if (user.email !== SUPER_ADMIN_EMAIL) {
+                    document.getElementById('accessDenied').style.display = 'flex';
+                    return false;
+                }
+
+                // Authorized!
+                document.getElementById('accessDenied').style.display = 'none';
+                document.getElementById('adminContainer').style.display = 'block';
+                document.getElementById('adminEmail').textContent = user.email;
+                return true;
+            } catch (e) {
+                document.getElementById('accessDenied').style.display = 'flex';
+                return false;
+            }
+        }
+
+        function logout() {
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/login.html';
+        }
+
+        // Load prices from localStorage or use defaults
+        function loadPrices() {
+            const saved = localStorage.getItem('acreprofit_admin_prices');
+            if (saved) {
+                products = JSON.parse(saved);
+            } else {
+                products = JSON.parse(JSON.stringify(defaultProducts));
+            }
+            renderTable();
+            updateStats();
+        }
+
+        function calculateSellPrice(costPrice, marginPct) {
+            return costPrice * (1 + marginPct / 100);
+        }
+
+        function renderTable() {
+            const tbody = document.getElementById('pricingBody');
+            tbody.innerHTML = products.map((p, idx) => {
+                const sellPrice = calculateSellPrice(p.costPrice, p.marginPct);
+                const marginAmt = sellPrice - p.costPrice;
+                return `
+                    <tr>
+                        <td>
+                            <div class="product-name">${p.name}${p.rup ? '<span class="rup-badge">RUP</span>' : ''}</div>
+                            <div class="product-note">${p.notes || ''}</div>
+                        </td>
+                        <td><span class="category-badge ${p.category}">${p.category}</span></td>
+                        <td>${p.package}<br><small style="color:#666">(${p.unitsPerPack} ${p.unit})</small></td>
+                        <td class="cost-price">$${p.costPrice.toFixed(2)}/${p.unit}</td>
+                        <td>
+                            <input type="number" class="editable-input sell-price-input"
+                                   data-idx="${idx}"
+                                   value="${sellPrice.toFixed(2)}"
+                                   step="0.01"
+                                   onchange="updateFromSellPrice(${idx}, this.value)">
+                            <span style="color:#666">/${p.unit}</span>
+                        </td>
+                        <td class="margin-amount">$${marginAmt.toFixed(2)}</td>
+                        <td>
+                            <input type="number" class="editable-input" style="width:60px; color:#D4A017;"
+                                   data-idx="${idx}"
+                                   value="${p.marginPct}"
+                                   min="0" max="100"
+                                   onchange="updateMargin(${idx}, this.value)">%
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        function updateFromSellPrice(idx, sellPrice) {
+            sellPrice = parseFloat(sellPrice) || 0;
+            const costPrice = products[idx].costPrice;
+            if (costPrice > 0) {
+                products[idx].marginPct = ((sellPrice / costPrice) - 1) * 100;
+            }
+            renderTable();
+            updateStats();
+        }
+
+        function updateMargin(idx, marginPct) {
+            products[idx].marginPct = parseFloat(marginPct) || 0;
+            renderTable();
+            updateStats();
+        }
+
+        function applyDefaultMargin() {
+            const margin = parseFloat(document.getElementById('defaultMargin').value) || 15;
+            products.forEach(p => p.marginPct = margin);
+            renderTable();
+            updateStats();
+        }
+
+        function updateStats() {
+            const totalProducts = products.length;
+            let totalCost = 0;
+            let totalSell = 0;
+            let totalMarginPct = 0;
+
+            products.forEach(p => {
+                totalCost += p.costPrice;
+                totalSell += calculateSellPrice(p.costPrice, p.marginPct);
+                totalMarginPct += p.marginPct;
+            });
+
+            document.getElementById('totalProducts').textContent = totalProducts;
+            document.getElementById('avgMargin').textContent = (totalMarginPct / totalProducts).toFixed(1) + '%';
+            document.getElementById('totalCostValue').textContent = '$' + totalCost.toFixed(2);
+            document.getElementById('totalSellValue').textContent = '$' + totalSell.toFixed(2);
+        }
+
+        function savePrices() {
+            localStorage.setItem('acreprofit_admin_prices', JSON.stringify(products));
+
+            // Also try to save to server
+            const token = localStorage.getItem('acreprofit_token');
+            fetch(`${API_URL}/api/chemicals/admin/prices`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({ products })
+            }).catch(e => console.log('Server save failed, using local storage'));
+
+            document.getElementById('successMessage').style.display = 'block';
+            setTimeout(() => {
+                document.getElementById('successMessage').style.display = 'none';
+            }, 3000);
+        }
+
+        function exportPrices() {
+            let csv = 'Product,Category,Package,Cost Price,Margin %,Sell Price\n';
+            products.forEach(p => {
+                const sellPrice = calculateSellPrice(p.costPrice, p.marginPct);
+                csv += `"${p.name}","${p.category}","${p.package}",${p.costPrice},${p.marginPct},${sellPrice.toFixed(2)}\n`;
+            });
+
+            const blob = new Blob([csv], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'acre_profit_pricing_' + new Date().toISOString().split('T')[0] + '.csv';
+            a.click();
+        }
+
+        function resetToDefaults() {
+            if (confirm('Reset all prices to default values? This cannot be undone.')) {
+                products = JSON.parse(JSON.stringify(defaultProducts));
+                localStorage.removeItem('acreprofit_admin_prices');
+                renderTable();
+                updateStats();
+            }
         }
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', () => {
-            loadChemicals();
-            loadSuppliers();
-        });
-
-        // Load all chemicals
-        async function loadChemicals() {
-            try {
-                const response = await fetch(`${API_URL}/api/chemicals`);
-                if (response.ok) {
-                    chemicals = await response.json();
-                    renderChemicals();
-                } else {
-                    showAlert('Failed to load chemicals', 'error');
-                }
-            } catch (error) {
-                console.error('Error loading chemicals:', error);
-                // Demo data for when API is down
-                chemicals = getDemoChemicals();
-                renderChemicals();
-            }
+        if (checkAuth()) {
+            loadPrices();
         }
-
-        // Load suppliers list
-        async function loadSuppliers() {
-            try {
-                const response = await fetch(`${API_URL}/api/chemicals/suppliers`);
-                if (response.ok) {
-                    suppliers = await response.json();
-                    populateSupplierFilter();
-                }
-            } catch (error) {
-                console.error('Error loading suppliers:', error);
-                suppliers = ['Acre Profit', 'CPD'];
-                populateSupplierFilter();
-            }
-        }
-
-        function populateSupplierFilter() {
-            const select = document.getElementById('filterSupplier');
-            select.innerHTML = '<option value="">All Suppliers</option>';
-            suppliers.forEach(s => {
-                select.innerHTML += `<option value="${s}">${s}</option>`;
-            });
-        }
-
-        function renderChemicals() {
-            const tbody = document.getElementById('chemicalsBody');
-            const filterProduct = document.getElementById('filterProduct').value.toLowerCase();
-            const filterSupplier = document.getElementById('filterSupplier').value;
-            const filterPackSize = document.getElementById('filterPackSize').value;
-
-            let filtered = chemicals.filter(c => {
-                if (filterProduct && !c.productName.toLowerCase().includes(filterProduct)) return false;
-                if (filterSupplier && c.supplier !== filterSupplier) return false;
-                if (filterPackSize && c.packSize !== filterPackSize) return false;
-                return true;
-            });
-
-            if (filtered.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="8" style="text-align: center; padding: 40px;">No chemicals found</td></tr>';
-                return;
-            }
-
-            tbody.innerHTML = filtered.map(c => `
-                <tr>
-                    <td><strong>${c.productName}</strong></td>
-                    <td><span class="supplier-badge ${c.supplier === 'CPD' ? 'supplier-cpd' : 'supplier-other'}">${c.supplier}</span></td>
-                    <td>${c.packSize}</td>
-                    <td>${c.unit}</td>
-                    <td class="price">$${c.price.toFixed(2)}</td>
-                    <td>${formatDate(c.priceDate)}</td>
-                    <td>${c.notes || '-'}</td>
-                    <td>
-                        <button class="btn btn-secondary btn-small" onclick="editChemical('${c._id}')">Edit</button>
-                        <button class="btn btn-secondary btn-small" onclick="viewHistory('${c._id}')">History</button>
-                    </td>
-                </tr>
-            `).join('');
-        }
-
-        function filterChemicals() {
-            renderChemicals();
-        }
-
-        function clearFilters() {
-            document.getElementById('filterProduct').value = '';
-            document.getElementById('filterSupplier').value = '';
-            document.getElementById('filterPackSize').value = '';
-            renderChemicals();
-        }
-
-        // Tab switching
-        function switchTab(tabName) {
-            document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-            document.querySelectorAll('.tab-content').forEach(t => t.classList.remove('active'));
-
-            document.querySelector(`[onclick="switchTab('${tabName}')"]`).classList.add('active');
-            document.getElementById(`tab-${tabName}`).classList.add('active');
-
-            if (tabName === 'compare') {
-                loadComparison();
-            }
-        }
-
-        // Load price comparison
-        async function loadComparison() {
-            const container = document.getElementById('comparisonContainer');
-
-            try {
-                const response = await fetch(`${API_URL}/api/chemicals/report/comparison`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-
-                if (response.ok) {
-                    const report = await response.json();
-                    renderComparison(report);
-                } else {
-                    // Generate comparison from local data
-                    const localReport = generateLocalComparison();
-                    renderComparison(localReport);
-                }
-            } catch (error) {
-                const localReport = generateLocalComparison();
-                renderComparison(localReport);
-            }
-        }
-
-        function generateLocalComparison() {
-            const productGroups = {};
-            chemicals.forEach(c => {
-                if (!productGroups[c.productName]) {
-                    productGroups[c.productName] = [];
-                }
-                productGroups[c.productName].push(c);
-            });
-
-            const report = [];
-            for (const [productName, items] of Object.entries(productGroups)) {
-                if (items.length > 1) {
-                    items.sort((a, b) => a.price - b.price);
-                    const lowest = items[0];
-                    const highest = items[items.length - 1];
-
-                    report.push({
-                        productName,
-                        supplierCount: items.length,
-                        lowestPrice: { supplier: lowest.supplier, packSize: lowest.packSize, price: lowest.price },
-                        highestPrice: { supplier: highest.supplier, packSize: highest.packSize, price: highest.price },
-                        potentialSavings: highest.price - lowest.price,
-                        allSuppliers: items.map(i => ({ supplier: i.supplier, packSize: i.packSize, price: i.price }))
-                    });
-                }
-            }
-
-            return report.sort((a, b) => b.potentialSavings - a.potentialSavings);
-        }
-
-        function renderComparison(report) {
-            const container = document.getElementById('comparisonContainer');
-
-            if (report.length === 0) {
-                container.innerHTML = '<p style="text-align: center; color: #6c757d; padding: 40px;">No products with multiple suppliers found. Add chemicals from different suppliers to see price comparisons.</p>';
-                return;
-            }
-
-            container.innerHTML = report.map(item => `
-                <div class="comparison-card">
-                    <h4>${item.productName} <span style="font-weight: normal; color: #6c757d; font-size: 0.9rem;">(${item.supplierCount} suppliers)</span></h4>
-                    <div class="comparison-suppliers">
-                        ${item.allSuppliers.map((s, i) => `
-                            <div class="supplier-price ${i === 0 ? 'best' : ''}">
-                                <div style="font-weight: 600;">${s.supplier}</div>
-                                <div style="font-size: 0.85rem; color: #6c757d;">${s.packSize}</div>
-                                <div class="price">$${s.price.toFixed(2)}</div>
-                                ${i === 0 ? '<div style="color: #28a745; font-size: 0.8rem;">Best Price</div>' : `<div class="savings negative">+$${(s.price - item.lowestPrice.price).toFixed(2)}</div>`}
-                            </div>
-                        `).join('')}
-                    </div>
-                    <div style="margin-top: 10px; font-size: 0.9rem;">
-                        <span class="savings">Potential savings: $${item.potentialSavings.toFixed(2)}</span> per unit by choosing ${item.lowestPrice.supplier}
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Add/Edit Modal
-        function showAddModal() {
-            document.getElementById('modalTitle').textContent = 'Add Chemical';
-            document.getElementById('chemicalForm').reset();
-            document.getElementById('chemicalId').value = '';
-            document.getElementById('chemicalModal').classList.add('active');
-        }
-
-        function editChemical(id) {
-            const chemical = chemicals.find(c => c._id === id);
-            if (!chemical) return;
-
-            document.getElementById('modalTitle').textContent = 'Edit Chemical';
-            document.getElementById('chemicalId').value = id;
-            document.getElementById('productName').value = chemical.productName;
-            document.getElementById('supplier').value = chemical.supplier;
-            document.getElementById('packSize').value = chemical.packSize;
-            document.getElementById('unit').value = chemical.unit;
-            document.getElementById('price').value = chemical.price;
-            document.getElementById('priceVersion').value = chemical.priceVersion || '';
-            document.getElementById('equivalentProduct').value = chemical.equivalentProduct || '';
-            document.getElementById('notes').value = chemical.notes || '';
-
-            document.getElementById('chemicalModal').classList.add('active');
-        }
-
-        function closeModal() {
-            document.getElementById('chemicalModal').classList.remove('active');
-        }
-
-        async function saveChemical(event) {
-            event.preventDefault();
-
-            const id = document.getElementById('chemicalId').value;
-            const data = {
-                productName: document.getElementById('productName').value,
-                supplier: document.getElementById('supplier').value,
-                packSize: document.getElementById('packSize').value,
-                unit: document.getElementById('unit').value,
-                price: parseFloat(document.getElementById('price').value),
-                priceVersion: document.getElementById('priceVersion').value,
-                equivalentProduct: document.getElementById('equivalentProduct').value,
-                notes: document.getElementById('notes').value
-            };
-
-            try {
-                const url = id ? `${API_URL}/api/chemicals/${id}` : `${API_URL}/api/chemicals`;
-                const method = id ? 'PUT' : 'POST';
-
-                const response = await fetch(url, {
-                    method,
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (response.ok) {
-                    showAlert(id ? 'Chemical updated!' : 'Chemical added!', 'success');
-                    closeModal();
-                    loadChemicals();
-                } else {
-                    const error = await response.json();
-                    showAlert(error.error || 'Failed to save', 'error');
-                }
-            } catch (error) {
-                showAlert('Network error. Please try again.', 'error');
-            }
-        }
-
-        // Price History
-        async function viewHistory(id) {
-            document.getElementById('historyModal').classList.add('active');
-            const content = document.getElementById('historyContent');
-            content.innerHTML = '<div class="loading">Loading history...</div>';
-
-            try {
-                const response = await fetch(`${API_URL}/api/chemicals/${id}/history`);
-                if (response.ok) {
-                    const history = await response.json();
-                    renderHistory(history);
-                } else {
-                    content.innerHTML = '<p>No history available</p>';
-                }
-            } catch (error) {
-                content.innerHTML = '<p>Unable to load history</p>';
-            }
-        }
-
-        function renderHistory(history) {
-            const content = document.getElementById('historyContent');
-
-            if (history.length === 0) {
-                content.innerHTML = '<p>No price history recorded yet.</p>';
-                return;
-            }
-
-            content.innerHTML = history.map(h => `
-                <div class="history-item">
-                    <div>
-                        <span class="price">$${h.price.toFixed(2)}</span>
-                        ${h.priceVersion ? `<span style="color: #6c757d; margin-left: 10px;">(${h.priceVersion})</span>` : ''}
-                    </div>
-                    <div class="history-date">${formatDate(h.priceDate)}</div>
-                </div>
-            `).join('');
-        }
-
-        function closeHistoryModal() {
-            document.getElementById('historyModal').classList.remove('active');
-        }
-
-        // Bulk Import
-        function previewImport() {
-            const supplier = document.getElementById('importSupplier').value;
-            const rawData = document.getElementById('bulkData').value.trim();
-
-            if (!supplier) {
-                showAlert('Please enter a supplier name', 'error');
-                return;
-            }
-
-            if (!rawData) {
-                showAlert('Please paste chemical data', 'error');
-                return;
-            }
-
-            // Parse CSV or tab-separated data
-            const lines = rawData.split('\n').filter(l => l.trim());
-            pendingImport = [];
-
-            for (const line of lines) {
-                // Try tab first, then comma
-                let parts = line.split('\t');
-                if (parts.length < 4) {
-                    parts = line.split(',');
-                }
-
-                if (parts.length >= 4) {
-                    const productName = parts[0].trim();
-                    const packSize = parts[1].trim();
-                    const unit = parts[2].trim().toLowerCase();
-                    const price = parseFloat(parts[3].replace(/[$,]/g, ''));
-                    const notes = parts[4] ? parts[4].trim() : '';
-
-                    // Skip header row
-                    if (productName.toLowerCase() === 'product' || isNaN(price)) continue;
-
-                    pendingImport.push({
-                        productName,
-                        packSize,
-                        unit: unit || 'gl',
-                        price,
-                        notes,
-                        supplier
-                    });
-                }
-            }
-
-            if (pendingImport.length === 0) {
-                showAlert('No valid data found. Check the format.', 'error');
-                return;
-            }
-
-            // Show preview
-            document.getElementById('previewCount').textContent = pendingImport.length;
-            document.getElementById('previewBody').innerHTML = pendingImport.map(c => `
-                <tr>
-                    <td>${c.productName}</td>
-                    <td>${c.packSize}</td>
-                    <td>${c.unit}</td>
-                    <td>$${c.price.toFixed(2)}</td>
-                    <td>${c.notes || '-'}</td>
-                </tr>
-            `).join('');
-
-            document.getElementById('importPreview').style.display = 'block';
-        }
-
-        async function executeImport() {
-            if (pendingImport.length === 0) {
-                showAlert('No data to import', 'error');
-                return;
-            }
-
-            const supplier = document.getElementById('importSupplier').value;
-            const version = document.getElementById('importVersion').value || new Date().toISOString().slice(0, 10);
-
-            try {
-                const response = await fetch(`${API_URL}/api/chemicals/bulk`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        chemicals: pendingImport,
-                        supplier,
-                        priceVersion: version
-                    })
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    showAlert(`Import complete: ${result.summary.created} created, ${result.summary.updated} updated, ${result.summary.unchanged} unchanged`, 'success');
-                    clearImport();
-                    loadChemicals();
-                    loadSuppliers();
-                } else {
-                    const error = await response.json();
-                    showAlert(error.error || 'Import failed', 'error');
-                }
-            } catch (error) {
-                showAlert('Network error during import', 'error');
-            }
-        }
-
-        function clearImport() {
-            document.getElementById('bulkData').value = '';
-            document.getElementById('importPreview').style.display = 'none';
-            pendingImport = [];
-        }
-
-        // Utilities
-        function formatDate(dateStr) {
-            if (!dateStr) return '-';
-            const date = new Date(dateStr);
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
-
-        function showAlert(message, type) {
-            const container = document.getElementById('alertContainer');
-            const alert = document.createElement('div');
-            alert.className = `alert alert-${type}`;
-            alert.textContent = message;
-            container.appendChild(alert);
-
-            setTimeout(() => alert.remove(), 5000);
-        }
-
-        // Seed initial data
-        async function seedData() {
-            if (!confirm('This will load the initial chemical pricing data (Acre Profit and CPD prices). Continue?')) {
-                return;
-            }
-
-            try {
-                const response = await fetch(`${API_URL}/api/chemicals/seed`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({ secretKey: 'acreprofit2026seed' })
-                });
-
-                if (response.ok) {
-                    const result = await response.json();
-                    showAlert(`Data loaded! Acre Profit: ${result.summary.acreProfit.created} created. CPD: ${result.summary.cpd.created} created.`, 'success');
-                    loadChemicals();
-                    loadSuppliers();
-                } else {
-                    const error = await response.json();
-                    showAlert(error.error || 'Failed to seed data', 'error');
-                }
-            } catch (error) {
-                showAlert('Network error. Make sure the API is running.', 'error');
-            }
-        }
-
-        // Demo data when API is unavailable
-        function getDemoChemicals() {
-            return [
-                // Acre Profit prices
-                { _id: '1', productName: 'Dicamba DMA', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 31.24, priceDate: new Date(), notes: '' },
-                { _id: '2', productName: 'Dicamba DMA', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 30.89, priceDate: new Date(), notes: '' },
-                { _id: '3', productName: 'Dicamba HD', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 35.31, priceDate: new Date(), notes: '' },
-                { _id: '4', productName: 'LV 6', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 32.43, priceDate: new Date(), notes: '' },
-                { _id: '5', productName: 'LV 6', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 30.14, priceDate: new Date(), notes: '' },
-                { _id: '6', productName: 'RT3', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 17.50, priceDate: new Date(), notes: '' },
-                { _id: '7', productName: 'Glystar Supreme', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 15.53, priceDate: new Date(), notes: '' },
-                { _id: '8', productName: 'Aatrex', supplier: 'Acre Profit', packSize: 'Shuttle', unit: 'gl', price: 12.78, priceDate: new Date(), notes: '' },
-                { _id: '9', productName: 'Level Best Pro', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 43.83, priceDate: new Date(), notes: '' },
-                { _id: '10', productName: 'Tapran', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 28.71, priceDate: new Date(), notes: '' },
-                { _id: '11', productName: 'Aggrestrol', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 33.81, priceDate: new Date(), notes: '' },
-                { _id: '12', productName: 'Sulfentrazone', supplier: 'Acre Profit', packSize: '2x2.5', unit: 'gl', price: 75.20, priceDate: new Date(), notes: '' },
-                { _id: '13', productName: 'Valor SX', supplier: 'Acre Profit', packSize: '4x5', unit: 'lb', price: 15.06, priceDate: new Date(), notes: '' },
-                // CPD prices
-                { _id: '14', productName: 'Dicamba DMA', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 30.25, priceDate: new Date(), notes: '' },
-                { _id: '15', productName: 'Dicamba DMA', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 28.25, priceDate: new Date(), notes: '' },
-                { _id: '16', productName: 'Dicamba HD', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 30.57, priceDate: new Date(), notes: '' },
-                { _id: '17', productName: 'LV 6', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 29.90, priceDate: new Date(), notes: '' },
-                { _id: '18', productName: 'LV 6', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 27.90, priceDate: new Date(), notes: '' },
-                { _id: '19', productName: 'AgSaver', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 13.25, priceDate: new Date(), notes: 'Formulation equiv -11% (RT3 equiv)' },
-                { _id: '20', productName: 'Aatrex', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 13.35, priceDate: new Date(), notes: '' },
-                { _id: '21', productName: 'Aggrestrol', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 21.00, priceDate: new Date(), notes: 'Need to get equivalents' },
-                { _id: '22', productName: 'Sulfentrazone', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 70.50, priceDate: new Date(), notes: '' },
-                { _id: '23', productName: 'Valor SX', supplier: 'CPD', packSize: '4x5', unit: 'lb', price: 14.25, priceDate: new Date(), notes: '' },
-                { _id: '24', productName: 'CPD Glufosinate', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 16.50, priceDate: new Date(), notes: '' },
-                { _id: '25', productName: 'CPD Paraquat', supplier: 'CPD', packSize: 'Shuttle', unit: 'gl', price: 16.00, priceDate: new Date(), notes: '' },
-                { _id: '26', productName: 'CPD Mesotrione', supplier: 'CPD', packSize: '2x2.5', unit: 'gl', price: 48.25, priceDate: new Date(), notes: '' }
-            ];
-        }
-
-        // Close modals on outside click
-        document.querySelectorAll('.modal').forEach(modal => {
-            modal.addEventListener('click', (e) => {
-                if (e.target === modal) {
-                    modal.classList.remove('active');
-                }
-            });
-        });
     </script>
 </body>
 </html>
