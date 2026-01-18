@@ -204,10 +204,45 @@
                 </div>
             </div>
 
+            <!-- Delivery Location Selection -->
+            <div class="delivery-location-section">
+                <h2>Select Your Pickup Location</h2>
+                <p class="location-subtitle">Choose which rep location you'll pick up from. We group orders to fill full truckloads to each location.</p>
+                <div class="location-buttons">
+                    <button class="location-btn" data-location="mcconnell" onclick="selectLocation('mcconnell')">
+                        <span class="location-icon">📍</span>
+                        <div class="location-info">
+                            <strong>McConnell</strong>
+                            <span>Kyle McConnell</span>
+                            <span>(970) 571-1015</span>
+                        </div>
+                    </button>
+                    <button class="location-btn" data-location="bamford" onclick="selectLocation('bamford')">
+                        <span class="location-icon">📍</span>
+                        <div class="location-info">
+                            <strong>Bamford</strong>
+                            <span>Chad Bamford</span>
+                            <span>(970) 520-3716</span>
+                        </div>
+                    </button>
+                    <button class="location-btn" data-location="mollohan" onclick="selectLocation('mollohan')">
+                        <span class="location-icon">📍</span>
+                        <div class="location-info">
+                            <strong>Mollohan</strong>
+                            <span>Ty Mollohan</span>
+                            <span>(970) 520-2340</span>
+                        </div>
+                    </button>
+                </div>
+                <div class="truck-status" id="truckStatus">
+                    <!-- Shows current truck fill status for each timing window -->
+                </div>
+            </div>
+
             <!-- Chemical Ordering by Application Timing -->
             <div class="chemicals-by-timing" id="chemicalsTiming">
                 <h2>Order Chemicals by Application Timing</h2>
-                <p class="timing-subtitle">Select chemicals for each application window. This helps us coordinate truck deliveries.</p>
+                <p class="timing-subtitle">Select chemicals for each application window. Orders are grouped by timing for truck deliveries.</p>
 
                 <!-- Early Spring - Burndown -->
                 <div class="timing-section" data-timing="early-spring">
@@ -728,6 +763,41 @@
             document.getElementById('totalCostDisplay').textContent = `$${totalCost.toFixed(2)}`;
             document.getElementById('merchCreditDisplay').textContent = `$${orderData.merchCredit.toFixed(2)}`;
             document.getElementById('modalCreditAmount').textContent = `$${orderData.merchCredit.toFixed(2)}`;
+        }
+
+        // Delivery location selection
+        let selectedLocation = null;
+
+        function selectLocation(location) {
+            selectedLocation = location;
+            document.querySelectorAll('.location-btn').forEach(btn => btn.classList.remove('selected'));
+            document.querySelector(`.location-btn[data-location="${location}"]`).classList.add('selected');
+
+            // Show truck status for selected location
+            const statusDiv = document.getElementById('truckStatus');
+            statusDiv.innerHTML = `
+                <div class="truck-fill-status">
+                    <h4>Truck Fill Status for ${location.charAt(0).toUpperCase() + location.slice(1)}</h4>
+                    <div class="truck-timings">
+                        <div class="truck-timing-row">
+                            <span class="timing-label">Early Spring (March):</span>
+                            <div class="fill-bar"><div class="fill-progress" style="width: 45%"></div></div>
+                            <span class="fill-pct">45% full</span>
+                        </div>
+                        <div class="truck-timing-row">
+                            <span class="timing-label">Pre-Plant (April-May):</span>
+                            <div class="fill-bar"><div class="fill-progress" style="width: 30%"></div></div>
+                            <span class="fill-pct">30% full</span>
+                        </div>
+                        <div class="truck-timing-row">
+                            <span class="timing-label">Post-Emerge (May-June):</span>
+                            <div class="fill-bar"><div class="fill-progress" style="width: 15%"></div></div>
+                            <span class="fill-pct">15% full</span>
+                        </div>
+                    </div>
+                    <p class="truck-note">When a truck reaches 100%, we place the order and schedule delivery.</p>
+                </div>
+            `;
         }
 
         // Chemical timing section functions
@@ -1514,6 +1584,138 @@
 
             .merch-options {
                 grid-template-columns: 1fr;
+            }
+        }
+
+        /* Delivery Location Selection */
+        .delivery-location-section {
+            margin-top: 40px;
+            margin-bottom: 40px;
+        }
+
+        .delivery-location-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .location-subtitle {
+            color: var(--text-muted);
+            margin-bottom: 20px;
+        }
+
+        .location-buttons {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .location-btn {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 20px;
+            background: white;
+            border: 2px solid var(--border);
+            border-radius: var(--radius-lg);
+            cursor: pointer;
+            transition: all 0.2s;
+            text-align: left;
+        }
+
+        .location-btn:hover {
+            border-color: var(--primary);
+            background: #f8fdf8;
+        }
+
+        .location-btn.selected {
+            border-color: var(--primary);
+            background: #dcfce7;
+        }
+
+        .location-icon {
+            font-size: 1.5rem;
+        }
+
+        .location-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .location-info strong {
+            font-size: 1.1rem;
+            color: var(--text-dark);
+        }
+
+        .location-info span {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .truck-fill-status {
+            background: white;
+            padding: 20px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+        }
+
+        .truck-fill-status h4 {
+            margin-bottom: 16px;
+            color: var(--primary);
+        }
+
+        .truck-timing-row {
+            display: grid;
+            grid-template-columns: 180px 1fr 80px;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .timing-label {
+            font-weight: 500;
+            font-size: 0.9rem;
+        }
+
+        .fill-bar {
+            height: 20px;
+            background: #e5e7eb;
+            border-radius: 10px;
+            overflow: hidden;
+        }
+
+        .fill-progress {
+            height: 100%;
+            background: linear-gradient(90deg, var(--primary), #4ade80);
+            border-radius: 10px;
+            transition: width 0.3s;
+        }
+
+        .fill-pct {
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: var(--primary);
+        }
+
+        .truck-note {
+            margin-top: 12px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            font-style: italic;
+        }
+
+        @media (max-width: 768px) {
+            .location-buttons {
+                grid-template-columns: 1fr;
+            }
+
+            .truck-timing-row {
+                grid-template-columns: 1fr;
+                gap: 4px;
+            }
+
+            .fill-bar {
+                width: 100%;
             }
         }
 
