@@ -26,7 +26,8 @@
             </a>
             <ul class="nav-links">
                 <li><a href="/dashboard.html">Dashboard</a></li>
-                <li><a href="/chemicals.html" class="active">Order Chemicals</a></li>
+                <li><a href="/chemicals.html" class="active">Crop Protection</a></li>
+                <li><a href="/farm-products.html">Farm Products</a></li>
                 <li><a href="/merch.html">Merch</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a></li>
             </ul>
@@ -36,7 +37,7 @@
     <main class="chemicals-page">
         <div class="container">
             <div class="page-header">
-                <h1>Order Chemicals</h1>
+                <h1>Crop Protection</h1>
                 <p>Choose how you'd like to build your order</p>
             </div>
 
@@ -231,7 +232,12 @@
 
     <footer class="footer">
         <div class="container">
-            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+            <div class="legal-footer" style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 16px; line-height: 1.5; background: #fef3c7; padding: 16px; border-radius: var(--radius); border: 1px solid #f59e0b;">
+                <p style="margin-bottom: 8px;"><strong style="color: #92400e;">Label is the Law:</strong> Always read and follow pesticide label directions. Application rates shown are suggestions only - each situation requires individual evaluation.</p>
+                <p style="margin-bottom: 8px;"><strong style="color: #92400e;">Restricted Use Pesticides:</strong> Products marked <span style="background: #dc2626; color: white; padding: 1px 4px; border-radius: 3px; font-size: 0.65rem; font-weight: 700;">RUP</span> require a valid Private or Commercial Applicator License.</p>
+                <p style="margin-bottom: 0;"><strong style="color: #92400e;">No Warranty:</strong> Seller makes no warranty of merchantability or fitness for a particular purpose. Consult with a Certified Crop Advisor for specific recommendations.</p>
+            </div>
+            <div class="footer-bottom" style="border-top: 1px solid var(--border); padding-top: 16px;">
                 <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
             </div>
         </div>
@@ -267,6 +273,107 @@
         let orderItems = [];
         let selectedCrop = null;
         let selectedProgram = null;
+
+        // ============ SMART PACKAGE BREAKDOWN CALCULATOR ============
+        // Package sizes available for most chemicals
+        const PACKAGE_SIZES = {
+            'gl': [
+                { name: 'Shuttle', size: 250, singular: 'Shuttle', plural: 'Shuttles' },
+                { name: '2x2.5', size: 5, singular: '2x2.5 gal case', plural: '2x2.5 gal cases' },
+                { name: '2.5 gal', size: 2.5, singular: '2.5 gal jug', plural: '2.5 gal jugs' }
+            ],
+            'oz': [
+                { name: '2x2.5', size: 320, singular: '2x2.5 gal case', plural: '2x2.5 gal cases' }, // 2.5 gal = 320 oz
+                { name: 'Gallon', size: 128, singular: 'gallon', plural: 'gallons' }
+            ],
+            'lb': [
+                { name: 'Bag 50', size: 50, singular: '50 lb bag', plural: '50 lb bags' },
+                { name: 'Bag 25', size: 25, singular: '25 lb bag', plural: '25 lb bags' }
+            ]
+        };
+
+        /**
+         * Calculate optimal package breakdown
+         * e.g., 280 gal needed = 1 Shuttle (250 gal) + 6 x 2.5 gal jugs (15 gal)
+         * Returns: { packages: [{name, qty, size}], totalOrdered: number, overage: number }
+         */
+        function calculatePackageBreakdown(totalNeeded, unit = 'gl', availableSizes = null) {
+            const sizes = availableSizes || PACKAGE_SIZES[unit] || PACKAGE_SIZES['gl'];
+            const result = {
+                packages: [],
+                totalOrdered: 0,
+                overage: 0,
+                breakdown: ''
+            };
+
+            let remaining = totalNeeded;
+
+            // Start with largest package size that makes sense
+            for (const pkg of sizes) {
+                if (remaining >= pkg.size) {
+                    const qty = Math.floor(remaining / pkg.size);
+                    if (qty > 0) {
+                        result.packages.push({
+                            name: pkg.name,
+                            qty: qty,
+                            size: pkg.size,
+                            label: qty === 1 ? pkg.singular : pkg.plural
+                        });
+                        remaining -= qty * pkg.size;
+                        result.totalOrdered += qty * pkg.size;
+                    }
+                }
+            }
+
+            // If we still have remaining, round up to smallest package
+            if (remaining > 0 && sizes.length > 0) {
+                const smallestPkg = sizes[sizes.length - 1];
+                const qty = Math.ceil(remaining / smallestPkg.size);
+                result.packages.push({
+                    name: smallestPkg.name,
+                    qty: qty,
+                    size: smallestPkg.size,
+                    label: qty === 1 ? smallestPkg.singular : smallestPkg.plural
+                });
+                result.totalOrdered += qty * smallestPkg.size;
+            }
+
+            result.overage = result.totalOrdered - totalNeeded;
+
+            // Build human-readable breakdown string
+            result.breakdown = result.packages.map(p =>
+                `${p.qty} ${p.label}`
+            ).join(' + ');
+
+            return result;
+        }
+
+        /**
+         * Format package breakdown for display in table
+         */
+        function formatPackageBreakdownHTML(totalNeeded, unit = 'gl') {
+            const breakdown = calculatePackageBreakdown(totalNeeded, unit);
+
+            let html = '<div class="package-breakdown">';
+            html += `<div class="total-needed"><strong>${totalNeeded.toFixed(1)} ${unit}</strong> needed</div>`;
+            html += '<div class="package-list">';
+
+            breakdown.packages.forEach((pkg, idx) => {
+                html += `<span class="pkg-item">${pkg.qty} ${pkg.label}</span>`;
+                if (idx < breakdown.packages.length - 1) {
+                    html += '<span class="pkg-plus">+</span>';
+                }
+            });
+
+            html += '</div>';
+
+            if (breakdown.overage > 0.1) {
+                html += `<div class="overage">(+${breakdown.overage.toFixed(1)} ${unit} extra)</div>`;
+            }
+
+            html += '</div>';
+            return html;
+        }
 
         // ============ LOAD DATA FROM API ============
         async function loadChemicals() {
@@ -1079,45 +1186,71 @@
                 </div>
             `).join('');
 
-            // Order totals
+            // Order totals with smart package breakdown
             let totalsHTML = `
                 <div class="order-totals-section">
-                    <h3>Order Totals (Rounded to Package Sizes)</h3>
-                    <table class="results-table">
+                    <h3>Order Totals - Package Breakdown</h3>
+                    <p class="section-note">Optimized package sizes to minimize waste</p>
+                    <table class="results-table package-table">
                         <thead>
                             <tr>
                                 <th>Chemical</th>
                                 <th>Total Needed</th>
-                                <th>Order Qty</th>
+                                <th>Package Breakdown</th>
                                 <th>Est. Cost</th>
                             </tr>
                         </thead>
                         <tbody>
-                            ${Object.values(totalsByChemical).map(item => `
+                            ${Object.values(totalsByChemical).map(item => {
+                                const breakdown = calculatePackageBreakdown(item.totalNeeded, item.unit);
+                                // Recalculate cost based on actual packages
+                                const actualCost = breakdown.totalOrdered * item.price;
+                                return `
                                 <tr>
-                                    <td>${item.name}</td>
-                                    <td>${item.totalNeeded.toFixed(1)} ${item.unit}</td>
-                                    <td>${item.packages} x ${item.packSize}</td>
-                                    <td>$${item.cost.toFixed(2)}</td>
+                                    <td><strong>${item.name}</strong></td>
+                                    <td class="needed-col">
+                                        <span class="total-gal">${item.totalNeeded.toFixed(1)} ${item.unit}</span>
+                                    </td>
+                                    <td class="breakdown-col">
+                                        <div class="pkg-breakdown">
+                                            ${breakdown.packages.map((pkg, idx) => `
+                                                <span class="pkg-chip">${pkg.qty} ${pkg.label}</span>
+                                                ${idx < breakdown.packages.length - 1 ? '<span class="pkg-plus">+</span>' : ''}
+                                            `).join('')}
+                                        </div>
+                                        <div class="pkg-total">
+                                            = ${breakdown.totalOrdered.toFixed(1)} ${item.unit} ordered
+                                            ${breakdown.overage > 0.1 ? `<span class="overage">(+${breakdown.overage.toFixed(1)} extra)</span>` : ''}
+                                        </div>
+                                    </td>
+                                    <td class="cost-col"><strong>$${actualCost.toFixed(2)}</strong></td>
                                 </tr>
-                            `).join('')}
+                            `}).join('')}
                         </tbody>
                         <tfoot>
-                            <tr>
+                            <tr class="total-row">
                                 <td colspan="3"><strong>Estimated Total</strong></td>
-                                <td><strong>$${totalCost.toFixed(2)}</strong></td>
+                                <td><strong class="grand-total">$${totalCost.toFixed(2)}</strong></td>
                             </tr>
                             <tr>
                                 <td colspan="3">Cost Per Acre</td>
                                 <td>$${(totalCost / acres).toFixed(2)}</td>
                             </tr>
-                            <tr>
+                            <tr class="merch-row">
                                 <td colspan="3">Merch Credit Earned ($10 per $1,000)</td>
-                                <td>$${(Math.floor(totalCost / 1000) * 10).toFixed(2)}</td>
+                                <td class="merch-credit">+$${(Math.floor(totalCost / 1000) * 10).toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
-                    <button class="btn btn-primary btn-lg" onclick="submitProgramOrder(${acres}, ${totalCost})">Submit This Order</button>
+
+                    <div class="order-actions">
+                        <button class="btn btn-primary btn-lg" onclick="submitProgramOrder(${acres}, ${totalCost})">
+                            Submit This Order
+                        </button>
+                        <button class="btn btn-outline" onclick="window.print()">
+                            Print Order Summary
+                        </button>
+                    </div>
                 </div>
             `;
 
@@ -2140,6 +2273,106 @@
 
         .notification.info {
             background: #2563eb;
+        }
+
+        /* Package Breakdown Styles */
+        .package-table {
+            width: 100%;
+        }
+
+        .package-table th,
+        .package-table td {
+            padding: 16px;
+            vertical-align: top;
+        }
+
+        .needed-col {
+            white-space: nowrap;
+        }
+
+        .total-gal {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .breakdown-col {
+            min-width: 300px;
+        }
+
+        .pkg-breakdown {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 8px;
+        }
+
+        .pkg-chip {
+            display: inline-block;
+            background: #dcfce7;
+            color: #166534;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            border: 1px solid #86efac;
+        }
+
+        .pkg-plus {
+            color: #6b7280;
+            font-weight: 700;
+        }
+
+        .pkg-total {
+            font-size: 0.85rem;
+            color: var(--text-light);
+        }
+
+        .overage {
+            color: #f59e0b;
+            font-weight: 500;
+        }
+
+        .cost-col {
+            text-align: right;
+            white-space: nowrap;
+        }
+
+        .total-row td {
+            background: var(--secondary);
+            border-top: 2px solid var(--border);
+        }
+
+        .grand-total {
+            font-size: 1.25rem;
+            color: var(--primary);
+        }
+
+        .merch-row td {
+            background: #fef3c7;
+        }
+
+        .merch-credit {
+            color: #f59e0b;
+            font-weight: 700;
+        }
+
+        .section-note {
+            color: var(--text-light);
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+        }
+
+        .order-actions {
+            display: flex;
+            gap: 16px;
+            margin-top: 24px;
+            justify-content: center;
+        }
+
+        .order-actions .btn {
+            min-width: 200px;
         }
 
         @media (max-width: 768px) {

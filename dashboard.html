@@ -60,64 +60,33 @@
                 </div>
             </div>
 
-            <!-- Category Grid -->
-            <div class="category-grid">
-                <a href="/crop-inputs.html" class="category-card">
-                    <div class="category-icon">🌱</div>
-                    <h2>Crop Inputs</h2>
-                    <p>Herbicides, fungicides, insecticides, seed treatments, adjuvants</p>
-                    <div class="category-stats">
-                        <span class="stat"><strong id="cropInputsOrders">12</strong> active orders</span>
-                        <span class="stat-highlight">3 near threshold</span>
+            <!-- Product Categories -->
+            <div class="category-grid category-grid-2">
+                <a href="/chemicals.html" class="category-card category-card-large">
+                    <div class="category-icon">🌾</div>
+                    <h2>Crop Protection</h2>
+                    <p>Herbicides, fungicides, insecticides, adjuvants - order by the acre or direct</p>
+                    <div class="category-features">
+                        <span class="feature-tag">Spray Programs</span>
+                        <span class="feature-tag">Bulk Pricing</span>
+                        <span class="feature-tag">Package Calculator</span>
+                    </div>
+                    <div class="category-cta">
+                        Browse Products & Calculate →
                     </div>
                 </a>
 
-                <a href="/fertilizer.html" class="category-card">
-                    <div class="category-icon">🧪</div>
-                    <h2>Fertilizer</h2>
-                    <p>Nitrogen, phosphorus, potassium, micronutrients, liquid & dry</p>
-                    <div class="category-stats">
-                        <span class="stat"><strong>8</strong> active orders</span>
-                        <span class="stat-highlight">2 near threshold</span>
-                    </div>
-                </a>
-
-                <a href="/fuel.html" class="category-card">
-                    <div class="category-icon">⛽</div>
-                    <h2>Fuel</h2>
-                    <p>Diesel, gasoline, propane, DEF, bulk tank delivery</p>
-                    <div class="category-stats">
-                        <span class="stat"><strong>5</strong> active orders</span>
-                        <span class="stat-highlight">1 near threshold</span>
-                    </div>
-                </a>
-
-                <a href="/equipment.html" class="category-card">
+                <a href="/farm-products.html" class="category-card category-card-large">
                     <div class="category-icon">🚜</div>
-                    <h2>Equipment</h2>
-                    <p>Parts, tires, filters, lubricants, tools, GPS/precision ag</p>
-                    <div class="category-stats">
-                        <span class="stat"><strong>15</strong> active orders</span>
-                        <span class="stat-highlight">5 near threshold</span>
-                    </div>
-                </a>
-
-                <a href="/farm-products.html" class="category-card">
-                    <div class="category-icon">🏪</div>
                     <h2>Farm Products</h2>
-                    <p>Fencing, irrigation supplies, storage, safety equipment</p>
-                    <div class="category-stats">
-                        <span class="stat"><strong>7</strong> active orders</span>
-                        <span class="stat-highlight">2 near threshold</span>
+                    <p>Multiseal tire sealant, equipment supplies, and more farm essentials</p>
+                    <div class="category-features">
+                        <span class="feature-tag">Multiseal</span>
+                        <span class="feature-tag">Bulk Pricing</span>
+                        <span class="feature-tag">Group Buys</span>
                     </div>
-                </a>
-
-                <a href="/request-product.html" class="category-card category-card-cta">
-                    <div class="category-icon">➕</div>
-                    <h2>Request a Product</h2>
-                    <p>Don't see what you need? Request it and we'll find suppliers.</p>
-                    <div class="category-stats">
-                        <span class="stat-cta">Start a new group buy →</span>
+                    <div class="category-cta">
+                        View Products →
                     </div>
                 </a>
             </div>
@@ -211,56 +180,17 @@
                 </div>
             </div>
 
-            <!-- Active Orders Preview -->
+            <!-- Your Orders -->
             <div class="orders-preview">
                 <div class="section-header">
-                    <h3>Your Active Pool Orders</h3>
-                    <a href="/my-orders.html" class="view-all">View All →</a>
+                    <h3>Your Orders</h3>
                 </div>
                 <div class="orders-list" id="activeOrdersList">
-                    <div class="order-preview-card">
-                        <div class="order-product">
-                            <span class="product-category">Crop Inputs</span>
-                            <h4>Roundup PowerMax 3</h4>
-                        </div>
-                        <div class="order-details">
-                            <span class="your-qty">Your qty: <strong>50 gal</strong></span>
-                            <span class="pool-progress">
-                                <span class="progress-bar" style="--progress: 72%"></span>
-                                <span class="progress-text">72% to threshold</span>
-                            </span>
-                        </div>
-                        <div class="order-status status-pooling">Pooling</div>
-                    </div>
-
-                    <div class="order-preview-card">
-                        <div class="order-product">
-                            <span class="product-category">Fuel</span>
-                            <h4>Off-Road Diesel</h4>
-                        </div>
-                        <div class="order-details">
-                            <span class="your-qty">Your qty: <strong>1,000 gal</strong></span>
-                            <span class="pool-progress">
-                                <span class="progress-bar" style="--progress: 95%"></span>
-                                <span class="progress-text">95% to threshold</span>
-                            </span>
-                        </div>
-                        <div class="order-status status-almost">Almost There!</div>
-                    </div>
-
-                    <div class="order-preview-card">
-                        <div class="order-product">
-                            <span class="product-category">Fertilizer</span>
-                            <h4>Anhydrous Ammonia</h4>
-                        </div>
-                        <div class="order-details">
-                            <span class="your-qty">Your qty: <strong>20 tons</strong></span>
-                            <span class="pool-progress">
-                                <span class="progress-bar" style="--progress: 100%"></span>
-                                <span class="progress-text">Bidding in progress</span>
-                            </span>
-                        </div>
-                        <div class="order-status status-bidding">Awaiting Bids</div>
+                    <div class="empty-orders">
+                        <div class="empty-icon">📦</div>
+                        <h4>No orders yet</h4>
+                        <p>Browse our products above to place your first order</p>
+                        <a href="/chemicals.html" class="btn btn-primary">Shop Crop Inputs</a>
                     </div>
                 </div>
             </div>
@@ -299,7 +229,11 @@
 
     <footer class="footer">
         <div class="container">
-            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+            <div class="legal-footer" style="font-size: 0.75rem; color: var(--text-light); margin-bottom: 16px; line-height: 1.5;">
+                <p style="margin-bottom: 8px;"><strong>Important:</strong> Always read and follow label directions. Application suggestions are not recommendations - each field requires individual evaluation. Consult with a Certified Crop Advisor for specific guidance.</p>
+                <p>Restricted Use Pesticides (RUPs) require a valid applicator license. <a href="/compliance.html" style="color: var(--primary);">Learn more about compliance requirements</a>.</p>
+            </div>
+            <div class="footer-bottom" style="border-top: 1px solid var(--border); padding-top: 16px;">
                 <p>&copy; 2026 AcreProfit.com. Farmers Helping Farmers.</p>
             </div>
         </div>
@@ -818,8 +752,119 @@
         .chatbot-input input { flex: 1; padding: 10px 12px; border: 1px solid var(--border); border-radius: var(--radius); font-size: 0.875rem; }
         .chatbot-input button { background: var(--primary); color: var(--white); border: none; padding: 10px 16px; border-radius: var(--radius); margin-left: 8px; cursor: pointer; }
 
+        /* Two-column category grid */
+        .category-grid-2 {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+
+        .category-card-large {
+            padding: 32px;
+            min-height: 220px;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .category-card-large .category-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .category-card-large h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .category-card-large p {
+            flex-grow: 1;
+            margin-bottom: 16px;
+        }
+
+        .category-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-bottom: 16px;
+        }
+
+        .feature-tag {
+            background: rgba(45, 90, 39, 0.1);
+            color: var(--primary);
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .category-cta {
+            font-weight: 700;
+            color: var(--primary);
+            font-size: 1rem;
+        }
+
+        /* Coming Soon Section */
+        .coming-soon-section {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 32px;
+            text-align: center;
+            border: 2px dashed var(--border);
+        }
+
+        .coming-soon-section h3 {
+            margin-bottom: 8px;
+            color: var(--text-light);
+        }
+
+        .coming-soon-section p {
+            color: var(--text-light);
+            margin-bottom: 16px;
+        }
+
+        .coming-soon-tags {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+
+        .coming-tag {
+            background: #f3f4f6;
+            color: #6b7280;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+        }
+
+        /* Empty Orders State */
+        .empty-orders {
+            text-align: center;
+            padding: 48px 24px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+        }
+
+        .empty-orders .empty-icon {
+            font-size: 3rem;
+            margin-bottom: 16px;
+        }
+
+        .empty-orders h4 {
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .empty-orders p {
+            color: var(--text-light);
+            margin-bottom: 20px;
+        }
+
         @media (max-width: 768px) {
             .dashboard-header { flex-direction: column; align-items: flex-start; }
+            .category-grid-2 { grid-template-columns: 1fr; }
             .order-preview-card { flex-direction: column; align-items: flex-start; gap: 12px; }
             .order-details { width: 100%; }
             .chatbot-window { width: calc(100vw - 48px); }

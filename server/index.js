@@ -72,6 +72,85 @@ const userSchema = new mongoose.Schema({
         zip: String
     },
     crops: [String],
+
+    // ============ APPLICATOR COMPLIANCE FIELDS ============
+
+    // Business Classification
+    businessType: {
+        type: String,
+        enum: ['farm', 'commercial_applicator', 'dealer', 'other'],
+        default: 'farm'
+    },
+
+    // Private Applicator License (for farmers buying RUPs)
+    privateApplicatorLicense: {
+        hasLicense: { type: Boolean, default: false },
+        licenseNumber: String,
+        state: String,                    // Issuing state (2-letter)
+        expirationDate: Date,
+        certificationCategories: [String], // e.g., ['01-Agricultural Plant', '10-Demonstration']
+        licenseDocumentUrl: String,       // Uploaded license image/PDF
+        verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        verifiedAt: Date,
+        verificationStatus: {
+            type: String,
+            enum: ['pending', 'verified', 'expired', 'rejected'],
+            default: 'pending'
+        }
+    },
+
+    // Commercial Applicator License (for commercial applicators)
+    commercialApplicatorLicense: {
+        hasLicense: { type: Boolean, default: false },
+        licenseNumber: String,
+        state: String,
+        businessName: String,
+        expirationDate: Date,
+        certificationCategories: [String],
+        licenseDocumentUrl: String,
+        verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        verifiedAt: Date,
+        verificationStatus: {
+            type: String,
+            enum: ['pending', 'verified', 'expired', 'rejected'],
+            default: 'pending'
+        }
+    },
+
+    // Paraquat Training Certification (EPA-mandated)
+    paraquatCertification: {
+        completed: { type: Boolean, default: false },
+        completionDate: Date,
+        expirationDate: Date,            // Valid for 3 years
+        certificateNumber: String,
+        certificateUrl: String,          // Uploaded certificate
+        verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        verifiedAt: Date
+    },
+
+    // Dicamba Training Certification (annual requirement)
+    dicambaCertification: {
+        completed: { type: Boolean, default: false },
+        completionDate: Date,
+        trainingYear: Number,            // e.g., 2026 - must be current year
+        trainingProvider: String,        // Who provided the training
+        certificateUrl: String,
+        verifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        verifiedAt: Date
+    },
+
+    // Compliance Agreement
+    complianceAgreement: {
+        agreedToTerms: { type: Boolean, default: false },
+        agreementDate: Date,
+        agreementVersion: String,        // Track which version they agreed to
+        ipAddress: String               // Record IP for legal purposes
+    },
+
+    // RUP Purchase Eligibility (calculated field)
+    canPurchaseRUP: { type: Boolean, default: false },
+    rupEligibilityNotes: String,
+
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -253,6 +332,101 @@ const chemicalSchema = new mongoose.Schema({
     equivalentSupplier: String, // Supplier of equivalent product
     notes: String, // e.g., "Formulation equiv -11%", "Need to get equivalents"
 
+    // ============ REGULATORY COMPLIANCE FIELDS ============
+
+    // EPA Registration (REQUIRED for all pesticides)
+    epaRegistrationNumber: String, // e.g., "524-579", "100-1623"
+
+    // Restriction Classification
+    isRestrictedUse: { type: Boolean, default: false }, // RUP flag
+    rupStates: [String], // States where this is classified as RUP (2-letter codes)
+
+    // Signal Word (EPA mandated - appears on label)
+    signalWord: {
+        type: String,
+        enum: ['DANGER', 'DANGER-POISON', 'WARNING', 'CAUTION', 'NONE'],
+        default: 'CAUTION'
+    },
+
+    // Hazard Classifications
+    hazardClassifications: [{
+        type: String,
+        enum: [
+            'acute_oral_toxicity',
+            'acute_dermal_toxicity',
+            'acute_inhalation_toxicity',
+            'eye_irritant',
+            'skin_irritant',
+            'skin_sensitizer',
+            'carcinogen',
+            'reproductive_toxin',
+            'environmental_hazard_aquatic',
+            'environmental_hazard_bees',
+            'groundwater_advisory'
+        ]
+    }],
+
+    // Required Certifications to Purchase
+    requiredCertifications: [{
+        type: String,
+        enum: [
+            'private_applicator',      // State private applicator license
+            'commercial_applicator',   // State commercial applicator license
+            'paraquat_training',       // EPA-mandated Paraquat training
+            'dicamba_training',        // Annual Dicamba OTT training
+            'fumigant_training'        // Soil fumigant training
+        ]
+    }],
+
+    // Safety Data Sheet (SDS)
+    sdsUrl: String,        // URL to SDS PDF
+    sdsRevisionDate: Date, // Last SDS revision
+
+    // EPA Label
+    labelUrl: String,      // URL to EPA-approved label PDF
+    labelRevisionDate: Date,
+
+    // State Registrations (pesticides must be registered in each state)
+    stateRegistrations: [{
+        state: { type: String, maxlength: 2 }, // Two-letter state code
+        registrationNumber: String,
+        expirationDate: Date,
+        isRestricted: { type: Boolean, default: false }, // RUP in this state
+        restrictions: String // State-specific restrictions
+    }],
+
+    // Active Ingredients (for reporting and compliance)
+    activeIngredients: [{
+        name: String,              // e.g., "Glyphosate", "Atrazine"
+        percentage: Number,        // e.g., 41.0
+        poundsPerGallon: Number,   // e.g., 4.17 lb AE/gal
+        casNumber: String          // Chemical Abstracts Service number
+    }],
+
+    // DOT Transportation / Storage
+    dotHazClass: String,           // DOT hazardous materials class (e.g., "6.1", "8")
+    unNumber: String,              // UN identification number (e.g., "UN2902")
+    packingGroup: String,          // I, II, or III
+    storageRequirements: String,   // Special storage instructions
+    shelfLifeMonths: Number,       // Product shelf life
+
+    // Manufacturer Information
+    manufacturer: String,          // e.g., "BASF", "Bayer", "Syngenta"
+    manufacturerAddress: String,
+    manufacturerPhone: String,     // Emergency contact
+    epaEstablishmentNumber: String, // EPA Est. No. on label
+
+    // Additional Compliance Flags
+    requiresApplicatorVerification: { type: Boolean, default: false }, // Must verify license before sale
+    requiresAnnualTraining: { type: Boolean, default: false },         // Requires annual training (Dicamba)
+    hasBuyerAgreement: { type: Boolean, default: false },              // Requires signed agreement
+    isGroundwaterAdvisory: { type: Boolean, default: false },          // Has groundwater advisory
+    hasBufferZoneRequirements: { type: Boolean, default: false },      // Has application buffer zones
+    bufferZoneDetails: String,
+
+    // Compliance Notes
+    complianceNotes: String, // Internal notes about compliance requirements
+
     // Status
     isActive: { type: Boolean, default: true },
     availableForOrder: { type: Boolean, default: true },
@@ -277,6 +451,10 @@ chemicalSchema.index({ sourceSupplier: 1 });
 chemicalSchema.index({ category: 1 });
 chemicalSchema.index({ crops: 1 });
 chemicalSchema.index({ priceDate: -1 });
+// Compliance indexes
+chemicalSchema.index({ isRestrictedUse: 1 });
+chemicalSchema.index({ epaRegistrationNumber: 1 });
+chemicalSchema.index({ 'stateRegistrations.state': 1 });
 
 const Chemical = mongoose.model('Chemical', chemicalSchema);
 
@@ -296,6 +474,111 @@ const chemicalPriceHistorySchema = new mongoose.Schema({
 });
 
 const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
+
+// ============ RUP SALE RECORD MODEL ============
+// Required by EPA/state law to maintain records of all Restricted Use Pesticide sales
+// Must be kept for minimum 2 years (recommend 3 years)
+const rupSaleRecordSchema = new mongoose.Schema({
+    // Transaction Info
+    saleDate: { type: Date, required: true, default: Date.now },
+    orderNumber: String, // Reference to the order
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChemicalOrder' },
+
+    // Seller Info (Acre Profit / Rep)
+    sellerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    sellerName: String,
+    dealerLicenseNumber: String,      // Your pesticide dealer license
+    dealerLicenseState: String,
+
+    // Purchaser Info (Customer)
+    purchaserId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    purchaserName: { type: String, required: true },
+    purchaserAddress: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
+    purchaserPhone: String,
+    purchaserEmail: String,
+
+    // Applicator License Info (REQUIRED for RUP sales)
+    applicatorLicenseType: {
+        type: String,
+        enum: ['private', 'commercial'],
+        required: true
+    },
+    applicatorLicenseNumber: { type: String, required: true },
+    applicatorLicenseState: { type: String, required: true },
+    applicatorLicenseExpiration: Date,
+    applicatorCertificationCategories: [String],
+
+    // License Verification
+    licenseVerificationMethod: {
+        type: String,
+        enum: ['document_on_file', 'online_verification', 'phone_verification', 'in_person'],
+        required: true
+    },
+    licenseVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    licenseVerifiedAt: Date,
+    licenseDocumentUrl: String,       // Copy of license on file
+
+    // Product Info
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+    productName: { type: String, required: true },
+    epaRegistrationNumber: { type: String, required: true },
+    activeIngredient: String,
+    signalWord: String,
+
+    // Quantity
+    quantity: { type: Number, required: true },
+    unit: String,
+    packSize: String,
+    totalAmount: Number,              // Total dollar amount
+
+    // Additional Certifications (if required)
+    paraquatCertRequired: { type: Boolean, default: false },
+    paraquatCertVerified: { type: Boolean, default: false },
+    paraquatCertNumber: String,
+    paraquatCertDate: Date,
+
+    dicambaCertRequired: { type: Boolean, default: false },
+    dicambaCertVerified: { type: Boolean, default: false },
+    dicambaCertYear: Number,
+
+    // Buyer Acknowledgement
+    buyerAcknowledgement: {
+        acknowledged: { type: Boolean, default: false },
+        acknowledgedAt: Date,
+        ipAddress: String,
+        statement: { type: String, default: 'I certify that I am a licensed applicator and will use this product in accordance with the label.' }
+    },
+
+    // Compliance Notes
+    notes: String,
+
+    // Record Status
+    status: {
+        type: String,
+        enum: ['completed', 'pending_verification', 'cancelled', 'flagged'],
+        default: 'completed'
+    },
+
+    // Audit Trail
+    createdAt: { type: Date, default: Date.now },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updatedAt: { type: Date, default: Date.now },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
+
+// Indexes for compliance reporting
+rupSaleRecordSchema.index({ saleDate: -1 });
+rupSaleRecordSchema.index({ purchaserId: 1 });
+rupSaleRecordSchema.index({ epaRegistrationNumber: 1 });
+rupSaleRecordSchema.index({ applicatorLicenseNumber: 1 });
+rupSaleRecordSchema.index({ status: 1 });
+
+const RupSaleRecord = mongoose.model('RupSaleRecord', rupSaleRecordSchema);
 
 // Chemical Order Model
 const chemicalOrderSchema = new mongoose.Schema({
@@ -2812,6 +3095,409 @@ app.delete('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, re
         res.json({ message: 'Chemical deleted', chemical });
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ COMPLIANCE API ROUTES ============
+
+// Get all RUP (Restricted Use Pesticide) products
+app.get('/api/compliance/rup-products', authMiddleware, async (req, res) => {
+    try {
+        const rupProducts = await Chemical.find({ isRestrictedUse: true, isActive: true })
+            .select('productName epaRegistrationNumber signalWord requiredCertifications category')
+            .sort({ productName: 1 });
+        res.json(rupProducts);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get products requiring special certifications
+app.get('/api/compliance/products-by-certification/:certType', authMiddleware, async (req, res) => {
+    try {
+        const products = await Chemical.find({
+            requiredCertifications: req.params.certType,
+            isActive: true
+        }).sort({ productName: 1 });
+        res.json(products);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Check if user can purchase RUP products
+app.get('/api/compliance/check-rup-eligibility/:userId', authMiddleware, async (req, res) => {
+    try {
+        const user = await User.findById(req.params.userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        const eligibility = {
+            canPurchaseRUP: false,
+            hasPrivateLicense: false,
+            hasCommercialLicense: false,
+            hasParaquatCert: false,
+            hasDicambaCert: false,
+            issues: []
+        };
+
+        const now = new Date();
+        const currentYear = now.getFullYear();
+
+        // Check private applicator license
+        if (user.privateApplicatorLicense?.hasLicense) {
+            if (user.privateApplicatorLicense.verificationStatus === 'verified') {
+                if (user.privateApplicatorLicense.expirationDate > now) {
+                    eligibility.hasPrivateLicense = true;
+                } else {
+                    eligibility.issues.push('Private applicator license is expired');
+                }
+            } else {
+                eligibility.issues.push('Private applicator license pending verification');
+            }
+        }
+
+        // Check commercial applicator license
+        if (user.commercialApplicatorLicense?.hasLicense) {
+            if (user.commercialApplicatorLicense.verificationStatus === 'verified') {
+                if (user.commercialApplicatorLicense.expirationDate > now) {
+                    eligibility.hasCommercialLicense = true;
+                } else {
+                    eligibility.issues.push('Commercial applicator license is expired');
+                }
+            } else {
+                eligibility.issues.push('Commercial applicator license pending verification');
+            }
+        }
+
+        // Check Paraquat certification (valid for 3 years)
+        if (user.paraquatCertification?.completed) {
+            if (user.paraquatCertification.expirationDate > now) {
+                eligibility.hasParaquatCert = true;
+            } else {
+                eligibility.issues.push('Paraquat certification has expired');
+            }
+        }
+
+        // Check Dicamba certification (must be current year)
+        if (user.dicambaCertification?.completed) {
+            if (user.dicambaCertification.trainingYear === currentYear) {
+                eligibility.hasDicambaCert = true;
+            } else {
+                eligibility.issues.push(`Dicamba training is from ${user.dicambaCertification.trainingYear}, needs ${currentYear} training`);
+            }
+        }
+
+        // User can purchase RUP if they have either a valid private or commercial license
+        eligibility.canPurchaseRUP = eligibility.hasPrivateLicense || eligibility.hasCommercialLicense;
+
+        res.json(eligibility);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update user compliance/license info (admin or user themselves)
+app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const updateData = req.body;
+
+        // Only admin or the user themselves can update
+        if (req.user.role !== 'admin' && req.user.role !== 'superadmin' && req.user._id.toString() !== userId) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Update license fields
+        if (updateData.privateApplicatorLicense) {
+            user.privateApplicatorLicense = { ...user.privateApplicatorLicense?.toObject(), ...updateData.privateApplicatorLicense };
+            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+                user.privateApplicatorLicense.verifiedBy = req.user._id;
+                user.privateApplicatorLicense.verifiedAt = new Date();
+            }
+        }
+
+        if (updateData.commercialApplicatorLicense) {
+            user.commercialApplicatorLicense = { ...user.commercialApplicatorLicense?.toObject(), ...updateData.commercialApplicatorLicense };
+            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+                user.commercialApplicatorLicense.verifiedBy = req.user._id;
+                user.commercialApplicatorLicense.verifiedAt = new Date();
+            }
+        }
+
+        if (updateData.paraquatCertification) {
+            user.paraquatCertification = { ...user.paraquatCertification?.toObject(), ...updateData.paraquatCertification };
+            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+                user.paraquatCertification.verifiedBy = req.user._id;
+                user.paraquatCertification.verifiedAt = new Date();
+            }
+        }
+
+        if (updateData.dicambaCertification) {
+            user.dicambaCertification = { ...user.dicambaCertification?.toObject(), ...updateData.dicambaCertification };
+            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+                user.dicambaCertification.verifiedBy = req.user._id;
+                user.dicambaCertification.verifiedAt = new Date();
+            }
+        }
+
+        // Recalculate RUP eligibility
+        const now = new Date();
+        user.canPurchaseRUP = (
+            (user.privateApplicatorLicense?.verificationStatus === 'verified' && user.privateApplicatorLicense?.expirationDate > now) ||
+            (user.commercialApplicatorLicense?.verificationStatus === 'verified' && user.commercialApplicatorLicense?.expirationDate > now)
+        );
+
+        await user.save();
+        res.json({ message: 'Compliance info updated', user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Verify user license (admin only)
+app.post('/api/compliance/verify-license/:userId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { licenseType, status, notes } = req.body;
+
+        const user = await User.findById(userId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (licenseType === 'private' && user.privateApplicatorLicense) {
+            user.privateApplicatorLicense.verificationStatus = status;
+            user.privateApplicatorLicense.verifiedBy = req.user._id;
+            user.privateApplicatorLicense.verifiedAt = new Date();
+        } else if (licenseType === 'commercial' && user.commercialApplicatorLicense) {
+            user.commercialApplicatorLicense.verificationStatus = status;
+            user.commercialApplicatorLicense.verifiedBy = req.user._id;
+            user.commercialApplicatorLicense.verifiedAt = new Date();
+        }
+
+        if (notes) {
+            user.rupEligibilityNotes = notes;
+        }
+
+        // Recalculate RUP eligibility
+        const now = new Date();
+        user.canPurchaseRUP = (
+            (user.privateApplicatorLicense?.verificationStatus === 'verified' && user.privateApplicatorLicense?.expirationDate > now) ||
+            (user.commercialApplicatorLicense?.verificationStatus === 'verified' && user.commercialApplicatorLicense?.expirationDate > now)
+        );
+
+        await user.save();
+        res.json({ message: 'License verified', user });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create RUP Sale Record (called during checkout for RUP products)
+app.post('/api/compliance/rup-sale-record', authMiddleware, async (req, res) => {
+    try {
+        const recordData = req.body;
+
+        // Get user compliance info
+        const user = await User.findById(recordData.purchaserId);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        // Verify user can purchase RUP
+        if (!user.canPurchaseRUP) {
+            return res.status(403).json({ error: 'User is not eligible to purchase Restricted Use Pesticides' });
+        }
+
+        // Get chemical info
+        const chemical = await Chemical.findById(recordData.chemicalId);
+
+        // Build the record
+        const record = new RupSaleRecord({
+            ...recordData,
+            sellerId: req.user._id,
+            sellerName: req.user.name,
+            purchaserName: user.name,
+            purchaserAddress: {
+                street: user.farm?.address || '',
+                city: '',
+                state: user.farm?.state || '',
+                zip: user.farm?.zip || ''
+            },
+            purchaserPhone: user.phone,
+            purchaserEmail: user.email,
+            applicatorLicenseType: user.privateApplicatorLicense?.hasLicense ? 'private' : 'commercial',
+            applicatorLicenseNumber: user.privateApplicatorLicense?.licenseNumber || user.commercialApplicatorLicense?.licenseNumber,
+            applicatorLicenseState: user.privateApplicatorLicense?.state || user.commercialApplicatorLicense?.state,
+            applicatorLicenseExpiration: user.privateApplicatorLicense?.expirationDate || user.commercialApplicatorLicense?.expirationDate,
+            licenseVerificationMethod: 'document_on_file',
+            licenseVerifiedBy: user.privateApplicatorLicense?.verifiedBy || user.commercialApplicatorLicense?.verifiedBy,
+            licenseVerifiedAt: user.privateApplicatorLicense?.verifiedAt || user.commercialApplicatorLicense?.verifiedAt,
+            epaRegistrationNumber: chemical?.epaRegistrationNumber || recordData.epaRegistrationNumber,
+            signalWord: chemical?.signalWord,
+            paraquatCertRequired: chemical?.requiredCertifications?.includes('paraquat_training'),
+            paraquatCertVerified: user.paraquatCertification?.completed,
+            paraquatCertNumber: user.paraquatCertification?.certificateNumber,
+            paraquatCertDate: user.paraquatCertification?.completionDate,
+            dicambaCertRequired: chemical?.requiredCertifications?.includes('dicamba_training'),
+            dicambaCertVerified: user.dicambaCertification?.completed,
+            dicambaCertYear: user.dicambaCertification?.trainingYear,
+            createdBy: req.user._id
+        });
+
+        await record.save();
+        res.status(201).json({ message: 'RUP sale record created', record });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get RUP Sale Records (admin - for compliance reporting)
+app.get('/api/compliance/rup-sale-records', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { startDate, endDate, productName, purchaserId, limit = 100 } = req.query;
+
+        const query = {};
+        if (startDate || endDate) {
+            query.saleDate = {};
+            if (startDate) query.saleDate.$gte = new Date(startDate);
+            if (endDate) query.saleDate.$lte = new Date(endDate);
+        }
+        if (productName) query.productName = new RegExp(productName, 'i');
+        if (purchaserId) query.purchaserId = purchaserId;
+
+        const records = await RupSaleRecord.find(query)
+            .populate('purchaserId', 'name email')
+            .populate('sellerId', 'name')
+            .sort({ saleDate: -1 })
+            .limit(parseInt(limit));
+
+        res.json(records);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get compliance summary/dashboard (admin)
+app.get('/api/compliance/dashboard', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const thirtyDaysAgo = new Date(now - 30 * 24 * 60 * 60 * 1000);
+
+        // Count RUP products
+        const rupProductCount = await Chemical.countDocuments({ isRestrictedUse: true, isActive: true });
+
+        // Count users with valid licenses
+        const usersWithPrivateLicense = await User.countDocuments({
+            'privateApplicatorLicense.verificationStatus': 'verified',
+            'privateApplicatorLicense.expirationDate': { $gt: now }
+        });
+
+        const usersWithCommercialLicense = await User.countDocuments({
+            'commercialApplicatorLicense.verificationStatus': 'verified',
+            'commercialApplicatorLicense.expirationDate': { $gt: now }
+        });
+
+        // Count users pending verification
+        const pendingVerification = await User.countDocuments({
+            $or: [
+                { 'privateApplicatorLicense.verificationStatus': 'pending' },
+                { 'commercialApplicatorLicense.verificationStatus': 'pending' }
+            ]
+        });
+
+        // Count users with expiring licenses (within 30 days)
+        const expiringLicenses = await User.countDocuments({
+            $or: [
+                {
+                    'privateApplicatorLicense.verificationStatus': 'verified',
+                    'privateApplicatorLicense.expirationDate': { $gt: now, $lt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }
+                },
+                {
+                    'commercialApplicatorLicense.verificationStatus': 'verified',
+                    'commercialApplicatorLicense.expirationDate': { $gt: now, $lt: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000) }
+                }
+            ]
+        });
+
+        // RUP sales in last 30 days
+        const recentRupSales = await RupSaleRecord.countDocuments({
+            saleDate: { $gte: thirtyDaysAgo }
+        });
+
+        // Products missing EPA registration
+        const productsMissingEPA = await Chemical.countDocuments({
+            isActive: true,
+            category: { $in: ['herbicide', 'fungicide', 'insecticide'] },
+            $or: [
+                { epaRegistrationNumber: { $exists: false } },
+                { epaRegistrationNumber: '' },
+                { epaRegistrationNumber: null }
+            ]
+        });
+
+        res.json({
+            rupProductCount,
+            usersWithPrivateLicense,
+            usersWithCommercialLicense,
+            totalLicensedUsers: usersWithPrivateLicense + usersWithCommercialLicense,
+            pendingVerification,
+            expiringLicenses,
+            recentRupSales,
+            productsMissingEPA,
+            currentYear
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get users pending license verification (admin)
+app.get('/api/compliance/pending-verification', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const users = await User.find({
+            $or: [
+                { 'privateApplicatorLicense.verificationStatus': 'pending', 'privateApplicatorLicense.hasLicense': true },
+                { 'commercialApplicatorLicense.verificationStatus': 'pending', 'commercialApplicatorLicense.hasLicense': true }
+            ]
+        }).select('name email phone farm privateApplicatorLicense commercialApplicatorLicense createdAt');
+
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get users with expiring licenses (admin)
+app.get('/api/compliance/expiring-licenses', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const now = new Date();
+        const sixtyDaysFromNow = new Date(now.getTime() + 60 * 24 * 60 * 60 * 1000);
+
+        const users = await User.find({
+            $or: [
+                {
+                    'privateApplicatorLicense.verificationStatus': 'verified',
+                    'privateApplicatorLicense.expirationDate': { $gt: now, $lt: sixtyDaysFromNow }
+                },
+                {
+                    'commercialApplicatorLicense.verificationStatus': 'verified',
+                    'commercialApplicatorLicense.expirationDate': { $gt: now, $lt: sixtyDaysFromNow }
+                }
+            ]
+        }).select('name email phone farm privateApplicatorLicense commercialApplicatorLicense');
+
+        res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

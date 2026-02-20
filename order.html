@@ -795,7 +795,25 @@
                         <button class="btn btn-outline" onclick="openMerchModal()">Use Merch Credit</button>
                         <button class="btn btn-primary" onclick="submitOrder()">Submit Order</button>
                     </div>
+
+                    <!-- RUP Warning (shown if order contains RUP) -->
+                    <div id="rupWarning" class="rup-warning" style="display: none;">
+                        <div class="rup-warning-icon">&#9888;</div>
+                        <div class="rup-warning-content">
+                            <strong>Restricted Use Pesticide Notice</strong>
+                            <p>Your order contains Restricted Use Pesticides (RUPs). A valid applicator license is required for purchase.</p>
+                            <p id="rupLicenseStatus" style="margin-top: 8px;"></p>
+                        </div>
+                    </div>
                 </div>
+            </div>
+
+            <!-- Legal Disclaimers -->
+            <div class="legal-disclaimers">
+                <p><strong>Important:</strong> Always read and follow label directions. The label is the law.</p>
+                <p>Acre Profit makes no warranty of merchantability or fitness for a particular purpose. Buyer assumes all responsibility for determining suitability of products for intended use.</p>
+                <p>Application recommendations shown are suggestions only. Each field and situation requires individual evaluation. Consult with a Certified Crop Advisor (CCA) for specific recommendations.</p>
+                <p>Restricted Use Pesticides (RUPs) may only be purchased and applied by certified applicators. Buyer certifies they hold valid certification for all RUP products ordered.</p>
             </div>
         </div>
     </main>
@@ -2597,6 +2615,71 @@
             .cheaper-form-inline {
                 flex-direction: column;
             }
+        }
+
+        /* RUP Warning Styles */
+        .rup-warning {
+            display: flex;
+            gap: 12px;
+            background: #fef2f2;
+            border: 2px solid #dc2626;
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 16px;
+        }
+
+        .rup-warning-icon {
+            color: #dc2626;
+            font-size: 24px;
+        }
+
+        .rup-warning-content {
+            flex: 1;
+        }
+
+        .rup-warning-content strong {
+            color: #dc2626;
+        }
+
+        .rup-warning-content p {
+            font-size: 0.875rem;
+            color: #991b1b;
+            margin: 4px 0 0;
+        }
+
+        .rup-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: #dc2626;
+            color: white;
+            vertical-align: middle;
+            margin-left: 4px;
+        }
+
+        /* Legal Disclaimers */
+        .legal-disclaimers {
+            background: #f9fafb;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-top: 24px;
+            font-size: 0.75rem;
+            color: var(--text-light);
+        }
+
+        .legal-disclaimers p {
+            margin: 8px 0;
+        }
+
+        .legal-disclaimers p:first-child {
+            margin-top: 0;
+        }
+
+        .legal-disclaimers strong {
+            color: var(--text);
         }
     </style>
 </body>
