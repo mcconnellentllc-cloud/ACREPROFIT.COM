@@ -370,6 +370,61 @@ chemicalOrderSchema.pre('save', async function(next) {
 
 const ChemicalOrder = mongoose.model('ChemicalOrder', chemicalOrderSchema);
 
+// Ledger Entry Model (Who Owes Who tracking)
+const ledgerEntrySchema = new mongoose.Schema({
+    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    date: { type: Date, default: Date.now },
+    description: { type: String, required: true },
+    amount: { type: Number, required: true }, // Always positive
+    // debit = rep owes Acre Profit more, credit = rep's debt decreases
+    type: { type: String, enum: ['debit', 'credit'], required: true },
+    category: {
+        type: String,
+        enum: ['order', 'payment', 'supplier_payment', 'commission', 'adjustment', 'refund'],
+        default: 'adjustment'
+    },
+    referenceType: { type: String, enum: ['ChemicalOrder', 'Order', 'Manual'], default: 'Manual' },
+    referenceId: { type: mongoose.Schema.Types.ObjectId },
+    // Positive = rep owes Acre Profit, Negative = Acre Profit owes rep
+    runningBalance: { type: Number, default: 0 },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    notes: String,
+    createdAt: { type: Date, default: Date.now }
+});
+
+ledgerEntrySchema.index({ representativeId: 1, date: -1 });
+ledgerEntrySchema.index({ referenceType: 1, referenceId: 1 });
+
+const LedgerEntry = mongoose.model('LedgerEntry', ledgerEntrySchema);
+
+// Helper: Create a ledger entry and compute running balance
+async function createLedgerEntry({ representativeId, description, amount, type, category, referenceType, referenceId, createdBy, notes }) {
+    const lastEntry = await LedgerEntry.findOne({ representativeId })
+        .sort({ date: -1, createdAt: -1 })
+        .lean();
+
+    const previousBalance = lastEntry ? lastEntry.runningBalance : 0;
+    const balanceChange = type === 'debit' ? amount : -amount;
+    const newBalance = Math.round((previousBalance + balanceChange) * 100) / 100;
+
+    const entry = new LedgerEntry({
+        representativeId,
+        description,
+        amount,
+        type,
+        category: category || 'adjustment',
+        referenceType: referenceType || 'Manual',
+        referenceId,
+        runningBalance: newBalance,
+        createdBy,
+        notes,
+        date: new Date()
+    });
+
+    await entry.save();
+    return entry;
+}
+
 // Spray Program Model (saved custom programs)
 const sprayProgramSchema = new mongoose.Schema({
     name: { type: String, required: true },
@@ -1104,6 +1159,47 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // ---- ADMIN ROUTES ----
 
 // Get all customers (admin only) - with search support
+// Create a new customer (admin only)
+app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, email, password, phone, farm, crops, state, acres } = req.body;
+
+        if (!name || !email) {
+            return res.status(400).json({ error: 'Name and email are required' });
+        }
+
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
+        const user = new User({
+            name,
+            email: email.toLowerCase(),
+            password: password || 'Farm2026!',
+            phone,
+            farm: {
+                name: farm || '',
+                acres: acres || 0,
+                state: state || ''
+            },
+            crops: crops || [],
+            representative: req.user._id,
+            role: 'customer'
+        });
+
+        await user.save();
+
+        const savedUser = await User.findById(user._id)
+            .select('-password')
+            .populate('representative', 'name email');
+
+        res.status(201).json(savedUser);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { search } = req.query;
@@ -1346,6 +1442,29 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Auto-create ledger entry when regular order is delivered
+        if (status === 'delivered' && order.representativeId) {
+            const existingEntry = await LedgerEntry.findOne({
+                referenceType: 'Order',
+                referenceId: order._id,
+                category: 'order'
+            });
+
+            if (!existingEntry) {
+                await createLedgerEntry({
+                    representativeId: order.representativeId,
+                    description: `Order delivered - ${order.crop} program, ${order.acres} acres`,
+                    amount: order.totalCost || 0,
+                    type: 'debit',
+                    category: 'order',
+                    referenceType: 'Order',
+                    referenceId: order._id,
+                    createdBy: req.user._id,
+                    notes: 'Auto-created on delivery'
+                });
+            }
         }
 
         res.json(order);
@@ -2829,7 +2948,219 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
         order.updatedAt = new Date();
         await order.save();
 
+        // Auto-create ledger entry when order is delivered
+        if (status === 'delivered' && order.representativeId) {
+            const existingEntry = await LedgerEntry.findOne({
+                referenceType: 'ChemicalOrder',
+                referenceId: order._id,
+                category: 'order'
+            });
+
+            if (!existingEntry) {
+                let costTotal = 0;
+                for (const item of order.items) {
+                    if (item.chemicalId) {
+                        const chemical = await Chemical.findById(item.chemicalId);
+                        if (chemical) {
+                            costTotal += item.quantity * chemical.costPrice * (chemical.unitsPerPack || 1);
+                        }
+                    } else {
+                        costTotal += item.totalPrice || 0;
+                    }
+                }
+
+                await createLedgerEntry({
+                    representativeId: order.representativeId,
+                    description: `Order ${order.orderNumber} delivered (${order.items.length} items)`,
+                    amount: Math.round(costTotal * 100) / 100,
+                    type: 'debit',
+                    category: 'order',
+                    referenceType: 'ChemicalOrder',
+                    referenceId: order._id,
+                    createdBy: req.user._id,
+                    notes: `Auto-created on delivery. Order total: $${order.total}`
+                });
+            }
+        }
+
         res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- LEDGER ROUTES ----
+
+// Get ledger entries
+app.get('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { repId, startDate, endDate, category } = req.query;
+        let query = {};
+
+        if (req.user.role === 'superadmin') {
+            if (repId) query.representativeId = repId;
+        } else {
+            query.representativeId = req.user._id;
+        }
+
+        if (category) query.category = category;
+        if (startDate || endDate) {
+            query.date = {};
+            if (startDate) query.date.$gte = new Date(startDate);
+            if (endDate) query.date.$lte = new Date(endDate);
+        }
+
+        const entries = await LedgerEntry.find(query)
+            .populate('representativeId', 'name email')
+            .populate('createdBy', 'name')
+            .sort({ date: -1, createdAt: -1 });
+
+        res.json(entries);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get balance summary per rep
+app.get('/api/admin/ledger/summary', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        let repFilter = {};
+
+        if (req.user.role === 'admin') {
+            repFilter = { _id: req.user._id };
+        } else {
+            repFilter = { role: { $in: ['admin', 'superadmin'] } };
+        }
+
+        const reps = await User.find(repFilter).select('name email role');
+
+        const summaries = [];
+        for (const rep of reps) {
+            const lastEntry = await LedgerEntry.findOne({ representativeId: rep._id })
+                .sort({ date: -1, createdAt: -1 });
+
+            const totalDebits = await LedgerEntry.aggregate([
+                { $match: { representativeId: rep._id, type: 'debit' } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]);
+
+            const totalCredits = await LedgerEntry.aggregate([
+                { $match: { representativeId: rep._id, type: 'credit' } },
+                { $group: { _id: null, total: { $sum: '$amount' } } }
+            ]);
+
+            summaries.push({
+                rep: { _id: rep._id, name: rep.name, email: rep.email },
+                balance: lastEntry ? lastEntry.runningBalance : 0,
+                totalDebits: totalDebits[0]?.total || 0,
+                totalCredits: totalCredits[0]?.total || 0,
+                entryCount: await LedgerEntry.countDocuments({ representativeId: rep._id })
+            });
+        }
+
+        res.json(summaries);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create manual ledger entry
+app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { representativeId, description, amount, type, category, notes } = req.body;
+
+        if (!description || !amount || !type) {
+            return res.status(400).json({ error: 'Description, amount, and type are required' });
+        }
+
+        let targetRepId = representativeId;
+        if (req.user.role === 'admin') {
+            targetRepId = req.user._id;
+        }
+
+        if (!targetRepId) {
+            return res.status(400).json({ error: 'Representative ID is required' });
+        }
+
+        const entry = await createLedgerEntry({
+            representativeId: targetRepId,
+            description,
+            amount: Math.abs(amount),
+            type,
+            category: category || 'adjustment',
+            referenceType: 'Manual',
+            createdBy: req.user._id,
+            notes
+        });
+
+        const populated = await LedgerEntry.findById(entry._id)
+            .populate('representativeId', 'name email')
+            .populate('createdBy', 'name');
+
+        res.status(201).json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- PRODUCTS ROUTE (with units sold) ----
+
+app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { search, category } = req.query;
+        let query = {};
+
+        if (search) {
+            const searchRegex = new RegExp(search, 'i');
+            query.$or = [
+                { productName: searchRegex },
+                { sourceSupplier: searchRegex }
+            ];
+        }
+        if (category) query.category = category;
+
+        const chemicals = await Chemical.find(query)
+            .populate('createdBy', 'name email')
+            .sort({ productName: 1, packSize: 1 });
+
+        // Aggregate units sold per chemical from non-cancelled orders
+        const salesData = await ChemicalOrder.aggregate([
+            { $match: { status: { $nin: ['cancelled', 'draft'] } } },
+            { $unwind: '$items' },
+            { $group: {
+                _id: '$items.chemicalId',
+                unitsSold: { $sum: '$items.quantity' },
+                totalRevenue: { $sum: '$items.totalPrice' }
+            }}
+        ]);
+
+        const salesMap = {};
+        for (const s of salesData) {
+            if (s._id) salesMap[s._id.toString()] = { unitsSold: s.unitsSold, totalRevenue: s.totalRevenue };
+        }
+
+        const products = chemicals.map(c => ({
+            _id: c._id,
+            productName: c.productName,
+            sourceSupplier: c.sourceSupplier,
+            category: c.category,
+            crops: c.crops,
+            packSize: c.packSize,
+            unit: c.unit,
+            unitsPerPack: c.unitsPerPack,
+            costPrice: c.costPrice,
+            sellPrice: c.sellPrice,
+            margin: c.margin,
+            isActive: c.isActive,
+            availableForOrder: c.availableForOrder,
+            notes: c.notes,
+            createdBy: c.createdBy,
+            createdAt: c.createdAt,
+            unitsSold: salesMap[c._id.toString()]?.unitsSold || 0,
+            totalRevenue: salesMap[c._id.toString()]?.totalRevenue || 0
+        }));
+
+        res.json(products);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

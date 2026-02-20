@@ -22,6 +22,8 @@
                 <li><a href="#orders" class="nav-tab" data-tab="orders">Orders</a></li>
                 <li><a href="#customers" class="nav-tab" data-tab="customers">Customers</a></li>
                 <li><a href="#bundles" class="nav-tab" data-tab="bundles">Bundles</a></li>
+                <li><a href="#products" class="nav-tab" data-tab="products">Products</a></li>
+                <li><a href="#ledger" class="nav-tab" data-tab="ledger">Ledger</a></li>
                 <li id="repAppsNav" style="display: none;"><a href="#applications" class="nav-tab" data-tab="applications">Rep Applications</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
             </ul>
@@ -171,6 +173,7 @@
                 <div class="tab-header">
                     <h2 id="customersTabTitle">My Customers</h2>
                     <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="openAddCustomerModal()">+ Add Customer</button>
                         <div class="search-box">
                             <input type="text" id="customerSearch" placeholder="Search customers...">
                         </div>
@@ -178,6 +181,68 @@
                 </div>
                 <div class="customers-grid" id="customersGrid">
                     <p class="loading">Loading customers...</p>
+                </div>
+            </div>
+
+            <!-- Add Customer Modal -->
+            <div class="modal-overlay" id="addCustomerModal" style="display: none;">
+                <div class="modal-content customer-modal-content">
+                    <button class="modal-close" onclick="closeAddCustomerModal()">&times;</button>
+                    <div class="customer-modal-header">
+                        <div class="customer-modal-avatar" style="background: var(--accent);">+</div>
+                        <div class="customer-modal-title">
+                            <h2>Add New Customer</h2>
+                            <p>Create a new customer account</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="addCustomerForm" class="edit-customer-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Full Name *</label>
+                                    <input type="text" id="addName" required placeholder="John Smith">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email *</label>
+                                    <input type="email" id="addEmail" required placeholder="john@example.com">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="tel" id="addPhone" placeholder="970-555-1234">
+                                </div>
+                                <div class="form-group">
+                                    <label>Password</label>
+                                    <input type="text" id="addPassword" placeholder="Farm2026! (default)">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Farm Name</label>
+                                    <input type="text" id="addFarm" placeholder="Smith Family Farm">
+                                </div>
+                                <div class="form-group">
+                                    <label>State</label>
+                                    <input type="text" id="addState" placeholder="Colorado">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Acres</label>
+                                    <input type="number" id="addAcres" min="0" placeholder="500">
+                                </div>
+                                <div class="form-group">
+                                    <label>Crops (comma-separated)</label>
+                                    <input type="text" id="addCrops" placeholder="Corn, Wheat, Soybeans">
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeAddCustomerModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="addCustomer()">Add Customer</button>
+                    </div>
                 </div>
             </div>
 
@@ -429,6 +494,234 @@
                     <p class="loading">Loading applications...</p>
                 </div>
             </div>
+
+            <!-- Products Tab -->
+            <div id="productsTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Product Catalog</h2>
+                    <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
+                        <div class="search-box">
+                            <input type="text" id="productSearch" placeholder="Search products..." oninput="filterProducts()">
+                        </div>
+                        <select id="productCategoryFilter" onchange="filterProducts()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Categories</option>
+                            <option value="herbicide">Herbicide</option>
+                            <option value="fungicide">Fungicide</option>
+                            <option value="insecticide">Insecticide</option>
+                            <option value="adjuvant">Adjuvant</option>
+                            <option value="fertilizer">Fertilizer</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="orders-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Supplier</th>
+                                <th>Pack Size</th>
+                                <th>Cost Price</th>
+                                <th>Sell Price</th>
+                                <th>Margin %</th>
+                                <th>Units Sold</th>
+                                <th>Revenue</th>
+                                <th>Added By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productsTableBody">
+                            <tr><td colspan="9" class="loading">Loading products...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add Product Modal -->
+            <div class="modal-overlay" id="addProductModal" style="display: none;">
+                <div class="modal-content customer-modal-content">
+                    <button class="modal-close" onclick="closeAddProductModal()">&times;</button>
+                    <div class="customer-modal-header">
+                        <div class="customer-modal-avatar" style="background: var(--accent);">+</div>
+                        <div class="customer-modal-title">
+                            <h2>Add Product to Catalog</h2>
+                            <p>Add a new product with your cost and sell pricing</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="addProductForm" class="edit-customer-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Product Name *</label>
+                                    <input type="text" id="addProductName" required placeholder="e.g., Glyphosate">
+                                </div>
+                                <div class="form-group">
+                                    <label>Supplier *</label>
+                                    <input type="text" id="addProductSupplier" required placeholder="e.g., CPD, Agri-Star">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Category</label>
+                                    <select id="addProductCategory">
+                                        <option value="herbicide">Herbicide</option>
+                                        <option value="fungicide">Fungicide</option>
+                                        <option value="insecticide">Insecticide</option>
+                                        <option value="adjuvant">Adjuvant</option>
+                                        <option value="fertilizer">Fertilizer</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Crops</label>
+                                    <input type="text" id="addProductCrops" placeholder="corn, wheat, soybeans">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Pack Size *</label>
+                                    <input type="text" id="addProductPackSize" required placeholder="e.g., 2x2.5, Shuttle">
+                                </div>
+                                <div class="form-group">
+                                    <label>Unit *</label>
+                                    <input type="text" id="addProductUnit" required placeholder="e.g., gl, oz, lb">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Units Per Pack</label>
+                                    <input type="number" id="addProductUnitsPerPack" placeholder="e.g., 250">
+                                </div>
+                                <div class="form-group">
+                                    <label>Notes</label>
+                                    <input type="text" id="addProductNotes" placeholder="Optional notes">
+                                </div>
+                            </div>
+                            <div class="form-row" style="background: var(--secondary); padding: 16px; border-radius: var(--radius);">
+                                <div class="form-group">
+                                    <label>Cost Price (per unit) *</label>
+                                    <input type="number" id="addProductCostPrice" required step="0.01" min="0" placeholder="What you pay" oninput="calcMarginPreview()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Sell Price (per unit) *</label>
+                                    <input type="number" id="addProductSellPrice" required step="0.01" min="0" placeholder="What customers pay" oninput="calcMarginPreview()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Margin Preview</label>
+                                    <div id="marginPreview" style="padding: 10px 14px; background: var(--white); border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;">--%</div>
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeAddProductModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="addProduct()">Add Product</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ledger Tab -->
+            <div id="ledgerTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Who Owes Who</h2>
+                    <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="openAddLedgerModal()">+ Add Entry</button>
+                        <select id="ledgerRepFilter" style="display:none; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
+                            <option value="">All Reps</option>
+                        </select>
+                        <select id="ledgerCategoryFilter" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
+                            <option value="">All Types</option>
+                            <option value="order">Orders</option>
+                            <option value="payment">Payments</option>
+                            <option value="supplier_payment">Supplier Payments</option>
+                            <option value="commission">Commissions</option>
+                            <option value="adjustment">Adjustments</option>
+                            <option value="refund">Refunds</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Balance Summary Cards -->
+                <div id="ledgerSummary" class="stats-grid" style="margin-bottom: 24px;"></div>
+
+                <!-- Ledger Table -->
+                <div class="orders-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th id="ledgerRepCol" style="display:none;">Rep</th>
+                                <th>Description</th>
+                                <th>Type</th>
+                                <th>Amount</th>
+                                <th>Balance</th>
+                                <th>By</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledgerTableBody">
+                            <tr><td colspan="7" class="loading">Loading ledger...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add Ledger Entry Modal -->
+            <div class="modal-overlay" id="addLedgerModal" style="display: none;">
+                <div class="modal-content" style="max-width: 500px;">
+                    <button class="modal-close" onclick="closeAddLedgerModal()">&times;</button>
+                    <div class="customer-modal-header" style="background: var(--primary); color: var(--white);">
+                        <div class="customer-modal-avatar" style="background: rgba(255,255,255,0.2);">$</div>
+                        <div class="customer-modal-title">
+                            <h2 style="color: var(--white);">Add Ledger Entry</h2>
+                            <p style="color: rgba(255,255,255,0.8);">Record a payment or adjustment</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="addLedgerForm" class="edit-customer-form">
+                            <div class="form-group" id="ledgerRepSelect" style="display:none;">
+                                <label>Representative *</label>
+                                <select id="ledgerEntryRep"></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Description *</label>
+                                <input type="text" id="ledgerEntryDesc" required placeholder="e.g., Payment received - check #1234">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Amount ($) *</label>
+                                    <input type="number" id="ledgerEntryAmount" step="0.01" min="0.01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Type *</label>
+                                    <select id="ledgerEntryType">
+                                        <option value="credit">Credit (Payment In)</option>
+                                        <option value="debit">Debit (Cost/Charge)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select id="ledgerEntryCategory">
+                                    <option value="payment">Payment Received</option>
+                                    <option value="supplier_payment">Supplier Payment</option>
+                                    <option value="commission">Commission</option>
+                                    <option value="adjustment">Adjustment</option>
+                                    <option value="refund">Refund</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <input type="text" id="ledgerEntryNotes" placeholder="Optional notes">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeAddLedgerModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="addLedgerEntry()">Add Entry</button>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -488,6 +781,10 @@
 
                 this.classList.add('active');
                 document.getElementById(tabName + 'Tab').classList.add('active');
+
+                // Lazy-load tab data
+                if (tabName === 'products' && allProducts.length === 0) loadProducts();
+                if (tabName === 'ledger') loadLedger();
             });
         });
 
@@ -717,7 +1014,80 @@
         function closeCustomerModal() {
             document.getElementById('customerModal').style.display = 'none';
             selectedCustomer = null;
+            // Reset to view mode
+            cancelEdit();
         }
+
+        // Add Customer Modal
+        function openAddCustomerModal() {
+            document.getElementById('addCustomerModal').style.display = 'flex';
+            document.getElementById('addName').value = '';
+            document.getElementById('addEmail').value = '';
+            document.getElementById('addPhone').value = '';
+            document.getElementById('addPassword').value = '';
+            document.getElementById('addFarm').value = '';
+            document.getElementById('addState').value = '';
+            document.getElementById('addAcres').value = '';
+            document.getElementById('addCrops').value = '';
+        }
+
+        function closeAddCustomerModal() {
+            document.getElementById('addCustomerModal').style.display = 'none';
+        }
+
+        async function addCustomer() {
+            const name = document.getElementById('addName').value.trim();
+            const email = document.getElementById('addEmail').value.trim();
+            const phone = document.getElementById('addPhone').value.trim();
+            const password = document.getElementById('addPassword').value.trim() || 'Farm2026!';
+            const farm = document.getElementById('addFarm').value.trim();
+            const state = document.getElementById('addState').value.trim();
+            const acres = parseInt(document.getElementById('addAcres').value) || 0;
+            const cropsStr = document.getElementById('addCrops').value.trim();
+            const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
+
+            if (!name || !email) {
+                alert('Name and email are required');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/customers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, email, password, phone, farm, state, acres, crops })
+                });
+
+                if (res.ok) {
+                    const newCustomer = await res.json();
+                    allCustomers.push(newCustomer);
+                    renderCustomers(allCustomers);
+                    closeAddCustomerModal();
+                    alert(`Customer "${name}" created successfully!\n\nLogin: ${email}\nPassword: ${password}`);
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to create customer');
+                }
+            } catch (error) {
+                console.error('Error adding customer:', error);
+                alert('Error adding customer. Please try again.');
+            }
+        }
+
+        // Close add customer modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeAddCustomerModal();
+            }
+        });
+
+        // Close add customer modal on overlay click
+        document.getElementById('addCustomerModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddCustomerModal();
+        });
 
         // Go to admin order page (from modal)
         function goToAdminOrder() {
@@ -817,15 +1187,350 @@
         document.addEventListener('keydown', function(e) {
             if (e.key === 'Escape') {
                 closeCustomerModal();
+                closeAddCustomerModal();
+                closeAddProductModal();
+                closeAddLedgerModal();
             }
         });
 
         // Close modal on overlay click
         document.getElementById('customerModal').addEventListener('click', function(e) {
-            if (e.target === this) {
-                closeCustomerModal();
-            }
+            if (e.target === this) closeCustomerModal();
         });
+        document.getElementById('addProductModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddProductModal();
+        });
+        document.getElementById('addLedgerModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddLedgerModal();
+        });
+
+        // ===== PRODUCTS TAB =====
+        let allProducts = [];
+
+        async function loadProducts() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/products`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                allProducts = await res.json();
+                renderProducts(allProducts);
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        function filterProducts() {
+            const search = document.getElementById('productSearch').value.toLowerCase().trim();
+            const category = document.getElementById('productCategoryFilter').value;
+
+            let filtered = allProducts;
+            if (search) {
+                filtered = filtered.filter(p =>
+                    p.productName.toLowerCase().includes(search) ||
+                    p.sourceSupplier.toLowerCase().includes(search)
+                );
+            }
+            if (category) {
+                filtered = filtered.filter(p => p.category === category);
+            }
+            renderProducts(filtered);
+        }
+
+        function renderProducts(products) {
+            const tbody = document.getElementById('productsTableBody');
+
+            if (!products.length) {
+                tbody.innerHTML = '<tr><td colspan="9" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map(p => {
+                const margin = p.margin || 0;
+                const marginColor = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
+                const profit = p.sellPrice - p.costPrice;
+
+                return `
+                <tr>
+                    <td>
+                        <strong>${p.productName}</strong>
+                        <br><small style="color:var(--text-muted)">${p.category || ''}</small>
+                    </td>
+                    <td>${p.sourceSupplier}</td>
+                    <td>${p.packSize} <small>(${p.unit})</small></td>
+                    <td>$${p.costPrice.toFixed(2)}</td>
+                    <td>$${p.sellPrice.toFixed(2)}</td>
+                    <td>
+                        <span style="color: ${marginColor}; font-weight: 700;">${margin.toFixed(1)}%</span>
+                        <br><small style="color: ${marginColor}">$${profit.toFixed(2)}/unit</small>
+                    </td>
+                    <td>${p.unitsSold || 0}</td>
+                    <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td style="font-size:0.8rem;">${p.createdBy?.name || '-'}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        // Add Product Modal
+        function openAddProductModal() {
+            document.getElementById('addProductModal').style.display = 'flex';
+            document.getElementById('addProductForm').reset();
+            document.getElementById('marginPreview').textContent = '--%';
+        }
+
+        function closeAddProductModal() {
+            document.getElementById('addProductModal').style.display = 'none';
+        }
+
+        function calcMarginPreview() {
+            const cost = parseFloat(document.getElementById('addProductCostPrice').value) || 0;
+            const sell = parseFloat(document.getElementById('addProductSellPrice').value) || 0;
+            const preview = document.getElementById('marginPreview');
+
+            if (cost > 0 && sell > 0) {
+                const margin = ((sell - cost) / sell * 100).toFixed(1);
+                const profit = (sell - cost).toFixed(2);
+                const color = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
+                preview.innerHTML = `<span style="color: ${color}">${margin}%</span> <small>($${profit}/unit)</small>`;
+            } else {
+                preview.textContent = '--%';
+            }
+        }
+
+        async function addProduct() {
+            const productName = document.getElementById('addProductName').value.trim();
+            const sourceSupplier = document.getElementById('addProductSupplier').value.trim();
+            const category = document.getElementById('addProductCategory').value;
+            const cropsStr = document.getElementById('addProductCrops').value.trim();
+            const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
+            const packSize = document.getElementById('addProductPackSize').value.trim();
+            const unit = document.getElementById('addProductUnit').value.trim();
+            const unitsPerPack = parseInt(document.getElementById('addProductUnitsPerPack').value) || undefined;
+            const costPrice = parseFloat(document.getElementById('addProductCostPrice').value);
+            const sellPrice = parseFloat(document.getElementById('addProductSellPrice').value);
+            const notes = document.getElementById('addProductNotes').value.trim();
+
+            if (!productName || !sourceSupplier || !packSize || !unit || isNaN(costPrice) || isNaN(sellPrice)) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ productName, sourceSupplier, category, crops, packSize, unit, costPrice, sellPrice, unitsPerPack, notes })
+                });
+
+                if (res.ok) {
+                    closeAddProductModal();
+                    loadProducts();
+                    alert(`Product "${productName}" added to the catalog!`);
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to add product');
+                }
+            } catch (error) {
+                console.error('Error adding product:', error);
+                alert('Error adding product. Please try again.');
+            }
+        }
+
+        // ===== LEDGER TAB =====
+        let ledgerEntries = [];
+        let ledgerRepsLoaded = false;
+
+        async function loadLedger() {
+            try {
+                const isSuperAdmin = userData.role === 'superadmin';
+
+                // Show rep columns/filters for superadmin
+                if (isSuperAdmin) {
+                    document.getElementById('ledgerRepFilter').style.display = '';
+                    document.getElementById('ledgerRepCol').style.display = '';
+                    document.getElementById('ledgerRepSelect').style.display = '';
+
+                    if (!ledgerRepsLoaded) {
+                        await loadLedgerReps();
+                        ledgerRepsLoaded = true;
+                    }
+                }
+
+                // Load summary
+                const summaryRes = await fetch(`${API_URL}/api/admin/ledger/summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const summaries = await summaryRes.json();
+                renderLedgerSummary(summaries);
+
+                // Load entries
+                const repId = isSuperAdmin ? document.getElementById('ledgerRepFilter').value : '';
+                const category = document.getElementById('ledgerCategoryFilter').value;
+
+                let url = `${API_URL}/api/admin/ledger`;
+                const params = new URLSearchParams();
+                if (repId) params.append('repId', repId);
+                if (category) params.append('category', category);
+                if (params.toString()) url += '?' + params.toString();
+
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                ledgerEntries = await res.json();
+                renderLedgerEntries(ledgerEntries);
+            } catch (error) {
+                console.error('Error loading ledger:', error);
+            }
+        }
+
+        async function loadLedgerReps() {
+            const res = await fetch(`${API_URL}/api/admin/ledger/summary`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            const summaries = await res.json();
+            const reps = summaries.map(s => s.rep);
+
+            const filterSelect = document.getElementById('ledgerRepFilter');
+            reps.forEach(rep => {
+                const opt = document.createElement('option');
+                opt.value = rep._id;
+                opt.textContent = rep.name;
+                filterSelect.appendChild(opt);
+            });
+
+            const entrySelect = document.getElementById('ledgerEntryRep');
+            entrySelect.innerHTML = '';
+            reps.forEach(rep => {
+                const opt = document.createElement('option');
+                opt.value = rep._id;
+                opt.textContent = rep.name;
+                entrySelect.appendChild(opt);
+            });
+        }
+
+        function renderLedgerSummary(summaries) {
+            document.getElementById('ledgerSummary').innerHTML = summaries.map(s => {
+                const balance = s.balance;
+                const isOwed = balance > 0;
+                const color = isOwed ? '#ea580c' : '#059669';
+                const label = isOwed
+                    ? `${s.rep.name} owes Acre Profit`
+                    : balance < 0 ? `Acre Profit owes ${s.rep.name}` : `${s.rep.name} - Even`;
+
+                return `
+                <div class="stat-card">
+                    <div class="stat-icon" style="background: ${isOwed ? '#fed7aa' : '#d1fae5'}; color: ${color};">$</div>
+                    <div class="stat-content">
+                        <span class="stat-value" style="color: ${color};">$${Math.abs(balance).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                        <span class="stat-label">${label}</span>
+                    </div>
+                </div>
+                `;
+            }).join('');
+        }
+
+        function renderLedgerEntries(entries) {
+            const isSuperAdmin = userData.role === 'superadmin';
+            const tbody = document.getElementById('ledgerTableBody');
+            const colSpan = isSuperAdmin ? 7 : 6;
+
+            if (!entries.length) {
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">No ledger entries yet. Entries are auto-created when orders are delivered, or add manually.</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = entries.map(e => {
+                const isDebit = e.type === 'debit';
+                const balanceColor = e.runningBalance > 0 ? '#ea580c' : e.runningBalance < 0 ? '#059669' : 'inherit';
+                const categoryLabels = {
+                    order: 'Order', payment: 'Payment', supplier_payment: 'Supplier',
+                    commission: 'Commission', adjustment: 'Adjustment', refund: 'Refund'
+                };
+
+                return `
+                <tr>
+                    <td>${new Date(e.date).toLocaleDateString()}</td>
+                    ${isSuperAdmin ? `<td>${e.representativeId?.name || '-'}</td>` : ''}
+                    <td>
+                        ${e.description}
+                        ${e.notes ? `<br><small style="color:var(--text-muted)">${e.notes}</small>` : ''}
+                        <span class="order-status ledger-cat-${e.category}" style="margin-left: 8px; font-size: 0.65rem;">${categoryLabels[e.category] || e.category}</span>
+                    </td>
+                    <td>
+                        <span style="color: ${isDebit ? '#dc2626' : '#059669'}; font-weight: 600;">
+                            ${isDebit ? 'DEBIT' : 'CREDIT'}
+                        </span>
+                    </td>
+                    <td style="font-weight: 600; color: ${isDebit ? '#dc2626' : '#059669'};">
+                        ${isDebit ? '+' : '-'}$${e.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    </td>
+                    <td style="font-weight: 700; color: ${balanceColor};">
+                        $${Math.abs(e.runningBalance).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                        <small style="color: var(--text-muted)">${e.runningBalance > 0 ? '(owes AP)' : e.runningBalance < 0 ? '(AP owes)' : ''}</small>
+                    </td>
+                    <td style="font-size:0.8rem;">${e.createdBy?.name || 'System'}</td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        // Ledger Modal
+        function openAddLedgerModal() {
+            document.getElementById('addLedgerModal').style.display = 'flex';
+            document.getElementById('addLedgerForm').reset();
+        }
+
+        function closeAddLedgerModal() {
+            document.getElementById('addLedgerModal').style.display = 'none';
+        }
+
+        async function addLedgerEntry() {
+            const description = document.getElementById('ledgerEntryDesc').value.trim();
+            const amount = parseFloat(document.getElementById('ledgerEntryAmount').value);
+            const type = document.getElementById('ledgerEntryType').value;
+            const category = document.getElementById('ledgerEntryCategory').value;
+            const notes = document.getElementById('ledgerEntryNotes').value.trim();
+
+            if (!description || isNaN(amount) || amount <= 0) {
+                alert('Please fill in description and a positive amount');
+                return;
+            }
+
+            let representativeId = null;
+            if (userData.role === 'superadmin') {
+                representativeId = document.getElementById('ledgerEntryRep').value;
+                if (!representativeId) {
+                    alert('Please select a representative');
+                    return;
+                }
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ledger`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ representativeId, description, amount, type, category, notes })
+                });
+
+                if (res.ok) {
+                    closeAddLedgerModal();
+                    loadLedger();
+                    alert('Ledger entry added!');
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to add entry');
+                }
+            } catch (error) {
+                console.error('Error adding ledger entry:', error);
+                alert('Error adding entry. Please try again.');
+            }
+        }
 
         // Initialize
         loadDashboardData();
@@ -984,6 +1689,14 @@
         .status-confirmed { background: #d1fae5; color: #065f46; }
         .status-shipped { background: #dbeafe; color: #1e40af; }
         .status-delivered { background: #dcfce7; color: #166534; }
+
+        /* Ledger category badges */
+        .ledger-cat-order { background: #dbeafe; color: #1e40af; }
+        .ledger-cat-payment { background: #d1fae5; color: #065f46; }
+        .ledger-cat-supplier_payment { background: #fce7f3; color: #9d174d; }
+        .ledger-cat-commission { background: #e9d5ff; color: #7c3aed; }
+        .ledger-cat-adjustment { background: #fef3c7; color: #92400e; }
+        .ledger-cat-refund { background: #fee2e2; color: #991b1b; }
 
         .bundle-list {
             display: flex;
