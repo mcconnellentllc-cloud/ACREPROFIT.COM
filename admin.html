@@ -24,6 +24,7 @@
                 <li><a href="#bundles" class="nav-tab" data-tab="bundles">Bundles</a></li>
                 <li><a href="#products" class="nav-tab" data-tab="products">Products</a></li>
                 <li><a href="#ledger" class="nav-tab" data-tab="ledger">Ledger</a></li>
+                <li><a href="#compliance" class="nav-tab" data-tab="compliance" style="color: #dc2626;">Compliance</a></li>
                 <li id="repAppsNav" style="display: none;"><a href="#applications" class="nav-tab" data-tab="applications">Rep Applications</a></li>
                 <li><a href="#" id="viewAsCustomerBtn" class="btn btn-secondary" style="margin-right: 0.5rem;">View as Customer</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
@@ -486,6 +487,176 @@
                 </div>
             </div>
 
+            <!-- Compliance Tab -->
+            <div id="complianceTab" class="tab-content">
+                <div class="tab-header">
+                    <h2 style="display: flex; align-items: center; gap: 8px;"><span style="color: #dc2626;">&#9888;</span> Compliance Dashboard</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">Manage regulatory compliance, applicator licenses, and RUP sales records</p>
+                </div>
+
+                <!-- Compliance Stats -->
+                <div class="stats-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #fef2f2; color: #dc2626;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="rupProductCount">0</span>
+                            <span class="stat-label">RUP Products</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #ecfdf5; color: #059669;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="licensedUsersCount">0</span>
+                            <span class="stat-label">Licensed Applicators</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #fef3c7; color: #d97706;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="pendingVerificationCount">0</span>
+                            <span class="stat-label">Pending Verification</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon" style="background: #fef2f2; color: #dc2626;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="expiringLicensesCount">0</span>
+                            <span class="stat-label">Expiring Soon (30d)</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Compliance Sections -->
+                <div class="dashboard-grid" style="grid-template-columns: 1fr 1fr;">
+                    <!-- Pending License Verifications -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Pending License Verifications</h3>
+                        </div>
+                        <div id="pendingVerificationList" class="orders-list-mini" style="max-height: 400px; overflow-y: auto;">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+
+                    <!-- Expiring Licenses -->
+                    <div class="card">
+                        <div class="card-header">
+                            <h3>Licenses Expiring Soon</h3>
+                        </div>
+                        <div id="expiringLicensesList" class="orders-list-mini" style="max-height: 400px; overflow-y: auto;">
+                            <p class="loading">Loading...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- RUP Products List -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <h3 style="color: #dc2626;">Restricted Use Products (RUP)</h3>
+                        <span id="productsMissingEPA" style="color: #dc2626; font-size: 0.875rem;"></span>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>EPA Reg #</th>
+                                    <th>Signal Word</th>
+                                    <th>Required Certs</th>
+                                    <th>Category</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rupProductsTableBody">
+                                <tr><td colspan="5" class="loading">Loading RUP products...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Recent RUP Sales -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <h3>Recent RUP Sales Records</h3>
+                        <span id="recentRupSalesCount" style="color: var(--text-light); font-size: 0.875rem;"></span>
+                    </div>
+                    <div class="table-container">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Customer</th>
+                                    <th>Product</th>
+                                    <th>EPA Reg #</th>
+                                    <th>License #</th>
+                                    <th>Qty</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody id="rupSalesTableBody">
+                                <tr><td colspan="7" class="loading">Loading RUP sales records...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Compliance Checklist -->
+                <div class="card" style="margin-top: 24px; background: #fef3c7; border: 2px solid #f59e0b;">
+                    <div class="card-header">
+                        <h3 style="color: #92400e;">Dealer Compliance Checklist</h3>
+                    </div>
+                    <div style="padding: 0 20px 20px;">
+                        <div style="display: flex; flex-direction: column; gap: 12px;">
+                            <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;">
+                                <input type="checkbox" id="checkDealerLicense" style="margin-top: 4px;">
+                                <div>
+                                    <strong>Pesticide Dealer License</strong>
+                                    <p style="color: #92400e; font-size: 0.875rem; margin: 4px 0 0;">Required in most states to sell pesticides. Check MO, KS, NE requirements.</p>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;">
+                                <input type="checkbox" id="checkRecordkeeping" style="margin-top: 4px;">
+                                <div>
+                                    <strong>RUP Sales Recordkeeping</strong>
+                                    <p style="color: #92400e; font-size: 0.875rem; margin: 4px 0 0;">Maintain RUP sales records for minimum 2 years (recommend 3 years).</p>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;">
+                                <input type="checkbox" id="checkSDS" style="margin-top: 4px;">
+                                <div>
+                                    <strong>SDS Availability</strong>
+                                    <p style="color: #92400e; font-size: 0.875rem; margin: 4px 0 0;">Safety Data Sheets must be available for all products sold.</p>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;">
+                                <input type="checkbox" id="checkLiability" style="margin-top: 4px;">
+                                <div>
+                                    <strong>Products Liability Insurance</strong>
+                                    <p style="color: #92400e; font-size: 0.875rem; margin: 4px 0 0;">Critical for pesticide resellers. Consult with insurance broker.</p>
+                                </div>
+                            </label>
+                            <label style="display: flex; align-items: flex-start; gap: 12px; cursor: pointer;">
+                                <input type="checkbox" id="checkEPA" style="margin-top: 4px;">
+                                <div>
+                                    <strong>EPA Registration Numbers</strong>
+                                    <p style="color: #92400e; font-size: 0.875rem; margin: 4px 0 0;">All pesticide products must have valid EPA registration numbers on file.</p>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Rep Applications Tab (Superadmin only) -->
             <div id="applicationsTab" class="tab-content">
                 <div class="tab-header">
@@ -611,6 +782,89 @@
                                 <div class="form-group">
                                     <label>Margin Preview</label>
                                     <div id="marginPreview" style="padding: 10px 14px; background: var(--white); border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;">--%</div>
+                                </div>
+                            </div>
+
+                            <!-- Compliance Section -->
+                            <div style="border-top: 2px solid var(--border); margin-top: 20px; padding-top: 20px;">
+                                <h3 style="margin-bottom: 16px; display: flex; align-items: center; gap: 8px;">
+                                    <span style="color: #dc2626;">&#9888;</span> Regulatory Compliance
+                                </h3>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>EPA Registration Number</label>
+                                        <input type="text" id="addProductEpaReg" placeholder="e.g., 524-579">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Signal Word</label>
+                                        <select id="addProductSignalWord">
+                                            <option value="CAUTION">CAUTION</option>
+                                            <option value="WARNING">WARNING</option>
+                                            <option value="DANGER">DANGER</option>
+                                            <option value="DANGER-POISON">DANGER-POISON</option>
+                                            <option value="NONE">NONE (Adjuvant)</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label style="display: flex; align-items: center; gap: 8px;">
+                                            <input type="checkbox" id="addProductIsRUP" onchange="toggleRupFields()">
+                                            <span style="color: #dc2626; font-weight: 600;">Restricted Use Pesticide (RUP)</span>
+                                        </label>
+                                    </div>
+                                    <div class="form-group" id="rupStatesGroup" style="display: none;">
+                                        <label>RUP in States (comma-separated)</label>
+                                        <input type="text" id="addProductRupStates" placeholder="e.g., CA, WI, MN (leave blank if federally RUP)">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Required Certifications</label>
+                                        <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 4px;">
+                                            <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                                <input type="checkbox" id="addProductReqPrivate" value="private_applicator"> Private Applicator License
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 8px; font-weight: normal;">
+                                                <input type="checkbox" id="addProductReqCommercial" value="commercial_applicator"> Commercial Applicator License
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; color: #dc2626;">
+                                                <input type="checkbox" id="addProductReqParaquat" value="paraquat_training"> Paraquat Training (EPA)
+                                            </label>
+                                            <label style="display: flex; align-items: center; gap: 8px; font-weight: normal; color: #f59e0b;">
+                                                <input type="checkbox" id="addProductReqDicamba" value="dicamba_training"> Dicamba Training (Annual)
+                                            </label>
+                                        </div>
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Active Ingredient</label>
+                                        <input type="text" id="addProductActiveIngredient" placeholder="e.g., Glyphosate 41%">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Manufacturer</label>
+                                        <input type="text" id="addProductManufacturer" placeholder="e.g., BASF, Bayer">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>SDS URL</label>
+                                        <input type="url" id="addProductSdsUrl" placeholder="https://...">
+                                    </div>
+                                </div>
+
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Label URL</label>
+                                        <input type="url" id="addProductLabelUrl" placeholder="https://...">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Compliance Notes</label>
+                                        <input type="text" id="addProductComplianceNotes" placeholder="Internal notes">
+                                    </div>
                                 </div>
                             </div>
                         </form>
@@ -787,6 +1041,7 @@
                 // Lazy-load tab data
                 if (tabName === 'products' && allProducts.length === 0) loadProducts();
                 if (tabName === 'ledger') loadLedger();
+                if (tabName === 'compliance') loadComplianceDashboard();
             });
         });
 
@@ -1306,6 +1561,16 @@
             }
         }
 
+        // Toggle RUP states field visibility
+        function toggleRupFields() {
+            const isRUP = document.getElementById('addProductIsRUP').checked;
+            document.getElementById('rupStatesGroup').style.display = isRUP ? 'block' : 'none';
+            // Auto-check private applicator if RUP
+            if (isRUP) {
+                document.getElementById('addProductReqPrivate').checked = true;
+            }
+        }
+
         async function addProduct() {
             const productName = document.getElementById('addProductName').value.trim();
             const sourceSupplier = document.getElementById('addProductSupplier').value.trim();
@@ -1319,6 +1584,30 @@
             const sellPrice = parseFloat(document.getElementById('addProductSellPrice').value);
             const notes = document.getElementById('addProductNotes').value.trim();
 
+            // Compliance fields
+            const epaRegistrationNumber = document.getElementById('addProductEpaReg').value.trim();
+            const signalWord = document.getElementById('addProductSignalWord').value;
+            const isRestrictedUse = document.getElementById('addProductIsRUP').checked;
+            const rupStatesStr = document.getElementById('addProductRupStates').value.trim();
+            const rupStates = rupStatesStr ? rupStatesStr.split(',').map(s => s.trim().toUpperCase()).filter(s => s) : [];
+
+            // Get required certifications
+            const requiredCertifications = [];
+            if (document.getElementById('addProductReqPrivate').checked) requiredCertifications.push('private_applicator');
+            if (document.getElementById('addProductReqCommercial').checked) requiredCertifications.push('commercial_applicator');
+            if (document.getElementById('addProductReqParaquat').checked) requiredCertifications.push('paraquat_training');
+            if (document.getElementById('addProductReqDicamba').checked) requiredCertifications.push('dicamba_training');
+
+            const activeIngredientStr = document.getElementById('addProductActiveIngredient').value.trim();
+            const activeIngredients = activeIngredientStr ? [{ name: activeIngredientStr }] : [];
+            const manufacturer = document.getElementById('addProductManufacturer').value.trim();
+            const sdsUrl = document.getElementById('addProductSdsUrl').value.trim();
+            const labelUrl = document.getElementById('addProductLabelUrl').value.trim();
+            const complianceNotes = document.getElementById('addProductComplianceNotes').value.trim();
+
+            // Set requiresApplicatorVerification if RUP
+            const requiresApplicatorVerification = isRestrictedUse;
+
             if (!productName || !sourceSupplier || !packSize || !unit || isNaN(costPrice) || isNaN(sellPrice)) {
                 alert('Please fill in all required fields');
                 return;
@@ -1331,7 +1620,12 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ productName, sourceSupplier, category, crops, packSize, unit, costPrice, sellPrice, unitsPerPack, notes })
+                    body: JSON.stringify({
+                        productName, sourceSupplier, category, crops, packSize, unit, costPrice, sellPrice, unitsPerPack, notes,
+                        // Compliance fields
+                        epaRegistrationNumber, signalWord, isRestrictedUse, rupStates, requiredCertifications,
+                        activeIngredients, manufacturer, sdsUrl, labelUrl, complianceNotes, requiresApplicatorVerification
+                    })
                 });
 
                 if (res.ok) {
@@ -1622,6 +1916,219 @@
                 console.error('Error adding ledger entry:', error);
                 alert('Error adding entry. Please try again.');
             }
+        }
+
+        // ============ COMPLIANCE DASHBOARD FUNCTIONS ============
+
+        async function loadComplianceDashboard() {
+            try {
+                // Load compliance summary
+                const summaryRes = await fetch(`${API_URL}/api/compliance/dashboard`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (summaryRes.ok) {
+                    const summary = await summaryRes.json();
+                    document.getElementById('rupProductCount').textContent = summary.rupProductCount || 0;
+                    document.getElementById('licensedUsersCount').textContent = summary.totalLicensedUsers || 0;
+                    document.getElementById('pendingVerificationCount').textContent = summary.pendingVerification || 0;
+                    document.getElementById('expiringLicensesCount').textContent = summary.expiringLicenses || 0;
+
+                    if (summary.productsMissingEPA > 0) {
+                        document.getElementById('productsMissingEPA').textContent = `${summary.productsMissingEPA} products missing EPA registration`;
+                    }
+
+                    if (summary.recentRupSales > 0) {
+                        document.getElementById('recentRupSalesCount').textContent = `${summary.recentRupSales} sales in last 30 days`;
+                    }
+                }
+
+                // Load pending verifications
+                loadPendingVerifications();
+
+                // Load expiring licenses
+                loadExpiringLicenses();
+
+                // Load RUP products
+                loadRupProducts();
+
+                // Load RUP sales records
+                loadRupSalesRecords();
+
+            } catch (error) {
+                console.error('Error loading compliance dashboard:', error);
+            }
+        }
+
+        async function loadPendingVerifications() {
+            const container = document.getElementById('pendingVerificationList');
+            try {
+                const res = await fetch(`${API_URL}/api/compliance/pending-verification`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const users = await res.json();
+                    if (users.length === 0) {
+                        container.innerHTML = '<p style="color: var(--text-light); padding: 16px;">No pending verifications</p>';
+                        return;
+                    }
+
+                    container.innerHTML = users.map(user => `
+                        <div class="order-mini" style="border-left: 3px solid #f59e0b;">
+                            <div class="order-mini-info">
+                                <strong>${user.name}</strong>
+                                <span class="order-mini-detail">${user.email}</span>
+                                <span class="order-mini-detail">
+                                    ${user.privateApplicatorLicense?.licenseNumber ?
+                                        `Private: ${user.privateApplicatorLicense.licenseNumber} (${user.privateApplicatorLicense.state})` :
+                                        user.commercialApplicatorLicense?.licenseNumber ?
+                                        `Commercial: ${user.commercialApplicatorLicense.licenseNumber} (${user.commercialApplicatorLicense.state})` : ''}
+                                </span>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-sm" style="background: #059669; color: white;" onclick="verifyLicense('${user._id}', 'verified')">Verify</button>
+                                <button class="btn btn-sm btn-outline" onclick="verifyLicense('${user._id}', 'rejected')">Reject</button>
+                            </div>
+                        </div>
+                    `).join('');
+                }
+            } catch (error) {
+                container.innerHTML = '<p style="color: #dc2626; padding: 16px;">Error loading data</p>';
+            }
+        }
+
+        async function loadExpiringLicenses() {
+            const container = document.getElementById('expiringLicensesList');
+            try {
+                const res = await fetch(`${API_URL}/api/compliance/expiring-licenses`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const users = await res.json();
+                    if (users.length === 0) {
+                        container.innerHTML = '<p style="color: var(--text-light); padding: 16px;">No licenses expiring in next 60 days</p>';
+                        return;
+                    }
+
+                    container.innerHTML = users.map(user => {
+                        const license = user.privateApplicatorLicense?.expirationDate ? user.privateApplicatorLicense : user.commercialApplicatorLicense;
+                        const expDate = new Date(license.expirationDate);
+                        const daysLeft = Math.ceil((expDate - new Date()) / (1000 * 60 * 60 * 24));
+
+                        return `
+                            <div class="order-mini" style="border-left: 3px solid ${daysLeft <= 30 ? '#dc2626' : '#f59e0b'};">
+                                <div class="order-mini-info">
+                                    <strong>${user.name}</strong>
+                                    <span class="order-mini-detail">${license.licenseNumber} (${license.state})</span>
+                                    <span class="order-mini-detail" style="color: ${daysLeft <= 30 ? '#dc2626' : '#f59e0b'};">
+                                        Expires: ${expDate.toLocaleDateString()} (${daysLeft} days)
+                                    </span>
+                                </div>
+                            </div>
+                        `;
+                    }).join('');
+                }
+            } catch (error) {
+                container.innerHTML = '<p style="color: #dc2626; padding: 16px;">Error loading data</p>';
+            }
+        }
+
+        async function loadRupProducts() {
+            const tbody = document.getElementById('rupProductsTableBody');
+            try {
+                const res = await fetch(`${API_URL}/api/compliance/rup-products`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const products = await res.json();
+                    if (products.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="5" style="color: var(--text-light);">No RUP products in catalog</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = products.map(p => `
+                        <tr>
+                            <td><strong>${p.productName}</strong></td>
+                            <td>${p.epaRegistrationNumber || '<span style="color: #dc2626;">Missing!</span>'}</td>
+                            <td><span class="signal-word signal-${(p.signalWord || '').toLowerCase().replace('-', '')}">${p.signalWord || 'N/A'}</span></td>
+                            <td>${(p.requiredCertifications || []).map(c => `<span class="cert-badge">${formatCertName(c)}</span>`).join(' ')}</td>
+                            <td>${p.category}</td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="5" style="color: #dc2626;">Error loading RUP products</td></tr>';
+            }
+        }
+
+        async function loadRupSalesRecords() {
+            const tbody = document.getElementById('rupSalesTableBody');
+            try {
+                const res = await fetch(`${API_URL}/api/compliance/rup-sale-records?limit=20`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const records = await res.json();
+                    if (records.length === 0) {
+                        tbody.innerHTML = '<tr><td colspan="7" style="color: var(--text-light);">No RUP sales records yet</td></tr>';
+                        return;
+                    }
+
+                    tbody.innerHTML = records.map(r => `
+                        <tr>
+                            <td>${new Date(r.saleDate).toLocaleDateString()}</td>
+                            <td>${r.purchaserName}</td>
+                            <td>${r.productName}</td>
+                            <td>${r.epaRegistrationNumber}</td>
+                            <td>${r.applicatorLicenseNumber} (${r.applicatorLicenseState})</td>
+                            <td>${r.quantity} ${r.unit || ''}</td>
+                            <td><span class="status-badge status-${r.status}">${r.status}</span></td>
+                        </tr>
+                    `).join('');
+                }
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="7" style="color: #dc2626;">Error loading sales records</td></tr>';
+            }
+        }
+
+        async function verifyLicense(userId, status) {
+            const licenseType = prompt('Enter license type: private or commercial', 'private');
+            if (!licenseType) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/compliance/verify-license/${userId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ licenseType, status })
+                });
+
+                if (res.ok) {
+                    alert(`License ${status === 'verified' ? 'verified' : 'rejected'} successfully`);
+                    loadComplianceDashboard();
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to update license status');
+                }
+            } catch (error) {
+                alert('Error updating license status');
+            }
+        }
+
+        function formatCertName(cert) {
+            const names = {
+                'private_applicator': 'Private',
+                'commercial_applicator': 'Commercial',
+                'paraquat_training': 'Paraquat',
+                'dicamba_training': 'Dicamba'
+            };
+            return names[cert] || cert;
         }
 
         // Initialize
@@ -2296,6 +2803,75 @@
             .dashboard-grid {
                 grid-template-columns: 1fr;
             }
+        }
+
+        /* Compliance Dashboard Styles */
+        .signal-word {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+
+        .signal-danger, .signal-dangerpoison {
+            background: #fef2f2;
+            color: #dc2626;
+            border: 1px solid #dc2626;
+        }
+
+        .signal-warning {
+            background: #fef3c7;
+            color: #d97706;
+            border: 1px solid #d97706;
+        }
+
+        .signal-caution {
+            background: #ecfdf5;
+            color: #059669;
+            border: 1px solid #059669;
+        }
+
+        .signal-none {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .cert-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            background: #f3f4f6;
+            color: #374151;
+            margin-right: 4px;
+        }
+
+        .rup-badge {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            background: #dc2626;
+            color: white;
+        }
+
+        .status-completed {
+            background: #ecfdf5;
+            color: #059669;
+        }
+
+        .status-pending_verification {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .status-flagged {
+            background: #fef2f2;
+            color: #dc2626;
         }
 
         @media (max-width: 768px) {
