@@ -426,33 +426,45 @@ async function createLedgerEntry({ representativeId, description, amount, type, 
 }
 
 // Spray Program Model (saved custom programs)
+// IMPORTANT: These are SUGGESTIONS only - each field requires its own evaluation
 const sprayProgramSchema = new mongoose.Schema({
-    name: { type: String, required: true },
+    name: { type: String, required: true }, // e.g., "Round 1 Corn Spray"
     description: String,
+    roundNumber: { type: Number }, // Round 1, 2, 3, etc.
 
-    // Program type
-    type: { type: String, enum: ['recommended', 'custom', 'template'], default: 'custom' },
-    isPublic: { type: Boolean, default: false }, // Recommended programs are public
+    // Program type - NOTE: "suggestion" not "recommendation" (legal)
+    type: { type: String, enum: ['suggestion', 'custom', 'template'], default: 'suggestion' },
+    isPublic: { type: Boolean, default: false }, // Public programs visible to customers
 
     // Target crop
     crop: { type: String, required: true }, // corn, soybeans, wheat, etc.
 
-    // Program passes/applications
+    // Disclaimer - required on all programs
+    disclaimer: {
+        type: String,
+        default: 'This is a suggestion only. Each field requires its own evaluation to determine if this chemical program will work for your specific conditions.'
+    },
+
+    // Program passes/applications (can have multiple chemicals per round)
     applications: [{
         name: String, // e.g., "Burndown", "Pre-emergent", "Post-emergent"
         timing: String, // e.g., "14 days before planting", "At planting", "V4-V6"
         chemicals: [{
             chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
             productName: String,
-            rate: Number,
-            rateUnit: String,
+            suggestedRate: Number, // Use "suggested" not "recommended"
+            rateUnit: String, // oz/acre, pt/acre, qt/acre, gal/acre, lb/acre
             packSize: String,
-            unit: String
+            unit: String,
+            notes: String // e.g., "Adjust based on weed pressure"
         }]
     }],
 
-    // Cost estimate per acre
+    // Cost estimate per acre (calculated)
     estimatedCostPerAcre: Number,
+
+    // Status
+    isActive: { type: Boolean, default: true },
 
     // Owner
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
