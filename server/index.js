@@ -1104,6 +1104,47 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // ---- ADMIN ROUTES ----
 
 // Get all customers (admin only) - with search support
+// Create a new customer (admin only)
+app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, email, password, phone, farm, crops, state, acres } = req.body;
+
+        if (!name || !email) {
+            return res.status(400).json({ error: 'Name and email are required' });
+        }
+
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
+        const user = new User({
+            name,
+            email: email.toLowerCase(),
+            password: password || 'Farm2026!',
+            phone,
+            farm: {
+                name: farm || '',
+                acres: acres || 0,
+                state: state || ''
+            },
+            crops: crops || [],
+            representative: req.user._id,
+            role: 'customer'
+        });
+
+        await user.save();
+
+        const savedUser = await User.findById(user._id)
+            .select('-password')
+            .populate('representative', 'name email');
+
+        res.status(201).json(savedUser);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { search } = req.query;

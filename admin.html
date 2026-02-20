@@ -171,6 +171,7 @@
                 <div class="tab-header">
                     <h2 id="customersTabTitle">My Customers</h2>
                     <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="openAddCustomerModal()">+ Add Customer</button>
                         <div class="search-box">
                             <input type="text" id="customerSearch" placeholder="Search customers...">
                         </div>
@@ -178,6 +179,68 @@
                 </div>
                 <div class="customers-grid" id="customersGrid">
                     <p class="loading">Loading customers...</p>
+                </div>
+            </div>
+
+            <!-- Add Customer Modal -->
+            <div class="modal-overlay" id="addCustomerModal" style="display: none;">
+                <div class="modal-content customer-modal-content">
+                    <button class="modal-close" onclick="closeAddCustomerModal()">&times;</button>
+                    <div class="customer-modal-header">
+                        <div class="customer-modal-avatar" style="background: var(--accent);">+</div>
+                        <div class="customer-modal-title">
+                            <h2>Add New Customer</h2>
+                            <p>Create a new customer account</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="addCustomerForm" class="edit-customer-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Full Name *</label>
+                                    <input type="text" id="addName" required placeholder="John Smith">
+                                </div>
+                                <div class="form-group">
+                                    <label>Email *</label>
+                                    <input type="email" id="addEmail" required placeholder="john@example.com">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="tel" id="addPhone" placeholder="970-555-1234">
+                                </div>
+                                <div class="form-group">
+                                    <label>Password</label>
+                                    <input type="text" id="addPassword" placeholder="Farm2026! (default)">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Farm Name</label>
+                                    <input type="text" id="addFarm" placeholder="Smith Family Farm">
+                                </div>
+                                <div class="form-group">
+                                    <label>State</label>
+                                    <input type="text" id="addState" placeholder="Colorado">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Acres</label>
+                                    <input type="number" id="addAcres" min="0" placeholder="500">
+                                </div>
+                                <div class="form-group">
+                                    <label>Crops (comma-separated)</label>
+                                    <input type="text" id="addCrops" placeholder="Corn, Wheat, Soybeans">
+                                </div>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeAddCustomerModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="addCustomer()">Add Customer</button>
+                    </div>
                 </div>
             </div>
 
@@ -717,7 +780,80 @@
         function closeCustomerModal() {
             document.getElementById('customerModal').style.display = 'none';
             selectedCustomer = null;
+            // Reset to view mode
+            cancelEdit();
         }
+
+        // Add Customer Modal
+        function openAddCustomerModal() {
+            document.getElementById('addCustomerModal').style.display = 'flex';
+            document.getElementById('addName').value = '';
+            document.getElementById('addEmail').value = '';
+            document.getElementById('addPhone').value = '';
+            document.getElementById('addPassword').value = '';
+            document.getElementById('addFarm').value = '';
+            document.getElementById('addState').value = '';
+            document.getElementById('addAcres').value = '';
+            document.getElementById('addCrops').value = '';
+        }
+
+        function closeAddCustomerModal() {
+            document.getElementById('addCustomerModal').style.display = 'none';
+        }
+
+        async function addCustomer() {
+            const name = document.getElementById('addName').value.trim();
+            const email = document.getElementById('addEmail').value.trim();
+            const phone = document.getElementById('addPhone').value.trim();
+            const password = document.getElementById('addPassword').value.trim() || 'Farm2026!';
+            const farm = document.getElementById('addFarm').value.trim();
+            const state = document.getElementById('addState').value.trim();
+            const acres = parseInt(document.getElementById('addAcres').value) || 0;
+            const cropsStr = document.getElementById('addCrops').value.trim();
+            const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
+
+            if (!name || !email) {
+                alert('Name and email are required');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/customers`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, email, password, phone, farm, state, acres, crops })
+                });
+
+                if (res.ok) {
+                    const newCustomer = await res.json();
+                    allCustomers.push(newCustomer);
+                    renderCustomers(allCustomers);
+                    closeAddCustomerModal();
+                    alert(`Customer "${name}" created successfully!\n\nLogin: ${email}\nPassword: ${password}`);
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to create customer');
+                }
+            } catch (error) {
+                console.error('Error adding customer:', error);
+                alert('Error adding customer. Please try again.');
+            }
+        }
+
+        // Close add customer modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeAddCustomerModal();
+            }
+        });
+
+        // Close add customer modal on overlay click
+        document.getElementById('addCustomerModal').addEventListener('click', function(e) {
+            if (e.target === this) closeAddCustomerModal();
+        });
 
         // Go to admin order page (from modal)
         function goToAdminOrder() {
