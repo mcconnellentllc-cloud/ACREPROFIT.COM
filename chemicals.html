@@ -67,6 +67,7 @@
                         <option value="insecticide">Insecticides</option>
                         <option value="fungicide">Fungicides</option>
                         <option value="adjuvant">Adjuvants</option>
+                        <option value="fertilizer">Fertilizers</option>
                     </select>
                 </div>
 
@@ -280,7 +281,7 @@
         function getDemoChemicals() {
             return [
                 // Glyphosate Options
-                { _id: '1', productName: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.25, defaultRate: 32, rateUnit: 'oz/acre', notes: 'Generic glyphosate - Best Value' },
+                { _id: '1', productName: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90, defaultRate: 30, rateUnit: 'fl oz/acre', notes: 'Generic glyphosate 4.17 lb AE/gal - Best Value' },
                 { _id: '2', productName: 'Glystar Supreme', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 14.50, defaultRate: 32, rateUnit: 'oz/acre', notes: 'Premium glyphosate' },
 
                 // Dicamba Products
@@ -288,7 +289,7 @@
                 { _id: '4', productName: 'LV 6 (2,4-D Ester)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 27.90, defaultRate: 16, rateUnit: 'oz/acre', notes: '2,4-D LV ester' },
 
                 // Atrazine
-                { _id: '5', productName: 'Aatrex 4L (Atrazine)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.78, defaultRate: 1.5, rateUnit: 'qt/acre', notes: 'Corn/Sorghum pre-emerge' },
+                { _id: '5', productName: 'Aatrex 4L (Atrazine)', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.35, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Atrazine 4 lb/gal (Grp 5) - Corn/Sorghum' },
 
                 // Contact Herbicides
                 { _id: '6', productName: 'Paraquat 3SL', category: 'herbicide', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 16.00, defaultRate: 2, rateUnit: 'pt/acre', notes: 'Contact burndown' },
@@ -310,175 +311,199 @@
                 { _id: '16', productName: 'Artect FI', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 11.30, defaultRate: 16, rateUnit: 'oz/acre', notes: 'Broadleaf burndown' },
 
                 // Adjuvants & Oils
-                { _id: '17', productName: 'Hydrovant', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 132.00, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Premium water conditioner & drift control - MAIN ADJUVANT (Retail: $165/gl)' },
+                { _id: '17', productName: 'Hydrovant', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00, defaultRate: 1.28, rateUnit: 'fl oz/acre', notes: 'NIS Surfactant - 0.1% of 8.5 gpa carrier volume' },
                 { _id: '18', productName: 'MSO (Methylated Seed Oil)', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 12.50, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Spray adjuvant' },
                 { _id: '19', productName: 'Crop Oil Concentrate', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 8.75, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Spray adjuvant' },
                 { _id: '20', productName: 'AMS (Ammonium Sulfate)', category: 'adjuvant', packSize: '50 lb bag', unit: 'lb', unitsPerPack: 50, price: 0.35, defaultRate: 8.5, rateUnit: 'lb/100gal', notes: 'Water conditioner' },
-                { _id: '21', productName: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 14.00, defaultRate: 0.25, rateUnit: '%v/v', notes: 'Spray adjuvant' }
+                { _id: '21', productName: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 14.00, defaultRate: 0.25, rateUnit: '%v/v', notes: 'Spray adjuvant' },
+
+                // Pre-mix & Specialty Herbicides
+                { _id: '22', productName: 'FulTime NXT', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 20.00, defaultRate: 2, rateUnit: 'qt/acre', notes: 'Acetochlor+Atrazine (Grp 15+5) - Post/At Planting' },
+                { _id: '23', productName: 'S-Metolachlor (Dual II Magnum)', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 38.00, defaultRate: 1.33, rateUnit: 'pt/acre', notes: 'S-Metolachlor 7.62 lb/gal (Grp 15) - Corn residual' },
+                { _id: '24', productName: 'Clarifier', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 32.00, defaultRate: 8, rateUnit: 'fl oz/acre', notes: 'Dicamba DGA 4lb AE + safener (Grp 4) - Corn post' },
+                { _id: '25', productName: 'Impact', category: 'herbicide', packSize: '1 gl', unit: 'gl', unitsPerPack: 1, price: 340.00, defaultRate: 1, rateUnit: 'fl oz/acre', notes: 'Topramezone 2.8 lb/gal (Grp 27) - Corn late post' },
+                { _id: '26', productName: 'StareDown', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 100.00, defaultRate: 0.4, rateUnit: 'pt/acre', notes: 'Fluroxypyr 2.8 lb AE/gal (Grp 4) - Sorghum at planting' },
+                { _id: '27', productName: 'Ally XP', category: 'herbicide', packSize: '10x1 oz', unit: 'oz', unitsPerPack: 10, price: 8.00, defaultRate: 0.1, rateUnit: 'oz/acre', notes: 'Metsulfuron-methyl 60% WDG (Grp 2 ALS) - Wheat broadleaf' },
+
+                // Fertilizers
+                { _id: '28', productName: '32-0-0 (UAN)', category: 'fertilizer', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.32, defaultRate: 8, rateUnit: 'gal/acre', notes: 'Urea Ammonium Nitrate - $435/ton (~187.6 gal/ton)' },
+                { _id: '29', productName: '12-0-0-26 (Thiosol)', category: 'fertilizer', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.99, defaultRate: 2, rateUnit: 'gal/acre', notes: 'Ammonium Thiosulfate - $550/ton (~184 gal/ton)' }
             ];
         }
 
         function getDemoPrograms() {
             return [
-                // WHEAT PROGRAMS
-                {
-                    _id: 'wheat-1',
-                    name: 'Wheat - Fall Burndown',
-                    description: 'Pre-plant burndown for winter wheat',
-                    crop: 'wheat',
-                    type: 'recommended',
-                    applications: [
-                        {
-                            name: 'Fall Burndown',
-                            timing: '14-21 days before planting',
-                            chemicals: [
-                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    _id: 'wheat-2',
-                    name: 'Wheat - Spring Broadleaf Control',
-                    description: 'Spring broadleaf weed control in winter wheat',
-                    crop: 'wheat',
-                    type: 'recommended',
-                    applications: [
-                        {
-                            name: 'Spring Application',
-                            timing: 'Wheat tillering to jointing',
-                            chemicals: [
-                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
-                                { productName: 'LV 6', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90 }
-                            ]
-                        }
-                    ]
-                },
-                {
-                    _id: 'wheat-3',
-                    name: 'Wheat - Full Season Program',
-                    description: 'Complete fall burndown + spring broadleaf control',
-                    crop: 'wheat',
-                    type: 'recommended',
-                    applications: [
-                        {
-                            name: 'Fall Burndown',
-                            timing: '14-21 days before planting',
-                            chemicals: [
-                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
-                            ]
-                        },
-                        {
-                            name: 'Spring Broadleaf',
-                            timing: 'Wheat tillering to jointing',
-                            chemicals: [
-                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
-                                { productName: 'LV 6', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90 }
-                            ]
-                        }
-                    ]
-                },
                 // CORN PROGRAMS
                 {
                     _id: 'corn-1',
-                    name: 'Corn - Burndown + Pre-emerge',
-                    description: 'Burndown with residual pre-emergent for corn',
+                    name: 'Corn - Burndown Only',
+                    description: 'Burndown application with residual (End March - April)',
                     crop: 'corn',
                     type: 'recommended',
+                    truckRoute: { timing: 'Mid March', weeksBeforeSpray: 2 },
                     applications: [
                         {
-                            name: 'Burndown/Pre-emerge',
-                            timing: '7-14 days before planting',
+                            name: 'Burndown',
+                            timing: 'End March - April',
+                            truckRouteDate: 'Mid March',
                             chemicals: [
-                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Aatrex', rate: 1.5, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 },
-                                { productName: 'Mesotrione', rate: 3, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 48.25 }
+                                { productName: 'Valor SX (flumioxazin)', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Dicamba DMA', rate: 10, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Aatrex 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.35 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
                 },
                 {
                     _id: 'corn-2',
-                    name: 'Corn - Post-emerge',
-                    description: 'Post-emergence weed control in corn',
+                    name: 'Corn - 2-Pass Program',
+                    description: 'Burndown + First Post-emerge (End March through Mid May)',
                     crop: 'corn',
                     type: 'recommended',
                     applications: [
                         {
-                            name: 'Post-emerge',
-                            timing: 'V4-V6 corn stage',
+                            name: 'Burndown',
+                            timing: 'End March - April',
+                            truckRouteDate: 'Mid March',
                             chemicals: [
-                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                                { productName: 'Valor SX (flumioxazin)', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Dicamba DMA', rate: 10, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Aatrex 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.35 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
+                            ]
+                        },
+                        {
+                            name: 'First Post',
+                            timing: 'Mid May',
+                            truckRouteDate: 'Early May',
+                            chemicals: [
+                                { productName: 'FulTime NXT', rate: 2, rateUnit: 'qt/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 20.00 },
+                                { productName: 'Clarifier', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 32.00 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 22, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Explorer (Mesotrione)', rate: 3, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 48.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
                 },
                 {
                     _id: 'corn-3',
-                    name: 'Corn - 2-Pass Program',
-                    description: 'Complete pre + post-emerge corn program',
+                    name: 'Corn - Full 3-Pass Program',
+                    description: 'Complete season: Burndown + First Post + 2nd/3rd Post',
                     crop: 'corn',
                     type: 'recommended',
                     applications: [
                         {
-                            name: 'Burndown/Pre-emerge',
-                            timing: '7-14 days before planting',
+                            name: 'Burndown',
+                            timing: 'End March - April',
+                            truckRouteDate: 'Mid March',
                             chemicals: [
-                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Aatrex', rate: 1.5, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 },
-                                { productName: 'Mesotrione', rate: 3, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 48.25 }
+                                { productName: 'Valor SX (flumioxazin)', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Dicamba DMA', rate: 10, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Aatrex 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.35 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         },
                         {
-                            name: 'Post-emerge',
-                            timing: 'V4-V6 corn stage',
+                            name: 'First Post',
+                            timing: 'Mid May',
+                            truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                                { productName: 'FulTime NXT', rate: 2, rateUnit: 'qt/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 20.00 },
+                                { productName: 'Clarifier', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 32.00 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 22, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Explorer (Mesotrione)', rate: 3, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 48.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
+                            ]
+                        },
+                        {
+                            name: '2nd/3rd Post (if needed)',
+                            timing: 'Late June - July',
+                            truckRouteDate: 'Mid June',
+                            chemicals: [
+                                { productName: 'S-Metolachlor (Dual II Magnum)', rate: 1.3, rateUnit: 'pt/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 38.00 },
+                                { productName: 'Clarifier', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 32.00 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 22, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Impact', rate: 1, rateUnit: 'fl oz/acre', packSize: '1 gl', unit: 'gl', unitsPerPack: 1, price: 340.00 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
                 },
-                // MILO/SORGHUM PROGRAMS
+                // SORGHUM PROGRAMS
                 {
                     _id: 'milo-1',
-                    name: 'Milo - Pre-emerge',
-                    description: 'Pre-emergence weed control for grain sorghum',
+                    name: 'Sorghum - Pre-Plant Only',
+                    description: '30-day minimum pre-plant burndown for grain sorghum',
                     crop: 'milo',
                     type: 'recommended',
                     applications: [
                         {
-                            name: 'Pre-emerge',
-                            timing: 'At or before planting',
+                            name: '30d Minimum Pre-Plant',
+                            timing: 'Early-Mid April (30 days before planting)',
+                            truckRouteDate: 'Late March',
                             chemicals: [
-                                { productName: 'Aatrex', rate: 2, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 }
+                                { productName: 'Valor SX (flumioxazin)', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
+                                { productName: 'Aatrex 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.35 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
                 },
                 {
                     _id: 'milo-2',
-                    name: 'Milo - 2-Pass Program',
-                    description: 'Complete pre + post-emerge milo program',
+                    name: 'Sorghum - Full 2-Pass Program',
+                    description: 'Complete pre-plant + at-planting sorghum program',
                     crop: 'milo',
                     type: 'recommended',
                     applications: [
                         {
-                            name: 'Pre-emerge',
-                            timing: 'At or before planting',
+                            name: '30d Minimum Pre-Plant',
+                            timing: 'Early-Mid April (30 days before planting)',
+                            truckRouteDate: 'Late March',
                             chemicals: [
-                                { productName: 'Aatrex', rate: 2, rateUnit: 'qt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 12.78 }
+                                { productName: 'Valor SX (flumioxazin)', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
+                                { productName: 'Aatrex 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 13.35 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         },
                         {
-                            name: 'Post-emerge',
-                            timing: '4-6 leaf sorghum',
+                            name: 'At Planting',
+                            timing: 'Mid May (at planting)',
+                            truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
-                                { productName: 'LV 6', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 27.90 }
+                                { productName: 'FulTime NXT', rate: 2, rateUnit: 'qt/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 20.00 },
+                                { productName: 'StareDown', rate: 0.4, rateUnit: 'pt/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 100.00 },
+                                { productName: 'AgSaver (Glyphosate)', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 12.90 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
+                            ]
+                        }
+                    ]
+                },
+                // WHEAT PROGRAMS
+                {
+                    _id: 'wheat-1',
+                    name: 'Wheat - Single Application',
+                    description: 'Spring broadleaf + fertilizer application for winter wheat',
+                    crop: 'wheat',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Single Application',
+                            timing: 'March - Early April (tillering to jointing)',
+                            truckRouteDate: 'Mid-Late February',
+                            chemicals: [
+                                { productName: 'Ally XP', rate: 0.1, rateUnit: 'oz/acre', packSize: '10x1 oz', unit: 'oz', unitsPerPack: 10, price: 8.00 },
+                                { productName: '32-0-0 (UAN)', rate: 8, rateUnit: 'gal/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.32 },
+                                { productName: '12-0-0-26 (Thiosol)', rate: 2, rateUnit: 'gal/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.99 }
                             ]
                         }
                     ]
@@ -865,6 +890,7 @@
                         ${prog.applications.map(app => `
                             <div class="program-pass">
                                 <strong>${app.name}</strong> (${app.timing})
+                                ${app.truckRouteDate ? `<span class="pass-truck-route">Delivery: ${app.truckRouteDate}</span>` : ''}
                                 <ul>
                                     ${app.chemicals.map(c => `<li>${c.productName} - ${c.rate} ${c.rateUnit}</li>`).join('')}
                                 </ul>
@@ -955,6 +981,7 @@
                 spraySheets.push({
                     name: app.name,
                     timing: app.timing,
+                    truckRouteDate: app.truckRouteDate || '',
                     acres,
                     chemicals: sheetChemicals
                 });
@@ -967,12 +994,45 @@
                 totalCost += item.cost;
             });
 
+            // Render truck route schedule
+            let truckRouteHTML = '';
+            const truckRoutes = spraySheets.filter(s => s.truckRouteDate);
+            if (truckRoutes.length > 0) {
+                truckRouteHTML = `
+                    <div class="truck-route-schedule">
+                        <div class="truck-route-header">
+                            <h3>Truck Route Delivery Schedule</h3>
+                            <p>Chemical deliveries scheduled 2 weeks before each application window</p>
+                        </div>
+                        <div class="truck-route-timeline">
+                            ${truckRoutes.map((route, idx) => `
+                                <div class="route-stop">
+                                    <div class="route-marker">
+                                        <span class="route-number">${idx + 1}</span>
+                                        ${idx < truckRoutes.length - 1 ? '<div class="route-line"></div>' : ''}
+                                    </div>
+                                    <div class="route-details">
+                                        <div class="route-date-badge">Delivery: ${route.truckRouteDate}</div>
+                                        <h4>${route.name}</h4>
+                                        <p class="route-spray-timing">Spray window: ${route.timing}</p>
+                                        <div class="route-chemicals">
+                                            ${route.chemicals.map(c => `<span class="route-chem-tag">${c.name} (${c.totalNeeded.toFixed(1)} ${c.unit})</span>`).join('')}
+                                        </div>
+                                    </div>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
             // Render spray sheets
             let spraySheetHTML = spraySheets.map(sheet => `
                 <div class="spray-sheet">
                     <div class="spray-sheet-header">
                         <h4>${sheet.name}</h4>
                         <span class="sheet-timing">${sheet.timing}</span>
+                        ${sheet.truckRouteDate ? `<span class="truck-route-badge">Delivery: ${sheet.truckRouteDate}</span>` : ''}
                         <span class="sheet-acres">${sheet.acres.toLocaleString()} acres</span>
                         <button class="btn btn-sm btn-outline print-sheet-btn" onclick="printSpraySheet(this)">Print</button>
                     </div>
@@ -1042,6 +1102,7 @@
             resultsDiv.innerHTML = `
                 <h2>Your Spray Program: ${selectedProgram.name}</h2>
                 <p class="program-summary">${acres.toLocaleString()} acres - ${selectedProgram.applications.length} application(s)</p>
+                ${truckRouteHTML}
                 <div class="spray-sheets-container">${spraySheetHTML}</div>
                 ${totalsHTML}
             `;
@@ -1523,6 +1584,11 @@
             color: #7c3aed;
         }
 
+        .category-badge.fertilizer {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
         .price-cell {
             white-space: nowrap;
         }
@@ -1787,6 +1853,137 @@
             padding-left: 20px;
             font-size: 0.875rem;
             color: #666;
+        }
+
+        .pass-truck-route {
+            display: inline-block;
+            background: #fef2f2;
+            color: #dc2626;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            margin-left: 8px;
+        }
+
+        /* Truck Route Schedule */
+        .truck-route-schedule {
+            background: linear-gradient(135deg, #f0fdf4, #ecfdf5);
+            border: 2px solid var(--primary);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 32px;
+        }
+
+        .truck-route-header {
+            margin-bottom: 24px;
+        }
+
+        .truck-route-header h3 {
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .truck-route-header p {
+            color: #666;
+            font-size: 0.9rem;
+        }
+
+        .truck-route-timeline {
+            position: relative;
+        }
+
+        .route-stop {
+            display: flex;
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .route-stop:last-child {
+            margin-bottom: 0;
+        }
+
+        .route-marker {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 40px;
+        }
+
+        .route-number {
+            width: 36px;
+            height: 36px;
+            background: var(--primary);
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            font-size: 0.9rem;
+            flex-shrink: 0;
+        }
+
+        .route-line {
+            width: 3px;
+            flex: 1;
+            background: var(--primary);
+            opacity: 0.3;
+            margin-top: 4px;
+            min-height: 20px;
+        }
+
+        .route-details {
+            flex: 1;
+            background: white;
+            border-radius: var(--radius);
+            padding: 16px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .route-date-badge {
+            display: inline-block;
+            background: #dc2626;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+
+        .route-details h4 {
+            margin-bottom: 4px;
+        }
+
+        .route-spray-timing {
+            color: #666;
+            font-size: 0.85rem;
+            margin-bottom: 8px;
+        }
+
+        .route-chemicals {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .route-chem-tag {
+            background: #f0fdf4;
+            border: 1px solid #86efac;
+            color: #166534;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+        }
+
+        .truck-route-badge {
+            background: #dc2626;
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            font-weight: 600;
         }
 
         /* Spray Sheets */

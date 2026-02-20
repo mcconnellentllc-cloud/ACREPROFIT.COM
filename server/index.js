@@ -1103,9 +1103,10 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 
 // ---- ADMIN ROUTES ----
 
-// Get all customers (admin only)
+// Get all customers (admin only) - with search support
 app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
+        const { search } = req.query;
         let query = { role: 'customer' };
 
         // If not superadmin, only show their own customers
@@ -1113,10 +1114,194 @@ app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res
             query.representative = req.user._id;
         }
 
+        // Add search filter if provided
+        if (search) {
+            const searchRegex = new RegExp(search, 'i');
+            query.$or = [
+                { name: searchRegex },
+                { email: searchRegex },
+                { farm: searchRegex },
+                { state: searchRegex }
+            ];
+        }
+
         const customers = await User.find(query)
             .select('-password')
-            .populate('representative', 'name email');
+            .populate('representative', 'name email')
+            .sort({ name: 1 });
         res.json(customers);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single customer details (admin only)
+app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const customer = await User.findById(req.params.customerId)
+            .select('-password')
+            .populate('representative', 'name email phone');
+
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Check access for non-superadmin
+        if (req.user.role === 'admin' &&
+            customer.representative?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        // Get order count and recent orders
+        const orders = await Order.find({ userId: customer._id })
+            .sort({ createdAt: -1 })
+            .limit(10);
+
+        res.json({
+            ...customer.toObject(),
+            orders,
+            orderCount: await Order.countDocuments({ userId: customer._id })
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update customer details (admin only)
+app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const customer = await User.findById(req.params.customerId);
+
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Check access for non-superadmin
+        if (req.user.role === 'admin' &&
+            customer.representative?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const { name, email, phone, farm, state, acres, crops } = req.body;
+
+        // Update fields if provided
+        if (name !== undefined) customer.name = name;
+        if (email !== undefined) customer.email = email.toLowerCase();
+        if (phone !== undefined) customer.phone = phone;
+        if (farm !== undefined) customer.farm = farm;
+        if (state !== undefined) customer.state = state;
+        if (acres !== undefined) customer.acres = acres;
+        if (crops !== undefined) customer.crops = crops;
+
+        customer.updatedAt = new Date();
+        await customer.save();
+
+        res.json(customer);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all orders for a specific customer (admin only)
+app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const customer = await User.findById(req.params.customerId);
+
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Check access for non-superadmin
+        if (req.user.role === 'admin' &&
+            customer.representative?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const orders = await Order.find({ userId: customer._id })
+            .populate('representativeId', 'name email')
+            .sort({ createdAt: -1 });
+
+        res.json(orders);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create order on behalf of a customer (admin only)
+app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { customerId, crop, programId, acres, chemicals, seeds, pivotBio, totalPrice, status } = req.body;
+
+        // Validate customer exists and admin has access
+        const customer = await User.findById(customerId);
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Check access for non-superadmin
+        if (req.user.role === 'admin' &&
+            customer.representative?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied - not your customer' });
+        }
+
+        const costPerAcre = acres > 0 ? Math.round((totalPrice / acres) * 100) / 100 : 0;
+
+        const order = new Order({
+            userId: customerId,
+            representativeId: req.user._id,
+            crop,
+            program: programId,
+            acres,
+            chemicals,
+            seeds,
+            pivotBio,
+            totalPrice,
+            costPerAcre,
+            status: status || 'draft',
+            createdBy: req.user._id // Track who created this order
+        });
+
+        await order.save();
+        res.status(201).json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Edit an order (admin only)
+app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { crop, acres, chemicals, seeds, pivotBio, totalPrice, status } = req.body;
+
+        let query = { _id: req.params.orderId };
+
+        // If not superadmin, can only edit their own customers' orders
+        if (req.user.role === 'admin') {
+            query.representativeId = req.user._id;
+        }
+
+        const order = await Order.findOne(query);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found or access denied' });
+        }
+
+        // Update fields
+        if (crop !== undefined) order.crop = crop;
+        if (acres !== undefined) order.acres = acres;
+        if (chemicals !== undefined) order.chemicals = chemicals;
+        if (seeds !== undefined) order.seeds = seeds;
+        if (pivotBio !== undefined) order.pivotBio = pivotBio;
+        if (totalPrice !== undefined) {
+            order.totalPrice = totalPrice;
+            order.costPerAcre = order.acres > 0 ? Math.round((totalPrice / order.acres) * 100) / 100 : 0;
+        }
+        if (status !== undefined) order.status = status;
+
+        order.updatedAt = new Date();
+        order.lastEditedBy = req.user._id;
+
+        await order.save();
+        res.json(order);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
