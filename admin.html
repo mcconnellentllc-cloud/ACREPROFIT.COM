@@ -1384,6 +1384,7 @@
             }));
 
             try {
+                console.log('Importing CPD products...', productsToImport.length, 'products');
                 const res = await fetch(`${API_URL}/api/chemicals/bulk`, {
                     method: 'POST',
                     headers: {
@@ -1397,17 +1398,25 @@
                     })
                 });
 
+                console.log('Response status:', res.status);
+
                 if (res.ok) {
                     const result = await res.json();
                     alert(`Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}`);
                     loadProducts();
                 } else {
-                    const error = await res.json();
-                    alert('Import failed: ' + (error.error || 'Unknown error'));
+                    const errorText = await res.text();
+                    console.error('Import failed:', res.status, errorText);
+                    try {
+                        const error = JSON.parse(errorText);
+                        alert('Import failed (' + res.status + '): ' + (error.error || errorText));
+                    } catch {
+                        alert('Import failed (' + res.status + '): ' + errorText);
+                    }
                 }
             } catch (error) {
                 console.error('Error importing products:', error);
-                alert('Error importing products. Please try again.');
+                alert('Error importing products: ' + error.message);
             }
 
             btn.disabled = false;
