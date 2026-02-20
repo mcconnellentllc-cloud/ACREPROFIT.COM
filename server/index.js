@@ -1167,6 +1167,41 @@ app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
     }
 });
 
+// Update customer details (admin only)
+app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const customer = await User.findById(req.params.customerId);
+
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Check access for non-superadmin
+        if (req.user.role === 'admin' &&
+            customer.representative?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const { name, email, phone, farm, state, acres, crops } = req.body;
+
+        // Update fields if provided
+        if (name !== undefined) customer.name = name;
+        if (email !== undefined) customer.email = email.toLowerCase();
+        if (phone !== undefined) customer.phone = phone;
+        if (farm !== undefined) customer.farm = farm;
+        if (state !== undefined) customer.state = state;
+        if (acres !== undefined) customer.acres = acres;
+        if (crops !== undefined) customer.crops = crops;
+
+        customer.updatedAt = new Date();
+        await customer.save();
+
+        res.json(customer);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Get all orders for a specific customer (admin only)
 app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {

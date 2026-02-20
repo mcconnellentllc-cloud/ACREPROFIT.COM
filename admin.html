@@ -192,7 +192,9 @@
                             <p id="modalCustomerFarm">Farm Name</p>
                         </div>
                     </div>
-                    <div class="customer-modal-body">
+
+                    <!-- View Mode -->
+                    <div class="customer-modal-body" id="viewMode">
                         <div class="customer-info-grid">
                             <div class="info-item">
                                 <span class="info-label">Email</span>
@@ -226,9 +228,55 @@
                             </div>
                         </div>
                     </div>
-                    <div class="customer-modal-actions">
+
+                    <!-- Edit Mode -->
+                    <div class="customer-modal-body" id="editMode" style="display: none;">
+                        <form id="editCustomerForm" class="edit-customer-form">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Name</label>
+                                    <input type="text" id="editName" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Email</label>
+                                    <input type="email" id="editEmail" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Phone</label>
+                                    <input type="tel" id="editPhone">
+                                </div>
+                                <div class="form-group">
+                                    <label>Farm Name</label>
+                                    <input type="text" id="editFarm">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>State</label>
+                                    <input type="text" id="editState">
+                                </div>
+                                <div class="form-group">
+                                    <label>Acres</label>
+                                    <input type="number" id="editAcres" min="0">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Crops (comma-separated)</label>
+                                <input type="text" id="editCrops" placeholder="e.g., Corn, Wheat, Soybeans">
+                            </div>
+                        </form>
+                    </div>
+
+                    <div class="customer-modal-actions" id="viewActions">
                         <button class="btn btn-outline" onclick="closeCustomerModal()">Close</button>
-                        <button class="btn btn-primary" id="placeOrderBtn" onclick="actAsCustomer()">Place Order for Customer</button>
+                        <button class="btn btn-outline" onclick="toggleEditMode()">Edit Customer</button>
+                        <button class="btn btn-primary" id="placeOrderBtn" onclick="goToAdminOrder()">Place Order</button>
+                    </div>
+                    <div class="customer-modal-actions" id="editActions" style="display: none;">
+                        <button class="btn btn-outline" onclick="cancelEdit()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveCustomer()">Save Changes</button>
                     </div>
                 </div>
             </div>
@@ -671,37 +719,98 @@
             selectedCustomer = null;
         }
 
-        // Act as customer (from modal)
-        function actAsCustomer() {
+        // Go to admin order page (from modal)
+        function goToAdminOrder() {
             if (!selectedCustomer) return;
-
-            // Store customer info in sessionStorage
-            sessionStorage.setItem('actingAsCustomer', JSON.stringify({
-                id: selectedCustomer._id,
-                name: selectedCustomer.name,
-                email: selectedCustomer.email,
-                farm: selectedCustomer.farm,
-                phone: selectedCustomer.phone
-            }));
-
-            // Redirect to order page
-            window.location.href = '/order.html';
+            closeCustomerModal();
+            window.location.href = `/admin-order.html?customer=${selectedCustomer._id}`;
         }
 
-        // Quick act as customer (from card button)
+        // Quick place order (from card button)
         function quickActAsCustomer(customerId, customerName) {
-            const customer = allCustomers.find(c => c._id === customerId);
-            if (!customer) return;
+            window.location.href = `/admin-order.html?customer=${customerId}`;
+        }
 
-            sessionStorage.setItem('actingAsCustomer', JSON.stringify({
-                id: customer._id,
-                name: customer.name,
-                email: customer.email,
-                farm: customer.farm,
-                phone: customer.phone
-            }));
+        // Toggle edit mode
+        function toggleEditMode() {
+            if (!selectedCustomer) return;
 
-            window.location.href = '/order.html';
+            // Populate edit form
+            document.getElementById('editName').value = selectedCustomer.name || '';
+            document.getElementById('editEmail').value = selectedCustomer.email || '';
+            document.getElementById('editPhone').value = selectedCustomer.phone || '';
+            document.getElementById('editFarm').value = selectedCustomer.farm || '';
+            document.getElementById('editState').value = selectedCustomer.state || '';
+            document.getElementById('editAcres').value = selectedCustomer.acres || '';
+            document.getElementById('editCrops').value = selectedCustomer.crops?.join(', ') || '';
+
+            // Show edit mode, hide view mode
+            document.getElementById('viewMode').style.display = 'none';
+            document.getElementById('editMode').style.display = 'block';
+            document.getElementById('viewActions').style.display = 'none';
+            document.getElementById('editActions').style.display = 'flex';
+        }
+
+        // Cancel edit
+        function cancelEdit() {
+            document.getElementById('viewMode').style.display = 'block';
+            document.getElementById('editMode').style.display = 'none';
+            document.getElementById('viewActions').style.display = 'flex';
+            document.getElementById('editActions').style.display = 'none';
+        }
+
+        // Save customer
+        async function saveCustomer() {
+            if (!selectedCustomer) return;
+
+            const name = document.getElementById('editName').value.trim();
+            const email = document.getElementById('editEmail').value.trim();
+            const phone = document.getElementById('editPhone').value.trim();
+            const farm = document.getElementById('editFarm').value.trim();
+            const state = document.getElementById('editState').value.trim();
+            const acres = parseInt(document.getElementById('editAcres').value) || 0;
+            const cropsStr = document.getElementById('editCrops').value.trim();
+            const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
+
+            if (!name || !email) {
+                alert('Name and email are required');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/customers/${selectedCustomer._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ name, email, phone, farm, state, acres, crops })
+                });
+
+                if (res.ok) {
+                    const updated = await res.json();
+
+                    // Update local data
+                    const index = allCustomers.findIndex(c => c._id === selectedCustomer._id);
+                    if (index !== -1) {
+                        allCustomers[index] = { ...allCustomers[index], ...updated };
+                    }
+                    selectedCustomer = { ...selectedCustomer, ...updated };
+
+                    // Refresh display
+                    renderCustomers(allCustomers);
+                    showCustomerModal(selectedCustomer);
+                    cancelEdit();
+
+                    alert('Customer updated successfully!');
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to update customer');
+                }
+            } catch (error) {
+                console.error('Error updating customer:', error);
+                alert('Error updating customer. Please try again.');
+            }
         }
 
         // Close modal on escape key
@@ -1338,6 +1447,44 @@
             padding: 24px 32px;
             border-top: 1px solid var(--border);
             justify-content: flex-end;
+        }
+
+        /* Edit Customer Form */
+        .edit-customer-form {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .edit-customer-form .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .edit-customer-form .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .edit-customer-form label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            color: var(--text-muted);
+        }
+
+        .edit-customer-form input {
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+        }
+
+        .edit-customer-form input:focus {
+            outline: none;
+            border-color: var(--primary);
         }
 
         @media (max-width: 1024px) {
