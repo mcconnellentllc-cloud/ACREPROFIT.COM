@@ -25,6 +25,7 @@
                 <li><a href="#products" class="nav-tab" data-tab="products">Products</a></li>
                 <li><a href="#ledger" class="nav-tab" data-tab="ledger">Ledger</a></li>
                 <li id="repAppsNav" style="display: none;"><a href="#applications" class="nav-tab" data-tab="applications">Rep Applications</a></li>
+                <li><a href="#" id="viewAsCustomerBtn" class="btn btn-secondary" style="margin-right: 0.5rem;">View as Customer</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
             </ul>
         </div>
@@ -795,6 +796,13 @@
             localStorage.removeItem('token');
             localStorage.removeItem('user');
             window.location.href = '/';
+        });
+
+        // View as Customer - Admin Preview Mode
+        document.getElementById('viewAsCustomerBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.setItem('adminPreviewMode', 'true');
+            window.location.href = '/dashboard.html';
         });
 
         // Load dashboard data

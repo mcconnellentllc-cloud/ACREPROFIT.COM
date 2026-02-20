@@ -21,6 +21,13 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Admin Preview Mode Banner -->
+    <div id="adminPreviewBanner" class="admin-preview-banner" style="display: none;">
+        <div class="container" style="display: flex; align-items: center; justify-content: space-between;">
+            <span>Admin Preview Mode - You're viewing the site as a customer</span>
+            <button id="exitPreviewBtn" class="btn btn-sm" style="background: white; color: #2D5A27;">Back to Admin</button>
+        </div>
+    </div>
     <nav class="navbar">
         <div class="container">
             <a href="/" class="logo">
@@ -338,6 +345,20 @@
         const user = localStorage.getItem('user');
         if (!token || !user) {
             window.location.href = '/login.html';
+        }
+
+        // Check for admin preview mode
+        const userData = user ? JSON.parse(user) : {};
+        const isAdminPreview = localStorage.getItem('adminPreviewMode') === 'true';
+        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin')) {
+            const banner = document.getElementById('adminPreviewBanner');
+            if (banner) {
+                banner.style.display = 'block';
+            }
+            document.getElementById('exitPreviewBtn')?.addEventListener('click', function() {
+                localStorage.removeItem('adminPreviewMode');
+                window.location.href = '/admin.html';
+            });
         }
 
         // Logout
