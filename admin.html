@@ -352,7 +352,7 @@
             <div id="bundlesTab" class="tab-content">
                 <div class="tab-header">
                     <h2>Order Bundles</h2>
-                    <p class="tab-desc">Track product quantities for bulk ordering</p>
+                    <p class="tab-desc">Track product quantities for bulk ordering - fills automatically from customer orders</p>
                 </div>
                 <div class="bundles-grid" id="bundlesGrid">
                     <div class="bundle-card">
@@ -364,28 +364,27 @@
                             <div class="bundle-gauge">
                                 <svg viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2D5A27" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="99" transform="rotate(-90 50 50)"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2D5A27" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
                                 </svg>
-                                <span class="gauge-value">65%</span>
+                                <span class="gauge-value">0%</span>
                             </div>
                             <div class="bundle-stats">
                                 <div class="bundle-stat">
-                                    <span class="stat-num">3,250</span>
+                                    <span class="stat-num">0</span>
                                     <span class="stat-lbl">Gallons Ordered</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">13</span>
+                                    <span class="stat-num">0</span>
                                     <span class="stat-lbl">Shuttles</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">7</span>
+                                    <span class="stat-num">20</span>
                                     <span class="stat-lbl">To Fill Truck</span>
                                 </div>
                             </div>
                         </div>
                         <div class="bundle-card-footer">
-                            <button class="btn btn-sm btn-outline">View Details</button>
-                            <button class="btn btn-sm btn-primary">Lock Order</button>
+                            <span class="bundle-status empty">No orders yet</span>
                         </div>
                     </div>
 
@@ -398,90 +397,93 @@
                             <div class="bundle-gauge">
                                 <svg viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#4a7c44" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="170" transform="rotate(-90 50 50)"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#4a7c44" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
                                 </svg>
-                                <span class="gauge-value">40%</span>
+                                <span class="gauge-value">0%</span>
                             </div>
                             <div class="bundle-stats">
                                 <div class="bundle-stat">
-                                    <span class="stat-num">2,000</span>
+                                    <span class="stat-num">0</span>
                                     <span class="stat-lbl">Gallons Ordered</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">8</span>
+                                    <span class="stat-num">0</span>
                                     <span class="stat-lbl">Shuttles</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">12</span>
+                                    <span class="stat-num">20</span>
                                     <span class="stat-lbl">To Fill Truck</span>
                                 </div>
                             </div>
                         </div>
                         <div class="bundle-card-footer">
-                            <button class="btn btn-sm btn-outline">View Details</button>
-                            <button class="btn btn-sm btn-primary" disabled>Not Ready</button>
+                            <span class="bundle-status empty">No orders yet</span>
                         </div>
                     </div>
 
-                    <div class="bundle-card hydrovant">
+                    <div class="bundle-card">
                         <div class="bundle-card-header">
-                            <h3>Hydrovant</h3>
-                            <span class="bundle-type">Gallons</span>
+                            <h3>Dicamba</h3>
+                            <span class="bundle-type">250 Gal Shuttle</span>
                         </div>
                         <div class="bundle-card-body">
                             <div class="bundle-gauge">
                                 <svg viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="212" transform="rotate(-90 50 50)"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
                                 </svg>
-                                <span class="gauge-value">25%</span>
+                                <span class="gauge-value">0%</span>
                             </div>
                             <div class="bundle-stats">
                                 <div class="bundle-stat">
-                                    <span class="stat-num">45</span>
+                                    <span class="stat-num">0</span>
                                     <span class="stat-lbl">Gallons Ordered</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">135</span>
-                                    <span class="stat-lbl">Gal to Best Price</span>
+                                    <span class="stat-num">0</span>
+                                    <span class="stat-lbl">Shuttles</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">$125</span>
-                                    <span class="stat-lbl">Best Price/Gal</span>
+                                    <span class="stat-num">20</span>
+                                    <span class="stat-lbl">To Fill Truck</span>
                                 </div>
                             </div>
                         </div>
                         <div class="bundle-card-footer">
-                            <span class="price-tier">Current: $135/gal</span>
+                            <span class="bundle-status empty">No orders yet</span>
                         </div>
                     </div>
 
-                    <div class="bundle-card pivot">
+                    <div class="bundle-card">
                         <div class="bundle-card-header">
-                            <h3>Pivot Bio</h3>
-                            <span class="bundle-type">Acres</span>
+                            <h3>2,4-D LV6</h3>
+                            <span class="bundle-type">250 Gal Shuttle</span>
                         </div>
                         <div class="bundle-card-body">
                             <div class="bundle-gauge">
                                 <svg viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="184" transform="rotate(-90 50 50)"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
                                 </svg>
-                                <span class="gauge-value">35%</span>
+                                <span class="gauge-value">0%</span>
                             </div>
                             <div class="bundle-stats">
                                 <div class="bundle-stat">
-                                    <span class="stat-num">3,500</span>
-                                    <span class="stat-lbl">Acres Ordered</span>
+                                    <span class="stat-num">0</span>
+                                    <span class="stat-lbl">Gallons Ordered</span>
                                 </div>
                                 <div class="bundle-stat">
-                                    <span class="stat-num">6,500</span>
-                                    <span class="stat-lbl">Acres to Goal</span>
+                                    <span class="stat-num">0</span>
+                                    <span class="stat-lbl">Shuttles</span>
+                                </div>
+                                <div class="bundle-stat">
+                                    <span class="stat-num">20</span>
+                                    <span class="stat-lbl">To Fill Truck</span>
                                 </div>
                             </div>
                         </div>
                         <div class="bundle-card-footer">
-                            <a href="https://www.pivotbio.com/" target="_blank" class="btn btn-sm btn-outline">Product Info</a>
+                            <span class="bundle-status empty">No orders yet</span>
                         </div>
                     </div>
                 </div>
@@ -2518,6 +2520,27 @@
         .price-tier {
             font-size: 0.875rem;
             color: var(--text-muted);
+        }
+
+        .bundle-status {
+            font-size: 0.875rem;
+            padding: 4px 12px;
+            border-radius: 12px;
+        }
+
+        .bundle-status.empty {
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+
+        .bundle-status.filling {
+            background: #fef3c7;
+            color: #d97706;
+        }
+
+        .bundle-status.ready {
+            background: #dcfce7;
+            color: #166534;
         }
 
         .applications-list {
