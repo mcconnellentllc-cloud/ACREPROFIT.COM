@@ -291,6 +291,11 @@
             color: #17a2b8;
         }
 
+        .category-badge.fertilizer {
+            background: rgba(212, 160, 23, 0.2);
+            color: #D4A017;
+        }
+
         .rup-badge {
             background: #dc3545;
             color: white;
@@ -459,11 +464,11 @@
 
         // Default cost prices (what we pay CPD)
         const defaultProducts = [
-            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 13.25, marginPct: 15, notes: 'Best value glyphosate' },
+            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 12.90, marginPct: 15, notes: 'Glyphosate 4.17 lb AE/gal - Best value' },
             { id: '2', name: 'Glystar Supreme', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 14.50, marginPct: 15, notes: 'Premium glyphosate' },
             { id: '3', name: 'Dicamba DMA (4lb)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 28.25, marginPct: 15, notes: 'Broadleaf control' },
             { id: '4', name: 'LV 6 (2,4-D Ester)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 27.90, marginPct: 15, notes: '2,4-D LV ester' },
-            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 12.78, marginPct: 15, notes: 'Corn/Sorghum pre-emerge' },
+            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 13.35, marginPct: 15, notes: 'Atrazine 4 lb/gal (Grp 5) - Corn/Sorghum' },
             { id: '6', name: 'Paraquat 3SL', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 16.00, marginPct: 15, notes: 'Contact burndown', rup: true },
             { id: '7', name: 'Glufosinate 2.34', category: 'herbicide', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 16.50, marginPct: 15, notes: 'Liberty-link systems' },
             { id: '8', name: 'Mesotrione 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 48.25, marginPct: 15, notes: 'Callisto generic' },
@@ -479,7 +484,15 @@
             { id: '18', name: 'MSO (Methylated Seed Oil)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 12.50, marginPct: 10, notes: 'Spray adjuvant' },
             { id: '19', name: 'Crop Oil Concentrate', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 8.75, marginPct: 10, notes: 'Spray adjuvant' },
             { id: '20', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', package: '50 lb bag', unit: 'lb', unitsPerPack: 50, costPrice: 0.35, marginPct: 10, notes: 'Water conditioner' },
-            { id: '21', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 14.00, marginPct: 10, notes: 'Spray adjuvant' }
+            { id: '21', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 14.00, marginPct: 10, notes: 'Spray adjuvant' },
+            { id: '22', name: 'FulTime NXT', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 20.00, marginPct: 15, notes: 'Acetochlor+Atrazine (Grp 15+5) - Post/At Planting' },
+            { id: '23', name: 'S-Metolachlor (Dual II Magnum)', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 38.00, marginPct: 15, notes: 'S-Metolachlor 7.62 lb/gal (Grp 15) - Corn residual' },
+            { id: '24', name: 'Clarifier', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 32.00, marginPct: 15, notes: 'Dicamba DGA 4lb AE + safener (Grp 4)' },
+            { id: '25', name: 'Impact', category: 'herbicide', package: '1 gl', unit: 'gl', unitsPerPack: 1, costPrice: 340.00, marginPct: 15, notes: 'Topramezone 2.8 lb/gal (Grp 27) - Corn late post' },
+            { id: '26', name: 'StareDown', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 100.00, marginPct: 15, notes: 'Fluroxypyr 2.8 lb AE/gal (Grp 4) - Sorghum' },
+            { id: '27', name: 'Ally XP', category: 'herbicide', package: '10x1 oz', unit: 'oz', unitsPerPack: 10, costPrice: 8.00, marginPct: 15, notes: 'Metsulfuron-methyl 60% WDG (Grp 2 ALS) - Wheat' },
+            { id: '28', name: '32-0-0 (UAN)', category: 'fertilizer', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 2.32, marginPct: 10, notes: 'Urea Ammonium Nitrate - $435/ton' },
+            { id: '29', name: '12-0-0-26 (Thiosol)', category: 'fertilizer', package: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, costPrice: 2.99, marginPct: 10, notes: 'Ammonium Thiosulfate - $550/ton' }
         ];
 
         let products = [];

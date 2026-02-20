@@ -138,6 +138,72 @@
                 </div>
             </div>
 
+            <!-- Truck Route Schedule -->
+            <div class="truck-route-dashboard">
+                <div class="section-header">
+                    <h3>Truck Route Delivery Schedule</h3>
+                    <a href="/chemicals.html" class="view-all">View Programs →</a>
+                </div>
+                <p class="schedule-subtitle">Chemical deliveries arrive 2 weeks before each spray window</p>
+                <div class="route-timeline-dashboard">
+                    <div class="route-item">
+                        <div class="route-date">
+                            <span class="route-month">FEB</span>
+                            <span class="route-day">Mid</span>
+                        </div>
+                        <div class="route-info">
+                            <h4>Wheat - Single Application</h4>
+                            <p>Ally XP, 32-0-0 (UAN), 12-0-0-26 (Thiosol)</p>
+                            <span class="route-spray-label">Spray: March - Early April</span>
+                        </div>
+                    </div>
+                    <div class="route-item">
+                        <div class="route-date">
+                            <span class="route-month">MAR</span>
+                            <span class="route-day">Mid</span>
+                        </div>
+                        <div class="route-info">
+                            <h4>Corn - Burndown</h4>
+                            <p>Valor SX, Glyphosate, Dicamba, Aatrex 4L, Hydrovant</p>
+                            <span class="route-spray-label">Spray: End March - April</span>
+                        </div>
+                    </div>
+                    <div class="route-item">
+                        <div class="route-date">
+                            <span class="route-month">MAR</span>
+                            <span class="route-day">Late</span>
+                        </div>
+                        <div class="route-info">
+                            <h4>Sorghum - Pre-Plant</h4>
+                            <p>Valor SX, Aatrex 4L, Glyphosate, Dicamba, Hydrovant</p>
+                            <span class="route-spray-label">Spray: Early-Mid April</span>
+                        </div>
+                    </div>
+                    <div class="route-item">
+                        <div class="route-date">
+                            <span class="route-month">MAY</span>
+                            <span class="route-day">Early</span>
+                        </div>
+                        <div class="route-info">
+                            <h4>Corn - First Post / Sorghum - At Planting</h4>
+                            <p>FulTime NXT, Clarifier, Glyphosate, Explorer, StareDown, Hydrovant</p>
+                            <span class="route-spray-label">Spray: Mid May</span>
+                        </div>
+                    </div>
+                    <div class="route-item">
+                        <div class="route-date">
+                            <span class="route-month">JUN</span>
+                            <span class="route-day">Mid</span>
+                        </div>
+                        <div class="route-info">
+                            <h4>Corn - 2nd/3rd Post (if needed)</h4>
+                            <p>Dual II Magnum, Clarifier, Glyphosate, Impact, Hydrovant</p>
+                            <span class="route-spray-label">Spray: Late June - July</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Active Orders Preview -->
             <div class="orders-preview">
                 <div class="section-header">
@@ -497,6 +563,91 @@
             color: var(--text);
             display: block;
             margin-bottom: 4px;
+        }
+
+        /* Truck Route Dashboard */
+        .truck-route-dashboard {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            box-shadow: var(--shadow);
+            margin-bottom: 48px;
+            border-left: 4px solid var(--primary);
+        }
+
+        .schedule-subtitle {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+        }
+
+        .route-timeline-dashboard {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .route-item {
+            display: flex;
+            gap: 20px;
+            align-items: flex-start;
+            padding: 16px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            transition: all 0.2s;
+        }
+
+        .route-item:hover {
+            border-color: var(--primary);
+            background: #f0fdf4;
+        }
+
+        .route-date {
+            min-width: 60px;
+            text-align: center;
+            background: var(--primary);
+            color: white;
+            border-radius: var(--radius);
+            padding: 8px 12px;
+        }
+
+        .route-month {
+            display: block;
+            font-size: 0.7rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .route-day {
+            display: block;
+            font-size: 1rem;
+            font-weight: 700;
+        }
+
+        .route-info {
+            flex: 1;
+        }
+
+        .route-info h4 {
+            margin-bottom: 4px;
+            font-size: 1rem;
+        }
+
+        .route-info p {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+        }
+
+        .route-spray-label {
+            display: inline-block;
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
         }
 
         /* Orders Preview */
