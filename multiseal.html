@@ -1,0 +1,439 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Multiseal Tire Sealant - Acre Profit">
+    <title>Multiseal Tire Sealant - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <ul class="nav-links">
+                <li><a href="/dashboard.html">Dashboard</a></li>
+                <li><a href="/chemicals.html">Order Chemicals</a></li>
+                <li><a href="/multiseal.html" class="active">Multiseal</a></li>
+                <li><a href="/merch.html">Merch</a></li>
+                <li><a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a></li>
+            </ul>
+        </div>
+    </nav>
+
+    <main class="multiseal-page">
+        <div class="container">
+            <!-- Hero Section -->
+            <div class="product-hero">
+                <div class="hero-content">
+                    <h1>Multiseal Tire Sealant</h1>
+                    <p class="hero-subtitle">Stop flats before they stop you. Premium tire sealant for farm equipment.</p>
+                    <div class="hero-benefits">
+                        <span class="benefit">Seals punctures up to 1/4"</span>
+                        <span class="benefit">Extends tire life</span>
+                        <span class="benefit">Works in all temperatures</span>
+                    </div>
+                </div>
+                <div class="hero-image">
+                    <div class="tire-icon">🛞</div>
+                </div>
+            </div>
+
+            <!-- Pricing Options -->
+            <div class="pricing-section">
+                <h2>Pricing</h2>
+                <p class="pricing-note">Pool your order with other farmers for the best pricing</p>
+
+                <div class="pricing-grid">
+                    <div class="pricing-card">
+                        <div class="pricing-header">
+                            <h3>5 Gallon Pail</h3>
+                            <div class="pricing-best">Best for Small Operations</div>
+                        </div>
+                        <div class="pricing-body">
+                            <div class="price">
+                                <span class="price-amount">$XX</span>
+                                <span class="price-unit">per pail</span>
+                            </div>
+                            <ul class="pricing-features">
+                                <li>Treats 4-6 tires</li>
+                                <li>Easy to store</li>
+                                <li>No special equipment needed</li>
+                            </ul>
+                            <div class="quantity-input">
+                                <label>Quantity:</label>
+                                <input type="number" id="pailQty" min="1" value="1">
+                            </div>
+                            <button class="btn btn-primary btn-block" onclick="addToOrder('pail')">Add to Order</button>
+                        </div>
+                    </div>
+
+                    <div class="pricing-card featured">
+                        <div class="pricing-header">
+                            <h3>55 Gallon Drum</h3>
+                            <div class="pricing-best">Best Value - Most Popular</div>
+                        </div>
+                        <div class="pricing-body">
+                            <div class="price">
+                                <span class="price-amount">$XX</span>
+                                <span class="price-unit">per drum</span>
+                            </div>
+                            <ul class="pricing-features">
+                                <li>Treats 40-60 tires</li>
+                                <li>Lowest cost per gallon</li>
+                                <li>Pump included</li>
+                            </ul>
+                            <div class="quantity-input">
+                                <label>Quantity:</label>
+                                <input type="number" id="drumQty" min="1" value="1">
+                            </div>
+                            <button class="btn btn-primary btn-block" onclick="addToOrder('drum')">Add to Order</button>
+                        </div>
+                    </div>
+
+                    <div class="pricing-card">
+                        <div class="pricing-header">
+                            <h3>275 Gallon Tote</h3>
+                            <div class="pricing-best">Best for Large Operations</div>
+                        </div>
+                        <div class="pricing-body">
+                            <div class="price">
+                                <span class="price-amount">$XX</span>
+                                <span class="price-unit">per tote</span>
+                            </div>
+                            <ul class="pricing-features">
+                                <li>Treats 200+ tires</li>
+                                <li>Share with neighbors</li>
+                                <li>Bulk discount pricing</li>
+                            </ul>
+                            <div class="quantity-input">
+                                <label>Quantity:</label>
+                                <input type="number" id="toteQty" min="1" value="1">
+                            </div>
+                            <button class="btn btn-primary btn-block" onclick="addToOrder('tote')">Add to Order</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Application Guide -->
+            <div class="application-guide">
+                <h2>Application Guide</h2>
+                <div class="guide-grid">
+                    <div class="guide-card">
+                        <h4>Tractor Tires</h4>
+                        <p>Front: 1-2 quarts | Rear: 2-4 quarts</p>
+                    </div>
+                    <div class="guide-card">
+                        <h4>Implement Tires</h4>
+                        <p>Small: 1 pint | Large: 1-2 quarts</p>
+                    </div>
+                    <div class="guide-card">
+                        <h4>Truck/Trailer</h4>
+                        <p>Standard: 1 quart | Dually: 1 pint each</p>
+                    </div>
+                    <div class="guide-card">
+                        <h4>Pivot Tires</h4>
+                        <p>Standard: 1-2 quarts per tire</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contact for Pricing -->
+            <div class="contact-section">
+                <h2>Get Exact Pricing</h2>
+                <p>Contact your rep for current pricing and group buy opportunities:</p>
+                <div class="rep-cards">
+                    <div class="rep-card">
+                        <strong>Kyle McConnell</strong>
+                        <a href="tel:9705711015">(970) 571-1015</a>
+                        <a href="mailto:Kyle@togoag.com">Kyle@togoag.com</a>
+                    </div>
+                    <div class="rep-card">
+                        <strong>Ty Mollohan</strong>
+                        <a href="tel:9705202340">(970) 520-2340</a>
+                        <a href="mailto:Tymollohan77@gmail.com">Tymollohan77@gmail.com</a>
+                    </div>
+                    <div class="rep-card">
+                        <strong>Chad Bamford</strong>
+                        <a href="tel:9705203716">(970) 520-3716</a>
+                        <a href="mailto:Ckbamford@yahoo.com">Ckbamford@yahoo.com</a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-bottom">
+                <p>&copy; 2026 AcreProfit.com. Farmers Helping Farmers.</p>
+            </div>
+        </div>
+    </footer>
+
+    <script>
+        const API_URL = 'https://acreprofit-com.onrender.com';
+
+        // Check auth
+        const token = localStorage.getItem('token');
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        });
+
+        function addToOrder(type) {
+            const qty = document.getElementById(type + 'Qty').value;
+            alert(`Added ${qty} ${type}(s) to your order! Contact your rep to confirm pricing and delivery.`);
+        }
+    </script>
+
+    <style>
+        .multiseal-page {
+            padding: 100px 0 60px;
+            background: var(--secondary);
+            min-height: 100vh;
+        }
+
+        .product-hero {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: linear-gradient(135deg, var(--primary) 0%, #1a3d15 100%);
+            color: white;
+            padding: 48px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 40px;
+        }
+
+        .hero-content h1 {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+        }
+
+        .hero-subtitle {
+            font-size: 1.25rem;
+            opacity: 0.9;
+            margin-bottom: 24px;
+        }
+
+        .hero-benefits {
+            display: flex;
+            gap: 16px;
+            flex-wrap: wrap;
+        }
+
+        .benefit {
+            background: rgba(255,255,255,0.2);
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.875rem;
+        }
+
+        .tire-icon {
+            font-size: 8rem;
+        }
+
+        .pricing-section {
+            margin-bottom: 40px;
+        }
+
+        .pricing-section h2 {
+            margin-bottom: 8px;
+        }
+
+        .pricing-note {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 24px;
+        }
+
+        .pricing-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            overflow: hidden;
+            box-shadow: var(--shadow);
+        }
+
+        .pricing-card.featured {
+            border: 3px solid var(--primary);
+            transform: scale(1.02);
+        }
+
+        .pricing-header {
+            background: var(--secondary);
+            padding: 20px;
+            text-align: center;
+        }
+
+        .pricing-header h3 {
+            margin-bottom: 4px;
+        }
+
+        .pricing-best {
+            font-size: 0.8rem;
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .pricing-body {
+            padding: 24px;
+        }
+
+        .price {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .price-amount {
+            font-size: 2.5rem;
+            font-weight: 800;
+            color: var(--primary);
+        }
+
+        .price-unit {
+            display: block;
+            color: var(--text-light);
+            font-size: 0.875rem;
+        }
+
+        .pricing-features {
+            list-style: none;
+            padding: 0;
+            margin: 0 0 24px;
+        }
+
+        .pricing-features li {
+            padding: 8px 0;
+            border-bottom: 1px solid var(--border);
+            font-size: 0.9rem;
+        }
+
+        .pricing-features li:before {
+            content: "✓ ";
+            color: var(--primary);
+            font-weight: bold;
+        }
+
+        .quantity-input {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 16px;
+        }
+
+        .quantity-input input {
+            flex: 1;
+            padding: 10px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            text-align: center;
+            font-size: 1rem;
+        }
+
+        .application-guide {
+            background: var(--white);
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            margin-bottom: 40px;
+        }
+
+        .application-guide h2 {
+            margin-bottom: 24px;
+        }
+
+        .guide-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+        }
+
+        .guide-card {
+            background: var(--secondary);
+            padding: 20px;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+
+        .guide-card h4 {
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .guide-card p {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .contact-section {
+            background: var(--white);
+            padding: 32px;
+            border-radius: var(--radius-lg);
+            text-align: center;
+        }
+
+        .contact-section h2 {
+            margin-bottom: 8px;
+        }
+
+        .contact-section > p {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .rep-cards {
+            display: flex;
+            justify-content: center;
+            gap: 32px;
+            flex-wrap: wrap;
+        }
+
+        .rep-card {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .rep-card a {
+            color: var(--primary);
+        }
+
+        @media (max-width: 768px) {
+            .product-hero {
+                flex-direction: column;
+                text-align: center;
+            }
+
+            .pricing-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-card.featured {
+                transform: none;
+            }
+
+            .guide-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+        }
+    </style>
+</body>
+</html>
