@@ -501,6 +501,7 @@
                     <h2>Product Catalog</h2>
                     <div class="tab-header-actions">
                         <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
+                        <button class="btn btn-outline" onclick="importCPDProducts()" id="importCPDBtn">Import CPD Products</button>
                         <div class="search-box">
                             <input type="text" id="productSearch" placeholder="Search products..." oninput="filterProducts()">
                         </div>
@@ -1337,6 +1338,80 @@
                 console.error('Error adding product:', error);
                 alert('Error adding product. Please try again.');
             }
+        }
+
+        // Bulk import CPD products with their cost prices
+        async function importCPDProducts() {
+            if (!confirm('This will import all CPD products with their cost prices. Sell prices will be set equal to cost (add margins after). Continue?')) {
+                return;
+            }
+
+            const btn = document.getElementById('importCPDBtn');
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+
+            // CPD Products from spreadsheet - costPrice is CPD cost, sellPrice starts same (add margins later)
+            const cpdProducts = [
+                { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', costPrice: 30.25, category: 'herbicide' },
+                { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', costPrice: 28.25, unitsPerPack: 250, category: 'herbicide' },
+                { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', costPrice: 30.57, unitsPerPack: 250, category: 'herbicide' },
+                { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', costPrice: 29.90, category: 'herbicide' },
+                { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', costPrice: 27.90, unitsPerPack: 250, category: 'herbicide' },
+                { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', costPrice: 12.90, unitsPerPack: 250, category: 'herbicide', equivalentProduct: 'RT3', notes: 'RT3 equivalent' },
+                { productName: 'AgSaver (Glystar Supreme)', packSize: 'Shuttle', unit: 'gl', costPrice: 12.90, unitsPerPack: 250, category: 'herbicide', equivalentProduct: 'Glystar Supreme' },
+                { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', costPrice: 13.35, unitsPerPack: 250, category: 'herbicide' },
+                { productName: 'Agri-Star (Level Best Pro)', packSize: '2x2.5', unit: 'gl', costPrice: 39.25, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
+                { productName: 'Agri-Star (Level Best Pro)', packSize: 'Shuttle', unit: 'gl', costPrice: 38.13, unitsPerPack: 250, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
+                { productName: 'Agri-Star (Tapran)', packSize: '2x2.5', unit: 'gl', costPrice: 19.00, category: 'herbicide', equivalentProduct: 'Tapran' },
+                { productName: 'Agri-Star (Tapran)', packSize: 'Shuttle', unit: 'gl', costPrice: 18.00, unitsPerPack: 250, category: 'herbicide', equivalentProduct: 'Tapran' },
+                { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', costPrice: 21.00, category: 'adjuvant' },
+                { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', costPrice: 20.00, unitsPerPack: 250, category: 'adjuvant' },
+                { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', costPrice: 70.50, category: 'herbicide' },
+                { productName: 'Valor SX', packSize: '4x5', unit: 'lb', costPrice: 14.25, category: 'herbicide' },
+                { productName: 'CPD Glufosinate', packSize: 'Shuttle', unit: 'gl', costPrice: 16.00, unitsPerPack: 250, category: 'herbicide' },
+                { productName: 'CPD Paraquat', packSize: 'Shuttle', unit: 'gl', costPrice: 15.25, unitsPerPack: 250, category: 'herbicide' },
+                { productName: 'CPD Mesotrione', packSize: '2x2.5', unit: 'gl', costPrice: 48.25, category: 'herbicide' },
+                { productName: 'CPD Clethodim', packSize: '2x2.5', unit: 'gl', costPrice: 33.50, category: 'herbicide' },
+                { productName: 'CPD Clethodim', packSize: '135', unit: 'gl', costPrice: 33.00, unitsPerPack: 135, category: 'herbicide' },
+                { productName: 'AMS x5', packSize: '24', unit: 'lb', costPrice: 1.45, category: 'adjuvant', notes: '24 lb bags' }
+            ];
+
+            // Set sellPrice = costPrice initially (margins added later)
+            const productsToImport = cpdProducts.map(p => ({
+                ...p,
+                sellPrice: p.costPrice,
+                sourceSupplier: 'CPD'
+            }));
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/bulk`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        chemicals: productsToImport,
+                        sourceSupplier: 'CPD',
+                        priceVersion: '2026-Q1'
+                    })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    alert(`Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}`);
+                    loadProducts();
+                } else {
+                    const error = await res.json();
+                    alert('Import failed: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error importing products:', error);
+                alert('Error importing products. Please try again.');
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Import CPD Products';
         }
 
         // ===== LEDGER TAB =====
