@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Multiseal Tire Sealant - Acre Profit">
-    <title>Multiseal Tire Sealant - Acre Profit</title>
+    <meta name="description" content="Farm Products - Acre Profit">
+    <title>Farm Products - Acre Profit</title>
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,29 +19,37 @@
             </a>
             <ul class="nav-links">
                 <li><a href="/dashboard.html">Dashboard</a></li>
-                <li><a href="/chemicals.html">Order Chemicals</a></li>
-                <li><a href="/multiseal.html" class="active">Multiseal</a></li>
+                <li><a href="/chemicals.html">Crop Protection</a></li>
+                <li><a href="/farm-products.html" class="active">Farm Products</a></li>
                 <li><a href="/merch.html">Merch</a></li>
                 <li><a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a></li>
             </ul>
         </div>
     </nav>
 
-    <main class="multiseal-page">
+    <main class="farm-products-page">
         <div class="container">
-            <!-- Hero Section -->
-            <div class="product-hero">
-                <div class="hero-content">
-                    <h1>Multiseal Tire Sealant</h1>
-                    <p class="hero-subtitle">Stop flats before they stop you. Premium tire sealant for farm equipment.</p>
-                    <div class="hero-benefits">
-                        <span class="benefit">Seals punctures up to 1/4"</span>
-                        <span class="benefit">Extends tire life</span>
-                        <span class="benefit">Works in all temperatures</span>
+            <!-- Page Header -->
+            <div class="page-header">
+                <h1>Farm Products</h1>
+                <p>Quality farm supplies at bulk pricing</p>
+            </div>
+
+            <!-- Multiseal Section -->
+            <div class="product-section" id="multiseal">
+                <div class="product-hero">
+                    <div class="hero-content">
+                        <h2>Multiseal Tire Sealant</h2>
+                        <p class="hero-subtitle">Stop flats before they stop you. Premium tire sealant for farm equipment.</p>
+                        <div class="hero-benefits">
+                            <span class="benefit">Seals punctures up to 1/4"</span>
+                            <span class="benefit">Extends tire life</span>
+                            <span class="benefit">Works in all temperatures</span>
+                        </div>
                     </div>
-                </div>
-                <div class="hero-image">
-                    <div class="tire-icon">🛞</div>
+                    <div class="hero-image">
+                        <div class="tire-icon">🛞</div>
+                    </div>
                 </div>
             </div>
 
@@ -202,10 +210,27 @@
     </script>
 
     <style>
-        .multiseal-page {
+        .farm-products-page {
             padding: 100px 0 60px;
             background: var(--secondary);
             min-height: 100vh;
+        }
+
+        .page-header {
+            margin-bottom: 32px;
+        }
+
+        .page-header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+        }
+
+        .page-header p {
+            color: var(--text-light);
+        }
+
+        .product-section {
+            margin-bottom: 48px;
         }
 
         .product-hero {
