@@ -169,13 +169,67 @@
             <!-- Customers Tab -->
             <div id="customersTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>My Customers</h2>
-                    <div class="search-box">
-                        <input type="text" id="customerSearch" placeholder="Search customers...">
+                    <h2 id="customersTabTitle">My Customers</h2>
+                    <div class="tab-header-actions">
+                        <div class="search-box">
+                            <input type="text" id="customerSearch" placeholder="Search customers...">
+                        </div>
                     </div>
                 </div>
                 <div class="customers-grid" id="customersGrid">
                     <p class="loading">Loading customers...</p>
+                </div>
+            </div>
+
+            <!-- Customer Detail Modal -->
+            <div class="modal-overlay" id="customerModal" style="display: none;">
+                <div class="modal-content customer-modal-content">
+                    <button class="modal-close" onclick="closeCustomerModal()">&times;</button>
+                    <div class="customer-modal-header">
+                        <div class="customer-modal-avatar" id="modalCustomerAvatar">JD</div>
+                        <div class="customer-modal-title">
+                            <h2 id="modalCustomerName">Customer Name</h2>
+                            <p id="modalCustomerFarm">Farm Name</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <div class="customer-info-grid">
+                            <div class="info-item">
+                                <span class="info-label">Email</span>
+                                <span class="info-value" id="modalCustomerEmail">email@example.com</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Phone</span>
+                                <span class="info-value" id="modalCustomerPhone">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">State</span>
+                                <span class="info-value" id="modalCustomerState">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Acres</span>
+                                <span class="info-value" id="modalCustomerAcres">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Crops</span>
+                                <span class="info-value" id="modalCustomerCrops">-</span>
+                            </div>
+                            <div class="info-item">
+                                <span class="info-label">Total Orders</span>
+                                <span class="info-value" id="modalCustomerOrderCount">0</span>
+                            </div>
+                        </div>
+                        <div class="customer-orders-section">
+                            <h3>Recent Orders</h3>
+                            <div id="modalCustomerOrders" class="customer-orders-list">
+                                <p class="empty">No orders yet</p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeCustomerModal()">Close</button>
+                        <button class="btn btn-primary" id="placeOrderBtn" onclick="actAsCustomer()">Place Order for Customer</button>
+                    </div>
                 </div>
             </div>
 
@@ -366,6 +420,15 @@
 
         document.getElementById('adminName').textContent = userData.name.split(' ')[0];
 
+        // Update customers tab title based on role
+        if (userData.role === 'superadmin') {
+            document.getElementById('customersTabTitle').textContent = 'All Customers';
+        }
+
+        // Store for customer data
+        let allCustomers = [];
+        let selectedCustomer = null;
+
         // Tab navigation
         document.querySelectorAll('.nav-tab').forEach(tab => {
             tab.addEventListener('click', function(e) {
@@ -441,23 +504,10 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const customers = await customersRes.json();
+                allCustomers = customers;
 
                 document.getElementById('totalCustomers').textContent = customers.length;
-
-                document.getElementById('customersGrid').innerHTML = customers.length ? customers.map(c => `
-                    <div class="customer-card">
-                        <div class="customer-avatar">${c.name.split(' ').map(n => n[0]).join('')}</div>
-                        <div class="customer-info">
-                            <h4>${c.name}</h4>
-                            <p>${c.farm?.name || 'No farm name'}</p>
-                            <p class="customer-detail">${c.farm?.acres?.toLocaleString() || 0} acres • ${c.farm?.state || 'N/A'}</p>
-                            <div class="customer-contact">
-                                <a href="mailto:${c.email}">${c.email}</a>
-                                ${c.phone ? `<a href="tel:${c.phone}">${c.phone}</a>` : ''}
-                            </div>
-                        </div>
-                    </div>
-                `).join('') : '<p class="empty">No customers yet</p>';
+                renderCustomers(customers);
 
             } catch (error) {
                 console.error('Error loading dashboard:', error);
@@ -522,6 +572,149 @@
                 } catch (error) {
                     console.error('Error updating status:', error);
                 }
+            }
+        });
+
+        // Render customers grid
+        function renderCustomers(customers) {
+            document.getElementById('customersGrid').innerHTML = customers.length ? customers.map(c => `
+                <div class="customer-card" data-customer-id="${c._id}">
+                    <div class="customer-avatar">${c.name.split(' ').map(n => n[0]).join('')}</div>
+                    <div class="customer-info">
+                        <h4>${c.name}</h4>
+                        <p>${c.farm || 'No farm name'}</p>
+                        <p class="customer-detail">${c.acres?.toLocaleString() || 0} acres • ${c.state || 'N/A'}</p>
+                        <div class="customer-contact">
+                            <a href="mailto:${c.email}">${c.email}</a>
+                            ${c.phone ? `<a href="tel:${c.phone}">${c.phone}</a>` : ''}
+                        </div>
+                    </div>
+                    <div class="customer-actions">
+                        <button class="btn btn-sm btn-outline" onclick="viewCustomer('${c._id}')">View Details</button>
+                        <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${c.name.replace(/'/g, "\\'")}')">Place Order</button>
+                    </div>
+                </div>
+            `).join('') : '<p class="empty">No customers yet</p>';
+        }
+
+        // Customer search functionality
+        document.getElementById('customerSearch').addEventListener('input', function(e) {
+            const searchTerm = e.target.value.toLowerCase();
+            if (searchTerm.length === 0) {
+                renderCustomers(allCustomers);
+                return;
+            }
+            const filtered = allCustomers.filter(c =>
+                c.name.toLowerCase().includes(searchTerm) ||
+                c.email.toLowerCase().includes(searchTerm) ||
+                (c.farm && c.farm.toLowerCase().includes(searchTerm)) ||
+                (c.state && c.state.toLowerCase().includes(searchTerm))
+            );
+            renderCustomers(filtered);
+        });
+
+        // View customer details
+        async function viewCustomer(customerId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/customers/${customerId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const customer = await res.json();
+
+                if (res.ok) {
+                    selectedCustomer = customer;
+                    showCustomerModal(customer);
+                } else {
+                    alert(customer.error || 'Error loading customer');
+                }
+            } catch (error) {
+                console.error('Error loading customer:', error);
+                alert('Error loading customer details');
+            }
+        }
+
+        // Show customer modal
+        function showCustomerModal(customer) {
+            const initials = customer.name.split(' ').map(n => n[0]).join('');
+            document.getElementById('modalCustomerAvatar').textContent = initials;
+            document.getElementById('modalCustomerName').textContent = customer.name;
+            document.getElementById('modalCustomerFarm').textContent = customer.farm || 'No farm name';
+            document.getElementById('modalCustomerEmail').textContent = customer.email;
+            document.getElementById('modalCustomerPhone').textContent = customer.phone || '-';
+            document.getElementById('modalCustomerState').textContent = customer.state || '-';
+            document.getElementById('modalCustomerAcres').textContent = customer.acres ? customer.acres.toLocaleString() : '-';
+            document.getElementById('modalCustomerCrops').textContent = customer.crops?.join(', ') || '-';
+            document.getElementById('modalCustomerOrderCount').textContent = customer.orderCount || 0;
+
+            // Render orders
+            const ordersHtml = customer.orders && customer.orders.length ? customer.orders.map(order => `
+                <div class="customer-order-item">
+                    <div class="order-item-info">
+                        <span class="order-crop">${order.crop || 'General'}</span>
+                        <span class="order-date">${new Date(order.createdAt).toLocaleDateString()}</span>
+                    </div>
+                    <div class="order-item-details">
+                        <span class="order-acres">${order.acres?.toLocaleString() || 0} acres</span>
+                        <span class="order-total">$${order.totalPrice?.toLocaleString() || 0}</span>
+                        <span class="order-status status-${order.status}">${order.status}</span>
+                    </div>
+                </div>
+            `).join('') : '<p class="empty">No orders yet</p>';
+
+            document.getElementById('modalCustomerOrders').innerHTML = ordersHtml;
+            document.getElementById('customerModal').style.display = 'flex';
+        }
+
+        // Close customer modal
+        function closeCustomerModal() {
+            document.getElementById('customerModal').style.display = 'none';
+            selectedCustomer = null;
+        }
+
+        // Act as customer (from modal)
+        function actAsCustomer() {
+            if (!selectedCustomer) return;
+
+            // Store customer info in sessionStorage
+            sessionStorage.setItem('actingAsCustomer', JSON.stringify({
+                id: selectedCustomer._id,
+                name: selectedCustomer.name,
+                email: selectedCustomer.email,
+                farm: selectedCustomer.farm,
+                phone: selectedCustomer.phone
+            }));
+
+            // Redirect to order page
+            window.location.href = '/order.html';
+        }
+
+        // Quick act as customer (from card button)
+        function quickActAsCustomer(customerId, customerName) {
+            const customer = allCustomers.find(c => c._id === customerId);
+            if (!customer) return;
+
+            sessionStorage.setItem('actingAsCustomer', JSON.stringify({
+                id: customer._id,
+                name: customer.name,
+                email: customer.email,
+                farm: customer.farm,
+                phone: customer.phone
+            }));
+
+            window.location.href = '/order.html';
+        }
+
+        // Close modal on escape key
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                closeCustomerModal();
+            }
+        });
+
+        // Close modal on overlay click
+        document.getElementById('customerModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                closeCustomerModal();
             }
         });
 
@@ -966,6 +1159,185 @@
             border: 2px solid var(--border);
             border-radius: var(--radius);
             width: 250px;
+        }
+
+        .tab-header-actions {
+            display: flex;
+            gap: 16px;
+            align-items: center;
+        }
+
+        .customer-card {
+            position: relative;
+            flex-direction: column;
+        }
+
+        .customer-card .customer-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .customer-card .customer-actions .btn {
+            flex: 1;
+        }
+
+        /* Customer Modal Styles */
+        .modal-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 1000;
+            padding: 20px;
+        }
+
+        .modal-content {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            max-width: 600px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+
+        .modal-close {
+            position: absolute;
+            top: 16px;
+            right: 16px;
+            background: none;
+            border: none;
+            font-size: 24px;
+            cursor: pointer;
+            color: var(--text-muted);
+            z-index: 10;
+        }
+
+        .customer-modal-header {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            padding: 32px;
+            background: var(--primary);
+            color: var(--white);
+        }
+
+        .customer-modal-avatar {
+            width: 72px;
+            height: 72px;
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.5rem;
+            font-weight: 700;
+        }
+
+        .customer-modal-title h2 {
+            margin-bottom: 4px;
+        }
+
+        .customer-modal-title p {
+            opacity: 0.9;
+        }
+
+        .customer-modal-body {
+            padding: 24px 32px;
+        }
+
+        .customer-info-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 16px;
+            margin-bottom: 24px;
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .info-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .info-value {
+            font-size: 1rem;
+            color: var(--text);
+        }
+
+        .customer-orders-section h3 {
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .customer-orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .customer-order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            background: var(--secondary);
+            border-radius: var(--radius);
+        }
+
+        .order-item-info {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+
+        .order-crop {
+            font-weight: 600;
+        }
+
+        .order-date {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        .order-item-details {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .order-acres {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .order-total {
+            font-weight: 600;
+        }
+
+        .customer-modal-actions {
+            display: flex;
+            gap: 12px;
+            padding: 24px 32px;
+            border-top: 1px solid var(--border);
+            justify-content: flex-end;
         }
 
         @media (max-width: 1024px) {

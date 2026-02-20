@@ -863,6 +863,81 @@
         }
 
         const userData = JSON.parse(user);
+
+        // Check if admin is acting as a customer
+        let actingAsCustomer = null;
+        const actingAsData = sessionStorage.getItem('actingAsCustomer');
+        if (actingAsData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+            actingAsCustomer = JSON.parse(actingAsData);
+            showActingAsBanner();
+        }
+
+        function showActingAsBanner() {
+            const banner = document.createElement('div');
+            banner.id = 'actingAsBanner';
+            banner.className = 'acting-as-banner';
+            banner.innerHTML = `
+                <div class="acting-as-content">
+                    <span class="acting-as-icon">👤</span>
+                    <span class="acting-as-text">
+                        <strong>Placing order for:</strong> ${actingAsCustomer.name}
+                        ${actingAsCustomer.farm ? `(${actingAsCustomer.farm})` : ''}
+                    </span>
+                    <button class="btn btn-sm btn-outline acting-as-exit" onclick="exitActingAs()">Exit</button>
+                </div>
+            `;
+            document.body.insertBefore(banner, document.body.firstChild);
+
+            // Add styles for the banner
+            const style = document.createElement('style');
+            style.textContent = `
+                .acting-as-banner {
+                    background: linear-gradient(135deg, #2D5A27 0%, #4a7c44 100%);
+                    color: white;
+                    padding: 12px 24px;
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    right: 0;
+                    z-index: 9999;
+                }
+                .acting-as-content {
+                    max-width: 1200px;
+                    margin: 0 auto;
+                    display: flex;
+                    align-items: center;
+                    gap: 12px;
+                }
+                .acting-as-icon {
+                    font-size: 1.25rem;
+                }
+                .acting-as-text {
+                    flex: 1;
+                }
+                .acting-as-exit {
+                    background: rgba(255,255,255,0.2);
+                    color: white;
+                    border-color: rgba(255,255,255,0.3);
+                }
+                .acting-as-exit:hover {
+                    background: rgba(255,255,255,0.3);
+                }
+                body.has-acting-banner .navbar {
+                    top: 48px;
+                }
+                body.has-acting-banner .order-page {
+                    padding-top: 148px;
+                }
+            `;
+            document.head.appendChild(style);
+            document.body.classList.add('has-acting-banner');
+        }
+
+        function exitActingAs() {
+            sessionStorage.removeItem('actingAsCustomer');
+            window.location.href = '/admin.html';
+        }
+
         let selectedYear = 2026;
         let selectedMerchOption = null;
         let orderData = {
@@ -1261,30 +1336,49 @@
             }
 
             try {
-                const response = await fetch(`${API_URL}/api/orders`, {
+                let endpoint = `${API_URL}/api/orders`;
+                let orderPayload = {
+                    year: selectedYear,
+                    crops: orderData.crops,
+                    totalAcres: orderData.totalAcres,
+                    totalCost: orderData.totalCost,
+                    totalPrice: orderData.totalCost,
+                    acres: orderData.totalAcres,
+                    merchCredit: orderData.merchCredit
+                };
+
+                // If admin is acting as customer, use the admin endpoint
+                if (actingAsCustomer) {
+                    endpoint = `${API_URL}/api/admin/orders/for-customer`;
+                    orderPayload.customerId = actingAsCustomer.id;
+                    orderPayload.status = 'draft';
+                }
+
+                const response = await fetch(endpoint, {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({
-                        year: selectedYear,
-                        crops: orderData.crops,
-                        totalAcres: orderData.totalAcres,
-                        totalCost: orderData.totalCost,
-                        merchCredit: orderData.merchCredit
-                    })
+                    body: JSON.stringify(orderPayload)
                 });
 
                 if (response.ok) {
-                    alert('Order submitted successfully! Your representative will contact you soon.');
-                    window.location.href = '/dashboard.html';
+                    if (actingAsCustomer) {
+                        sessionStorage.removeItem('actingAsCustomer');
+                        alert(`Order created successfully for ${actingAsCustomer.name}!`);
+                        window.location.href = '/admin.html';
+                    } else {
+                        alert('Order submitted successfully! Your representative will contact you soon.');
+                        window.location.href = '/dashboard.html';
+                    }
                 } else {
-                    throw new Error('Failed to submit order');
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to submit order');
                 }
             } catch (error) {
                 console.error('Error:', error);
-                alert('Order saved locally. Please contact your representative to confirm.');
+                alert(error.message || 'Order saved locally. Please contact your representative to confirm.');
             }
         }
 
