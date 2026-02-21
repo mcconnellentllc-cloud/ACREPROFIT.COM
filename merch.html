@@ -38,26 +38,7 @@
             <div class="merch-header">
                 <div class="merch-intro">
                     <h1>Acre Profit Merch</h1>
-                    <p>Earn <strong>$20 in merch credit</strong> for every <strong>$2,000</strong> you spend on bulk orders.</p>
-                </div>
-                <div class="credit-card">
-                    <div class="credit-icon">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>
-                    </div>
-                    <div class="credit-info">
-                        <span class="credit-label">Your Merch Credit</span>
-                        <span class="credit-amount" id="creditAmount">$0.00</span>
-                    </div>
-                </div>
-            </div>
-
-            <div class="merch-progress">
-                <div class="progress-info">
-                    <span>Progress to next $50 credit:</span>
-                    <span id="progressText">$0 / $2,000</span>
-                </div>
-                <div class="progress-bar">
-                    <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                    <p>Quality farm workwear and gear.</p>
                 </div>
             </div>
 
@@ -76,16 +57,8 @@
                 </div>
                 <div class="cart-footer">
                     <div class="cart-totals">
-                        <div class="cart-row">
-                            <span>Subtotal</span>
-                            <span id="cartSubtotal">$0.00</span>
-                        </div>
-                        <div class="cart-row credit-row">
-                            <span>Merch Credit Applied</span>
-                            <span id="creditApplied">-$0.00</span>
-                        </div>
                         <div class="cart-row total-row">
-                            <span>Total Due</span>
+                            <span>Total</span>
                             <span id="cartTotal">$0.00</span>
                         </div>
                     </div>
@@ -235,30 +208,6 @@
 
         // Cart state
         let cart = [];
-        let merchCredit = 0;
-        let totalSpent = 0;
-
-        // Load merch credit
-        async function loadMerchCredit() {
-            try {
-                const response = await fetch(`${API_URL}/api/merch-credit`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-
-                merchCredit = data.creditAvailable || 0;
-                totalSpent = data.totalSpent || 0;
-
-                document.getElementById('creditAmount').textContent = `$${merchCredit.toFixed(2)}`;
-
-                const currentInCycle = totalSpent % 2000;
-                const progressPercent = (currentInCycle / 2000) * 100;
-                document.getElementById('progressFill').style.width = `${progressPercent}%`;
-                document.getElementById('progressText').textContent = `$${currentInCycle.toLocaleString()} / $2,000`;
-            } catch (error) {
-                console.error('Error loading merch credit:', error);
-            }
-        }
 
         // Cart functionality
         const cartOverlay = document.getElementById('cartOverlay');
@@ -311,23 +260,19 @@
 
         function updateCart() {
             const cartItems = document.getElementById('cartItems');
-            const cartSubtotal = document.getElementById('cartSubtotal');
-            const creditApplied = document.getElementById('creditApplied');
             const cartTotal = document.getElementById('cartTotal');
             const checkoutBtn = document.getElementById('checkoutBtn');
 
             if (cart.length === 0) {
                 cartItems.innerHTML = '<p class="cart-empty">Your cart is empty</p>';
-                cartSubtotal.textContent = '$0.00';
-                creditApplied.textContent = '-$0.00';
                 cartTotal.textContent = '$0.00';
                 checkoutBtn.disabled = true;
                 return;
             }
 
-            let subtotal = 0;
+            let total = 0;
             cartItems.innerHTML = cart.map(item => {
-                subtotal += item.price * item.quantity;
+                total += item.price * item.quantity;
                 return `
                     <div class="cart-item">
                         <div class="cart-item-info">
@@ -344,11 +289,6 @@
                 `;
             }).join('');
 
-            const appliedCredit = Math.min(merchCredit, subtotal);
-            const total = Math.max(0, subtotal - appliedCredit);
-
-            cartSubtotal.textContent = `$${subtotal.toFixed(2)}`;
-            creditApplied.textContent = `-$${appliedCredit.toFixed(2)}`;
             cartTotal.textContent = `$${total.toFixed(2)}`;
             checkoutBtn.disabled = false;
         }
@@ -370,9 +310,7 @@
             btn.disabled = true;
             btn.textContent = 'Processing...';
 
-            const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
-            const appliedCredit = Math.min(merchCredit, subtotal);
-            const totalDue = Math.max(0, subtotal - appliedCredit);
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
 
             try {
                 // Submit merch order to API
@@ -390,9 +328,7 @@
                             quantity: item.quantity,
                             price: item.price
                         })),
-                        subtotal,
-                        creditApplied: appliedCredit,
-                        totalDue,
+                        total,
                         shippingAddress: userData.farm ? {
                             name: userData.name,
                             address: userData.farm.address || '',
@@ -409,28 +345,12 @@
                     throw new Error(result.error || 'Failed to place order');
                 }
 
-                // Use merch credit if applied
-                if (appliedCredit > 0) {
-                    await fetch(`${API_URL}/api/merch-credit/use`, {
-                        method: 'POST',
-                        headers: {
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${token}`
-                        },
-                        body: JSON.stringify({
-                            amount: appliedCredit,
-                            description: `Merch order: ${cart.map(i => i.name).join(', ')}`
-                        })
-                    });
-                }
-
                 // Success
-                alert(`Order placed successfully! ${appliedCredit > 0 ? `$${appliedCredit.toFixed(2)} credit applied. ` : ''}${totalDue > 0 ? `Amount due: $${totalDue.toFixed(2)}. ` : ''}You'll receive shipping confirmation via email.`);
+                alert(`Order placed successfully! Total: $${total.toFixed(2)}. You'll receive shipping confirmation via email.`);
 
                 cart = [];
                 updateCart();
                 closeCart();
-                loadMerchCredit();
 
             } catch (error) {
                 alert('Error: ' + error.message);
@@ -442,7 +362,6 @@
 
         // Initialize
         renderProducts();
-        loadMerchCredit();
     </script>
 
     <style>

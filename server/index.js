@@ -211,6 +211,11 @@ const orderSchema = new mongoose.Schema({
     },
     totalCost: Number,
     costPerAcre: Number,
+    // Commission tracking (3-tier pricing)
+    repCommission: { type: Number, default: 0 }, // Amount going to rep (sellPrice - adminPrice)
+    adminRevenue: { type: Number, default: 0 }, // Acre Profit revenue (adminPrice - costPrice)
+    totalCost_cost: { type: Number }, // Total at cost tier
+    totalCost_admin: { type: Number }, // Total at admin tier
     // Payment information
     paymentMethod: {
         type: String,
@@ -297,6 +302,31 @@ const merchCreditSchema = new mongoose.Schema({
 
 const MerchCredit = mongoose.model('MerchCredit', merchCreditSchema);
 
+// Rep Commission Tracking Model
+const repCommissionSchema = new mongoose.Schema({
+    repId: { type: String, required: true }, // 'kyle', 'ty', 'chad' or ObjectId for user-reps
+    repName: String,
+    // Running totals
+    totalCommissionEarned: { type: Number, default: 0 },
+    totalCommissionPaid: { type: Number, default: 0 },
+    commissionBalance: { type: Number, default: 0 }, // Earned - Paid
+    // Commission history
+    history: [{
+        orderId: mongoose.Schema.Types.ObjectId,
+        customerId: mongoose.Schema.Types.ObjectId,
+        customerName: String,
+        orderTotal: Number, // Retail total
+        commissionAmount: Number,
+        status: { type: String, enum: ['pending', 'paid'], default: 'pending' },
+        date: { type: Date, default: Date.now },
+        paidDate: Date
+    }],
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const RepCommission = mongoose.model('RepCommission', repCommissionSchema);
+
 // Chemical Pricing Model
 const chemicalSchema = new mongoose.Schema({
     // Product info
@@ -312,9 +342,11 @@ const chemicalSchema = new mongoose.Schema({
     unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
     unitsPerPack: { type: Number }, // e.g., 250 for a Shuttle (250 gal)
 
-    // Pricing - COST is what Acre Profit pays, SELL is customer price
-    costPrice: { type: Number, required: true }, // What we pay the supplier (per unit)
-    sellPrice: { type: Number, required: true }, // What we charge customers (per unit)
+    // Pricing - 3-tier pricing model
+    costPrice: { type: Number, required: true }, // Tier 1: What we pay the supplier (per unit)
+    adminPrice: { type: Number }, // Tier 2: Cost + Acre Profit admin margin (per unit)
+    sellPrice: { type: Number, required: true }, // Tier 3: Retail price - what customer pays (per unit)
+    // Rep commission = sellPrice - adminPrice (goes to the customer's assigned rep)
     margin: { type: Number }, // Calculated: (sellPrice - costPrice) / sellPrice * 100
 
     // Application info (for program building)
