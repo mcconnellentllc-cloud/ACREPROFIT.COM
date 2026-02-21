@@ -51,6 +51,14 @@
                     <h1>Welcome back, <span id="userName">Farmer</span></h1>
                     <p>What are you buying today? Pool your orders with other farmers to unlock bulk pricing.</p>
                 </div>
+                <div class="rep-info-card" id="repInfoCard">
+                    <div class="rep-icon">📍</div>
+                    <div class="rep-details">
+                        <span class="rep-label">Your Rep & Pickup</span>
+                        <span class="rep-name" id="repName">-</span>
+                        <span class="rep-location" id="repLocation">-</span>
+                    </div>
+                </div>
             </div>
 
             <!-- Product Categories -->
@@ -270,6 +278,20 @@
         // Populate user info
         document.getElementById('userName').textContent = userData.name.split(' ')[0];
 
+        // Rep data
+        const reps = {
+            kyle: { name: 'Kyle McConnell', phone: '(970) 571-1015', location: 'Yuma, CO' },
+            ty: { name: 'Ty Mollohan', phone: '(970) 520-2340', location: 'Wray, CO' },
+            chad: { name: 'Chad Bamford', phone: '(970) 520-3716', location: 'Burlington, CO' }
+        };
+
+        // Show rep info
+        const repId = userData.representativeId;
+        if (repId && reps[repId]) {
+            document.getElementById('repName').textContent = reps[repId].name;
+            document.getElementById('repLocation').textContent = 'Pickup: ' + reps[repId].location;
+        }
+
         // Logout handler
         document.getElementById('logoutBtn').addEventListener('click', function(e) {
             e.preventDefault();
@@ -353,31 +375,41 @@
             font-size: 1.125rem;
         }
 
-        .merch-credit-badge {
+        .rep-info-card {
             display: flex;
             align-items: center;
             gap: 12px;
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
             padding: 16px 24px;
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow);
         }
 
-        .merch-credit-badge .credit-icon {
+        .rep-info-card .rep-icon {
             font-size: 2rem;
         }
 
-        .merch-credit-badge .credit-label {
-            display: block;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            text-transform: uppercase;
+        .rep-info-card .rep-details {
+            display: flex;
+            flex-direction: column;
         }
 
-        .merch-credit-badge .credit-amount {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: #92400e;
+        .rep-info-card .rep-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .rep-info-card .rep-name {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .rep-info-card .rep-location {
+            font-size: 0.875rem;
+            color: var(--primary);
+            font-weight: 500;
         }
 
         /* Category Grid */

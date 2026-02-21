@@ -131,30 +131,32 @@
                     </div>
 
                     <div class="form-section">
-                        <h3>Choose Your Representative *</h3>
-                        <p class="section-note">Select the representative who will service your account.</p>
+                        <h3>Choose Your Representative & Pickup Location *</h3>
+                        <p class="section-note">Your rep is your point of contact and pickup location for orders.</p>
 
                         <div class="rep-grid" id="repGrid">
-                            <!-- Representatives loaded dynamically -->
                             <label class="rep-card">
                                 <input type="radio" name="representative" value="kyle" required>
                                 <div class="rep-info">
                                     <span class="rep-name">Kyle McConnell</span>
-                                    <span class="rep-contact">(970) 571-1015</span>
+                                    <span class="rep-phone">(970) 571-1015</span>
+                                    <span class="rep-location">Pickup: Yuma, CO</span>
                                 </div>
                             </label>
                             <label class="rep-card">
                                 <input type="radio" name="representative" value="ty">
                                 <div class="rep-info">
                                     <span class="rep-name">Ty Mollohan</span>
-                                    <span class="rep-contact">(970) 520-2340</span>
+                                    <span class="rep-phone">(970) 520-2340</span>
+                                    <span class="rep-location">Pickup: Wray, CO</span>
                                 </div>
                             </label>
                             <label class="rep-card">
                                 <input type="radio" name="representative" value="chad">
                                 <div class="rep-info">
                                     <span class="rep-name">Chad Bamford</span>
-                                    <span class="rep-contact">(970) 520-3716</span>
+                                    <span class="rep-phone">(970) 520-3716</span>
+                                    <span class="rep-location">Pickup: Burlington, CO</span>
                                 </div>
                             </label>
                         </div>
@@ -432,9 +434,16 @@
             color: var(--text);
         }
 
-        .rep-contact {
+        .rep-phone {
             font-size: 0.875rem;
             color: var(--text-muted);
+        }
+
+        .rep-location {
+            font-size: 0.875rem;
+            color: var(--primary);
+            font-weight: 500;
+            margin-top: 4px;
         }
 
         .error-message {
