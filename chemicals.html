@@ -218,10 +218,6 @@
                         <span>Estimated Total</span>
                         <span id="orderTotal">$0.00</span>
                     </div>
-                    <div class="credit-row">
-                        <span>Merch Credit Earned</span>
-                        <span id="merchCreditEarned">$0.00</span>
-                    </div>
                 </div>
                 <button id="submitOrder" class="btn btn-primary btn-block" disabled>
                     Submit Order
@@ -968,10 +964,6 @@
                                 <td colspan="4"><strong>Estimated Total</strong></td>
                                 <td><strong>$${totalCost.toFixed(2)}</strong></td>
                             </tr>
-                            <tr>
-                                <td colspan="4">Merch Credit Earned ($10 per $1,000)</td>
-                                <td>$${(Math.floor(totalCost / 1000) * 10).toFixed(2)}</td>
-                            </tr>
                         </tfoot>
                     </table>
                     <button class="btn btn-primary" onclick="addCropOrderToCart()">Add All to Order</button>
@@ -1260,10 +1252,6 @@
                                 <td colspan="3">Cost Per Acre</td>
                                 <td>$${(totalCost / acres).toFixed(2)}</td>
                             </tr>
-                            <tr class="merch-row">
-                                <td colspan="3">Merch Credit Earned ($10 per $1,000)</td>
-                                <td class="merch-credit">+$${(Math.floor(totalCost / 1000) * 10).toFixed(2)}</td>
-                            </tr>
                         </tfoot>
                     </table>
 
@@ -1409,14 +1397,12 @@
             const summaryItems = document.getElementById('summaryItems');
             const itemCount = document.getElementById('itemCount');
             const orderTotal = document.getElementById('orderTotal');
-            const merchCredit = document.getElementById('merchCreditEarned');
             const submitBtn = document.getElementById('submitOrder');
 
             if (orderItems.length === 0) {
                 summaryItems.innerHTML = '<p class="empty-cart">No items added yet</p>';
                 itemCount.textContent = '0 items';
                 orderTotal.textContent = '$0.00';
-                merchCredit.textContent = '$0.00';
                 submitBtn.disabled = true;
                 return;
             }
@@ -1438,7 +1424,6 @@
 
             itemCount.textContent = `${orderItems.length} items`;
             orderTotal.textContent = `$${total.toFixed(2)}`;
-            merchCredit.textContent = `$${(Math.floor(total / 1000) * 10).toFixed(2)}`;
             submitBtn.disabled = false;
         }
 

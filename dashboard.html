@@ -51,13 +51,6 @@
                     <h1>Welcome back, <span id="userName">Farmer</span></h1>
                     <p>What are you buying today? Pool your orders with other farmers to unlock bulk pricing.</p>
                 </div>
-                <div class="merch-credit-badge">
-                    <span class="credit-icon">🎁</span>
-                    <div class="credit-info">
-                        <span class="credit-label">Merch Credit</span>
-                        <span class="credit-amount" id="merchCredit">$0.00</span>
-                    </div>
-                </div>
             </div>
 
             <!-- Product Categories -->
@@ -276,7 +269,6 @@
 
         // Populate user info
         document.getElementById('userName').textContent = userData.name.split(' ')[0];
-        document.getElementById('merchCredit').textContent = `$${(userData.merchCredit || 0).toFixed(2)}`;
 
         // Logout handler
         document.getElementById('logoutBtn').addEventListener('click', function(e) {
