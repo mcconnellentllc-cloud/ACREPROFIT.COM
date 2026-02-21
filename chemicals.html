@@ -987,12 +987,22 @@
             // Convert to gallons if needed
             if (targetUnit === 'gl') {
                 if (rateUnit.includes('oz')) {
-                    totalNeeded = totalNeeded / 128;
+                    totalNeeded = totalNeeded / 128; // fl oz to gallons
                 } else if (rateUnit.includes('pt')) {
                     totalNeeded = totalNeeded / 8;
                 } else if (rateUnit.includes('qt')) {
                     totalNeeded = totalNeeded / 4;
                 }
+            }
+            // Convert to pounds if needed
+            else if (targetUnit === 'lb') {
+                if (rateUnit.includes('oz')) {
+                    totalNeeded = totalNeeded / 16; // oz to lb
+                }
+            }
+            // Convert to oz if needed (for products sold in oz packages)
+            else if (targetUnit === 'oz') {
+                // rate is already in oz, no conversion needed
             }
             return totalNeeded;
         }
