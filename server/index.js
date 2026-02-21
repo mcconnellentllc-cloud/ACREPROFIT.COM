@@ -219,7 +219,7 @@ const orderSchema = new mongoose.Schema({
     // Payment information
     paymentMethod: {
         type: String,
-        enum: ['stripe_ach', 'stripe_card', 'check', 'pending'],
+        enum: ['stripe_ach', 'check', 'pending'],
         default: 'pending'
     },
     paymentStatus: {
@@ -2519,7 +2519,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
 
         // Update order with payment intent
         order.stripePaymentIntentId = paymentIntent.id;
-        order.paymentMethod = paymentMethod === 'ach' ? 'stripe_ach' : 'stripe_card';
+        order.paymentMethod = 'stripe_ach'; // ACH only - no credit cards
         order.paymentStatus = 'processing';
         await order.save();
 
