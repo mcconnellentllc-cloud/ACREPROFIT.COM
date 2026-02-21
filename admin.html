@@ -23,6 +23,8 @@
                 <li><a href="#customers" class="nav-tab" data-tab="customers">Customers</a></li>
                 <li><a href="#bundles" class="nav-tab" data-tab="bundles">Bundles</a></li>
                 <li><a href="#products" class="nav-tab" data-tab="products">Products</a></li>
+                <li id="pricingNav" style="display: none;"><a href="#pricing" class="nav-tab" data-tab="pricing">Pricing Tiers</a></li>
+                <li id="commissionsNav" style="display: none;"><a href="#commissions" class="nav-tab" data-tab="commissions">Rep Commissions</a></li>
                 <li><a href="#ledger" class="nav-tab" data-tab="ledger">Ledger</a></li>
                 <li><a href="#compliance" class="nav-tab" data-tab="compliance" style="color: #dc2626;">Compliance</a></li>
                 <li id="repAppsNav" style="display: none;"><a href="#applications" class="nav-tab" data-tab="applications">Rep Applications</a></li>
@@ -923,6 +925,210 @@
                 </div>
             </div>
 
+            <!-- Pricing Tiers Tab (Superadmin Only) -->
+            <div id="pricingTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>3-Tier Pricing Management</h2>
+                    <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
+                </div>
+
+                <div class="pricing-explanation">
+                    <div class="pricing-tier-card cost">
+                        <h4>Tier 1: Cost Price</h4>
+                        <p>What we pay suppliers</p>
+                    </div>
+                    <div class="pricing-arrow">→</div>
+                    <div class="pricing-tier-card admin">
+                        <h4>Tier 2: Admin Price</h4>
+                        <p>Cost + Acre Profit margin</p>
+                    </div>
+                    <div class="pricing-arrow">→</div>
+                    <div class="pricing-tier-card retail">
+                        <h4>Tier 3: Retail Price</h4>
+                        <p>What customers pay</p>
+                    </div>
+                </div>
+
+                <div class="commission-note">
+                    <strong>Rep Commission</strong> = Retail Price - Admin Price (per unit sold)
+                </div>
+
+                <div class="orders-table-wrapper" style="margin-top: 24px;">
+                    <table class="admin-table" id="pricingTable">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Category</th>
+                                <th>Unit</th>
+                                <th style="background: #fee2e2;">Cost Price</th>
+                                <th style="background: #fef3c7;">Admin Price</th>
+                                <th style="background: #dcfce7;">Retail Price</th>
+                                <th>AP Margin</th>
+                                <th>Rep Commission</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="pricingTableBody">
+                            <tr><td colspan="9" class="loading">Loading products...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Rep Commissions Tab (Superadmin Only) -->
+            <div id="commissionsTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Rep Commissions</h2>
+                    <p class="tab-subtitle">Track commissions earned by each representative</p>
+                </div>
+
+                <div class="stats-grid" id="commissionSummary">
+                    <div class="stat-card">
+                        <div class="stat-icon green">💰</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalCommissionsEarned">$0</span>
+                            <span class="stat-label">Total Commissions Earned</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue">✓</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalCommissionsPaid">$0</span>
+                            <span class="stat-label">Total Paid Out</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">⏳</div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalCommissionsPending">$0</span>
+                            <span class="stat-label">Pending Payout</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="rep-commissions-grid" id="repCommissionsGrid">
+                    <!-- Kyle -->
+                    <div class="rep-commission-card">
+                        <div class="rep-header">
+                            <div class="rep-avatar">KM</div>
+                            <div class="rep-info">
+                                <h3>Kyle McConnell</h3>
+                                <span class="rep-location">Yuma, CO</span>
+                            </div>
+                        </div>
+                        <div class="rep-stats">
+                            <div class="rep-stat">
+                                <span class="label">Customers</span>
+                                <span class="value" id="kyle-customers">0</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Orders</span>
+                                <span class="value" id="kyle-orders">0</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Total Sales</span>
+                                <span class="value" id="kyle-sales">$0</span>
+                            </div>
+                        </div>
+                        <div class="commission-breakdown">
+                            <div class="commission-row earned">
+                                <span>Commission Earned</span>
+                                <span id="kyle-earned">$0.00</span>
+                            </div>
+                            <div class="commission-row paid">
+                                <span>Paid Out</span>
+                                <span id="kyle-paid">$0.00</span>
+                            </div>
+                            <div class="commission-row balance">
+                                <span>Balance Owed</span>
+                                <span id="kyle-balance">$0.00</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="payCommission('kyle')">Record Payment</button>
+                    </div>
+
+                    <!-- Ty -->
+                    <div class="rep-commission-card">
+                        <div class="rep-header">
+                            <div class="rep-avatar">TM</div>
+                            <div class="rep-info">
+                                <h3>Ty Mollohan</h3>
+                                <span class="rep-location">Wray, CO</span>
+                            </div>
+                        </div>
+                        <div class="rep-stats">
+                            <div class="rep-stat">
+                                <span class="label">Customers</span>
+                                <span class="value" id="ty-customers">0</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Orders</span>
+                                <span class="value" id="ty-orders">0</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Total Sales</span>
+                                <span class="value" id="ty-sales">$0</span>
+                            </div>
+                        </div>
+                        <div class="commission-breakdown">
+                            <div class="commission-row earned">
+                                <span>Commission Earned</span>
+                                <span id="ty-earned">$0.00</span>
+                            </div>
+                            <div class="commission-row paid">
+                                <span>Paid Out</span>
+                                <span id="ty-paid">$0.00</span>
+                            </div>
+                            <div class="commission-row balance">
+                                <span>Balance Owed</span>
+                                <span id="ty-balance">$0.00</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="payCommission('ty')">Record Payment</button>
+                    </div>
+
+                    <!-- Chad -->
+                    <div class="rep-commission-card">
+                        <div class="rep-header">
+                            <div class="rep-avatar">CB</div>
+                            <div class="rep-info">
+                                <h3>Chad Bamford</h3>
+                                <span class="rep-location">Burlington, CO</span>
+                            </div>
+                        </div>
+                        <div class="rep-stats">
+                            <div class="rep-stat">
+                                <span class="label">Customers</span>
+                                <span class="value" id="chad-customers">0</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Orders</span>
+                                <span class="value" id="chad-orders">0</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Total Sales</span>
+                                <span class="value" id="chad-sales">$0</span>
+                            </div>
+                        </div>
+                        <div class="commission-breakdown">
+                            <div class="commission-row earned">
+                                <span>Commission Earned</span>
+                                <span id="chad-earned">$0.00</span>
+                            </div>
+                            <div class="commission-row paid">
+                                <span>Paid Out</span>
+                                <span id="chad-paid">$0.00</span>
+                            </div>
+                            <div class="commission-row balance">
+                                <span>Balance Owed</span>
+                                <span id="chad-balance">$0.00</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-primary btn-sm" onclick="payCommission('chad')">Record Payment</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Add Ledger Entry Modal -->
             <div class="modal-overlay" id="addLedgerModal" style="display: none;">
                 <div class="modal-content" style="max-width: 500px;">
@@ -1012,9 +1218,16 @@
         // Show superadmin features
         if (userData.role === 'superadmin') {
             document.getElementById('repAppsNav').style.display = 'block';
+            document.getElementById('pricingNav').style.display = 'block';
+            document.getElementById('commissionsNav').style.display = 'block';
             document.getElementById('adminRole').textContent = 'Super Admin';
+            loadPricingData();
+            loadCommissionData();
         } else {
             document.getElementById('adminRole').textContent = 'Representative';
+            // Show rep's own commission view
+            document.getElementById('commissionsNav').style.display = 'block';
+            loadRepOwnCommission(userData);
         }
 
         document.getElementById('adminName').textContent = userData.name.split(' ')[0];
@@ -2133,6 +2346,316 @@
             return names[cert] || cert;
         }
 
+        // ============ 3-TIER PRICING MANAGEMENT ============
+        async function loadPricingData() {
+            const tbody = document.getElementById('pricingTableBody');
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const products = await res.json();
+
+                if (products.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="9">No products found</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = products.map(p => {
+                    const costPrice = p.costPrice || 0;
+                    const adminPrice = p.adminPrice || costPrice * 1.10; // Default 10% admin markup
+                    const retailPrice = p.sellPrice || adminPrice * 1.15; // Default 15% rep markup
+                    const apMargin = adminPrice - costPrice;
+                    const repCommission = retailPrice - adminPrice;
+
+                    return `
+                        <tr data-id="${p._id}">
+                            <td><strong>${p.productName}</strong></td>
+                            <td><span class="category-badge cat-${p.category}">${p.category}</span></td>
+                            <td>/${p.unit}</td>
+                            <td style="background: #fef2f2;">
+                                <input type="number" step="0.01" class="pricing-input cost-input"
+                                       value="${costPrice.toFixed(2)}" data-field="costPrice">
+                            </td>
+                            <td style="background: #fffbeb;">
+                                <input type="number" step="0.01" class="pricing-input admin-input"
+                                       value="${adminPrice.toFixed(2)}" data-field="adminPrice">
+                            </td>
+                            <td style="background: #f0fdf4;">
+                                <input type="number" step="0.01" class="pricing-input retail-input"
+                                       value="${retailPrice.toFixed(2)}" data-field="sellPrice">
+                            </td>
+                            <td class="ap-margin">$${apMargin.toFixed(2)}</td>
+                            <td class="rep-commission">$${repCommission.toFixed(2)}</td>
+                            <td>
+                                <button class="btn btn-sm btn-primary" onclick="savePricing('${p._id}', this)">Save</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+
+                // Add change listeners to recalculate margins
+                document.querySelectorAll('.pricing-input').forEach(input => {
+                    input.addEventListener('input', function() {
+                        const row = this.closest('tr');
+                        const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
+                        const admin = parseFloat(row.querySelector('.admin-input').value) || 0;
+                        const retail = parseFloat(row.querySelector('.retail-input').value) || 0;
+                        row.querySelector('.ap-margin').textContent = '$' + (admin - cost).toFixed(2);
+                        row.querySelector('.rep-commission').textContent = '$' + (retail - admin).toFixed(2);
+                    });
+                });
+            } catch (error) {
+                tbody.innerHTML = '<tr><td colspan="9" style="color: #dc2626;">Error loading products</td></tr>';
+            }
+        }
+
+        async function savePricing(productId, btn) {
+            const row = btn.closest('tr');
+            const costPrice = parseFloat(row.querySelector('.cost-input').value);
+            const adminPrice = parseFloat(row.querySelector('.admin-input').value);
+            const sellPrice = parseFloat(row.querySelector('.retail-input').value);
+
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/${productId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ costPrice, adminPrice, sellPrice })
+                });
+
+                if (res.ok) {
+                    btn.textContent = 'Saved!';
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-success');
+                    setTimeout(() => {
+                        btn.textContent = 'Save';
+                        btn.classList.remove('btn-success');
+                        btn.classList.add('btn-primary');
+                        btn.disabled = false;
+                    }, 1500);
+                } else {
+                    throw new Error('Failed to save');
+                }
+            } catch (error) {
+                btn.textContent = 'Error';
+                btn.disabled = false;
+                setTimeout(() => { btn.textContent = 'Save'; }, 2000);
+            }
+        }
+
+        // ============ REP COMMISSION TRACKING ============
+        async function loadCommissionData() {
+            // For now, calculate from customers and orders
+            try {
+                const customersRes = await fetch(`${API_URL}/api/customers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const customers = await customersRes.json();
+
+                const ordersRes = await fetch(`${API_URL}/api/orders`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const orders = await ordersRes.json();
+
+                // Calculate per rep
+                const repData = {
+                    kyle: { customers: 0, orders: 0, sales: 0, commission: 0 },
+                    ty: { customers: 0, orders: 0, sales: 0, commission: 0 },
+                    chad: { customers: 0, orders: 0, sales: 0, commission: 0 }
+                };
+
+                // Count customers per rep
+                customers.forEach(c => {
+                    const repId = c.representativeId;
+                    if (repData[repId]) {
+                        repData[repId].customers++;
+                    }
+                });
+
+                // Calculate orders and sales per rep
+                orders.forEach(o => {
+                    const repId = o.representativeId?.toLowerCase?.() || o.representativeId;
+                    if (typeof repId === 'string' && repData[repId]) {
+                        repData[repId].orders++;
+                        repData[repId].sales += o.totalCost || 0;
+                        // Commission is tracked per order or estimated as % of sale
+                        repData[repId].commission += o.repCommission || (o.totalCost * 0.05) || 0; // Default 5% if not set
+                    }
+                });
+
+                // Update UI
+                let totalEarned = 0, totalPaid = 0;
+                ['kyle', 'ty', 'chad'].forEach(rep => {
+                    const data = repData[rep];
+                    document.getElementById(`${rep}-customers`).textContent = data.customers;
+                    document.getElementById(`${rep}-orders`).textContent = data.orders;
+                    document.getElementById(`${rep}-sales`).textContent = '$' + data.sales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                    document.getElementById(`${rep}-earned`).textContent = '$' + data.commission.toFixed(2);
+                    document.getElementById(`${rep}-paid`).textContent = '$0.00'; // TODO: Track actual payments
+                    document.getElementById(`${rep}-balance`).textContent = '$' + data.commission.toFixed(2);
+                    totalEarned += data.commission;
+                });
+
+                document.getElementById('totalCommissionsEarned').textContent = '$' + totalEarned.toFixed(2);
+                document.getElementById('totalCommissionsPaid').textContent = '$0.00';
+                document.getElementById('totalCommissionsPending').textContent = '$' + totalEarned.toFixed(2);
+
+            } catch (error) {
+                console.error('Error loading commission data:', error);
+            }
+        }
+
+        function payCommission(repId) {
+            const amount = prompt('Enter payment amount:');
+            if (!amount) return;
+
+            // TODO: Record payment via API
+            alert(`Recording $${amount} payment to ${repId}. This feature will be fully implemented with the ledger integration.`);
+        }
+
+        // ============ REP'S OWN COMMISSION VIEW ============
+        async function loadRepOwnCommission(userData) {
+            // Determine rep ID from user data
+            const repId = userData.representativeId || userData.email?.split('@')[0] || 'kyle';
+            const repNames = {
+                kyle: 'Kyle McConnell',
+                ty: 'Ty Mollohan',
+                chad: 'Chad Bamford'
+            };
+            const repLocations = {
+                kyle: 'Yuma, CO',
+                ty: 'Wray, CO',
+                chad: 'Burlington, CO'
+            };
+
+            // Hide the full rep grid and show single rep view
+            const commissionsTab = document.getElementById('commissionsTab');
+            const grid = document.getElementById('repCommissionsGrid');
+
+            // Hide grid header that says "all reps"
+            const tabHeader = commissionsTab.querySelector('.tab-header');
+            tabHeader.innerHTML = `
+                <h2>My Commissions</h2>
+                <p class="tab-subtitle">Your earnings from customer orders</p>
+            `;
+
+            try {
+                // Get customers assigned to this rep
+                const customersRes = await fetch(`${API_URL}/api/customers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const allCustomers = await customersRes.json();
+                const myCustomers = allCustomers.filter(c => c.representativeId === repId);
+
+                // Get orders for this rep
+                const ordersRes = await fetch(`${API_URL}/api/orders`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const allOrders = await ordersRes.json();
+                const myOrders = allOrders.filter(o => {
+                    const oRepId = o.representativeId?.toLowerCase?.() || o.representativeId;
+                    return oRepId === repId;
+                });
+
+                // Calculate totals
+                let totalSales = 0;
+                let totalCommission = 0;
+                myOrders.forEach(o => {
+                    totalSales += o.totalCost || 0;
+                    totalCommission += o.repCommission || (o.totalCost * 0.05) || 0;
+                });
+
+                // Update summary cards
+                document.getElementById('totalCommissionsEarned').textContent = '$' + totalCommission.toFixed(2);
+                document.getElementById('totalCommissionsPaid').textContent = '$0.00';
+                document.getElementById('totalCommissionsPending').textContent = '$' + totalCommission.toFixed(2);
+
+                // Replace grid with single rep view
+                grid.innerHTML = `
+                    <div class="rep-commission-card" style="max-width: 100%;">
+                        <div class="rep-header">
+                            <div class="rep-avatar">${userData.name?.split(' ').map(n => n[0]).join('') || 'R'}</div>
+                            <div class="rep-info">
+                                <h3>${userData.name || repNames[repId] || 'Representative'}</h3>
+                                <span class="rep-location">${repLocations[repId] || 'Location TBD'}</span>
+                            </div>
+                        </div>
+                        <div class="rep-stats" style="justify-content: flex-start; gap: 48px;">
+                            <div class="rep-stat">
+                                <span class="label">My Customers</span>
+                                <span class="value">${myCustomers.length}</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Total Orders</span>
+                                <span class="value">${myOrders.length}</span>
+                            </div>
+                            <div class="rep-stat">
+                                <span class="label">Total Sales</span>
+                                <span class="value">$${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                            </div>
+                        </div>
+                        <div class="commission-breakdown">
+                            <div class="commission-row earned">
+                                <span>Commission Earned</span>
+                                <span>$${totalCommission.toFixed(2)}</span>
+                            </div>
+                            <div class="commission-row paid">
+                                <span>Paid Out</span>
+                                <span>$0.00</span>
+                            </div>
+                            <div class="commission-row balance">
+                                <span>Balance Owed to You</span>
+                                <span>$${totalCommission.toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card" style="margin-top: 24px;">
+                        <div class="card-header">
+                            <h3>My Customers</h3>
+                        </div>
+                        <div class="orders-table-wrapper">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Customer</th>
+                                        <th>Farm</th>
+                                        <th>Location</th>
+                                        <th>Acres</th>
+                                        <th>Orders</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${myCustomers.length === 0 ? '<tr><td colspan="5">No customers yet</td></tr>' :
+                                    myCustomers.map(c => {
+                                        const custOrders = myOrders.filter(o => o.userId === c._id || o.userId?._id === c._id);
+                                        return `
+                                            <tr>
+                                                <td><strong>${c.name}</strong><br><span style="color: var(--text-muted); font-size: 0.85rem;">${c.email}</span></td>
+                                                <td>${c.farm?.name || '-'}</td>
+                                                <td>${c.farm?.county || ''} ${c.farm?.state || ''}</td>
+                                                <td>${c.farm?.acres?.toLocaleString() || '-'}</td>
+                                                <td>${custOrders.length}</td>
+                                            </tr>
+                                        `;
+                                    }).join('')}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                console.error('Error loading rep commission:', error);
+                grid.innerHTML = '<p style="color: #dc2626;">Error loading commission data</p>';
+            }
+        }
+
         // Initialize
         loadDashboardData();
         loadApplications();
@@ -2895,6 +3418,194 @@
         .status-flagged {
             background: #fef2f2;
             color: #dc2626;
+        }
+
+        /* 3-Tier Pricing Styles */
+        .pricing-explanation {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin: 24px 0;
+            flex-wrap: wrap;
+        }
+
+        .pricing-tier-card {
+            padding: 16px 24px;
+            border-radius: var(--radius);
+            text-align: center;
+            min-width: 160px;
+        }
+
+        .pricing-tier-card.cost {
+            background: #fef2f2;
+            border: 2px solid #fecaca;
+        }
+
+        .pricing-tier-card.admin {
+            background: #fffbeb;
+            border: 2px solid #fde68a;
+        }
+
+        .pricing-tier-card.retail {
+            background: #f0fdf4;
+            border: 2px solid #bbf7d0;
+        }
+
+        .pricing-tier-card h4 {
+            margin: 0 0 4px 0;
+            font-size: 0.9rem;
+        }
+
+        .pricing-tier-card p {
+            margin: 0;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .pricing-arrow {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+        }
+
+        .commission-note {
+            text-align: center;
+            padding: 12px 24px;
+            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            border-radius: var(--radius);
+            color: var(--primary);
+        }
+
+        .pricing-input {
+            width: 80px;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            text-align: right;
+            font-family: inherit;
+        }
+
+        .pricing-input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .ap-margin, .rep-commission {
+            font-weight: 600;
+        }
+
+        .tab-subtitle {
+            color: var(--text-muted);
+            margin-top: 4px;
+        }
+
+        /* Rep Commission Styles */
+        .rep-commissions-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        .rep-commission-card {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            box-shadow: var(--shadow);
+        }
+
+        .rep-commission-card .rep-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            margin-bottom: 20px;
+        }
+
+        .rep-commission-card .rep-avatar {
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            background: var(--primary);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+        }
+
+        .rep-commission-card .rep-info h3 {
+            margin: 0;
+            font-size: 1.1rem;
+        }
+
+        .rep-commission-card .rep-location {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .rep-stats {
+            display: flex;
+            gap: 16px;
+            margin-bottom: 20px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .rep-stat {
+            flex: 1;
+            text-align: center;
+        }
+
+        .rep-stat .label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+        }
+
+        .rep-stat .value {
+            display: block;
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+
+        .commission-breakdown {
+            margin-bottom: 16px;
+        }
+
+        .commission-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            border-bottom: 1px solid #f3f4f6;
+        }
+
+        .commission-row.earned span:last-child {
+            color: #059669;
+            font-weight: 600;
+        }
+
+        .commission-row.paid span:last-child {
+            color: #6b7280;
+        }
+
+        .commission-row.balance {
+            border-bottom: none;
+            background: #f0fdf4;
+            margin: 0 -12px;
+            padding: 12px;
+            border-radius: var(--radius);
+        }
+
+        .commission-row.balance span:last-child {
+            color: var(--primary);
+            font-weight: 700;
+            font-size: 1.1rem;
+        }
+
+        .btn-success {
+            background: #059669 !important;
         }
 
         @media (max-width: 768px) {
