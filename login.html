@@ -7,7 +7,7 @@
     <title>Login - Acre Profit</title>
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#2D5A27">
+    <meta name="theme-color" content="#0F2440">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Acre Profit">
@@ -20,60 +20,57 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
-<body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="logo">
-                <img src="logo.svg" alt="Acre Profit">
-            </a>
-            <ul class="nav-links">
-                <li><a href="/#how-it-works">How It Works</a></li>
-                <li><a href="/#products">Products</a></li>
-                <li><a href="/signup.html" class="btn btn-primary">Sign Up</a></li>
-            </ul>
+<body class="auth-body">
+    <div class="auth-split">
+        <!-- Left side - Farm image -->
+        <div class="auth-image">
+            <div class="auth-image-content">
+                <a href="/" class="auth-logo">
+                    <img src="logo.svg" alt="Acre Profit">
+                </a>
+                <div class="auth-tagline">
+                    <h2>Farmers Helping Farmers</h2>
+                    <p>Join our bulk buying co-op and save on the products you need most.</p>
+                </div>
+            </div>
         </div>
-    </nav>
 
-    <main class="auth-page">
-        <div class="container">
-            <div class="auth-wrapper" style="max-width: 450px;">
+        <!-- Right side - Login form -->
+        <div class="auth-form-side">
+            <div class="auth-form-wrapper">
                 <div class="auth-header">
                     <h1>Welcome Back</h1>
-                    <p>Login to access your account and orders.</p>
+                    <p>Sign in to access your orders and account.</p>
                 </div>
 
                 <form id="loginForm" class="auth-form">
                     <div class="form-group">
-                        <label for="email">Email</label>
-                        <input type="email" id="email" name="email" required placeholder="john@farm.com">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required placeholder="you@yourfarm.com">
                     </div>
 
                     <div class="form-group">
                         <label for="password">Password</label>
-                        <input type="password" id="password" name="password" required placeholder="Your password">
+                        <input type="password" id="password" name="password" required placeholder="Enter your password">
                     </div>
 
                     <div id="errorMessage" class="error-message" style="display: none;"></div>
 
-                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
-                        Login
+                    <button type="submit" class="btn btn-accent btn-lg btn-block" id="submitBtn">
+                        Sign In
                     </button>
 
                     <p class="auth-switch">
-                        Don't have an account? <a href="/signup.html">Sign Up</a>
+                        Don't have an account? <a href="/signup.html">Create one</a>
                     </p>
                 </form>
-            </div>
-        </div>
-    </main>
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
-                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
+                <div class="auth-footer">
+                    <a href="/">Back to Home</a>
+                </div>
             </div>
         </div>
-    </footer>
+    </div>
 
     <script>
         const API_URL = 'https://acreprofit-com.onrender.com';
@@ -97,7 +94,7 @@
             const errorDiv = document.getElementById('errorMessage');
 
             submitBtn.disabled = true;
-            submitBtn.textContent = 'Logging in...';
+            submitBtn.textContent = 'Signing in...';
             errorDiv.style.display = 'none';
 
             const data = {
@@ -146,35 +143,90 @@
                 }
                 errorDiv.style.display = 'block';
                 submitBtn.disabled = false;
-                submitBtn.textContent = 'Login';
+                submitBtn.textContent = 'Sign In';
             }
         });
     </script>
 
     <style>
-        .auth-page {
-            padding: 120px 0 80px;
-            background: var(--secondary);
+        .auth-body {
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .auth-split {
+            display: flex;
             min-height: 100vh;
         }
 
-        .auth-wrapper {
-            max-width: 600px;
-            margin: 0 auto;
-            background: var(--white);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-xl);
+        .auth-image {
+            flex: 1;
+            background-image: url('https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=1200&q=80');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
             padding: 48px;
         }
 
+        .auth-image::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(15, 36, 64, 0.4) 0%, rgba(15, 36, 64, 0.85) 100%);
+        }
+
+        .auth-image-content {
+            position: relative;
+            z-index: 2;
+            color: white;
+        }
+
+        .auth-logo img {
+            height: 48px;
+            filter: brightness(0) invert(1);
+            margin-bottom: 32px;
+        }
+
+        .auth-tagline h2 {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            color: white;
+        }
+
+        .auth-tagline p {
+            font-size: 1.125rem;
+            color: rgba(255, 255, 255, 0.9);
+            max-width: 400px;
+        }
+
+        .auth-form-side {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            background: var(--white);
+        }
+
+        .auth-form-wrapper {
+            width: 100%;
+            max-width: 400px;
+        }
+
         .auth-header {
-            text-align: center;
-            margin-bottom: 40px;
+            margin-bottom: 32px;
         }
 
         .auth-header h1 {
             font-size: 2rem;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
+            color: var(--text);
         }
 
         .auth-header p {
@@ -201,17 +253,18 @@
             font-size: 1rem;
             font-family: inherit;
             transition: var(--transition);
+            background: var(--white);
         }
 
         .auth-form input:focus {
             outline: none;
             border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
+            box-shadow: 0 0 0 3px rgba(27, 58, 92, 0.1);
         }
 
         .error-message {
-            background: #fee2e2;
-            color: #dc2626;
+            background: #FEE2E2;
+            color: #DC2626;
             padding: 12px 16px;
             border-radius: var(--radius);
             margin-bottom: 20px;
@@ -225,13 +278,47 @@
         }
 
         .auth-switch a {
-            color: var(--primary);
+            color: var(--accent);
             font-weight: 600;
         }
 
-        @media (max-width: 768px) {
-            .auth-wrapper {
-                padding: 32px 24px;
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+
+        .auth-footer {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .auth-footer a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .auth-footer a:hover {
+            color: var(--primary);
+        }
+
+        @media (max-width: 1024px) {
+            .auth-image {
+                display: none;
+            }
+
+            .auth-form-side {
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .auth-form-wrapper {
+                padding: 0;
+            }
+
+            .auth-header h1 {
+                font-size: 1.75rem;
             }
         }
     </style>
