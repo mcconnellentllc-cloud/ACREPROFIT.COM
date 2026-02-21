@@ -440,7 +440,7 @@
                 { _id: '16', productName: 'Artect FI', category: 'herbicide', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 11.30, defaultRate: 16, rateUnit: 'oz/acre', notes: 'Broadleaf burndown' },
 
                 // Adjuvants & Oils
-                { _id: '17', productName: 'Hydrovant', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00, defaultRate: 1.28, rateUnit: 'fl oz/acre', notes: 'NIS Surfactant - 0.1% of 8.5 gpa carrier volume' },
+                { _id: '17', productName: 'Hydrovant', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00, defaultRate: 1.28, rateUnit: 'fl oz/acre', notes: 'NIS Surfactant - 0.1% v/v at 10 gal/acre spray volume' },
                 { _id: '18', productName: 'MSO (Methylated Seed Oil)', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 12.50, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Spray adjuvant' },
                 { _id: '19', productName: 'Crop Oil Concentrate', category: 'adjuvant', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 8.75, defaultRate: 1, rateUnit: 'qt/acre', notes: 'Spray adjuvant' },
                 { _id: '20', productName: 'AMS (Ammonium Sulfate)', category: 'adjuvant', packSize: '50 lb bag', unit: 'lb', unitsPerPack: 50, price: 0.35, defaultRate: 8.5, rateUnit: 'lb/100gal', notes: 'Water conditioner' },
@@ -632,7 +632,8 @@
                             chemicals: [
                                 { productName: 'Ally XP', rate: 0.1, rateUnit: 'oz/acre', packSize: '10x1 oz', unit: 'oz', unitsPerPack: 10, price: 8.00 },
                                 { productName: '32-0-0 (UAN)', rate: 8, rateUnit: 'gal/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.32 },
-                                { productName: '12-0-0-26 (Thiosol)', rate: 2, rateUnit: 'gal/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.99 }
+                                { productName: '12-0-0-26 (Thiosol)', rate: 2, rateUnit: 'gal/acre', packSize: 'Shuttle (250 gl)', unit: 'gl', unitsPerPack: 250, price: 2.99 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
@@ -650,7 +651,8 @@
                             timing: 'As needed',
                             chemicals: [
                                 { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
@@ -667,7 +669,8 @@
                             timing: 'As needed',
                             chemicals: [
                                 { productName: 'Paraquat', rate: 2, rateUnit: 'pt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00 },
-                                { productName: 'AgSaver (Glyphosate)', rate: 24, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 }
+                                { productName: 'AgSaver (Glyphosate)', rate: 24, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
@@ -684,14 +687,16 @@
                             timing: 'Early spring',
                             chemicals: [
                                 { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                                { productName: 'Dicamba DMA', rate: 8, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         },
                         {
                             name: 'Second Burndown',
                             timing: 'Mid-summer',
                             chemicals: [
-                                { productName: 'Paraquat', rate: 2, rateUnit: 'pt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00 }
+                                { productName: 'Paraquat', rate: 2, rateUnit: 'pt/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 16.00 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
@@ -709,7 +714,8 @@
                             timing: '7-14 days before planting',
                             chemicals: [
                                 { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
-                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 }
+                                { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
@@ -727,7 +733,8 @@
                             chemicals: [
                                 { productName: 'AgSaver (Glyphosate)', rate: 32, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 13.25 },
                                 { productName: 'Dicamba DMA', rate: 4, rateUnit: 'oz/acre', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, price: 28.25 },
-                                { productName: 'Clethodim', rate: 6, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 33.50 }
+                                { productName: 'Clethodim', rate: 6, rateUnit: 'oz/acre', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, price: 33.50 },
+                                { productName: 'Hydrovant', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, price: 110.00 }
                             ]
                         }
                     ]
@@ -1155,8 +1162,11 @@
                 `;
             }
 
-            // Render spray sheets
-            let spraySheetHTML = spraySheets.map(sheet => `
+            // Render spray sheets - 10 gal/acre spray rate
+            const SPRAY_RATE_GPA = 10;
+            let spraySheetHTML = spraySheets.map(sheet => {
+                const totalWater = sheet.acres * SPRAY_RATE_GPA;
+                return `
                 <div class="spray-sheet">
                     <div class="spray-sheet-header">
                         <h4>${sheet.name}</h4>
@@ -1165,12 +1175,16 @@
                         <span class="sheet-acres">${sheet.acres.toLocaleString()} acres</span>
                         <button class="btn btn-sm btn-outline print-sheet-btn" onclick="printSpraySheet(this)">Print</button>
                     </div>
+                    <div class="spray-rate-info">
+                        <strong>Spray Rate:</strong> ${SPRAY_RATE_GPA} gal/acre &nbsp;|&nbsp;
+                        <strong>Total Water:</strong> ${totalWater.toLocaleString()} gallons
+                    </div>
                     <table class="spray-sheet-table">
                         <thead>
                             <tr>
-                                <th>Chemical</th>
-                                <th>Rate</th>
-                                <th>Total for Field</th>
+                                <th>Product</th>
+                                <th>Rate/Acre</th>
+                                <th>Total Needed</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -1178,13 +1192,13 @@
                                 <tr>
                                     <td>${c.name}</td>
                                     <td>${c.rate} ${c.rateUnit}</td>
-                                    <td>${c.totalNeeded.toFixed(1)} ${c.unit}</td>
+                                    <td><strong>${c.totalNeeded.toFixed(2)} ${c.unit}</strong></td>
                                 </tr>
                             `).join('')}
                         </tbody>
                     </table>
                 </div>
-            `).join('');
+            `}).join('');
 
             // Order totals with smart package breakdown
             let totalsHTML = `
@@ -2173,6 +2187,15 @@
             padding: 4px 12px;
             border-radius: 20px;
             font-size: 0.85rem;
+        }
+
+        .spray-rate-info {
+            background: #e8f5e9;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 12px;
+            font-size: 0.95rem;
+            color: #2d5a27;
         }
 
         .spray-sheet-table {
