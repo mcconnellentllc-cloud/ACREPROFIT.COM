@@ -42,6 +42,12 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
     phone: String,
+    address: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
     role: {
         type: String,
         enum: ['customer', 'admin', 'superadmin'],
@@ -1097,7 +1103,7 @@ app.post('/api/admin/reset-admins', async (req, res) => {
 
 app.post('/api/auth/signup', async (req, res) => {
     try {
-        const { name, email, password, phone, farm, crops, representativeId } = req.body;
+        const { name, email, password, phone, address, farm, crops, representativeId } = req.body;
 
         const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) {
@@ -1109,9 +1115,10 @@ app.post('/api/auth/signup', async (req, res) => {
             email,
             password,
             phone,
+            address,
             farm,
             crops,
-            representative: representativeId,
+            representativeId,
             role: 'customer'
         });
         await user.save();
@@ -1123,7 +1130,10 @@ app.post('/api/auth/signup', async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,
+                address: user.address,
                 role: user.role,
+                representativeId: user.representativeId,
                 farm: user.farm
             },
             token
