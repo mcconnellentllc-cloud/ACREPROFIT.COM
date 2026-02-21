@@ -49,12 +49,12 @@
                     <span class="tab-desc">Choose from our chemical list</span>
                 </button>
                 <button class="option-tab" data-option="crop">
-                    <span class="tab-icon">🌾</span>
+                    <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 12v2M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66l4.24-4.24"></path></svg></span>
                     <span class="tab-title">By Crop & Rates</span>
                     <span class="tab-desc">Enter rates per acre</span>
                 </button>
                 <button class="option-tab" data-option="program">
-                    <span class="tab-icon">📦</span>
+                    <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>
                     <span class="tab-title">Program Packages</span>
                     <span class="tab-desc">Pre-built spray programs</span>
                 </button>
@@ -132,11 +132,11 @@
                 <div class="crop-selector">
                     <label>Select Your Crop</label>
                     <div class="crop-buttons">
-                        <button class="crop-btn" data-crop="wheat">🌾 Wheat</button>
-                        <button class="crop-btn" data-crop="corn">🌽 Corn</button>
-                        <button class="crop-btn" data-crop="milo">🌿 Milo/Sorghum</button>
-                        <button class="crop-btn" data-crop="millet">🌱 Millet</button>
-                        <button class="crop-btn" data-crop="fallow">🏜️ Summer Fallow</button>
+                        <button class="crop-btn" data-crop="wheat">Wheat</button>
+                        <button class="crop-btn" data-crop="corn">Corn</button>
+                        <button class="crop-btn" data-crop="milo">Milo/Sorghum</button>
+                        <button class="crop-btn" data-crop="millet">Millet</button>
+                        <button class="crop-btn" data-crop="fallow">Summer Fallow</button>
                     </div>
                 </div>
 
@@ -222,7 +222,7 @@
                     </div>
 
                     <div class="hydrovant-calc" id="hydrovantCalc">
-                        <div class="hydrovant-icon">💧</div>
+                        <div class="hydrovant-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"></path></svg></div>
                         <div class="hydrovant-info">
                             <strong>Hydrovant (NIS) Required</strong>
                             <span id="hydrovantAmount">Calculated after entering acres</span>
@@ -426,7 +426,9 @@
             try {
                 const response = await fetch(`${API_URL}/api/spray-programs`);
                 if (response.ok) {
-                    programs = await response.json();
+                    const serverPrograms = await response.json();
+                    // Use demo programs if server returns empty array
+                    programs = (serverPrograms && serverPrograms.length > 0) ? serverPrograms : getDemoPrograms();
                 } else {
                     programs = getDemoPrograms();
                 }
@@ -1433,7 +1435,7 @@
                                 </tr>
                             `}).join('')}
                             <tr class="hydrovant-row">
-                                <td><strong>💧 Hydrovant (NIS)</strong><br><span style="font-size: 0.8rem; color: #666;">0.1% v/v surfactant</span></td>
+                                <td><strong>Hydrovant (NIS)</strong><br><span style="font-size: 0.8rem; color: #666;">0.1% v/v surfactant</span></td>
                                 <td class="needed-col">
                                     <span class="total-gal">${hydrovantGal.toFixed(2)} gl</span>
                                 </td>
@@ -1462,7 +1464,7 @@
 
                     <div class="payment-deadline-box">
                         <div class="deadline-header">
-                            <span class="deadline-icon">⚠️</span>
+                            <span class="deadline-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
                             <h4>Order & Payment Due Together</h4>
                         </div>
                         <div class="deadline-warning">

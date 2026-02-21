@@ -7,7 +7,7 @@
     <title>Dashboard - Acre Profit</title>
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#2D5A27">
+    <meta name="theme-color" content="#0F2440">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Acre Profit">
@@ -52,7 +52,7 @@
                     <p>What are you buying today? Pool your orders with other farmers to unlock bulk pricing.</p>
                 </div>
                 <div class="rep-info-card" id="repInfoCard">
-                    <div class="rep-icon">📍</div>
+                    <div class="rep-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></div>
                     <div class="rep-details">
                         <span class="rep-label">Your Rep & Pickup</span>
                         <span class="rep-name" id="repName">-</span>
@@ -64,7 +64,7 @@
             <!-- Product Categories -->
             <div class="category-grid category-grid-2">
                 <a href="/chemicals.html" class="category-card category-card-large">
-                    <div class="category-icon">🌾</div>
+                    <div class="category-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v6m0 12v2M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66l4.24-4.24"></path></svg></div>
                     <h2>Crop Protection</h2>
                     <p>Herbicides, fungicides, insecticides, adjuvants - order by the acre or direct</p>
                     <div class="category-features">
@@ -78,7 +78,7 @@
                 </a>
 
                 <a href="/farm-products.html" class="category-card category-card-large">
-                    <div class="category-icon">🚜</div>
+                    <div class="category-icon"><svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg></div>
                     <h2>Farm Products</h2>
                     <p>Multiseal tire sealant, equipment supplies, and more farm essentials</p>
                     <div class="category-features">
@@ -188,7 +188,7 @@
                 </div>
                 <div class="orders-list" id="activeOrdersList">
                     <div class="empty-orders">
-                        <div class="empty-icon">📦</div>
+                        <div class="empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></div>
                         <h4>No orders yet</h4>
                         <p>Browse our products above to place your first order</p>
                         <a href="/chemicals.html" class="btn btn-primary">Shop Crop Inputs</a>
@@ -201,7 +201,7 @@
     <!-- Chatbot Widget -->
     <div class="chatbot-widget" id="chatbot">
         <button class="chatbot-toggle" onclick="toggleChatbot()">
-            <span class="chat-icon">💬</span>
+            <span class="chat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
             <span class="chat-label">Help</span>
         </button>
         <div class="chatbot-window" id="chatbotWindow">
@@ -379,14 +379,15 @@
             display: flex;
             align-items: center;
             gap: 12px;
-            background: linear-gradient(135deg, #e8f5e9, #c8e6c9);
+            background: var(--secondary);
+            border: 1px solid var(--border);
             padding: 16px 24px;
             border-radius: var(--radius-lg);
             box-shadow: var(--shadow);
         }
 
         .rep-info-card .rep-icon {
-            font-size: 2rem;
+            color: var(--primary);
         }
 
         .rep-info-card .rep-details {
@@ -438,7 +439,7 @@
         }
 
         .category-icon {
-            font-size: 3rem;
+            color: var(--primary);
             margin-bottom: 16px;
         }
 
@@ -792,7 +793,7 @@
         }
 
         .category-card-large .category-icon {
-            font-size: 3rem;
+            color: var(--primary);
             margin-bottom: 16px;
         }
 
@@ -814,7 +815,7 @@
         }
 
         .feature-tag {
-            background: rgba(45, 90, 39, 0.1);
+            background: rgba(27, 58, 92, 0.1);
             color: var(--primary);
             padding: 4px 12px;
             border-radius: 16px;
@@ -872,7 +873,7 @@
         }
 
         .empty-orders .empty-icon {
-            font-size: 3rem;
+            color: var(--text-muted);
             margin-bottom: 16px;
         }
 
