@@ -1080,7 +1080,7 @@ app.post('/api/admin/reset-admins', async (req, res) => {
             { name: 'Kyle McConnell', email: 'kyle@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
             { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'admin' },
             { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'admin' },
-            { name: 'Seth Rolfs', email: 'seth@acreprofit.com', password: 'Farm2026!', phone: '785-531-0680', role: 'admin' }
+            { name: 'Seth Rolfs', email: 'smrolfs@live.com', password: 'Farm2026!', phone: '785-531-0680', role: 'admin' }
         ];
 
         const results = [];
