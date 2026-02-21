@@ -1489,7 +1489,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // Create a new customer (admin only)
 app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { name, email, password, phone, farm, crops, state, acres } = req.body;
+        const { name, email, password, phone, farm, crops, state, acres, representativeId } = req.body;
 
         if (!name || !email) {
             return res.status(400).json({ error: 'Name and email are required' });
@@ -1511,7 +1511,8 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
                 state: state || ''
             },
             crops: crops || [],
-            representative: req.user._id,
+            representativeId: representativeId || 'kyle', // String rep ID for pickup location
+            representative: req.user._id, // ObjectId of admin who created
             role: 'customer'
         });
 
