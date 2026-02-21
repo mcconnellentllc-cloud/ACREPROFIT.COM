@@ -42,6 +42,12 @@ const userSchema = new mongoose.Schema({
     email: { type: String, required: true, unique: true, lowercase: true },
     password: { type: String, required: true },
     phone: String,
+    address: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
     role: {
         type: String,
         enum: ['customer', 'admin', 'superadmin'],
@@ -219,7 +225,7 @@ const orderSchema = new mongoose.Schema({
     // Payment information
     paymentMethod: {
         type: String,
-        enum: ['stripe_ach', 'stripe_card', 'check', 'pending'],
+        enum: ['stripe_ach', 'check', 'pending'],
         default: 'pending'
     },
     paymentStatus: {
@@ -1074,7 +1080,7 @@ app.post('/api/admin/reset-admins', async (req, res) => {
             { name: 'Kyle McConnell', email: 'kyle@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
             { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'admin' },
             { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'admin' },
-            { name: 'Seth Rolfs', email: 'seth@acreprofit.com', password: 'Farm2026!', phone: '785-531-0680', role: 'admin' }
+            { name: 'Seth Rolfs', email: 'smrolfs@live.com', password: 'Farm2026!', phone: '785-531-0680', role: 'admin' }
         ];
 
         const results = [];
@@ -1097,7 +1103,7 @@ app.post('/api/admin/reset-admins', async (req, res) => {
 
 app.post('/api/auth/signup', async (req, res) => {
     try {
-        const { name, email, password, phone, farm, crops, representativeId } = req.body;
+        const { name, email, password, phone, address, farm, crops, representativeId } = req.body;
 
         const existingUser = await User.findOne({ email: email.toLowerCase() });
         if (existingUser) {
@@ -1109,9 +1115,10 @@ app.post('/api/auth/signup', async (req, res) => {
             email,
             password,
             phone,
+            address,
             farm,
             crops,
-            representative: representativeId,
+            representativeId,
             role: 'customer'
         });
         await user.save();
@@ -1123,7 +1130,10 @@ app.post('/api/auth/signup', async (req, res) => {
                 id: user._id,
                 name: user.name,
                 email: user.email,
+                phone: user.phone,
+                address: user.address,
                 role: user.role,
+                representativeId: user.representativeId,
                 farm: user.farm
             },
             token
@@ -1489,7 +1499,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // Create a new customer (admin only)
 app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { name, email, password, phone, farm, crops, state, acres } = req.body;
+        const { name, email, password, phone, farm, crops, state, acres, representativeId } = req.body;
 
         if (!name || !email) {
             return res.status(400).json({ error: 'Name and email are required' });
@@ -1511,7 +1521,8 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
                 state: state || ''
             },
             crops: crops || [],
-            representative: req.user._id,
+            representativeId: representativeId || 'kyle', // String rep ID for pickup location
+            representative: req.user._id, // ObjectId of admin who created
             role: 'customer'
         });
 
@@ -2518,7 +2529,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
 
         // Update order with payment intent
         order.stripePaymentIntentId = paymentIntent.id;
-        order.paymentMethod = paymentMethod === 'ach' ? 'stripe_ach' : 'stripe_card';
+        order.paymentMethod = 'stripe_ach'; // ACH only - no credit cards
         order.paymentStatus = 'processing';
         await order.save();
 

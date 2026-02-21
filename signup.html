@@ -37,103 +37,81 @@
     <main class="auth-page">
         <div class="container">
             <div class="auth-wrapper">
-                <div class="auth-header">
-                    <h1>Create Your Account</h1>
-                    <p>Join the co-op and start saving on bulk orders.</p>
+                <!-- Step 1: Basic Info -->
+                <div id="step1" class="signup-step">
+                    <div class="auth-header">
+                        <h1>Create Your Account</h1>
+                        <p>Join the co-op and start saving on bulk orders.</p>
+                    </div>
+
+                    <form id="step1Form" class="auth-form">
+                        <div class="form-section">
+                            <div class="form-group">
+                                <label for="name">Your Name *</label>
+                                <input type="text" id="name" name="name" required placeholder="John Smith">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="email">Email *</label>
+                                <input type="email" id="email" name="email" required placeholder="john@farm.com">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="phone">Phone *</label>
+                                <input type="tel" id="phone" name="phone" required placeholder="(555) 123-4567">
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3>Your Address</h3>
+
+                            <div class="form-group">
+                                <label for="address">Street Address *</label>
+                                <input type="text" id="address" name="address" required placeholder="123 Farm Road">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="city">City *</label>
+                                <input type="text" id="city" name="city" required placeholder="Yuma">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="state">State *</label>
+                                    <select id="state" name="state" required>
+                                        <option value="">Select State</option>
+                                        <option value="CO">Colorado</option>
+                                        <option value="KS">Kansas</option>
+                                        <option value="NE">Nebraska</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="zip">ZIP Code *</label>
+                                    <input type="text" id="zip" name="zip" required placeholder="80759" pattern="[0-9]{5}">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+                        <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
+                            Continue
+                        </button>
+
+                        <p class="auth-switch">
+                            Already have an account? <a href="/login.html">Login</a>
+                        </p>
+                    </form>
                 </div>
 
-                <form id="signupForm" class="auth-form">
-                    <div class="form-section">
-                        <h3>Account Information</h3>
-
-                        <div class="form-group">
-                            <label for="name">Your Name *</label>
-                            <input type="text" id="name" name="name" required placeholder="John Smith">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="email">Email *</label>
-                            <input type="email" id="email" name="email" required placeholder="john@farm.com">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="password">Password *</label>
-                            <input type="password" id="password" name="password" required minlength="6" placeholder="Min 6 characters">
-                        </div>
-
-                        <div class="form-group">
-                            <label for="phone">Phone</label>
-                            <input type="tel" id="phone" name="phone" placeholder="(555) 123-4567">
-                        </div>
+                <!-- Step 2: Pick Representative -->
+                <div id="step2" class="signup-step" style="display: none;">
+                    <div class="auth-header">
+                        <h1>Pick Your Representative</h1>
+                        <p>Your rep is your point of contact and pickup location for orders.</p>
                     </div>
 
-                    <div class="form-section">
-                        <h3>Your Farm</h3>
-
-                        <div class="form-group">
-                            <label for="farmName">Farm Name</label>
-                            <input type="text" id="farmName" name="farmName" placeholder="Smith Family Farm">
-                        </div>
-
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="state">State *</label>
-                                <select id="state" name="state" required>
-                                    <option value="">Select State</option>
-                                    <option value="CO">Colorado</option>
-                                    <option value="KS">Kansas</option>
-                                    <option value="NE">Nebraska</option>
-                                </select>
-                            </div>
-                            <div class="form-group">
-                                <label for="county">County</label>
-                                <input type="text" id="county" name="county" placeholder="Your County">
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label for="acres">Total Acres *</label>
-                            <div class="input-with-suffix">
-                                <input type="number" id="acres" name="acres" required min="1" placeholder="500">
-                                <span class="suffix">acres</span>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>Crops You Grow</label>
-                            <div class="checkbox-grid">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="corn">
-                                    <span>Corn</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="soybeans">
-                                    <span>Soybeans</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="wheat">
-                                    <span>Wheat</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="sorghum">
-                                    <span>Sorghum</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="millet">
-                                    <span>Millet</span>
-                                </label>
-                                <label class="checkbox-label">
-                                    <input type="checkbox" name="crops" value="hay">
-                                    <span>Hay/Forage</span>
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="form-section">
-                        <h3>Choose Your Representative & Pickup Location *</h3>
-                        <p class="section-note">Your rep is your point of contact and pickup location for orders.</p>
-
+                    <form id="step2Form" class="auth-form">
                         <div class="rep-grid" id="repGrid">
                             <label class="rep-card">
                                 <input type="radio" name="representative" value="kyle" required>
@@ -159,19 +137,23 @@
                                     <span class="rep-location">Pickup: Burlington, CO</span>
                                 </div>
                             </label>
+                            <label class="rep-card">
+                                <input type="radio" name="representative" value="seth">
+                                <div class="rep-info">
+                                    <span class="rep-name">Seth Rolfs</span>
+                                    <span class="rep-phone">(785) 531-0680</span>
+                                    <span class="rep-location">Pickup: Kansas</span>
+                                </div>
+                            </label>
                         </div>
-                    </div>
 
-                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+                        <div id="errorMessage2" class="error-message" style="display: none;"></div>
 
-                    <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
-                        Create Account
-                    </button>
-
-                    <p class="auth-switch">
-                        Already have an account? <a href="/login.html">Login</a>
-                    </p>
-                </form>
+                        <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn2">
+                            Complete Signup
+                        </button>
+                    </form>
+                </div>
             </div>
         </div>
     </main>
@@ -185,40 +167,53 @@
     </footer>
 
     <script>
-        const API_URL = 'https://acreprofit-com.onrender.com'; // Update with your Render URL
+        const API_URL = 'https://acreprofit-com.onrender.com';
+        let userData = {};
 
-        document.getElementById('signupForm').addEventListener('submit', async function(e) {
+        // Step 1: Collect basic info
+        document.getElementById('step1Form').addEventListener('submit', function(e) {
             e.preventDefault();
 
-            const submitBtn = document.getElementById('submitBtn');
-            const errorDiv = document.getElementById('errorMessage');
+            const formData = new FormData(this);
+            userData = {
+                name: formData.get('name'),
+                email: formData.get('email'),
+                phone: formData.get('phone'),
+                address: {
+                    street: formData.get('address'),
+                    city: formData.get('city'),
+                    state: formData.get('state'),
+                    zip: formData.get('zip')
+                }
+            };
+
+            // Move to step 2
+            document.getElementById('step1').style.display = 'none';
+            document.getElementById('step2').style.display = 'block';
+        });
+
+        // Step 2: Pick representative and complete signup
+        document.getElementById('step2Form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn2');
+            const errorDiv = document.getElementById('errorMessage2');
 
             submitBtn.disabled = true;
             submitBtn.textContent = 'Creating Account...';
             errorDiv.style.display = 'none';
 
             const formData = new FormData(this);
+            userData.representativeId = formData.get('representative');
 
-            const data = {
-                name: formData.get('name'),
-                email: formData.get('email'),
-                password: formData.get('password'),
-                phone: formData.get('phone'),
-                farm: {
-                    name: formData.get('farmName'),
-                    acres: parseInt(formData.get('acres')),
-                    state: formData.get('state'),
-                    county: formData.get('county')
-                },
-                crops: formData.getAll('crops'),
-                representativeId: formData.get('representative')
-            };
+            // Generate a simple password (user can reset later via email)
+            userData.password = 'temp_' + Date.now();
 
             try {
                 const response = await fetch(`${API_URL}/api/auth/signup`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
+                    body: JSON.stringify(userData)
                 });
 
                 const result = await response.json();
@@ -227,21 +222,20 @@
                     throw new Error(result.error || 'Signup failed');
                 }
 
-                // Store token and redirect to dashboard
+                // Store token and redirect to producer portal
                 localStorage.setItem('token', result.token);
                 localStorage.setItem('user', JSON.stringify(result.user));
                 window.location.href = '/dashboard.html';
             } catch (error) {
                 // If server is down, allow demo mode
                 if (error.message === 'Failed to fetch' || error.message.includes('Load failed')) {
-                    // Create demo account locally
                     const demoUser = {
                         _id: 'demo_' + Date.now(),
-                        name: data.name,
-                        email: data.email,
-                        farm: data.farm,
-                        crops: data.crops,
-                        representativeId: data.representativeId,
+                        name: userData.name,
+                        email: userData.email,
+                        phone: userData.phone,
+                        address: userData.address,
+                        representativeId: userData.representativeId,
                         merchCredit: 0,
                         role: 'customer'
                     };
@@ -253,7 +247,7 @@
                     errorDiv.textContent = error.message;
                     errorDiv.style.display = 'block';
                     submitBtn.disabled = false;
-                    submitBtn.textContent = 'Create Account';
+                    submitBtn.textContent = 'Complete Signup';
                 }
             }
         });
@@ -267,7 +261,7 @@
         }
 
         .auth-wrapper {
-            max-width: 600px;
+            max-width: 500px;
             margin: 0 auto;
             background: var(--white);
             border-radius: var(--radius-lg);
@@ -306,12 +300,6 @@
             color: var(--primary);
         }
 
-        .section-note {
-            font-size: 0.875rem;
-            color: var(--text-light);
-            margin-bottom: 16px;
-        }
-
         .auth-form .form-group {
             margin-bottom: 20px;
         }
@@ -348,66 +336,23 @@
             gap: 20px;
         }
 
-        .input-with-suffix {
-            position: relative;
-        }
-
-        .input-with-suffix input {
-            padding-right: 70px;
-        }
-
-        .input-with-suffix .suffix {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-            font-weight: 500;
-        }
-
-        .checkbox-grid {
-            display: grid;
-            grid-template-columns: repeat(2, 1fr);
-            gap: 12px;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            padding: 12px 16px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: var(--transition);
-            font-weight: 500;
-        }
-
-        .checkbox-label:hover {
-            background: #e8e8e0;
-        }
-
-        .checkbox-label input {
-            width: auto;
-            accent-color: var(--primary);
-        }
-
         .rep-grid {
             display: grid;
             grid-template-columns: 1fr;
             gap: 12px;
+            margin-bottom: 24px;
         }
 
         .rep-card {
             display: flex;
             align-items: center;
             gap: 16px;
-            padding: 16px 20px;
+            padding: 20px 24px;
             background: var(--secondary);
             border-radius: var(--radius);
             cursor: pointer;
             transition: var(--transition);
-            border: 2px solid transparent;
+            border: 3px solid transparent;
         }
 
         .rep-card:hover {
@@ -422,6 +367,7 @@
         .rep-card input {
             width: auto;
             accent-color: var(--primary);
+            transform: scale(1.3);
         }
 
         .rep-info {
@@ -430,20 +376,22 @@
         }
 
         .rep-name {
-            font-weight: 600;
+            font-weight: 700;
+            font-size: 1.125rem;
             color: var(--text);
         }
 
         .rep-phone {
             font-size: 0.875rem;
             color: var(--text-muted);
+            margin-top: 2px;
         }
 
         .rep-location {
-            font-size: 0.875rem;
+            font-size: 0.9rem;
             color: var(--primary);
-            font-weight: 500;
-            margin-top: 4px;
+            font-weight: 600;
+            margin-top: 6px;
         }
 
         .error-message {
@@ -472,10 +420,6 @@
             }
 
             .form-row {
-                grid-template-columns: 1fr;
-            }
-
-            .checkbox-grid {
                 grid-template-columns: 1fr;
             }
         }
