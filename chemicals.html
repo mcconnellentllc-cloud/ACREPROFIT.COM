@@ -245,10 +245,55 @@
                     </div>
 
                     <div class="chemicals-config">
-                        <h4>Adjust Application Rates</h4>
-                        <p class="section-note">Modify rates as needed. Default rates shown based on label recommendations.</p>
+                        <h4>CPD Supplied Chemicals</h4>
+                        <p class="section-note">These chemicals are supplied through CPD with pricing shown. Modify rates as needed.</p>
                         <div id="chemicalRatesConfig">
                             <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Custom Chemicals Section (not from CPD) -->
+                    <div class="custom-chemicals-section">
+                        <h4>Add Your Own Chemicals <span class="badge-info">Not supplied by CPD</span></h4>
+                        <p class="section-note">Add chemicals you'll source elsewhere. We'll generate a bid sheet you can send to suppliers.</p>
+
+                        <div id="customChemicalsList">
+                            <!-- Populated dynamically -->
+                        </div>
+
+                        <div class="add-custom-chemical-form">
+                            <div class="custom-chem-row">
+                                <div class="form-group">
+                                    <label>Product Name</label>
+                                    <input type="text" id="customChemName" placeholder="e.g., Engenia, XtendiMax">
+                                </div>
+                                <div class="form-group">
+                                    <label>Application</label>
+                                    <select id="customChemApplication">
+                                        <!-- Populated based on selected program -->
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Rate</label>
+                                    <input type="number" id="customChemRate" placeholder="12" step="0.5" min="0">
+                                </div>
+                                <div class="form-group">
+                                    <label>Unit</label>
+                                    <select id="customChemUnit">
+                                        <option value="fl oz/acre">fl oz/acre</option>
+                                        <option value="oz/acre">oz/acre</option>
+                                        <option value="pt/acre">pt/acre</option>
+                                        <option value="qt/acre">qt/acre</option>
+                                        <option value="gal/acre">gal/acre</option>
+                                        <option value="lb/acre">lb/acre</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Pack Size (optional)</label>
+                                    <input type="text" id="customChemPackSize" placeholder="e.g., 2x2.5 gal">
+                                </div>
+                                <button type="button" class="btn btn-secondary" onclick="addCustomChemical()">+ Add</button>
+                            </div>
                         </div>
                     </div>
 
@@ -335,6 +380,7 @@
         let orderItems = [];
         let selectedCrop = null;
         let selectedProgram = null;
+        let customChemicals = []; // Chemicals not supplied by CPD - for bid sheet
 
         // ============ SMART PACKAGE BREAKDOWN CALCULATOR ============
         // Package sizes available for most chemicals
@@ -1123,6 +1169,9 @@
             document.getElementById('programResults').style.display = 'none';
             section.style.display = 'block';
 
+            // Clear custom chemicals when selecting new program
+            customChemicals = [];
+
             // Populate chemical rates config
             populateChemicalRates();
 
@@ -1190,6 +1239,91 @@
             });
             document.getElementById('programAcres').addEventListener('input', updateChemicalTotals);
             updateChemicalTotals();
+
+            // Populate application dropdown for custom chemicals
+            populateCustomChemApplications();
+            renderCustomChemicals();
+        }
+
+        // ============ CUSTOM CHEMICALS (NOT FROM CPD) ============
+        function populateCustomChemApplications() {
+            const select = document.getElementById('customChemApplication');
+            if (!select || !selectedProgram) return;
+
+            select.innerHTML = selectedProgram.applications.map(app =>
+                `<option value="${app.name}">${app.name} (${app.timing})</option>`
+            ).join('');
+        }
+
+        function addCustomChemical() {
+            const name = document.getElementById('customChemName').value.trim();
+            const application = document.getElementById('customChemApplication').value;
+            const rate = parseFloat(document.getElementById('customChemRate').value) || 0;
+            const rateUnit = document.getElementById('customChemUnit').value;
+            const packSize = document.getElementById('customChemPackSize').value.trim() || 'TBD';
+
+            if (!name) {
+                alert('Please enter a product name');
+                return;
+            }
+            if (rate <= 0) {
+                alert('Please enter a valid rate');
+                return;
+            }
+
+            customChemicals.push({
+                id: Date.now(),
+                productName: name,
+                application: application,
+                rate: rate,
+                rateUnit: rateUnit,
+                packSize: packSize,
+                isCustom: true
+            });
+
+            // Clear form
+            document.getElementById('customChemName').value = '';
+            document.getElementById('customChemRate').value = '';
+            document.getElementById('customChemPackSize').value = '';
+
+            renderCustomChemicals();
+            showNotification(`Added ${name} to your custom chemicals`);
+        }
+
+        function removeCustomChemical(id) {
+            customChemicals = customChemicals.filter(c => c.id !== id);
+            renderCustomChemicals();
+        }
+
+        function renderCustomChemicals() {
+            const container = document.getElementById('customChemicalsList');
+            if (!container) return;
+
+            if (customChemicals.length === 0) {
+                container.innerHTML = '<p class="no-custom-chems">No custom chemicals added yet. These will appear on your bid sheet.</p>';
+                return;
+            }
+
+            container.innerHTML = `
+                <div class="custom-chems-table">
+                    <div class="custom-chems-header">
+                        <span>Product</span>
+                        <span>Application</span>
+                        <span>Rate</span>
+                        <span>Pack Size</span>
+                        <span></span>
+                    </div>
+                    ${customChemicals.map(chem => `
+                        <div class="custom-chem-item">
+                            <span class="custom-chem-name">${chem.productName}</span>
+                            <span class="custom-chem-app">${chem.application}</span>
+                            <span class="custom-chem-rate">${chem.rate} ${chem.rateUnit}</span>
+                            <span class="custom-chem-pack">${chem.packSize}</span>
+                            <button class="btn btn-sm btn-danger" onclick="removeCustomChemical(${chem.id})">Remove</button>
+                        </div>
+                    `).join('')}
+                </div>
+            `;
         }
 
         function adjustValue(inputId, delta) {
@@ -1293,10 +1427,15 @@
             const hydrovantOz = totalSprayGallons * hydrovantOzPerGal;
             const hydrovantGal = hydrovantOz / 128;
 
+            // Track custom chemicals separately for bid sheet
+            let customChemTotals = {};
+
             // Process each application (pass) in the program
             selectedProgram.applications.forEach(app => {
                 let sheetChemicals = [];
+                let sheetCustomChemicals = [];
 
+                // Process CPD-supplied chemicals
                 app.chemicals.forEach(chemItem => {
                     // Use customized rate from UI if available
                     const customRate = getCustomRate(chemItem.productName);
@@ -1321,7 +1460,8 @@
                         unitsPerPack,
                         unit,
                         price,
-                        cost
+                        cost,
+                        isCPD: true
                     });
 
                     // Aggregate for order totals
@@ -1340,12 +1480,43 @@
                     totalsByChemical[key].totalNeeded += totalNeeded;
                 });
 
+                // Process custom chemicals (not from CPD) for this application
+                customChemicals.filter(c => c.application === app.name).forEach(customChem => {
+                    const unit = customChem.rateUnit.includes('gal') ? 'gl' :
+                                customChem.rateUnit.includes('lb') ? 'lb' : 'gl';
+                    const totalNeeded = calculateAmount(customChem.rate, customChem.rateUnit, acres, unit);
+
+                    sheetCustomChemicals.push({
+                        name: customChem.productName,
+                        rate: customChem.rate,
+                        rateUnit: customChem.rateUnit,
+                        totalNeeded,
+                        packSize: customChem.packSize,
+                        unit,
+                        isCPD: false
+                    });
+
+                    // Aggregate custom chemicals for bid sheet
+                    const key = customChem.productName;
+                    if (!customChemTotals[key]) {
+                        customChemTotals[key] = {
+                            name: customChem.productName,
+                            totalNeeded: 0,
+                            packSize: customChem.packSize,
+                            unit,
+                            rateUnit: customChem.rateUnit
+                        };
+                    }
+                    customChemTotals[key].totalNeeded += totalNeeded;
+                });
+
                 spraySheets.push({
                     name: app.name,
                     timing: app.timing,
                     truckRouteDate: app.truckRouteDate || '',
                     acres,
-                    chemicals: sheetChemicals
+                    chemicals: sheetChemicals,
+                    customChemicals: sheetCustomChemicals
                 });
             });
 
@@ -1408,6 +1579,7 @@
                         <thead>
                             <tr>
                                 <th>Product</th>
+                                <th>Source</th>
                                 <th>Rate/Acre</th>
                                 <th>Total Needed</th>
                             </tr>
@@ -1416,10 +1588,19 @@
                             ${sheet.chemicals.map(c => `
                                 <tr>
                                     <td>${c.name}</td>
+                                    <td><span class="source-badge cpd">CPD</span></td>
                                     <td>${c.rate} ${c.rateUnit}</td>
                                     <td><strong>${c.totalNeeded.toFixed(2)} ${c.unit}</strong></td>
                                 </tr>
                             `).join('')}
+                            ${sheet.customChemicals && sheet.customChemicals.length > 0 ? sheet.customChemicals.map(c => `
+                                <tr class="custom-chem-row">
+                                    <td>${c.name}</td>
+                                    <td><span class="source-badge bid-sheet">Bid Sheet</span></td>
+                                    <td>${c.rate} ${c.rateUnit}</td>
+                                    <td><strong>${c.totalNeeded.toFixed(2)} ${c.unit}</strong></td>
+                                </tr>
+                            `).join('') : ''}
                         </tbody>
                     </table>
                 </div>
@@ -1521,7 +1702,7 @@
 
                     <div class="order-actions">
                         <button class="btn btn-primary btn-lg" onclick="submitProgramOrder(${acres}, ${totalCost})">
-                            Submit This Order
+                            Submit CPD Order
                         </button>
                         <button class="btn btn-outline" onclick="window.print()">
                             Print Order Summary
@@ -1530,12 +1711,80 @@
                 </div>
             `;
 
+            // Generate Bid Sheet for custom chemicals (not from CPD)
+            let bidSheetHTML = '';
+            const customChemList = Object.values(customChemTotals);
+            if (customChemList.length > 0) {
+                bidSheetHTML = `
+                <div class="bid-sheet-section">
+                    <div class="bid-sheet-header">
+                        <h3>Supplier Bid Request Sheet</h3>
+                        <p>The following chemicals are NOT supplied by CPD. Forward this bid sheet to your preferred suppliers to get competitive quotes.</p>
+                    </div>
+
+                    <div class="bid-sheet-content" id="bidSheetContent">
+                        <div class="bid-sheet-farm-info">
+                            <h4>Request for Quote</h4>
+                            <p><strong>Farm:</strong> ${userData.farmName || userData.email || 'Customer'}</p>
+                            <p><strong>Total Acres:</strong> ${acres.toLocaleString()}</p>
+                            <p><strong>Crop Program:</strong> ${selectedProgram.name}</p>
+                            <p><strong>Date:</strong> ${new Date().toLocaleDateString()}</p>
+                            <p><strong>Delivery Needed By:</strong> ${getDeliveryDate()}</p>
+                        </div>
+
+                        <table class="bid-sheet-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Quantity Needed</th>
+                                    <th>Preferred Pack Size</th>
+                                    <th>Your Price</th>
+                                    <th>Availability</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${customChemList.map(item => `
+                                    <tr>
+                                        <td><strong>${item.name}</strong></td>
+                                        <td>${item.totalNeeded.toFixed(2)} ${item.unit}</td>
+                                        <td>${item.packSize}</td>
+                                        <td class="bid-price-cell">$_______/${item.unit}</td>
+                                        <td class="bid-avail-cell">_______</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+
+                        <div class="bid-sheet-notes">
+                            <p><strong>Supplier:</strong> ________________________________</p>
+                            <p><strong>Contact:</strong> ________________________________</p>
+                            <p><strong>Quote Valid Until:</strong> ________________________________</p>
+                            <p><strong>Notes:</strong> ________________________________</p>
+                        </div>
+                    </div>
+
+                    <div class="bid-sheet-actions">
+                        <button class="btn btn-warning" onclick="printBidSheet()">
+                            Print Bid Sheet
+                        </button>
+                        <button class="btn btn-outline" onclick="copyBidSheetEmail()">
+                            Copy as Email
+                        </button>
+                        <button class="btn btn-outline" onclick="downloadBidSheet()">
+                            Download PDF
+                        </button>
+                    </div>
+                </div>
+                `;
+            }
+
             resultsDiv.innerHTML = `
                 <h2>Your Spray Program: ${selectedProgram.name}</h2>
                 <p class="program-summary">${acres.toLocaleString()} acres - ${selectedProgram.applications.length} application(s)</p>
                 ${truckRouteHTML}
                 <div class="spray-sheets-container">${spraySheetHTML}</div>
                 ${totalsHTML}
+                ${bidSheetHTML}
             `;
             resultsDiv.style.display = 'block';
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
@@ -1598,6 +1847,107 @@
             `);
             printWindow.document.close();
             printWindow.print();
+        }
+
+        // ============ BID SHEET FUNCTIONS ============
+        function printBidSheet() {
+            const bidContent = document.getElementById('bidSheetContent');
+            if (!bidContent) return;
+
+            const printWindow = window.open('', '_blank');
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Supplier Bid Request - Acre Profit</title>
+                    <style>
+                        body { font-family: Arial, sans-serif; padding: 40px; max-width: 800px; margin: 0 auto; }
+                        h1 { color: #2d5a27; border-bottom: 2px solid #2d5a27; padding-bottom: 10px; }
+                        h4 { color: #333; margin-top: 30px; }
+                        table { width: 100%; border-collapse: collapse; margin: 20px 0; }
+                        th, td { border: 1px solid #ccc; padding: 12px; text-align: left; }
+                        th { background: #f5f5f5; font-weight: 600; }
+                        .bid-price-cell, .bid-avail-cell { min-width: 100px; }
+                        .bid-sheet-farm-info { background: #f9f9f9; padding: 20px; border-radius: 8px; margin-bottom: 20px; }
+                        .bid-sheet-farm-info p { margin: 8px 0; }
+                        .bid-sheet-notes { margin-top: 30px; }
+                        .bid-sheet-notes p { margin: 15px 0; border-bottom: 1px dotted #ccc; padding-bottom: 10px; }
+                        .footer { margin-top: 40px; text-align: center; color: #666; font-size: 12px; }
+                    </style>
+                </head>
+                <body>
+                    <h1>Request for Chemical Quote</h1>
+                    ${bidContent.innerHTML}
+                    <div class="footer">
+                        <p>Generated by AcreProfit.com - ${new Date().toLocaleDateString()}</p>
+                        <p>Please return completed quote to the farm contact listed above.</p>
+                    </div>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
+        }
+
+        function copyBidSheetEmail() {
+            const acres = parseFloat(document.getElementById('programAcres').value) || 0;
+            const customChemList = Object.values(customChemicals.reduce((acc, c) => {
+                const unit = c.rateUnit.includes('gal') ? 'gl' : c.rateUnit.includes('lb') ? 'lb' : 'gl';
+                const totalNeeded = calculateAmount(c.rate, c.rateUnit, acres, unit);
+                const key = c.productName;
+                if (!acc[key]) {
+                    acc[key] = { name: c.productName, totalNeeded: 0, packSize: c.packSize, unit };
+                }
+                acc[key].totalNeeded += totalNeeded;
+                return acc;
+            }, {}));
+
+            let emailText = `Subject: Request for Chemical Quote - ${selectedProgram?.name || 'Spray Program'}
+
+Dear Supplier,
+
+I am requesting quotes for the following crop protection products for the upcoming season:
+
+FARM INFORMATION:
+- Farm: ${userData.farmName || userData.email || 'Customer'}
+- Total Acres: ${acres.toLocaleString()}
+- Crop Program: ${selectedProgram?.name || 'Custom Program'}
+- Delivery Needed By: ${getDeliveryDate()}
+
+PRODUCTS NEEDED:
+${customChemList.map(item => `- ${item.name}: ${item.totalNeeded.toFixed(2)} ${item.unit} (preferred pack: ${item.packSize})`).join('\n')}
+
+Please provide:
+1. Price per unit
+2. Available quantity
+3. Estimated delivery date
+4. Quote valid until date
+
+Thank you for your time. Please reply to this email with your quote.
+
+Best regards,
+${userData.farmName || userData.email || 'Customer'}
+
+---
+Generated by AcreProfit.com`;
+
+            navigator.clipboard.writeText(emailText).then(() => {
+                showNotification('Bid request email copied to clipboard!');
+            }).catch(() => {
+                // Fallback for older browsers
+                const textarea = document.createElement('textarea');
+                textarea.value = emailText;
+                document.body.appendChild(textarea);
+                textarea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textarea);
+                showNotification('Bid request email copied to clipboard!');
+            });
+        }
+
+        function downloadBidSheet() {
+            // For now, just print to PDF (browser's print to PDF)
+            printBidSheet();
+            showNotification('Use your browser\'s "Save as PDF" option in the print dialog');
         }
 
         // ============ ORDER FUNCTIONS ============
