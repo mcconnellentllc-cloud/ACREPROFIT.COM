@@ -526,6 +526,33 @@
                         <button class="btn btn-sm btn-warning" onclick="submitCheaperRequest()">Submit</button>
                     </div>
                 </div>
+
+                <!-- Add Your Own Chemical -->
+                <div class="add-chemical-section">
+                    <h4>Add Your Own Chemical</h4>
+                    <p>Don't see what you need? Add your chemical with supplier, brand, and cost - we'll add it to the system for you and others to order.</p>
+                    <button class="btn btn-primary" onclick="openAddChemicalModal()">+ Add Custom Chemical</button>
+                </div>
+
+                <!-- User's Custom Chemicals -->
+                <div class="user-chemicals-section" id="userChemicalsSection" style="display: none;">
+                    <h4>Your Custom Chemicals</h4>
+                    <table class="chemical-table" id="userChemicalsTable">
+                        <thead>
+                            <tr>
+                                <th>Brand Name</th>
+                                <th>Supplier</th>
+                                <th>Package/UOM</th>
+                                <th>Cost/Unit</th>
+                                <th>Qty</th>
+                                <th>Subtotal</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="userChemicalsBody">
+                        </tbody>
+                    </table>
+                </div>
             </div>
 
             <!-- Quick Add Chemical Order List -->
@@ -891,6 +918,81 @@
                 <button class="btn btn-outline" onclick="closeMerchModal()">Cancel</button>
                 <button class="btn btn-primary" id="merchActionBtn" onclick="confirmMerchChoice()">Confirm</button>
             </div>
+        </div>
+    </div>
+
+    <!-- Add Custom Chemical Modal -->
+    <div class="modal-overlay" id="addChemicalModal">
+        <div class="modal-content">
+            <button class="modal-close" onclick="closeAddChemicalModal()">&times;</button>
+            <h2>Add Your Chemical</h2>
+            <p class="modal-subtitle">Enter the details of the chemical you want to add. This helps us build our database and makes ordering easier for everyone.</p>
+
+            <form id="addChemicalForm" onsubmit="submitCustomChemical(event)">
+                <div class="form-group">
+                    <label for="chemBrandName">Brand Name *</label>
+                    <input type="text" id="chemBrandName" placeholder="e.g., Roundup PowerMax, Generic Glyphosate" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="chemSupplier">Supplier *</label>
+                    <input type="text" id="chemSupplier" placeholder="e.g., Nutrien, Helena, Local Co-op" required>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="chemPackSize">Package Size</label>
+                        <input type="text" id="chemPackSize" placeholder="e.g., Shuttle (250 gal), 2x2.5 gal">
+                    </div>
+                    <div class="form-group">
+                        <label for="chemUom">Unit of Measure *</label>
+                        <select id="chemUom" required>
+                            <option value="">Select...</option>
+                            <option value="gallon">Gallon (gal)</option>
+                            <option value="quart">Quart (qt)</option>
+                            <option value="pint">Pint (pt)</option>
+                            <option value="ounce">Ounce (oz)</option>
+                            <option value="pound">Pound (lb)</option>
+                            <option value="bag">Bag</option>
+                            <option value="case">Case</option>
+                            <option value="jug">Jug</option>
+                            <option value="bucket">Bucket</option>
+                            <option value="unit">Unit</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="chemCost">Cost per Unit *</label>
+                    <div class="input-with-prefix">
+                        <span class="prefix">$</span>
+                        <input type="number" id="chemCost" step="0.01" min="0" placeholder="0.00" required>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="chemCategory">Category</label>
+                    <select id="chemCategory">
+                        <option value="herbicide">Herbicide</option>
+                        <option value="fungicide">Fungicide</option>
+                        <option value="insecticide">Insecticide</option>
+                        <option value="adjuvant">Adjuvant</option>
+                        <option value="fertilizer">Fertilizer</option>
+                        <option value="seed_treatment">Seed Treatment</option>
+                        <option value="other">Other</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="chemNotes">Notes (optional)</label>
+                    <textarea id="chemNotes" rows="2" placeholder="Any additional info about this product..."></textarea>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-outline" onclick="closeAddChemicalModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="submitChemBtn">Add Chemical</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -1466,6 +1568,186 @@
                 closeMerchModal();
             }
         }
+
+        // =============== Custom Chemical Modal Functions ===============
+        let userChemicals = [];
+
+        function openAddChemicalModal() {
+            document.getElementById('addChemicalModal').classList.add('active');
+        }
+
+        function closeAddChemicalModal() {
+            document.getElementById('addChemicalModal').classList.remove('active');
+            document.getElementById('addChemicalForm').reset();
+        }
+
+        async function submitCustomChemical(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitChemBtn');
+            btn.disabled = true;
+            btn.textContent = 'Adding...';
+
+            const chemicalData = {
+                brandName: document.getElementById('chemBrandName').value.trim(),
+                supplier: document.getElementById('chemSupplier').value.trim(),
+                packSize: document.getElementById('chemPackSize').value.trim(),
+                uom: document.getElementById('chemUom').value,
+                costPerUnit: parseFloat(document.getElementById('chemCost').value),
+                category: document.getElementById('chemCategory').value,
+                notes: document.getElementById('chemNotes').value.trim()
+            };
+
+            try {
+                const response = await fetch(`${API_URL}/api/user-chemicals`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(chemicalData)
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(result.error || 'Failed to add chemical');
+                }
+
+                alert('Chemical added successfully! It is now available in your order list.');
+                closeAddChemicalModal();
+                loadUserChemicals();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Add Chemical';
+            }
+        }
+
+        async function loadUserChemicals() {
+            try {
+                const response = await fetch(`${API_URL}/api/user-chemicals/available`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (response.ok) {
+                    userChemicals = await response.json();
+                    renderUserChemicals();
+                }
+            } catch (error) {
+                console.error('Error loading user chemicals:', error);
+            }
+        }
+
+        function renderUserChemicals() {
+            const section = document.getElementById('userChemicalsSection');
+            const tbody = document.getElementById('userChemicalsBody');
+
+            if (!userChemicals || userChemicals.length === 0) {
+                section.style.display = 'none';
+                return;
+            }
+
+            section.style.display = 'block';
+            tbody.innerHTML = userChemicals.map(chem => `
+                <tr data-chem-id="${chem._id}">
+                    <td><strong>${chem.brandName}</strong>
+                        ${chem.status === 'pending' ? '<span class="status-badge pending">Pending Review</span>' : ''}
+                        ${chem.status === 'approved' ? '<span class="status-badge approved">Approved</span>' : ''}
+                    </td>
+                    <td>${chem.supplier}</td>
+                    <td>${chem.packSize || chem.uom}</td>
+                    <td>$${chem.costPerUnit.toFixed(2)}/${chem.uom}</td>
+                    <td><input type="number" min="0" value="0" class="user-chem-qty" data-price="${chem.costPerUnit}" data-id="${chem._id}" onchange="updateUserChemTotal(this)"></td>
+                    <td class="user-chem-subtotal">$0.00</td>
+                    <td>
+                        <button class="btn btn-sm btn-primary" onclick="addUserChemToOrder(this, '${chem._id}')">Add</button>
+                        <button class="btn btn-sm btn-outline" onclick="deleteUserChemical('${chem._id}')" title="Delete">X</button>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        function updateUserChemTotal(input) {
+            const qty = parseInt(input.value) || 0;
+            const price = parseFloat(input.dataset.price) || 0;
+            const subtotal = qty * price;
+            const row = input.closest('tr');
+            row.querySelector('.user-chem-subtotal').textContent = `$${subtotal.toFixed(2)}`;
+        }
+
+        function addUserChemToOrder(btn, chemId) {
+            const chem = userChemicals.find(c => c._id === chemId);
+            const row = btn.closest('tr');
+            const qty = parseInt(row.querySelector('.user-chem-qty').value) || 0;
+
+            if (qty <= 0) {
+                alert('Please enter a quantity.');
+                return;
+            }
+
+            // Add to quick order items
+            const year = document.getElementById('quickYear').value;
+            const location = document.getElementById('quickLocation').value;
+            const timing = document.getElementById('quickTiming').value;
+
+            if (!location || !timing) {
+                alert('Please select a pickup location and delivery timing first.');
+                return;
+            }
+
+            quickOrderItems.push({
+                year,
+                location,
+                timing,
+                product: chem.brandName,
+                supplier: chem.supplier,
+                packSize: chem.packSize || chem.uom,
+                pricePerUnit: chem.costPerUnit,
+                qty,
+                total: qty * chem.costPerUnit,
+                isUserChemical: true,
+                chemicalId: chemId
+            });
+
+            row.querySelector('.user-chem-qty').value = 0;
+            row.querySelector('.user-chem-subtotal').textContent = '$0.00';
+
+            renderOrderItems();
+            updateChemicalOrderTotal();
+            alert(`Added ${qty} ${chem.packSize || chem.uom} of ${chem.brandName} to your order!`);
+        }
+
+        async function deleteUserChemical(chemId) {
+            if (!confirm('Are you sure you want to delete this chemical?')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/user-chemicals/${chemId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const result = await response.json();
+                    throw new Error(result.error || 'Failed to delete');
+                }
+
+                loadUserChemicals();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Load user chemicals on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadUserChemicals();
+        });
 
         // Submit order
         async function submitOrder() {
@@ -2701,6 +2983,101 @@
 
         .btn-warning:hover {
             background: #d97706;
+        }
+
+        /* Add Chemical Section */
+        .add-chemical-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #ecfdf5;
+            border: 2px dashed #10b981;
+            border-radius: var(--radius-lg);
+            text-align: center;
+        }
+
+        .add-chemical-section h4 {
+            color: #065f46;
+            margin-bottom: 4px;
+        }
+
+        .add-chemical-section p {
+            color: #047857;
+            font-size: 0.9rem;
+            margin-bottom: 16px;
+        }
+
+        /* User Chemicals Section */
+        .user-chemicals-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #f0fdf4;
+            border-radius: var(--radius-lg);
+        }
+
+        .user-chemicals-section h4 {
+            color: #166534;
+            margin-bottom: 16px;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            margin-left: 8px;
+            text-transform: uppercase;
+        }
+
+        .status-badge.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-badge.approved {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        /* Modal form styles */
+        .input-with-prefix {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .input-with-prefix .prefix {
+            position: absolute;
+            left: 12px;
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .input-with-prefix input {
+            padding-left: 28px;
+        }
+
+        #addChemicalModal .form-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        #addChemicalModal .form-group textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-family: inherit;
+            resize: vertical;
+        }
+
+        .user-chem-qty {
+            width: 70px;
+            padding: 8px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            text-align: center;
         }
 
         @media (max-width: 768px) {
