@@ -3999,6 +3999,201 @@ app.put('/api/admin/chemical-requests/:id', authMiddleware, adminMiddleware, asy
     }
 });
 
+// ---- USER SUBMITTED CHEMICALS ----
+// Chemicals submitted by users to build the database
+
+const userSubmittedChemicalSchema = new mongoose.Schema({
+    // Submitted by
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    userName: String,
+
+    // Chemical info
+    brandName: { type: String, required: true },
+    supplier: { type: String, required: true },
+    uom: { type: String, required: true }, // Unit of measure (e.g., "gallon", "lb", "oz", "2.5 gal jug")
+    packSize: String, // e.g., "Shuttle (250 gal)", "2x2.5 gal", "50 lb bag"
+    costPerUnit: { type: Number, required: true }, // Cost per unit of measure
+
+    // Additional info
+    category: {
+        type: String,
+        enum: ['herbicide', 'fungicide', 'insecticide', 'adjuvant', 'fertilizer', 'seed_treatment', 'other'],
+        default: 'herbicide'
+    },
+    crops: [String], // Which crops it can be used on
+    notes: String, // Any additional info
+
+    // Review status
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+    },
+    reviewedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    reviewedAt: Date,
+    reviewNotes: String,
+
+    // If approved, link to the Chemical record created
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const UserSubmittedChemical = mongoose.model('UserSubmittedChemical', userSubmittedChemicalSchema);
+
+// Submit a new chemical to the database
+app.post('/api/user-chemicals', authMiddleware, async (req, res) => {
+    try {
+        const { brandName, supplier, uom, packSize, costPerUnit, category, crops, notes } = req.body;
+
+        if (!brandName || !supplier || !uom || !costPerUnit) {
+            return res.status(400).json({
+                error: 'Brand name, supplier, unit of measure, and cost are required'
+            });
+        }
+
+        const user = await User.findById(req.user._id);
+
+        const submission = new UserSubmittedChemical({
+            userId: req.user._id,
+            userName: user ? user.name : 'Unknown',
+            brandName,
+            supplier,
+            uom,
+            packSize: packSize || uom,
+            costPerUnit: parseFloat(costPerUnit),
+            category: category || 'herbicide',
+            crops: crops || [],
+            notes,
+            status: 'pending'
+        });
+
+        await submission.save();
+
+        res.status(201).json({
+            message: 'Chemical submitted successfully! It is now available in the system.',
+            chemical: submission
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get user's submitted chemicals
+app.get('/api/user-chemicals', authMiddleware, async (req, res) => {
+    try {
+        const chemicals = await UserSubmittedChemical.find({ userId: req.user._id })
+            .sort({ createdAt: -1 });
+        res.json(chemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all submitted chemicals (for use in ordering - shows all approved + user's own)
+app.get('/api/user-chemicals/available', authMiddleware, async (req, res) => {
+    try {
+        // Get approved chemicals and user's own submissions
+        const chemicals = await UserSubmittedChemical.find({
+            $or: [
+                { status: 'approved' },
+                { userId: req.user._id }
+            ]
+        })
+        .sort({ brandName: 1 });
+
+        res.json(chemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all user-submitted chemicals (admin view)
+app.get('/api/admin/user-chemicals', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = {};
+
+        if (status) query.status = status;
+
+        const chemicals = await UserSubmittedChemical.find(query)
+            .populate('userId', 'name email farm')
+            .populate('reviewedBy', 'name')
+            .sort({ createdAt: -1 });
+
+        res.json(chemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Review/approve user-submitted chemical
+app.put('/api/admin/user-chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, reviewNotes, addToDatabase } = req.body;
+        const submission = await UserSubmittedChemical.findById(req.params.id);
+
+        if (!submission) {
+            return res.status(404).json({ error: 'Submission not found' });
+        }
+
+        submission.status = status;
+        submission.reviewedBy = req.user._id;
+        submission.reviewedAt = new Date();
+        submission.reviewNotes = reviewNotes;
+        submission.updatedAt = new Date();
+
+        // If approved and addToDatabase is true, create a Chemical record
+        if (status === 'approved' && addToDatabase) {
+            const chemical = new Chemical({
+                productName: submission.brandName,
+                sourceSupplier: submission.supplier,
+                packSize: submission.packSize,
+                unit: submission.uom,
+                costPrice: submission.costPerUnit,
+                sellPrice: submission.costPerUnit, // Can be adjusted by admin
+                category: submission.category,
+                crops: submission.crops,
+                notes: `User-submitted by ${submission.userName}. ${submission.notes || ''}`,
+                isActive: true,
+                availableForOrder: true,
+                createdBy: req.user._id
+            });
+
+            await chemical.save();
+            submission.chemicalId = chemical._id;
+        }
+
+        await submission.save();
+        res.json(submission);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete user-submitted chemical (user can delete their own, admin can delete any)
+app.delete('/api/user-chemicals/:id', authMiddleware, async (req, res) => {
+    try {
+        const submission = await UserSubmittedChemical.findById(req.params.id);
+
+        if (!submission) {
+            return res.status(404).json({ error: 'Submission not found' });
+        }
+
+        // Check if user owns this or is admin
+        if (submission.userId.toString() !== req.user._id.toString() &&
+            req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Not authorized to delete this submission' });
+        }
+
+        await UserSubmittedChemical.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Chemical submission deleted' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // ---- LEDGER ROUTES ----
 
 // Get ledger entries
