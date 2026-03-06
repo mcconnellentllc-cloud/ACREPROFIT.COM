@@ -25,6 +25,7 @@
                 <li><a href="#products" class="nav-tab" data-tab="products">Products</a></li>
                 <li id="pricingNav" style="display: none;"><a href="#pricing" class="nav-tab" data-tab="pricing">Pricing Tiers</a></li>
                 <li id="commissionsNav" style="display: none;"><a href="#commissions" class="nav-tab" data-tab="commissions">Rep Commissions</a></li>
+                <li id="inventoryNav" style="display: none;"><a href="#inventory" class="nav-tab" data-tab="inventory">Inventory</a></li>
                 <li><a href="#ledger" class="nav-tab" data-tab="ledger">Ledger</a></li>
                 <li><a href="#compliance" class="nav-tab" data-tab="compliance" style="color: #dc2626;">Compliance</a></li>
                 <li id="repAppsNav" style="display: none;"><a href="#applications" class="nav-tab" data-tab="applications">Rep Applications</a></li>
@@ -47,7 +48,7 @@
             <div id="dashboardTab" class="tab-content active">
                 <div class="stats-grid">
                     <div class="stat-card">
-                        <div class="stat-icon blue">
+                        <div class="stat-icon green">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                         </div>
                         <div class="stat-content">
@@ -140,15 +141,65 @@
 
             <!-- Orders Tab -->
             <div id="ordersTab" class="tab-content">
+                <!-- Order Workflow Legend -->
+                <div class="workflow-tracker">
+                    <h4>Order Workflow</h4>
+                    <div class="workflow-steps">
+                        <div class="workflow-step">
+                            <span class="step-icon">1</span>
+                            <span class="step-label">Order</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">2</span>
+                            <span class="step-label">Payment</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">3</span>
+                            <span class="step-label">Payment Secured</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">4</span>
+                            <span class="step-label">Ordered from Mfg</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">5</span>
+                            <span class="step-label">BOL Assigned</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">6</span>
+                            <span class="step-label">Shipped</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">7</span>
+                            <span class="step-label">Delivered</span>
+                        </div>
+                        <span class="workflow-arrow">→</span>
+                        <div class="workflow-step">
+                            <span class="step-icon">8</span>
+                            <span class="step-label">Sign-Off</span>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="tab-header">
                     <h2>All Orders</h2>
                     <div class="filters">
                         <select id="orderStatusFilter">
                             <option value="">All Status</option>
-                            <option value="pending">Pending</option>
-                            <option value="confirmed">Confirmed</option>
+                            <option value="pending">Order Created</option>
+                            <option value="payment_pending">Payment Pending</option>
+                            <option value="payment_secured">Payment Secured</option>
+                            <option value="manufacturer_ordered">Ordered from Mfg</option>
+                            <option value="bol_assigned">BOL Assigned</option>
                             <option value="shipped">Shipped</option>
                             <option value="delivered">Delivered</option>
+                            <option value="signed_off">Signed Off</option>
                         </select>
                     </div>
                 </div>
@@ -244,9 +295,9 @@
                             <div class="form-group">
                                 <label>Representative / Pickup Location *</label>
                                 <select id="addRepresentative" required>
-                                    <option value="kyle">Kyle McConnell - Yuma, CO</option>
-                                    <option value="ty">Ty Mollohan - Wray, CO</option>
-                                    <option value="chad">Chad Bamford - Burlington, CO</option>
+                                    <option value="kyle">Kyle McConnell - Haxtun, CO</option>
+                                    <option value="ty">Ty Mollohan - Otis, CO</option>
+                                    <option value="chad">Chad Bamford - Haxtun, CO</option>
                                 </select>
                             </div>
                         </form>
@@ -440,7 +491,7 @@
                             <div class="bundle-gauge">
                                 <svg viewBox="0 0 100 100">
                                     <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
+                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2D5A27" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
                                 </svg>
                                 <span class="gauge-value">0%</span>
                             </div>
@@ -999,7 +1050,7 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon blue"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
+                        <div class="stat-icon green"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg></div>
                         <div class="stat-content">
                             <span class="stat-value" id="totalCommissionsPaid">$0</span>
                             <span class="stat-label">Total Paid Out</span>
@@ -1021,7 +1072,7 @@
                             <div class="rep-avatar">KM</div>
                             <div class="rep-info">
                                 <h3>Kyle McConnell</h3>
-                                <span class="rep-location">Yuma, CO</span>
+                                <span class="rep-location">Haxtun, CO</span>
                             </div>
                         </div>
                         <div class="rep-stats">
@@ -1061,7 +1112,7 @@
                             <div class="rep-avatar">TM</div>
                             <div class="rep-info">
                                 <h3>Ty Mollohan</h3>
-                                <span class="rep-location">Wray, CO</span>
+                                <span class="rep-location">Otis, CO</span>
                             </div>
                         </div>
                         <div class="rep-stats">
@@ -1101,7 +1152,7 @@
                             <div class="rep-avatar">CB</div>
                             <div class="rep-info">
                                 <h3>Chad Bamford</h3>
-                                <span class="rep-location">Burlington, CO</span>
+                                <span class="rep-location">Haxtun, CO</span>
                             </div>
                         </div>
                         <div class="rep-stats">
@@ -1133,6 +1184,223 @@
                             </div>
                         </div>
                         <button class="btn btn-primary btn-sm" onclick="payCommission('chad')">Record Payment</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Inventory Tab -->
+            <div id="inventoryTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Current Inventory</h2>
+                    <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Inventory</button>
+                        <div class="search-box">
+                            <input type="text" id="inventorySearch" placeholder="Search inventory..." oninput="filterInventory()">
+                        </div>
+                        <select id="inventoryCategoryFilter" onchange="filterInventory()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Categories</option>
+                            <option value="herbicide">Herbicide</option>
+                            <option value="fungicide">Fungicide</option>
+                            <option value="insecticide">Insecticide</option>
+                            <option value="adjuvant">Adjuvant</option>
+                            <option value="fertilizer">Fertilizer</option>
+                            <option value="seed">Seed</option>
+                            <option value="equipment">Equipment</option>
+                            <option value="other">Other</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Inventory Summary Cards -->
+                <div class="stats-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalInventoryItems">0</span>
+                            <span class="stat-label">Total Products</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalInventoryValue">$0</span>
+                            <span class="stat-label">Total Value</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon orange">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="lowStockCount">0</span>
+                            <span class="stat-label">Low Stock Items</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="inventoryCategories">0</span>
+                            <span class="stat-label">Categories</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Inventory Table -->
+                <div class="orders-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th>Category</th>
+                                <th>Qty</th>
+                                <th>Unit</th>
+                                <th class="cost-column">Cost</th>
+                                <th class="cost-column">Margin</th>
+                                <th>Retail</th>
+                                <th>Available</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="inventoryTableBody">
+                            <tr><td colspan="10" class="loading">Loading inventory...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Add Inventory Modal -->
+            <div class="modal-overlay" id="addInventoryModal" style="display: none;">
+                <div class="modal-content customer-modal-content">
+                    <button class="modal-close" onclick="closeAddInventoryModal()">&times;</button>
+                    <div class="customer-modal-header">
+                        <div class="customer-modal-avatar" style="background: var(--accent);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                        </div>
+                        <div class="customer-modal-title">
+                            <h2 id="inventoryModalTitle">Add Inventory Item</h2>
+                            <p>Enter product details for your inventory</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="addInventoryForm" class="edit-customer-form">
+                            <input type="hidden" id="editInventoryId">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Product Name *</label>
+                                    <input type="text" id="invProductName" required placeholder="e.g., Glyphosate 41%">
+                                </div>
+                                <div class="form-group">
+                                    <label>Category *</label>
+                                    <select id="invCategory" required>
+                                        <option value="">Select Category</option>
+                                        <option value="herbicide">Herbicide</option>
+                                        <option value="fungicide">Fungicide</option>
+                                        <option value="insecticide">Insecticide</option>
+                                        <option value="adjuvant">Adjuvant</option>
+                                        <option value="fertilizer">Fertilizer</option>
+                                        <option value="seed">Seed</option>
+                                        <option value="equipment">Equipment</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>SKU / Lot Number</label>
+                                    <input type="text" id="invSku" placeholder="e.g., GLY-2026-001">
+                                </div>
+                                <div class="form-group">
+                                    <label>Manufacturer/Brand</label>
+                                    <input type="text" id="invManufacturer" placeholder="e.g., Bayer, BASF">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Quantity *</label>
+                                    <input type="number" id="invQuantity" required min="0" step="0.01" placeholder="e.g., 100">
+                                </div>
+                                <div class="form-group">
+                                    <label>Unit *</label>
+                                    <select id="invUnit" required>
+                                        <option value="">Select Unit</option>
+                                        <option value="gallon">Gallon</option>
+                                        <option value="quart">Quart</option>
+                                        <option value="pint">Pint</option>
+                                        <option value="ounce">Ounce</option>
+                                        <option value="pound">Pound</option>
+                                        <option value="ton">Ton</option>
+                                        <option value="bag">Bag</option>
+                                        <option value="case">Case</option>
+                                        <option value="shuttle">Shuttle (250 gal)</option>
+                                        <option value="tote">Tote</option>
+                                        <option value="drum">Drum</option>
+                                        <option value="unit">Unit/Each</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-row" style="background: var(--secondary); padding: 16px; border-radius: var(--radius);">
+                                <div class="form-group">
+                                    <label>Cost Per Unit * <span style="color: var(--text-muted); font-size: 0.8rem;">(only you see this)</span></label>
+                                    <input type="number" id="invCostPerUnit" required step="0.01" min="0" placeholder="Your cost" oninput="calcInventoryPricing()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Margin %</label>
+                                    <input type="number" id="invMargin" step="0.1" min="0" max="500" placeholder="e.g., 15" value="15" oninput="calcInventoryPricing()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Retail Price</label>
+                                    <input type="number" id="invSellPrice" step="0.01" min="0" placeholder="Auto-calculated" oninput="calcInventoryPricing()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Total Cost Value</label>
+                                    <div id="invTotalValue" style="padding: 10px 14px; background: var(--white); border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;">$0.00</div>
+                                </div>
+                            </div>
+                            <div class="form-row" style="background: #dcfce7; padding: 16px; border-radius: var(--radius); margin-top: 12px;">
+                                <div class="form-group" style="flex: 2;">
+                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                        <input type="checkbox" id="invAvailableToSell" style="width: 20px; height: 20px; cursor: pointer;">
+                                        <strong>Make Available to Sell</strong>
+                                        <span style="color: var(--text-muted); font-size: 0.85rem;">- Customers will see this product with retail price</span>
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Storage Location</label>
+                                    <input type="text" id="invLocation" placeholder="e.g., Warehouse A, Bin 12">
+                                </div>
+                                <div class="form-group">
+                                    <label>Low Stock Alert</label>
+                                    <input type="number" id="invLowStockThreshold" min="0" placeholder="Alert when below this qty">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Expiration Date</label>
+                                    <input type="date" id="invExpirationDate">
+                                </div>
+                                <div class="form-group">
+                                    <label>Date Received</label>
+                                    <input type="date" id="invDateReceived">
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <textarea id="invNotes" rows="2" placeholder="Additional notes about this inventory item" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius); font-family: inherit;"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeAddInventoryModal()">Cancel</button>
+                        <button class="btn btn-primary" id="saveInventoryBtn" onclick="saveInventory()">Add Inventory</button>
                     </div>
                 </div>
             </div>
@@ -1218,21 +1486,30 @@
 
         const userData = JSON.parse(user);
 
-        // Check if admin
-        if (userData.role !== 'superadmin' && userData.role !== 'admin') {
+        // Check if admin/distributor
+        if (userData.role !== 'superadmin' && userData.role !== 'admin' && userData.role !== 'distributor') {
             window.location.href = '/dashboard.html';
         }
 
-        // Show superadmin features
+        // Show features based on role
         if (userData.role === 'superadmin') {
             document.getElementById('repAppsNav').style.display = 'block';
             document.getElementById('pricingNav').style.display = 'block';
             document.getElementById('commissionsNav').style.display = 'block';
+            document.getElementById('inventoryNav').style.display = 'block';
             document.getElementById('adminRole').textContent = 'Super Admin';
             loadPricingData();
             loadCommissionData();
+        } else if (userData.role === 'distributor') {
+            document.getElementById('adminRole').textContent = 'Distributor';
+            document.getElementById('inventoryNav').style.display = 'block';
+            // Hide tabs that distributors shouldn't see
+            document.getElementById('pricingNav').style.display = 'none';
+            document.getElementById('commissionsNav').style.display = 'none';
+            document.getElementById('repAppsNav').style.display = 'none';
         } else {
             document.getElementById('adminRole').textContent = 'Representative';
+            document.getElementById('inventoryNav').style.display = 'block';
             // Show rep's own commission view
             document.getElementById('commissionsNav').style.display = 'block';
             loadRepOwnCommission(userData);
@@ -1265,6 +1542,7 @@
                 if (tabName === 'products' && allProducts.length === 0) loadProducts();
                 if (tabName === 'ledger') loadLedger();
                 if (tabName === 'compliance') loadComplianceDashboard();
+                if (tabName === 'inventory') loadInventory();
             });
         });
 
@@ -1322,10 +1600,14 @@
                         <td><span class="order-status status-${order.status}">${order.status}</span></td>
                         <td>
                             <select class="status-select" data-order-id="${order._id}">
-                                <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Pending</option>
-                                <option value="confirmed" ${order.status === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+                                <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Order Created</option>
+                                <option value="payment_pending" ${order.status === 'payment_pending' ? 'selected' : ''}>Payment Pending</option>
+                                <option value="payment_secured" ${order.status === 'payment_secured' ? 'selected' : ''}>Payment Secured</option>
+                                <option value="manufacturer_ordered" ${order.status === 'manufacturer_ordered' ? 'selected' : ''}>Ordered from Mfg</option>
+                                <option value="bol_assigned" ${order.status === 'bol_assigned' ? 'selected' : ''}>BOL Assigned</option>
                                 <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>Shipped</option>
                                 <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>Delivered</option>
+                                <option value="signed_off" ${order.status === 'signed_off' ? 'selected' : ''}>Delivery Signed Off</option>
                             </select>
                         </td>
                     </tr>
@@ -2537,9 +2819,9 @@
                 chad: 'Chad Bamford'
             };
             const repLocations = {
-                kyle: 'Yuma, CO',
-                ty: 'Wray, CO',
-                chad: 'Burlington, CO'
+                kyle: 'Haxtun, CO',
+                ty: 'Otis, CO',
+                chad: 'Haxtun, CO'
             };
 
             // Hide the full rep grid and show single rep view
@@ -2665,9 +2947,293 @@
             }
         }
 
+        // ==================== INVENTORY MANAGEMENT ====================
+        let allInventory = [];
+
+        // Load inventory data
+        async function loadInventory() {
+            try {
+                const res = await fetch(`${API_URL}/api/inventory`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    // If no inventory endpoint exists, use localStorage as fallback
+                    allInventory = JSON.parse(localStorage.getItem('inventory') || '[]');
+                } else {
+                    allInventory = await res.json();
+                }
+                renderInventory(allInventory);
+                updateInventoryStats();
+            } catch (error) {
+                console.log('Using local inventory storage');
+                allInventory = JSON.parse(localStorage.getItem('inventory') || '[]');
+                renderInventory(allInventory);
+                updateInventoryStats();
+            }
+        }
+
+        // Render inventory table
+        function renderInventory(items) {
+            const tbody = document.getElementById('inventoryTableBody');
+            const currentUserId = userData._id || userData.id;
+
+            if (!items || items.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">No inventory items. Click "+ Add Inventory" to add products.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = items.map(item => {
+                const isOwner = item.addedById === currentUserId || userData.role === 'superadmin';
+                const isLowStock = item.lowStockThreshold && item.quantity <= item.lowStockThreshold;
+                const statusClass = isLowStock ? 'status-pending' : 'status-confirmed';
+                const statusText = isLowStock ? 'Low Stock' : 'In Stock';
+                const availableClass = item.availableToSell ? 'status-confirmed' : 'status-pending';
+                const availableText = item.availableToSell ? 'Listed' : 'Not Listed';
+
+                return `
+                    <tr>
+                        <td><strong>${item.productName}</strong>${item.manufacturer ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.manufacturer}</span>` : ''}</td>
+                        <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${item.category || '-'}</span></td>
+                        <td><strong>${item.quantity?.toLocaleString() || 0}</strong></td>
+                        <td>${item.unit || '-'}</td>
+                        <td class="cost-column">${isOwner ? '$' + (item.costPerUnit?.toFixed(2) || '0.00') : '<span style="color:#999;">Hidden</span>'}</td>
+                        <td class="cost-column">${isOwner ? (item.margin || 0) + '%' : '<span style="color:#999;">-</span>'}</td>
+                        <td><strong style="color: var(--primary);">$${item.sellPrice?.toFixed(2) || '0.00'}</strong></td>
+                        <td><span class="order-status ${availableClass}">${availableText}</span></td>
+                        <td><span class="order-status ${statusClass}">${statusText}</span></td>
+                        <td>
+                            ${isOwner ? `
+                                <button class="btn btn-sm btn-outline" onclick="editInventory('${item.id || item._id}')">Edit</button>
+                                <button class="btn btn-sm" onclick="adjustInventory('${item.id || item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
+                                <button class="btn btn-sm" onclick="deleteInventory('${item.id || item._id}')" style="background: #dc2626; color: white;">Delete</button>
+                            ` : '<span style="color:#999; font-size: 0.8rem;">View Only</span>'}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        // Update inventory stats
+        function updateInventoryStats() {
+            const totalItems = allInventory.length;
+            const totalValue = allInventory.reduce((sum, item) => sum + ((item.quantity || 0) * (item.costPerUnit || 0)), 0);
+            const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold).length;
+            const categories = [...new Set(allInventory.map(item => item.category).filter(Boolean))].length;
+
+            document.getElementById('totalInventoryItems').textContent = totalItems;
+            document.getElementById('totalInventoryValue').textContent = '$' + totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('lowStockCount').textContent = lowStockItems;
+            document.getElementById('inventoryCategories').textContent = categories;
+        }
+
+        // Filter inventory
+        function filterInventory() {
+            const searchTerm = document.getElementById('inventorySearch').value.toLowerCase();
+            const categoryFilter = document.getElementById('inventoryCategoryFilter').value;
+
+            let filtered = allInventory;
+
+            if (searchTerm) {
+                filtered = filtered.filter(item =>
+                    item.productName?.toLowerCase().includes(searchTerm) ||
+                    item.sku?.toLowerCase().includes(searchTerm) ||
+                    item.manufacturer?.toLowerCase().includes(searchTerm)
+                );
+            }
+
+            if (categoryFilter) {
+                filtered = filtered.filter(item => item.category === categoryFilter);
+            }
+
+            renderInventory(filtered);
+        }
+
+        // Open add inventory modal
+        function openAddInventoryModal() {
+            document.getElementById('addInventoryModal').style.display = 'flex';
+            document.getElementById('addInventoryForm').reset();
+            document.getElementById('editInventoryId').value = '';
+            document.getElementById('inventoryModalTitle').textContent = 'Add Inventory Item';
+            document.getElementById('saveInventoryBtn').textContent = 'Add Inventory';
+            document.getElementById('invTotalValue').textContent = '$0.00';
+            document.getElementById('invMargin').value = '15'; // Default 15% margin
+            document.getElementById('invAvailableToSell').checked = false;
+        }
+
+        // Close add inventory modal
+        function closeAddInventoryModal() {
+            document.getElementById('addInventoryModal').style.display = 'none';
+        }
+
+        // Calculate inventory pricing with margin
+        function calcInventoryPricing() {
+            const qty = parseFloat(document.getElementById('invQuantity').value) || 0;
+            const cost = parseFloat(document.getElementById('invCostPerUnit').value) || 0;
+            const margin = parseFloat(document.getElementById('invMargin').value) || 0;
+
+            // Auto-calculate retail price if margin is entered
+            const retailPrice = cost * (1 + margin / 100);
+            if (margin > 0 && cost > 0) {
+                document.getElementById('invSellPrice').value = retailPrice.toFixed(2);
+            }
+
+            // Total value (based on cost for internal tracking)
+            const total = qty * cost;
+            document.getElementById('invTotalValue').textContent = '$' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+
+        // Save inventory item
+        async function saveInventory() {
+            const editId = document.getElementById('editInventoryId').value;
+
+            const costPerUnit = parseFloat(document.getElementById('invCostPerUnit').value) || 0;
+            const margin = parseFloat(document.getElementById('invMargin').value) || 0;
+            const sellPrice = parseFloat(document.getElementById('invSellPrice').value) || (costPerUnit * (1 + margin / 100));
+
+            const item = {
+                id: editId || 'inv_' + Date.now(),
+                productName: document.getElementById('invProductName').value,
+                category: document.getElementById('invCategory').value,
+                sku: document.getElementById('invSku').value,
+                manufacturer: document.getElementById('invManufacturer').value,
+                quantity: parseFloat(document.getElementById('invQuantity').value) || 0,
+                unit: document.getElementById('invUnit').value,
+                costPerUnit: costPerUnit,
+                margin: margin,
+                sellPrice: sellPrice,
+                availableToSell: document.getElementById('invAvailableToSell').checked,
+                location: document.getElementById('invLocation').value,
+                lowStockThreshold: parseFloat(document.getElementById('invLowStockThreshold').value) || 0,
+                expirationDate: document.getElementById('invExpirationDate').value,
+                dateReceived: document.getElementById('invDateReceived').value || new Date().toISOString().split('T')[0],
+                notes: document.getElementById('invNotes').value,
+                addedBy: userData.name,
+                addedById: userData._id || userData.id,
+                updatedAt: new Date().toISOString()
+            };
+
+            try {
+                // Try API first
+                const method = editId ? 'PUT' : 'POST';
+                const url = editId ? `${API_URL}/api/inventory/${editId}` : `${API_URL}/api/inventory`;
+                const res = await fetch(url, {
+                    method: method,
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(item)
+                });
+
+                if (res.ok) {
+                    closeAddInventoryModal();
+                    loadInventory();
+                    alert(editId ? 'Inventory updated!' : 'Inventory added!');
+                    return;
+                }
+            } catch (error) {
+                console.log('Using local storage for inventory');
+            }
+
+            // Fallback to localStorage
+            if (editId) {
+                const idx = allInventory.findIndex(i => (i.id || i._id) === editId);
+                if (idx !== -1) {
+                    allInventory[idx] = { ...allInventory[idx], ...item };
+                }
+            } else {
+                item.createdAt = new Date().toISOString();
+                allInventory.push(item);
+            }
+
+            localStorage.setItem('inventory', JSON.stringify(allInventory));
+            closeAddInventoryModal();
+            renderInventory(allInventory);
+            updateInventoryStats();
+            alert(editId ? 'Inventory updated!' : 'Inventory added!');
+        }
+
+        // Edit inventory item
+        function editInventory(id) {
+            const item = allInventory.find(i => (i.id || i._id) === id);
+            if (!item) return;
+
+            document.getElementById('editInventoryId').value = id;
+            document.getElementById('invProductName').value = item.productName || '';
+            document.getElementById('invCategory').value = item.category || '';
+            document.getElementById('invSku').value = item.sku || '';
+            document.getElementById('invManufacturer').value = item.manufacturer || '';
+            document.getElementById('invQuantity').value = item.quantity || '';
+            document.getElementById('invUnit').value = item.unit || '';
+            document.getElementById('invCostPerUnit').value = item.costPerUnit || '';
+            document.getElementById('invMargin').value = item.margin || 15;
+            document.getElementById('invSellPrice').value = item.sellPrice || '';
+            document.getElementById('invAvailableToSell').checked = item.availableToSell || false;
+            document.getElementById('invLocation').value = item.location || '';
+            document.getElementById('invLowStockThreshold').value = item.lowStockThreshold || '';
+            document.getElementById('invExpirationDate').value = item.expirationDate || '';
+            document.getElementById('invDateReceived').value = item.dateReceived || '';
+            document.getElementById('invNotes').value = item.notes || '';
+
+            document.getElementById('inventoryModalTitle').textContent = 'Edit Inventory Item';
+            document.getElementById('saveInventoryBtn').textContent = 'Save Changes';
+            document.getElementById('addInventoryModal').style.display = 'flex';
+            calcInventoryPricing();
+        }
+
+        // Adjust inventory quantity
+        function adjustInventory(id) {
+            const item = allInventory.find(i => (i.id || i._id) === id);
+            if (!item) return;
+
+            const adjustment = prompt(`Adjust quantity for "${item.productName}"\nCurrent: ${item.quantity} ${item.unit}\n\nEnter adjustment (+10 to add, -5 to subtract):`);
+            if (adjustment === null) return;
+
+            const adjustNum = parseFloat(adjustment);
+            if (isNaN(adjustNum)) {
+                alert('Please enter a valid number');
+                return;
+            }
+
+            item.quantity = Math.max(0, (item.quantity || 0) + adjustNum);
+            item.updatedAt = new Date().toISOString();
+
+            localStorage.setItem('inventory', JSON.stringify(allInventory));
+            renderInventory(allInventory);
+            updateInventoryStats();
+            alert(`Quantity adjusted by ${adjustNum >= 0 ? '+' : ''}${adjustNum}. New quantity: ${item.quantity} ${item.unit}`);
+        }
+
+        // Delete inventory item
+        async function deleteInventory(id) {
+            if (!confirm('Are you sure you want to delete this inventory item?')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/inventory/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    loadInventory();
+                    return;
+                }
+            } catch (error) {
+                console.log('Using local storage');
+            }
+
+            // Fallback to localStorage
+            allInventory = allInventory.filter(i => (i.id || i._id) !== id);
+            localStorage.setItem('inventory', JSON.stringify(allInventory));
+            renderInventory(allInventory);
+            updateInventoryStats();
+        }
+
         // Initialize
         loadDashboardData();
         loadApplications();
+
+        // Load inventory when inventory tab is clicked
+        document.querySelector('[data-tab="inventory"]')?.addEventListener('click', loadInventory);
     </script>
 
     <style>
@@ -2746,7 +3312,6 @@
             justify-content: center;
         }
 
-        .stat-icon.blue { background: #dbeafe; color: #2563eb; }
         .stat-icon.green { background: #d1fae5; color: #059669; }
         .stat-icon.orange { background: #fed7aa; color: #ea580c; }
         .stat-icon.purple { background: #e9d5ff; color: #9333ea; }
@@ -2819,12 +3384,67 @@
         }
 
         .status-pending { background: #fef3c7; color: #92400e; }
-        .status-confirmed { background: #d1fae5; color: #065f46; }
-        .status-shipped { background: #dbeafe; color: #1e40af; }
+        .status-payment_pending { background: #fef3c7; color: #92400e; }
+        .status-payment_secured { background: #d4e8d1; color: #1e3d1a; }
+        .status-manufacturer_ordered { background: #e9d5ff; color: #7c3aed; }
+        .status-bol_assigned { background: #d4e8d1; color: #1e3d1a; }
+        .status-shipped { background: #d4e8d1; color: #1e3d1a; }
         .status-delivered { background: #dcfce7; color: #166534; }
+        .status-signed_off { background: #059669; color: white; }
+        .status-confirmed { background: #d1fae5; color: #065f46; }
+
+        /* Order Workflow Tracker */
+        .workflow-tracker {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 20px 24px;
+            margin-bottom: 24px;
+            box-shadow: var(--shadow);
+        }
+        .workflow-tracker h4 {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 16px;
+        }
+        .workflow-steps {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        .workflow-step {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .workflow-step .step-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.75rem;
+            font-weight: 700;
+            background: #f3f4f6;
+            color: #6b7280;
+        }
+        .workflow-step .step-label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+        .workflow-arrow {
+            color: #d1d5db;
+            font-size: 1.2rem;
+        }
+        .workflow-step.active .step-icon { background: var(--primary); color: white; }
+        .workflow-step.completed .step-icon { background: #059669; color: white; }
 
         /* Ledger category badges */
-        .ledger-cat-order { background: #dbeafe; color: #1e40af; }
+        .ledger-cat-order { background: #d4e8d1; color: #1e3d1a; }
         .ledger-cat-payment { background: #d1fae5; color: #065f46; }
         .ledger-cat-supplier_payment { background: #fce7f3; color: #9d174d; }
         .ledger-cat-commission { background: #e9d5ff; color: #7c3aed; }
@@ -2995,8 +3615,8 @@
             opacity: 0.9;
         }
 
-        .bundle-card.hydrovant .bundle-card-header { background: #3b82f6; }
-        .bundle-card.pivot .bundle-card-header { background: #10b981; }
+        .bundle-card.hydrovant .bundle-card-header { background: #2D5A27; }
+        .bundle-card.pivot .bundle-card-header { background: #4a7c43; }
 
         .bundle-card-body {
             padding: 24px;
@@ -3615,6 +4235,37 @@
 
         .btn-success {
             background: #059669 !important;
+        }
+
+        /* Inventory Status Styles */
+        .status-in-stock {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .status-low-stock {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .status-out-of-stock {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        /* Distributor Role Badge */
+        .admin-role.distributor {
+            background: rgba(249, 115, 22, 0.1);
+            color: #ea580c;
+        }
+
+        /* Private Cost Column Styling */
+        .cost-column {
+            background: #fef9c3;
+            border-left: 2px solid #facc15;
+        }
+        thead .cost-column {
+            background: #fef3c7;
         }
 
         @media (max-width: 768px) {

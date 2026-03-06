@@ -7,7 +7,7 @@
     <title>Dashboard - Acre Profit</title>
 
     <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#0F2440">
+    <meta name="theme-color" content="#2d5a27">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Acre Profit">
@@ -181,6 +181,70 @@
                 </div>
             </div>
 
+            <!-- License & Certification Resources -->
+            <div class="license-resources-section">
+                <div class="section-header">
+                    <h3>License & Certification Resources</h3>
+                    <span class="section-badge">Keep Current</span>
+                </div>
+                <p class="section-subtitle">Maintain your pesticide applicator license and earn continuing education credits</p>
+
+                <div class="license-grid">
+                    <!-- Renewal Links -->
+                    <div class="license-card renewal-card">
+                        <div class="license-card-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <h4>Colorado Dept. of Agriculture</h4>
+                        <p>Renew your pesticide applicator license and check certification status</p>
+                        <div class="license-links">
+                            <a href="https://ag.colorado.gov/divisions/plant-industry/pesticide-applicator-programs/applicator-licensing" target="_blank" rel="noopener" class="license-link primary-link">
+                                Renew License Online
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>
+                            <a href="https://ag.colorado.gov/divisions/plant-industry/pesticide-applicator-programs" target="_blank" rel="noopener" class="license-link">
+                                Applicator Programs Info
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>
+                            <a href="https://ag.colorado.gov/divisions/plant-industry/pesticide-applicator-programs/recertification" target="_blank" rel="noopener" class="license-link">
+                                Recertification Requirements
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"></path><polyline points="15 3 21 3 21 9"></polyline><line x1="10" y1="14" x2="21" y2="3"></line></svg>
+                            </a>
+                        </div>
+                    </div>
+
+                    <!-- CEU Classes -->
+                    <div class="license-card ceu-card">
+                        <div class="license-card-icon">
+                            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 10v6M2 10l10-5 10 5-10 5z"></path><path d="M6 12v5c3 3 9 3 12 0v-5"></path></svg>
+                        </div>
+                        <h4>Continuing Education (CEU) Classes</h4>
+                        <p>Earn credits to maintain your certification - online and in-person options</p>
+                        <div class="ceu-options">
+                            <div class="ceu-type">
+                                <span class="ceu-label">Online Classes</span>
+                                <ul class="ceu-list">
+                                    <li><a href="https://www.pested.com/colorado/" target="_blank" rel="noopener">PestEd.com - CO Courses</a></li>
+                                    <li><a href="https://www.pesticideeducation.com/colorado" target="_blank" rel="noopener">Pesticide Education Resources</a></li>
+                                    <li><a href="https://extension.colostate.edu/topic-areas/agriculture/pesticide-education-program/" target="_blank" rel="noopener">CSU Extension Online</a></li>
+                                </ul>
+                            </div>
+                            <div class="ceu-type">
+                                <span class="ceu-label">In-Person Classes</span>
+                                <ul class="ceu-list">
+                                    <li><a href="https://extension.colostate.edu/topic-areas/agriculture/pesticide-education-program/" target="_blank" rel="noopener">CSU Extension Workshops</a></li>
+                                    <li><a href="https://ag.colorado.gov/divisions/plant-industry/pesticide-applicator-programs/training-opportunities" target="_blank" rel="noopener">CDA Training Calendar</a></li>
+                                    <li>Contact your local Extension office for upcoming events</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="ceu-note">
+                            <strong>Tip:</strong> Private applicators need 12 CEUs every 3 years. Commercial applicators need 24 CEUs every 3 years.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             <!-- Your Orders -->
             <div class="orders-preview">
                 <div class="section-header">
@@ -280,9 +344,9 @@
 
         // Rep data
         const reps = {
-            kyle: { name: 'Kyle McConnell', phone: '(970) 571-1015', location: 'Yuma, CO' },
-            ty: { name: 'Ty Mollohan', phone: '(970) 520-2340', location: 'Wray, CO' },
-            chad: { name: 'Chad Bamford', phone: '(970) 520-3716', location: 'Burlington, CO' }
+            kyle: { name: 'Kyle McConnell', phone: '(970) 571-1015', location: 'Haxtun, CO' },
+            ty: { name: 'Ty Mollohan', phone: '(970) 520-2340', location: 'Otis, CO' },
+            chad: { name: 'Chad Bamford', phone: '(970) 520-3716', location: 'Haxtun, CO' }
         };
 
         // Show rep info
@@ -741,8 +805,8 @@
         }
 
         .status-pooling {
-            background: #dbeafe;
-            color: #1e40af;
+            background: #d4e8d1;
+            color: #1e3d1a;
         }
 
         .status-almost {
@@ -815,7 +879,7 @@
         }
 
         .feature-tag {
-            background: rgba(27, 58, 92, 0.1);
+            background: rgba(45, 90, 39, 0.1);
             color: var(--primary);
             padding: 4px 12px;
             border-radius: 16px;
@@ -887,12 +951,164 @@
             margin-bottom: 20px;
         }
 
+        /* License & Certification Resources */
+        .license-resources-section {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 32px;
+            box-shadow: var(--shadow);
+            margin-bottom: 48px;
+            border-left: 4px solid #2D5A27;
+        }
+
+        .license-resources-section .section-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 8px;
+        }
+
+        .section-badge {
+            background: #d4e8d1;
+            color: #1e3d1a;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .section-subtitle {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+        }
+
+        .license-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .license-card {
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+        }
+
+        .license-card-icon {
+            color: #2D5A27;
+            margin-bottom: 12px;
+        }
+
+        .license-card h4 {
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+        }
+
+        .license-card > p {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin-bottom: 16px;
+        }
+
+        .license-links {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .license-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            color: var(--primary);
+            font-size: 0.875rem;
+            font-weight: 500;
+            text-decoration: none;
+            padding: 8px 12px;
+            background: var(--white);
+            border-radius: var(--radius);
+            transition: all 0.2s;
+        }
+
+        .license-link:hover {
+            background: var(--primary);
+            color: white;
+        }
+
+        .license-link.primary-link {
+            background: var(--primary);
+            color: white;
+            font-weight: 600;
+        }
+
+        .license-link.primary-link:hover {
+            background: #1e4620;
+        }
+
+        .ceu-options {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+
+        .ceu-type {
+            background: var(--white);
+            border-radius: var(--radius);
+            padding: 12px;
+        }
+
+        .ceu-label {
+            display: block;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 8px;
+            letter-spacing: 0.5px;
+        }
+
+        .ceu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .ceu-list li {
+            font-size: 0.8rem;
+            margin-bottom: 6px;
+            color: var(--text-light);
+        }
+
+        .ceu-list a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .ceu-list a:hover {
+            text-decoration: underline;
+        }
+
+        .ceu-note {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 12px;
+            border-radius: var(--radius);
+            font-size: 0.8rem;
+            line-height: 1.4;
+        }
+
         @media (max-width: 768px) {
             .dashboard-header { flex-direction: column; align-items: flex-start; }
             .category-grid-2 { grid-template-columns: 1fr; }
             .order-preview-card { flex-direction: column; align-items: flex-start; gap: 12px; }
             .order-details { width: 100%; }
             .chatbot-window { width: calc(100vw - 48px); }
+            .license-grid { grid-template-columns: 1fr; }
+            .ceu-options { grid-template-columns: 1fr; }
         }
     </style>
 </body>

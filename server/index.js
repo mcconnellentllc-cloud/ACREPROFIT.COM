@@ -835,32 +835,39 @@ const MerchOrder = mongoose.model('MerchOrder', merchOrderSchema);
 async function initializeAdmins() {
     const admins = [
         {
-            name: 'Kyle McConnell',
-            email: 'kyle@togoag.com',
+            name: 'Acre Profit Admin',
+            email: 'contact@acreprofit.com',
             password: 'Farm2026!',
             phone: '970-571-1015',
             role: 'superadmin'
+        },
+        {
+            name: 'Kyle McConnell',
+            email: 'office@togoag.com',
+            password: 'Farm2026!',
+            phone: '970-571-1015',
+            role: 'distributor'
         },
         {
             name: 'Ty Mollohan',
             email: 'tymollohan77@gmail.com',
             password: 'Farm2026!',
             phone: '970-520-2340',
-            role: 'admin'
+            role: 'distributor'
         },
         {
             name: 'Chad Bamford',
             email: 'ckbamford@yahoo.com',
             password: 'Farm2026!',
             phone: '970-520-3716',
-            role: 'admin'
+            role: 'distributor'
         },
         {
             name: 'Seth Rolfs',
             email: 'seth@acreprofit.com',
             password: 'Farm2026!',
             phone: '785-531-0680',
-            role: 'admin'
+            role: 'distributor'
         }
     ];
 
@@ -1077,10 +1084,11 @@ app.post('/api/admin/reset-admins', async (req, res) => {
         }
 
         const admins = [
-            { name: 'Kyle McConnell', email: 'kyle@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
-            { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'admin' },
-            { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'admin' },
-            { name: 'Seth Rolfs', email: 'smrolfs@live.com', password: 'Farm2026!', phone: '785-531-0680', role: 'admin' }
+            { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
+            { name: 'Kyle McConnell', email: 'office@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'distributor' },
+            { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'distributor' },
+            { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'distributor' },
+            { name: 'Seth Rolfs', email: 'seth@acreprofit.com', password: 'Farm2026!', phone: '785-531-0680', role: 'distributor' }
         ];
 
         const results = [];
@@ -2213,7 +2221,7 @@ app.get('/api/representatives/:repId/payment-info', async (req, res) => {
 
         // Map rep IDs to emails
         const repEmails = {
-            kyle: 'kyle@togoag.com',
+            kyle: 'office@togoag.com',
             ty: 'tymollohan77@gmail.com',
             chad: 'ckbamford@yahoo.com',
             seth: 'seth@acreprofit.com'
