@@ -120,6 +120,37 @@
                     </div>
                     <div id="cheaperConfirmation" class="cheaper-confirmation" style="display: none;"></div>
                 </div>
+
+                <!-- Request Unlisted Product Section -->
+                <div class="request-product-section">
+                    <h3>Can't Find What You Need?</h3>
+                    <p>Request a product not in our list. We'll generate an email you can forward to multiple suppliers to get competitive bids.</p>
+                    <div class="request-product-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Product Name</label>
+                                <input type="text" id="requestProductName" placeholder="e.g., Engenia Herbicide">
+                            </div>
+                            <div class="form-group">
+                                <label>Estimated Quantity</label>
+                                <input type="number" id="requestQuantity" placeholder="100" min="1">
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Description (optional)</label>
+                            <input type="text" id="requestDescription" placeholder="Active ingredient, pack size, etc.">
+                        </div>
+                        <button class="btn btn-primary" onclick="requestUnlistedProduct()">Generate Quote Request</button>
+                    </div>
+                    <div id="requestProductResult" class="request-result" style="display: none;">
+                        <h4>Email Template Ready!</h4>
+                        <p>Copy the email below and send to your preferred suppliers. Forward any quotes to your rep.</p>
+                        <textarea id="emailTemplateText" readonly></textarea>
+                        <div class="request-actions">
+                            <button class="btn btn-outline" onclick="copyEmailTemplate()">Copy to Clipboard</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- OPTION 2: Crop-Based Calculator -->
@@ -1773,9 +1804,8 @@
                     },
                     body: JSON.stringify({
                         productName: product,
-                        alternateRetailer: retailer,
-                        alternatePrice: price,
-                        requestType: 'price_match'
+                        retailerSource: retailer,
+                        theirPrice: price
                     })
                 });
 
@@ -1814,6 +1844,75 @@
 
                 showNotification('Request saved. Your rep will follow up.', 'info');
             }
+        }
+
+        // Request unlisted product - generates email template
+        async function requestUnlistedProduct() {
+            const productName = document.getElementById('requestProductName').value.trim();
+            const quantity = document.getElementById('requestQuantity').value;
+            const description = document.getElementById('requestDescription').value.trim();
+
+            if (!productName) {
+                showNotification('Please enter a product name', 'error');
+                return;
+            }
+
+            const resultDiv = document.getElementById('requestProductResult');
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemical-orders/request-product`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        productName,
+                        estimatedQuantity: quantity || 0,
+                        description,
+                        unit: 'units'
+                    })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    document.getElementById('emailTemplateText').value = data.emailTemplate;
+                    resultDiv.style.display = 'block';
+                    showNotification('Email template generated!', 'success');
+
+                    // Clear form
+                    document.getElementById('requestProductName').value = '';
+                    document.getElementById('requestQuantity').value = '';
+                    document.getElementById('requestDescription').value = '';
+                } else {
+                    throw new Error('Server error');
+                }
+            } catch (error) {
+                // Generate a basic template locally
+                const localTemplate = `Subject: Request for Quote - ${productName}
+
+Dear Supplier,
+
+We are seeking competitive pricing on: ${productName}
+${description ? `Description: ${description}` : ''}
+${quantity ? `Estimated Quantity: ${quantity} units` : ''}
+
+Please provide your best pricing and availability.
+
+Thank you,
+Acre Profit Group Purchasing`;
+
+                document.getElementById('emailTemplateText').value = localTemplate;
+                resultDiv.style.display = 'block';
+                showNotification('Email template generated locally', 'info');
+            }
+        }
+
+        function copyEmailTemplate() {
+            const textarea = document.getElementById('emailTemplateText');
+            textarea.select();
+            document.execCommand('copy');
+            showNotification('Email copied to clipboard!', 'success');
         }
 
         // Initialize
@@ -2135,6 +2234,94 @@
 
         @media (max-width: 768px) {
             .cheaper-form {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        /* Request Unlisted Product Section */
+        .request-product-section {
+            margin-top: 24px;
+            padding: 20px;
+            background: #f0fdf4;
+            border: 2px dashed var(--primary);
+            border-radius: var(--radius-lg);
+        }
+
+        .request-product-section h3 {
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .request-product-section p {
+            color: #166534;
+            margin-bottom: 16px;
+            font-size: 0.95rem;
+        }
+
+        .request-product-form .form-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr;
+            gap: 12px;
+            margin-bottom: 12px;
+        }
+
+        .request-product-form .form-group {
+            margin: 0;
+        }
+
+        .request-product-form label {
+            display: block;
+            font-size: 0.85rem;
+            font-weight: 600;
+            color: #166534;
+            margin-bottom: 4px;
+        }
+
+        .request-product-form input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 2px solid #86efac;
+            border-radius: var(--radius);
+            background: white;
+        }
+
+        .request-result {
+            margin-top: 16px;
+            padding: 16px;
+            background: white;
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+        }
+
+        .request-result h4 {
+            color: var(--primary);
+            margin-bottom: 8px;
+        }
+
+        .request-result p {
+            font-size: 0.9rem;
+            margin-bottom: 12px;
+        }
+
+        .request-result textarea {
+            width: 100%;
+            height: 200px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-family: monospace;
+            font-size: 0.85rem;
+            resize: vertical;
+        }
+
+        .request-actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 8px;
+        }
+
+        @media (max-width: 768px) {
+            .request-product-form .form-row {
                 grid-template-columns: 1fr;
             }
         }

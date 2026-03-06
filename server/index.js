@@ -3808,6 +3808,197 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
     }
 });
 
+// ---- PRICE & CHEMICAL REQUEST ENDPOINTS ----
+
+// Schema for price requests and chemical requests
+const chemicalRequestSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    requestType: {
+        type: String,
+        enum: ['price_match', 'unlisted_product'],
+        required: true
+    },
+    // For price match requests
+    productName: String,
+    competitorSource: String,
+    competitorPrice: Number,
+    quantity: Number,
+    unit: String,
+    // For unlisted product requests
+    requestedProduct: String,
+    productDescription: String,
+    estimatedQuantity: Number,
+    // Common fields
+    status: {
+        type: String,
+        enum: ['pending', 'reviewing', 'sourcing', 'quoted', 'fulfilled', 'declined'],
+        default: 'pending'
+    },
+    adminNotes: String,
+    supplierQuotes: [{
+        supplierName: String,
+        price: Number,
+        notes: String,
+        quotedAt: Date
+    }],
+    emailTemplate: String, // Generated email for forwarding to suppliers
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const ChemicalRequest = mongoose.model('ChemicalRequest', chemicalRequestSchema);
+
+// Submit "Found it Cheaper" price match request
+app.post('/api/chemical-orders/price-request', authMiddleware, async (req, res) => {
+    try {
+        const { productName, retailerSource, theirPrice, quantity, unit } = req.body;
+
+        if (!productName || !retailerSource || !theirPrice) {
+            return res.status(400).json({ error: 'Product name, source, and price are required' });
+        }
+
+        const request = new ChemicalRequest({
+            userId: req.user._id,
+            requestType: 'price_match',
+            productName,
+            competitorSource: retailerSource,
+            competitorPrice: parseFloat(theirPrice),
+            quantity: quantity || 1,
+            unit: unit || 'unit',
+            status: 'pending'
+        });
+
+        await request.save();
+
+        res.status(201).json({
+            message: 'Price match request submitted! We will pool orders and negotiate a better price.',
+            requestId: request._id
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Request an unlisted chemical - generates email template
+app.post('/api/chemical-orders/request-product', authMiddleware, async (req, res) => {
+    try {
+        const { productName, description, estimatedQuantity, unit } = req.body;
+
+        if (!productName) {
+            return res.status(400).json({ error: 'Product name is required' });
+        }
+
+        const user = await User.findById(req.user._id).populate('representative', 'name email');
+
+        // Generate email template for suppliers
+        const emailTemplate = `Subject: Request for Quote - ${productName}
+
+Dear Supplier,
+
+We are seeking competitive pricing on the following agricultural product:
+
+PRODUCT DETAILS:
+- Product: ${productName}
+- Description: ${description || 'N/A'}
+- Estimated Quantity: ${estimatedQuantity || 'TBD'} ${unit || 'units'}
+- Delivery Location: Eastern Colorado
+
+BUYER INFORMATION:
+- Farm: ${user.farm?.name || user.name}
+- Contact: ${user.name}
+- Representative: ${user.representative?.name || 'Acre Profit'}
+
+We are a group purchasing organization pooling orders from multiple farms to achieve volume pricing. Please provide:
+
+1. Your best price per unit
+2. Minimum order quantity
+3. Availability/lead time
+4. Freight terms (delivered vs. pickup)
+
+Please reply to this email or contact us at:
+- Email: ${user.representative?.email || 'orders@acreprofit.com'}
+- Phone: ${user.phone || ''}
+
+We look forward to your quote.
+
+Best regards,
+${user.name}
+via Acre Profit Group Purchasing
+`;
+
+        const request = new ChemicalRequest({
+            userId: req.user._id,
+            requestType: 'unlisted_product',
+            requestedProduct: productName,
+            productDescription: description,
+            estimatedQuantity: estimatedQuantity || 0,
+            emailTemplate,
+            status: 'pending'
+        });
+
+        await request.save();
+
+        res.status(201).json({
+            message: 'Product request created. Use the email template below to send to suppliers.',
+            requestId: request._id,
+            emailTemplate,
+            instructions: 'Copy this email and send to your preferred suppliers. Forward any quotes to your rep or orders@acreprofit.com'
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get user's chemical requests
+app.get('/api/chemical-orders/requests', authMiddleware, async (req, res) => {
+    try {
+        const requests = await ChemicalRequest.find({ userId: req.user._id })
+            .sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Get all chemical requests
+app.get('/api/admin/chemical-requests', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const requests = await ChemicalRequest.find()
+            .populate('userId', 'name email farm')
+            .sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Update chemical request status
+app.put('/api/admin/chemical-requests/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, adminNotes, supplierQuote } = req.body;
+        const request = await ChemicalRequest.findById(req.params.id);
+
+        if (!request) {
+            return res.status(404).json({ error: 'Request not found' });
+        }
+
+        if (status) request.status = status;
+        if (adminNotes) request.adminNotes = adminNotes;
+        if (supplierQuote) {
+            request.supplierQuotes.push({
+                ...supplierQuote,
+                quotedAt: new Date()
+            });
+        }
+        request.updatedAt = new Date();
+
+        await request.save();
+        res.json(request);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // ---- LEDGER ROUTES ----
 
 // Get ledger entries
