@@ -830,6 +830,159 @@ const merchOrderSchema = new mongoose.Schema({
 
 const MerchOrder = mongoose.model('MerchOrder', merchOrderSchema);
 
+// Purchase Order Model (Orders FROM suppliers - what Acre Profit buys)
+const purchaseOrderSchema = new mongoose.Schema({
+    // Auto-generated PO number: PO-2026-00001
+    poNumber: { type: String, unique: true },
+
+    // Supplier information
+    supplier: {
+        name: { type: String, required: true },
+        contact: String,
+        phone: String,
+        email: String
+    },
+
+    // Line items - products ordered with quantities and pricing
+    items: [{
+        productName: { type: String, required: true },
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        description: String,
+        packSize: String,
+        unit: String, // gal, case, bag, etc.
+
+        // Quantity and pricing (prices can be edited)
+        quantityOrdered: { type: Number, required: true },
+        pricePerUnit: { type: Number, required: true }, // Cost price from supplier
+        totalPrice: Number, // Calculated: quantity * price
+
+        // For tracking splits
+        quantityAllocated: { type: Number, default: 0 }, // Total allocated to distributors
+        quantityRemaining: Number // Calculated: ordered - allocated
+    }],
+
+    // Totals
+    subtotal: Number,
+    freight: { type: Number, default: 0 },
+    otherFees: { type: Number, default: 0 },
+    totalCost: Number,
+
+    // Status workflow
+    status: {
+        type: String,
+        enum: ['draft', 'submitted', 'confirmed', 'partial_received', 'received', 'closed', 'cancelled'],
+        default: 'draft'
+    },
+
+    // Dates
+    orderDate: { type: Date, default: Date.now },
+    expectedDeliveryDate: Date,
+    receivedDate: Date,
+
+    // Shipping/delivery info
+    deliveryLocation: String,
+    bolNumber: String, // Bill of Lading
+    trackingInfo: String,
+
+    // Notes
+    notes: String,
+    internalNotes: String,
+
+    // Audit trail
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+purchaseOrderSchema.index({ poNumber: 1 });
+purchaseOrderSchema.index({ 'supplier.name': 1 });
+purchaseOrderSchema.index({ status: 1 });
+purchaseOrderSchema.index({ orderDate: -1 });
+
+const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
+
+// Purchase Order Split Model (How a PO is split between distributors)
+const purchaseOrderSplitSchema = new mongoose.Schema({
+    // Link to parent purchase order
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder', required: true },
+    poNumber: String, // Denormalized for quick display
+
+    // Distributor receiving this portion
+    distributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    distributorName: String, // Denormalized
+
+    // Split number for this PO (e.g., PO-2026-00001-A, PO-2026-00001-B)
+    splitCode: String, // A, B, C, etc.
+
+    // Items allocated to this distributor
+    items: [{
+        productName: String,
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        packSize: String,
+        unit: String,
+
+        // Allocation
+        quantityAllocated: { type: Number, required: true },
+        pricePerUnit: Number, // May be different if distributor pricing differs
+        totalPrice: Number,
+
+        // Reference to original PO item index
+        originalItemIndex: Number
+    }],
+
+    // Totals for this split
+    subtotal: Number,
+    freightAllocation: { type: Number, default: 0 },
+    totalCost: Number,
+
+    // Status
+    status: {
+        type: String,
+        enum: ['allocated', 'shipped', 'delivered', 'invoiced', 'paid'],
+        default: 'allocated'
+    },
+
+    // Delivery tracking
+    deliveryDate: Date,
+    deliveryLocation: String,
+    receivedBy: String,
+
+    // Notes
+    notes: String,
+
+    // Audit
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+purchaseOrderSplitSchema.index({ purchaseOrderId: 1 });
+purchaseOrderSplitSchema.index({ distributorId: 1 });
+purchaseOrderSplitSchema.index({ status: 1 });
+
+const PurchaseOrderSplit = mongoose.model('PurchaseOrderSplit', purchaseOrderSplitSchema);
+
+// Helper: Generate next PO number
+async function generatePONumber() {
+    const year = new Date().getFullYear();
+    const prefix = `PO-${year}-`;
+
+    const lastPO = await PurchaseOrder.findOne({ poNumber: { $regex: `^${prefix}` } })
+        .sort({ poNumber: -1 })
+        .lean();
+
+    let nextNum = 1;
+    if (lastPO && lastPO.poNumber) {
+        const lastNum = parseInt(lastPO.poNumber.split('-')[2], 10);
+        if (!isNaN(lastNum)) {
+            nextNum = lastNum + 1;
+        }
+    }
+
+    return `${prefix}${String(nextNum).padStart(5, '0')}`;
+}
+
 // ============ INITIALIZE ADMIN USERS ============
 
 async function initializeAdmins() {
@@ -4303,6 +4456,473 @@ app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) 
             .populate('createdBy', 'name');
 
         res.status(201).json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ PURCHASE ORDER ENDPOINTS ============
+
+// Get all purchase orders
+app.get('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, supplier } = req.query;
+        let query = {};
+
+        if (status) query.status = status;
+        if (supplier) query['supplier.name'] = new RegExp(supplier, 'i');
+
+        const purchaseOrders = await PurchaseOrder.find(query)
+            .populate('createdBy', 'name email')
+            .populate('updatedBy', 'name email')
+            .sort({ orderDate: -1 });
+
+        res.json(purchaseOrders);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single purchase order with splits
+app.get('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const po = await PurchaseOrder.findById(req.params.id)
+            .populate('createdBy', 'name email')
+            .populate('updatedBy', 'name email');
+
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        // Get all splits for this PO
+        const splits = await PurchaseOrderSplit.find({ purchaseOrderId: po._id })
+            .populate('distributorId', 'name email')
+            .sort({ splitCode: 1 });
+
+        res.json({ purchaseOrder: po, splits });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create purchase order
+app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { supplier, items, freight, otherFees, expectedDeliveryDate, deliveryLocation, notes } = req.body;
+
+        // Generate PO number
+        const poNumber = await generatePONumber();
+
+        // Calculate item totals and remaining quantities
+        const processedItems = items.map(item => ({
+            ...item,
+            totalPrice: Math.round((item.quantityOrdered * item.pricePerUnit) * 100) / 100,
+            quantityAllocated: 0,
+            quantityRemaining: item.quantityOrdered
+        }));
+
+        // Calculate totals
+        const subtotal = processedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        const totalCost = subtotal + (freight || 0) + (otherFees || 0);
+
+        const purchaseOrder = new PurchaseOrder({
+            poNumber,
+            supplier,
+            items: processedItems,
+            subtotal: Math.round(subtotal * 100) / 100,
+            freight: freight || 0,
+            otherFees: otherFees || 0,
+            totalCost: Math.round(totalCost * 100) / 100,
+            expectedDeliveryDate,
+            deliveryLocation,
+            notes,
+            createdBy: req.user._id,
+            updatedBy: req.user._id
+        });
+
+        await purchaseOrder.save();
+
+        const populated = await PurchaseOrder.findById(purchaseOrder._id)
+            .populate('createdBy', 'name email');
+
+        res.status(201).json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update purchase order (general info and status)
+app.put('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { supplier, expectedDeliveryDate, deliveryLocation, bolNumber, trackingInfo, notes, internalNotes, status } = req.body;
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        // Update allowed fields
+        if (supplier) po.supplier = supplier;
+        if (expectedDeliveryDate !== undefined) po.expectedDeliveryDate = expectedDeliveryDate;
+        if (deliveryLocation !== undefined) po.deliveryLocation = deliveryLocation;
+        if (bolNumber !== undefined) po.bolNumber = bolNumber;
+        if (trackingInfo !== undefined) po.trackingInfo = trackingInfo;
+        if (notes !== undefined) po.notes = notes;
+        if (internalNotes !== undefined) po.internalNotes = internalNotes;
+        if (status) {
+            po.status = status;
+            if (status === 'received') po.receivedDate = new Date();
+        }
+
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+
+        await po.save();
+
+        const populated = await PurchaseOrder.findById(po._id)
+            .populate('createdBy', 'name email')
+            .populate('updatedBy', 'name email');
+
+        res.json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update purchase order item price (key feature!)
+app.put('/api/admin/purchase-orders/:id/items/:itemIndex/price', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { pricePerUnit } = req.body;
+        const itemIndex = parseInt(req.params.itemIndex, 10);
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        if (itemIndex < 0 || itemIndex >= po.items.length) {
+            return res.status(400).json({ error: 'Invalid item index' });
+        }
+
+        // Update the price
+        po.items[itemIndex].pricePerUnit = pricePerUnit;
+        po.items[itemIndex].totalPrice = Math.round((po.items[itemIndex].quantityOrdered * pricePerUnit) * 100) / 100;
+
+        // Recalculate totals
+        const subtotal = po.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        po.subtotal = Math.round(subtotal * 100) / 100;
+        po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
+
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+
+        await po.save();
+
+        res.json({ message: 'Price updated', purchaseOrder: po });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update purchase order item quantity
+app.put('/api/admin/purchase-orders/:id/items/:itemIndex/quantity', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { quantityOrdered } = req.body;
+        const itemIndex = parseInt(req.params.itemIndex, 10);
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        if (itemIndex < 0 || itemIndex >= po.items.length) {
+            return res.status(400).json({ error: 'Invalid item index' });
+        }
+
+        const item = po.items[itemIndex];
+
+        // Ensure new quantity >= allocated quantity
+        if (quantityOrdered < item.quantityAllocated) {
+            return res.status(400).json({
+                error: `Cannot reduce below allocated quantity (${item.quantityAllocated})`
+            });
+        }
+
+        // Update the quantity
+        item.quantityOrdered = quantityOrdered;
+        item.totalPrice = Math.round((quantityOrdered * item.pricePerUnit) * 100) / 100;
+        item.quantityRemaining = quantityOrdered - item.quantityAllocated;
+
+        // Recalculate totals
+        const subtotal = po.items.reduce((sum, i) => sum + i.totalPrice, 0);
+        po.subtotal = Math.round(subtotal * 100) / 100;
+        po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
+
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+
+        await po.save();
+
+        res.json({ message: 'Quantity updated', purchaseOrder: po });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Add item to purchase order
+app.post('/api/admin/purchase-orders/:id/items', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { productName, chemicalId, description, packSize, unit, quantityOrdered, pricePerUnit } = req.body;
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        const newItem = {
+            productName,
+            chemicalId,
+            description,
+            packSize,
+            unit,
+            quantityOrdered,
+            pricePerUnit,
+            totalPrice: Math.round((quantityOrdered * pricePerUnit) * 100) / 100,
+            quantityAllocated: 0,
+            quantityRemaining: quantityOrdered
+        };
+
+        po.items.push(newItem);
+
+        // Recalculate totals
+        const subtotal = po.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        po.subtotal = Math.round(subtotal * 100) / 100;
+        po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
+
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+
+        await po.save();
+
+        res.json({ message: 'Item added', purchaseOrder: po });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete item from purchase order
+app.delete('/api/admin/purchase-orders/:id/items/:itemIndex', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const itemIndex = parseInt(req.params.itemIndex, 10);
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        if (itemIndex < 0 || itemIndex >= po.items.length) {
+            return res.status(400).json({ error: 'Invalid item index' });
+        }
+
+        // Check if item has allocations
+        if (po.items[itemIndex].quantityAllocated > 0) {
+            return res.status(400).json({
+                error: 'Cannot delete item with allocations. Remove splits first.'
+            });
+        }
+
+        po.items.splice(itemIndex, 1);
+
+        // Recalculate totals
+        const subtotal = po.items.reduce((sum, item) => sum + item.totalPrice, 0);
+        po.subtotal = Math.round(subtotal * 100) / 100;
+        po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
+
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+
+        await po.save();
+
+        res.json({ message: 'Item deleted', purchaseOrder: po });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ PURCHASE ORDER SPLIT ENDPOINTS ============
+
+// Get distributors for split dropdown
+app.get('/api/admin/distributors', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const distributors = await User.find({
+            role: { $in: ['admin', 'superadmin', 'distributor'] }
+        }).select('name email role').sort({ name: 1 });
+
+        res.json(distributors);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create a split (allocate portion of PO to a distributor)
+app.post('/api/admin/purchase-orders/:id/splits', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { distributorId, items, freightAllocation, notes } = req.body;
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        const distributor = await User.findById(distributorId);
+        if (!distributor) {
+            return res.status(404).json({ error: 'Distributor not found' });
+        }
+
+        // Validate allocations don't exceed available quantities
+        for (const splitItem of items) {
+            const poItem = po.items[splitItem.originalItemIndex];
+            if (!poItem) {
+                return res.status(400).json({ error: `Invalid item index: ${splitItem.originalItemIndex}` });
+            }
+
+            const availableQty = poItem.quantityOrdered - poItem.quantityAllocated;
+            if (splitItem.quantityAllocated > availableQty) {
+                return res.status(400).json({
+                    error: `Cannot allocate ${splitItem.quantityAllocated} of ${poItem.productName}. Only ${availableQty} available.`
+                });
+            }
+        }
+
+        // Generate split code (A, B, C, ...)
+        const existingSplits = await PurchaseOrderSplit.countDocuments({ purchaseOrderId: po._id });
+        const splitCode = String.fromCharCode(65 + existingSplits); // A=65, B=66, etc.
+
+        // Process split items
+        const processedItems = items.map(item => {
+            const poItem = po.items[item.originalItemIndex];
+            return {
+                productName: poItem.productName,
+                chemicalId: poItem.chemicalId,
+                packSize: poItem.packSize,
+                unit: poItem.unit,
+                quantityAllocated: item.quantityAllocated,
+                pricePerUnit: item.pricePerUnit || poItem.pricePerUnit,
+                totalPrice: Math.round((item.quantityAllocated * (item.pricePerUnit || poItem.pricePerUnit)) * 100) / 100,
+                originalItemIndex: item.originalItemIndex
+            };
+        });
+
+        const subtotal = processedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+
+        const split = new PurchaseOrderSplit({
+            purchaseOrderId: po._id,
+            poNumber: po.poNumber,
+            distributorId,
+            distributorName: distributor.name,
+            splitCode,
+            items: processedItems,
+            subtotal: Math.round(subtotal * 100) / 100,
+            freightAllocation: freightAllocation || 0,
+            totalCost: Math.round((subtotal + (freightAllocation || 0)) * 100) / 100,
+            notes,
+            createdBy: req.user._id
+        });
+
+        await split.save();
+
+        // Update PO item allocated quantities
+        for (const splitItem of items) {
+            po.items[splitItem.originalItemIndex].quantityAllocated += splitItem.quantityAllocated;
+            po.items[splitItem.originalItemIndex].quantityRemaining =
+                po.items[splitItem.originalItemIndex].quantityOrdered -
+                po.items[splitItem.originalItemIndex].quantityAllocated;
+        }
+
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+        await po.save();
+
+        const populated = await PurchaseOrderSplit.findById(split._id)
+            .populate('distributorId', 'name email');
+
+        res.status(201).json({ split: populated, purchaseOrder: po });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update split status
+app.put('/api/admin/purchase-order-splits/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, deliveryDate, deliveryLocation, receivedBy, notes } = req.body;
+
+        const split = await PurchaseOrderSplit.findById(req.params.id);
+        if (!split) {
+            return res.status(404).json({ error: 'Split not found' });
+        }
+
+        if (status) split.status = status;
+        if (deliveryDate !== undefined) split.deliveryDate = deliveryDate;
+        if (deliveryLocation !== undefined) split.deliveryLocation = deliveryLocation;
+        if (receivedBy !== undefined) split.receivedBy = receivedBy;
+        if (notes !== undefined) split.notes = notes;
+
+        split.updatedAt = new Date();
+        await split.save();
+
+        res.json(split);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete split (unallocate items back to PO)
+app.delete('/api/admin/purchase-order-splits/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const split = await PurchaseOrderSplit.findById(req.params.id);
+        if (!split) {
+            return res.status(404).json({ error: 'Split not found' });
+        }
+
+        // Don't allow deletion if already shipped/delivered
+        if (['shipped', 'delivered', 'invoiced', 'paid'].includes(split.status)) {
+            return res.status(400).json({
+                error: 'Cannot delete split that has been shipped, delivered, invoiced, or paid'
+            });
+        }
+
+        // Return quantities to PO
+        const po = await PurchaseOrder.findById(split.purchaseOrderId);
+        if (po) {
+            for (const splitItem of split.items) {
+                if (splitItem.originalItemIndex !== undefined && po.items[splitItem.originalItemIndex]) {
+                    po.items[splitItem.originalItemIndex].quantityAllocated -= splitItem.quantityAllocated;
+                    po.items[splitItem.originalItemIndex].quantityRemaining =
+                        po.items[splitItem.originalItemIndex].quantityOrdered -
+                        po.items[splitItem.originalItemIndex].quantityAllocated;
+                }
+            }
+            po.updatedAt = new Date();
+            await po.save();
+        }
+
+        await PurchaseOrderSplit.findByIdAndDelete(split._id);
+
+        res.json({ message: 'Split deleted and quantities returned to purchase order' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all splits for a distributor
+app.get('/api/admin/distributor-splits/:distributorId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const splits = await PurchaseOrderSplit.find({ distributorId: req.params.distributorId })
+            .populate('purchaseOrderId', 'poNumber supplier status')
+            .sort({ createdAt: -1 });
+
+        res.json(splits);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
