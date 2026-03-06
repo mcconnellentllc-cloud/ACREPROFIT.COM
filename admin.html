@@ -1258,12 +1258,12 @@
                             <tr>
                                 <th>Product Name</th>
                                 <th>Category</th>
-                                <th>SKU/Lot #</th>
-                                <th>Quantity</th>
+                                <th>Qty</th>
                                 <th>Unit</th>
-                                <th>Cost/Unit</th>
-                                <th>Total Value</th>
-                                <th>Location</th>
+                                <th class="cost-column">Cost</th>
+                                <th class="cost-column">Margin</th>
+                                <th>Retail</th>
+                                <th>Available</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -1347,16 +1347,29 @@
                             </div>
                             <div class="form-row" style="background: var(--secondary); padding: 16px; border-radius: var(--radius);">
                                 <div class="form-group">
-                                    <label>Cost Per Unit *</label>
-                                    <input type="number" id="invCostPerUnit" required step="0.01" min="0" placeholder="Your cost" oninput="calcInventoryValue()">
+                                    <label>Cost Per Unit * <span style="color: var(--text-muted); font-size: 0.8rem;">(only you see this)</span></label>
+                                    <input type="number" id="invCostPerUnit" required step="0.01" min="0" placeholder="Your cost" oninput="calcInventoryPricing()">
                                 </div>
                                 <div class="form-group">
-                                    <label>Sell Price Per Unit</label>
-                                    <input type="number" id="invSellPrice" step="0.01" min="0" placeholder="Sell price (optional)" oninput="calcInventoryValue()">
+                                    <label>Margin %</label>
+                                    <input type="number" id="invMargin" step="0.1" min="0" max="500" placeholder="e.g., 15" value="15" oninput="calcInventoryPricing()">
                                 </div>
                                 <div class="form-group">
-                                    <label>Total Value</label>
+                                    <label>Retail Price</label>
+                                    <input type="number" id="invSellPrice" step="0.01" min="0" placeholder="Auto-calculated" oninput="calcInventoryPricing()">
+                                </div>
+                                <div class="form-group">
+                                    <label>Total Cost Value</label>
                                     <div id="invTotalValue" style="padding: 10px 14px; background: var(--white); border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;">$0.00</div>
+                                </div>
+                            </div>
+                            <div class="form-row" style="background: #dcfce7; padding: 16px; border-radius: var(--radius); margin-top: 12px;">
+                                <div class="form-group" style="flex: 2;">
+                                    <label style="display: flex; align-items: center; gap: 10px; cursor: pointer;">
+                                        <input type="checkbox" id="invAvailableToSell" style="width: 20px; height: 20px; cursor: pointer;">
+                                        <strong>Make Available to Sell</strong>
+                                        <span style="color: var(--text-muted); font-size: 0.85rem;">- Customers will see this product with retail price</span>
+                                    </label>
                                 </div>
                             </div>
                             <div class="form-row">
@@ -2962,32 +2975,38 @@
         // Render inventory table
         function renderInventory(items) {
             const tbody = document.getElementById('inventoryTableBody');
+            const currentUserId = userData._id || userData.id;
+
             if (!items || items.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="10" class="empty">No inventory items. Click "+ Add Inventory" to add products.</td></tr>';
                 return;
             }
 
             tbody.innerHTML = items.map(item => {
-                const totalValue = (item.quantity || 0) * (item.costPerUnit || 0);
+                const isOwner = item.addedById === currentUserId || userData.role === 'superadmin';
                 const isLowStock = item.lowStockThreshold && item.quantity <= item.lowStockThreshold;
                 const statusClass = isLowStock ? 'status-pending' : 'status-confirmed';
                 const statusText = isLowStock ? 'Low Stock' : 'In Stock';
+                const availableClass = item.availableToSell ? 'status-confirmed' : 'status-pending';
+                const availableText = item.availableToSell ? 'Listed' : 'Not Listed';
 
                 return `
                     <tr>
                         <td><strong>${item.productName}</strong>${item.manufacturer ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.manufacturer}</span>` : ''}</td>
                         <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${item.category || '-'}</span></td>
-                        <td>${item.sku || '-'}</td>
                         <td><strong>${item.quantity?.toLocaleString() || 0}</strong></td>
                         <td>${item.unit || '-'}</td>
-                        <td>$${item.costPerUnit?.toFixed(2) || '0.00'}</td>
-                        <td><strong>$${totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
-                        <td>${item.location || '-'}</td>
+                        <td class="cost-column">${isOwner ? '$' + (item.costPerUnit?.toFixed(2) || '0.00') : '<span style="color:#999;">Hidden</span>'}</td>
+                        <td class="cost-column">${isOwner ? (item.margin || 0) + '%' : '<span style="color:#999;">-</span>'}</td>
+                        <td><strong style="color: var(--primary);">$${item.sellPrice?.toFixed(2) || '0.00'}</strong></td>
+                        <td><span class="order-status ${availableClass}">${availableText}</span></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
-                            <button class="btn btn-sm btn-outline" onclick="editInventory('${item.id || item._id}')">Edit</button>
-                            <button class="btn btn-sm" onclick="adjustInventory('${item.id || item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
-                            <button class="btn btn-sm" onclick="deleteInventory('${item.id || item._id}')" style="background: #dc2626; color: white;">Delete</button>
+                            ${isOwner ? `
+                                <button class="btn btn-sm btn-outline" onclick="editInventory('${item.id || item._id}')">Edit</button>
+                                <button class="btn btn-sm" onclick="adjustInventory('${item.id || item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
+                                <button class="btn btn-sm" onclick="deleteInventory('${item.id || item._id}')" style="background: #dc2626; color: white;">Delete</button>
+                            ` : '<span style="color:#999; font-size: 0.8rem;">View Only</span>'}
                         </td>
                     </tr>
                 `;
@@ -3037,6 +3056,8 @@
             document.getElementById('inventoryModalTitle').textContent = 'Add Inventory Item';
             document.getElementById('saveInventoryBtn').textContent = 'Add Inventory';
             document.getElementById('invTotalValue').textContent = '$0.00';
+            document.getElementById('invMargin').value = '15'; // Default 15% margin
+            document.getElementById('invAvailableToSell').checked = false;
         }
 
         // Close add inventory modal
@@ -3044,10 +3065,19 @@
             document.getElementById('addInventoryModal').style.display = 'none';
         }
 
-        // Calculate inventory value preview
-        function calcInventoryValue() {
+        // Calculate inventory pricing with margin
+        function calcInventoryPricing() {
             const qty = parseFloat(document.getElementById('invQuantity').value) || 0;
             const cost = parseFloat(document.getElementById('invCostPerUnit').value) || 0;
+            const margin = parseFloat(document.getElementById('invMargin').value) || 0;
+
+            // Auto-calculate retail price if margin is entered
+            const retailPrice = cost * (1 + margin / 100);
+            if (margin > 0 && cost > 0) {
+                document.getElementById('invSellPrice').value = retailPrice.toFixed(2);
+            }
+
+            // Total value (based on cost for internal tracking)
             const total = qty * cost;
             document.getElementById('invTotalValue').textContent = '$' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
         }
@@ -3055,6 +3085,10 @@
         // Save inventory item
         async function saveInventory() {
             const editId = document.getElementById('editInventoryId').value;
+
+            const costPerUnit = parseFloat(document.getElementById('invCostPerUnit').value) || 0;
+            const margin = parseFloat(document.getElementById('invMargin').value) || 0;
+            const sellPrice = parseFloat(document.getElementById('invSellPrice').value) || (costPerUnit * (1 + margin / 100));
 
             const item = {
                 id: editId || 'inv_' + Date.now(),
@@ -3064,8 +3098,10 @@
                 manufacturer: document.getElementById('invManufacturer').value,
                 quantity: parseFloat(document.getElementById('invQuantity').value) || 0,
                 unit: document.getElementById('invUnit').value,
-                costPerUnit: parseFloat(document.getElementById('invCostPerUnit').value) || 0,
-                sellPrice: parseFloat(document.getElementById('invSellPrice').value) || 0,
+                costPerUnit: costPerUnit,
+                margin: margin,
+                sellPrice: sellPrice,
+                availableToSell: document.getElementById('invAvailableToSell').checked,
                 location: document.getElementById('invLocation').value,
                 lowStockThreshold: parseFloat(document.getElementById('invLowStockThreshold').value) || 0,
                 expirationDate: document.getElementById('invExpirationDate').value,
@@ -3130,7 +3166,9 @@
             document.getElementById('invQuantity').value = item.quantity || '';
             document.getElementById('invUnit').value = item.unit || '';
             document.getElementById('invCostPerUnit').value = item.costPerUnit || '';
+            document.getElementById('invMargin').value = item.margin || 15;
             document.getElementById('invSellPrice').value = item.sellPrice || '';
+            document.getElementById('invAvailableToSell').checked = item.availableToSell || false;
             document.getElementById('invLocation').value = item.location || '';
             document.getElementById('invLowStockThreshold').value = item.lowStockThreshold || '';
             document.getElementById('invExpirationDate').value = item.expirationDate || '';
@@ -3140,7 +3178,7 @@
             document.getElementById('inventoryModalTitle').textContent = 'Edit Inventory Item';
             document.getElementById('saveInventoryBtn').textContent = 'Save Changes';
             document.getElementById('addInventoryModal').style.display = 'flex';
-            calcInventoryValue();
+            calcInventoryPricing();
         }
 
         // Adjust inventory quantity
@@ -4220,6 +4258,15 @@
         .admin-role.distributor {
             background: rgba(249, 115, 22, 0.1);
             color: #ea580c;
+        }
+
+        /* Private Cost Column Styling */
+        .cost-column {
+            background: #fef9c3;
+            border-left: 2px solid #facc15;
+        }
+        thead .cost-column {
+            background: #fef3c7;
         }
 
         @media (max-width: 768px) {
