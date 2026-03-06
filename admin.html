@@ -14,26 +14,38 @@
 <body>
     <nav class="navbar admin-nav">
         <div class="container">
-            <a href="/" class="logo">
+            <a href="/dashboard.html" class="logo">
                 <img src="logo.svg" alt="Acre Profit">
             </a>
-            <ul class="nav-links">
-                <li><a href="#dashboard" class="nav-tab active" data-tab="dashboard">Dashboard</a></li>
-                <li><a href="#orders" class="nav-tab" data-tab="orders">Orders</a></li>
-                <li><a href="#customers" class="nav-tab" data-tab="customers">Customers</a></li>
-                <li><a href="#bundles" class="nav-tab" data-tab="bundles">Bundles</a></li>
-                <li><a href="#products" class="nav-tab" data-tab="products">Products</a></li>
-                <li id="pricingNav" style="display: none;"><a href="#pricing" class="nav-tab" data-tab="pricing">Pricing Tiers</a></li>
-                <li id="commissionsNav" style="display: none;"><a href="#commissions" class="nav-tab" data-tab="commissions">Rep Commissions</a></li>
-                <li id="inventoryNav" style="display: none;"><a href="#inventory" class="nav-tab" data-tab="inventory">Inventory</a></li>
-                <li><a href="#ledger" class="nav-tab" data-tab="ledger">Ledger</a></li>
-                <li><a href="#compliance" class="nav-tab" data-tab="compliance" style="color: #dc2626;">Compliance</a></li>
-                <li id="repAppsNav" style="display: none;"><a href="#applications" class="nav-tab" data-tab="applications">Rep Applications</a></li>
-                <li><a href="#" id="viewAsCustomerBtn" class="btn btn-secondary" style="margin-right: 0.5rem;">View as Customer</a></li>
-                <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
-            </ul>
+            <div class="nav-center">
+                <a href="/dashboard.html" class="nav-back">← Dashboard</a>
+                <span class="nav-title">Admin Panel</span>
+            </div>
+            <div class="nav-right">
+                <a href="/dashboard.html" id="viewAsCustomerBtn" class="btn btn-secondary btn-sm">View as Customer</a>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
         </div>
     </nav>
+
+    <!-- Admin Tab Navigation -->
+    <div class="admin-tabs-bar">
+        <div class="container">
+            <div class="admin-tabs">
+                <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
+                <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
+                <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
+                <a href="#bundles" class="admin-tab" data-tab="bundles">Bundles</a>
+                <a href="#products" class="admin-tab" data-tab="products">Products</a>
+                <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
+                <a href="#compliance" class="admin-tab tab-warning" data-tab="compliance">Compliance</a>
+                <span id="pricingNav" style="display: none;"><a href="#pricing" class="admin-tab" data-tab="pricing">Pricing</a></span>
+                <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
+                <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
+                <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
+            </div>
+        </div>
+    </div>
 
     <main class="admin-page">
         <div class="container">
@@ -1582,12 +1594,12 @@
         let selectedCustomer = null;
 
         // Tab navigation
-        document.querySelectorAll('.nav-tab').forEach(tab => {
+        document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.addEventListener('click', function(e) {
                 e.preventDefault();
                 const tabName = this.dataset.tab;
 
-                document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
                 this.classList.add('active');
@@ -1600,6 +1612,13 @@
                 if (tabName === 'inventory') loadInventory();
             });
         });
+
+        // Handle URL hash for direct tab links
+        if (window.location.hash) {
+            const tabName = window.location.hash.substring(1);
+            const tabEl = document.querySelector(`.admin-tab[data-tab="${tabName}"]`);
+            if (tabEl) tabEl.click();
+        }
 
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', function(e) {
