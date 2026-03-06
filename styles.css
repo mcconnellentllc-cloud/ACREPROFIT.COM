@@ -1657,3 +1657,476 @@ h4 {
     width: 80px;
     text-align: center;
 }
+
+/* ===== Role-Based Dashboard Styles ===== */
+
+/* Role Switcher Banner */
+.role-switcher-banner {
+    background: linear-gradient(135deg, #1e3d1a 0%, #2d5a27 100%);
+    color: white;
+    padding: 10px 0;
+    font-size: 0.875rem;
+}
+
+.role-switcher-buttons {
+    display: flex;
+    gap: 8px;
+}
+
+.role-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(255,255,255,0.3);
+    background: transparent;
+    color: white;
+    border-radius: var(--radius);
+    cursor: pointer;
+    font-size: 0.8rem;
+    transition: all 0.2s;
+}
+
+.role-btn:hover {
+    background: rgba(255,255,255,0.1);
+}
+
+.role-btn.active {
+    background: white;
+    color: var(--primary);
+    border-color: white;
+    font-weight: 600;
+}
+
+/* Simplified Nav */
+.nav-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.role-badge {
+    padding: 4px 12px;
+    border-radius: var(--radius-full);
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.role-badge.role-customer {
+    background: #dcfce7;
+    color: #166534;
+}
+
+.role-badge.role-distributor {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.role-badge.role-superadmin {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.user-name {
+    font-weight: 500;
+    color: var(--text);
+}
+
+/* Dashboard Layout */
+.dashboard-section {
+    margin-bottom: 40px;
+}
+
+.section-title {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 20px;
+    color: var(--text);
+}
+
+/* Card Grids */
+.card-grid {
+    display: grid;
+    gap: 20px;
+}
+
+.card-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.card-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+.card-grid-4 {
+    grid-template-columns: repeat(4, 1fr);
+}
+
+@media (max-width: 1024px) {
+    .card-grid-4 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 768px) {
+    .card-grid-2,
+    .card-grid-3,
+    .card-grid-4 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* Dashboard Cards */
+.dashboard-card {
+    display: flex;
+    flex-direction: column;
+    padding: 24px;
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+}
+
+.dashboard-card:hover {
+    border-color: var(--primary);
+    box-shadow: var(--shadow-md);
+    transform: translateY(-2px);
+}
+
+.dashboard-card.card-primary {
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+    color: white;
+    border: none;
+}
+
+.dashboard-card.card-primary .card-icon {
+    background: rgba(255,255,255,0.2);
+}
+
+.dashboard-card.card-primary .card-cta {
+    color: rgba(255,255,255,0.9);
+}
+
+.dashboard-card.card-outline {
+    background: var(--secondary);
+}
+
+.dashboard-card.card-sm {
+    padding: 16px;
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+}
+
+.dashboard-card.card-sm h4 {
+    margin: 0;
+    font-size: 0.9rem;
+}
+
+.dashboard-card.card-warning {
+    border-color: #f59e0b;
+    background: #fffbeb;
+}
+
+.card-icon {
+    width: 56px;
+    height: 56px;
+    background: rgba(45, 90, 39, 0.1);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 16px;
+    color: var(--primary);
+}
+
+.card-icon-sm {
+    width: 40px;
+    height: 40px;
+    background: rgba(45, 90, 39, 0.1);
+    border-radius: var(--radius);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+    flex-shrink: 0;
+}
+
+.dashboard-card h3 {
+    font-size: 1.25rem;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.dashboard-card p {
+    font-size: 0.9rem;
+    color: var(--text-light);
+    margin-bottom: 16px;
+    flex-grow: 1;
+}
+
+.dashboard-card.card-primary p {
+    color: rgba(255,255,255,0.8);
+}
+
+.card-cta {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--primary);
+}
+
+/* Stats Row */
+.stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 32px;
+}
+
+@media (max-width: 768px) {
+    .stats-row {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+.stats-row .stat-card {
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 20px;
+    text-align: center;
+}
+
+.stats-row .stat-card.accent {
+    background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
+    border: none;
+    color: white;
+}
+
+.stats-row .stat-value {
+    display: block;
+    font-size: 1.75rem;
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.stats-row .stat-label {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.stats-row .stat-card.accent .stat-label {
+    color: rgba(255,255,255,0.8);
+}
+
+/* Rep Info Card */
+.rep-info-card {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 16px 20px;
+    background: var(--secondary);
+    border-radius: var(--radius);
+    margin-bottom: 32px;
+}
+
+.rep-icon {
+    width: 48px;
+    height: 48px;
+    background: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--primary);
+}
+
+.rep-details {
+    display: flex;
+    flex-direction: column;
+}
+
+.rep-label {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.rep-name {
+    font-weight: 600;
+    color: var(--text);
+}
+
+.rep-location {
+    font-size: 0.9rem;
+    color: var(--text-light);
+}
+
+/* Info Cards */
+.info-cards-row {
+    display: flex;
+    gap: 20px;
+}
+
+.info-card {
+    flex: 1;
+    padding: 20px;
+    background: var(--secondary);
+    border-radius: var(--radius);
+}
+
+.how-it-works-mini h4 {
+    margin-bottom: 16px;
+    font-size: 1rem;
+}
+
+.steps-row {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.steps-row .step {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.875rem;
+    color: var(--text-light);
+}
+
+.steps-row .step span {
+    width: 24px;
+    height: 24px;
+    background: var(--primary);
+    color: white;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.75rem;
+    font-weight: 600;
+}
+
+/* Quick Actions */
+.quick-actions-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+
+/* Back Link for Sub-pages */
+.back-to-dashboard {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 0.9rem;
+    margin-bottom: 20px;
+}
+
+.back-to-dashboard:hover {
+    color: var(--primary);
+}
+
+/* ===== Simplified Sub-page Navigation ===== */
+.nav-center {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.nav-back {
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 500;
+    transition: color 0.2s;
+}
+
+.nav-back:hover {
+    color: var(--primary);
+}
+
+.nav-title {
+    font-weight: 600;
+    color: var(--text);
+    font-size: 1.1rem;
+    padding-left: 16px;
+    border-left: 2px solid var(--border);
+}
+
+@media (max-width: 768px) {
+    .nav-center {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    .nav-title {
+        padding-left: 0;
+        border-left: none;
+        font-size: 1rem;
+    }
+}
+
+/* ===== Admin Tabs Bar ===== */
+.admin-tabs-bar {
+    background: var(--secondary);
+    border-bottom: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    z-index: 100;
+}
+
+.admin-tabs {
+    display: flex;
+    gap: 4px;
+    overflow-x: auto;
+    padding: 12px 0;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+}
+
+.admin-tabs::-webkit-scrollbar {
+    display: none;
+}
+
+.admin-tab {
+    padding: 8px 16px;
+    color: var(--text-light);
+    text-decoration: none;
+    font-size: 0.875rem;
+    font-weight: 500;
+    border-radius: var(--radius);
+    white-space: nowrap;
+    transition: all 0.2s;
+}
+
+.admin-tab:hover {
+    background: rgba(45, 90, 39, 0.1);
+    color: var(--primary);
+}
+
+.admin-tab.active {
+    background: var(--primary);
+    color: white;
+}
+
+.admin-tab.tab-warning {
+    color: #dc2626;
+}
+
+.admin-tab.tab-warning.active {
+    background: #dc2626;
+    color: white;
+}
+
+/* Adjust admin page to account for tabs bar */
+.admin-page {
+    padding-top: 24px;
+}
