@@ -348,6 +348,12 @@
                                 <span class="info-label">Total Orders</span>
                                 <span class="info-value" id="modalCustomerOrderCount">0</span>
                             </div>
+                            <div class="info-item full-width">
+                                <span class="info-label">Private Applicator License</span>
+                                <span class="info-value" id="modalCustomerLicense">
+                                    <span class="no-license">No license on file</span>
+                                </span>
+                            </div>
                         </div>
                         <div class="customer-orders-section">
                             <h3>Recent Orders</h3>
@@ -393,6 +399,55 @@
                             <div class="form-group">
                                 <label>Crops (comma-separated)</label>
                                 <input type="text" id="editCrops" placeholder="e.g., Corn, Wheat, Soybeans">
+                            </div>
+
+                            <!-- Private Applicator License Section -->
+                            <div class="license-section">
+                                <h4>Private Applicator License</h4>
+                                <div class="form-group checkbox-group">
+                                    <label>
+                                        <input type="checkbox" id="editHasLicense" onchange="toggleLicenseFields()">
+                                        Has Private Applicator License
+                                    </label>
+                                </div>
+                                <div id="licenseFields" style="display: none;">
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>License Number</label>
+                                            <input type="text" id="editLicenseNumber" placeholder="e.g., PA-12345">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Issuing State</label>
+                                            <select id="editLicenseState">
+                                                <option value="">Select State</option>
+                                                <option value="CO">Colorado</option>
+                                                <option value="KS">Kansas</option>
+                                                <option value="NE">Nebraska</option>
+                                                <option value="WY">Wyoming</option>
+                                                <option value="OK">Oklahoma</option>
+                                                <option value="TX">Texas</option>
+                                                <option value="NM">New Mexico</option>
+                                                <option value="SD">South Dakota</option>
+                                                <option value="MT">Montana</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="form-row">
+                                        <div class="form-group">
+                                            <label>Expiration Date</label>
+                                            <input type="date" id="editLicenseExpiration">
+                                        </div>
+                                        <div class="form-group">
+                                            <label>Verification Status</label>
+                                            <select id="editLicenseStatus">
+                                                <option value="pending">Pending Verification</option>
+                                                <option value="verified">Verified</option>
+                                                <option value="expired">Expired</option>
+                                                <option value="rejected">Rejected</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
                         </form>
                     </div>
@@ -1752,13 +1807,31 @@
             const initials = customer.name.split(' ').map(n => n[0]).join('');
             document.getElementById('modalCustomerAvatar').textContent = initials;
             document.getElementById('modalCustomerName').textContent = customer.name;
-            document.getElementById('modalCustomerFarm').textContent = customer.farm || 'No farm name';
+            document.getElementById('modalCustomerFarm').textContent = customer.farm?.name || 'No farm name';
             document.getElementById('modalCustomerEmail').textContent = customer.email;
             document.getElementById('modalCustomerPhone').textContent = customer.phone || '-';
-            document.getElementById('modalCustomerState').textContent = customer.state || '-';
-            document.getElementById('modalCustomerAcres').textContent = customer.acres ? customer.acres.toLocaleString() : '-';
+            document.getElementById('modalCustomerState').textContent = customer.farm?.state || '-';
+            document.getElementById('modalCustomerAcres').textContent = customer.farm?.acres ? customer.farm.acres.toLocaleString() : '-';
             document.getElementById('modalCustomerCrops').textContent = customer.crops?.join(', ') || '-';
             document.getElementById('modalCustomerOrderCount').textContent = customer.orderCount || 0;
+
+            // Update applicator license display
+            const licenseSection = document.getElementById('modalCustomerLicense');
+            if (licenseSection) {
+                if (customer.privateApplicatorLicense?.hasLicense) {
+                    const license = customer.privateApplicatorLicense;
+                    const expDate = license.expirationDate ? new Date(license.expirationDate).toLocaleDateString() : 'N/A';
+                    const status = license.verificationStatus || 'pending';
+                    const statusClass = status === 'verified' ? 'status-verified' : status === 'expired' ? 'status-expired' : 'status-pending';
+                    licenseSection.innerHTML = `
+                        <span class="license-badge ${statusClass}">
+                            ${license.licenseNumber} (${license.state}) - Exp: ${expDate}
+                            <span class="license-status">${status}</span>
+                        </span>`;
+                } else {
+                    licenseSection.innerHTML = '<span class="no-license">No license on file</span>';
+                }
+            }
 
             // Render orders
             const ordersHtml = customer.orders && customer.orders.length ? customer.orders.map(order => `
@@ -1879,10 +1952,20 @@
             document.getElementById('editName').value = selectedCustomer.name || '';
             document.getElementById('editEmail').value = selectedCustomer.email || '';
             document.getElementById('editPhone').value = selectedCustomer.phone || '';
-            document.getElementById('editFarm').value = selectedCustomer.farm || '';
-            document.getElementById('editState').value = selectedCustomer.state || '';
-            document.getElementById('editAcres').value = selectedCustomer.acres || '';
+            document.getElementById('editFarm').value = selectedCustomer.farm?.name || '';
+            document.getElementById('editState').value = selectedCustomer.farm?.state || '';
+            document.getElementById('editAcres').value = selectedCustomer.farm?.acres || '';
             document.getElementById('editCrops').value = selectedCustomer.crops?.join(', ') || '';
+
+            // Populate applicator license fields
+            const license = selectedCustomer.privateApplicatorLicense || {};
+            document.getElementById('editHasLicense').checked = license.hasLicense || false;
+            document.getElementById('editLicenseNumber').value = license.licenseNumber || '';
+            document.getElementById('editLicenseState').value = license.state || '';
+            document.getElementById('editLicenseExpiration').value = license.expirationDate ?
+                new Date(license.expirationDate).toISOString().split('T')[0] : '';
+            document.getElementById('editLicenseStatus').value = license.verificationStatus || 'pending';
+            toggleLicenseFields();
 
             // Show edit mode, hide view mode
             document.getElementById('viewMode').style.display = 'none';
@@ -1899,6 +1982,12 @@
             document.getElementById('editActions').style.display = 'none';
         }
 
+        // Toggle license fields visibility
+        function toggleLicenseFields() {
+            const hasLicense = document.getElementById('editHasLicense').checked;
+            document.getElementById('licenseFields').style.display = hasLicense ? 'block' : 'none';
+        }
+
         // Save customer
         async function saveCustomer() {
             if (!selectedCustomer) return;
@@ -1912,6 +2001,16 @@
             const cropsStr = document.getElementById('editCrops').value.trim();
             const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
 
+            // Get license data
+            const hasLicense = document.getElementById('editHasLicense').checked;
+            const privateApplicatorLicense = {
+                hasLicense: hasLicense,
+                licenseNumber: document.getElementById('editLicenseNumber').value.trim(),
+                state: document.getElementById('editLicenseState').value,
+                expirationDate: document.getElementById('editLicenseExpiration').value || null,
+                verificationStatus: document.getElementById('editLicenseStatus').value
+            };
+
             if (!name || !email) {
                 alert('Name and email are required');
                 return;
@@ -1924,7 +2023,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ name, email, phone, farm, state, acres, crops })
+                    body: JSON.stringify({ name, email, phone, farm, state, acres, crops, privateApplicatorLicense })
                 });
 
                 if (res.ok) {
@@ -3972,6 +4071,95 @@
         .edit-customer-form input:focus {
             outline: none;
             border-color: var(--primary);
+        }
+
+        .edit-customer-form select {
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            background: white;
+        }
+
+        .edit-customer-form select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        /* License Section Styles */
+        .license-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .license-section h4 {
+            margin: 0 0 12px 0;
+            font-size: 0.9rem;
+            color: var(--primary);
+        }
+
+        .checkbox-group label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            text-transform: none;
+            font-size: 0.9rem;
+        }
+
+        .checkbox-group input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            cursor: pointer;
+        }
+
+        #licenseFields {
+            margin-top: 12px;
+        }
+
+        /* License display in view mode */
+        .info-item.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .license-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .license-badge.status-verified {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .license-badge.status-pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .license-badge.status-expired {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .license-status {
+            padding: 2px 6px;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            font-weight: 600;
+            background: rgba(0,0,0,0.1);
+        }
+
+        .no-license {
+            color: var(--text-muted);
+            font-style: italic;
         }
 
         @media (max-width: 1024px) {

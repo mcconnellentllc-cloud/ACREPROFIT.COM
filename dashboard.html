@@ -181,6 +181,17 @@
                 </div>
             </div>
 
+            <!-- My Applicator License -->
+            <div class="my-license-section">
+                <div class="section-header">
+                    <h3>My Applicator License</h3>
+                    <span class="section-badge" id="licenseStatusBadge">Check Status</span>
+                </div>
+                <div class="my-license-content" id="myLicenseContent">
+                    <div class="license-loading">Loading license info...</div>
+                </div>
+            </div>
+
             <!-- License & Certification Resources -->
             <div class="license-resources-section">
                 <div class="section-header">
@@ -411,6 +422,127 @@
                 messages.scrollTop = messages.scrollHeight;
             }, 500);
         }
+
+        // Load and display user's applicator license
+        async function loadMyLicense() {
+            const contentEl = document.getElementById('myLicenseContent');
+            const badgeEl = document.getElementById('licenseStatusBadge');
+
+            try {
+                const res = await fetch(`${API_URL}/api/user/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load profile');
+
+                const profile = await res.json();
+                const license = profile.privateApplicatorLicense;
+
+                if (license?.hasLicense && license?.licenseNumber) {
+                    const expDate = license.expirationDate ? new Date(license.expirationDate).toLocaleDateString() : 'N/A';
+                    const status = license.verificationStatus || 'pending';
+                    const isExpired = license.expirationDate && new Date(license.expirationDate) < new Date();
+                    const displayStatus = isExpired ? 'expired' : status;
+
+                    badgeEl.textContent = displayStatus === 'verified' ? 'Verified' : displayStatus === 'expired' ? 'Expired' : 'Pending';
+                    badgeEl.className = `section-badge ${displayStatus}`;
+
+                    contentEl.innerHTML = `
+                        <div class="license-info-card">
+                            <div class="license-details">
+                                <div class="license-number">${license.licenseNumber}</div>
+                                <div class="license-meta">
+                                    State: ${license.state || 'N/A'} | Expires: ${expDate}
+                                </div>
+                            </div>
+                            <span class="license-status-tag ${displayStatus}">${displayStatus}</span>
+                        </div>
+                        <div class="license-actions">
+                            <button class="btn btn-outline btn-sm" onclick="showEditLicense()">Update License</button>
+                        </div>
+                    `;
+                } else {
+                    badgeEl.textContent = 'Add License';
+                    badgeEl.className = 'section-badge pending';
+
+                    contentEl.innerHTML = `
+                        <div class="no-license-card">
+                            <p>No applicator license on file. Add your license to purchase Restricted Use Pesticides.</p>
+                            <button class="btn btn-primary" onclick="showAddLicense()">Add My License</button>
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                console.error('Error loading license:', error);
+                contentEl.innerHTML = '<p class="error">Error loading license info</p>';
+            }
+        }
+
+        let showingLicenseForm = false;
+
+        function showAddLicense() {
+            const contentEl = document.getElementById('myLicenseContent');
+            contentEl.innerHTML = `
+                <form class="add-license-form" onsubmit="saveLicense(event)">
+                    <input type="text" id="newLicenseNumber" placeholder="License Number" required>
+                    <select id="newLicenseState" required>
+                        <option value="">State</option>
+                        <option value="CO">Colorado</option>
+                        <option value="KS">Kansas</option>
+                        <option value="NE">Nebraska</option>
+                        <option value="WY">Wyoming</option>
+                    </select>
+                    <input type="date" id="newLicenseExpiration" required>
+                    <button type="submit" class="btn btn-primary">Save</button>
+                </form>
+                <div class="license-actions">
+                    <button class="btn btn-outline btn-sm" onclick="loadMyLicense()">Cancel</button>
+                </div>
+            `;
+        }
+
+        function showEditLicense() {
+            showAddLicense();
+        }
+
+        async function saveLicense(event) {
+            event.preventDefault();
+            const licenseNumber = document.getElementById('newLicenseNumber').value.trim();
+            const state = document.getElementById('newLicenseState').value;
+            const expirationDate = document.getElementById('newLicenseExpiration').value;
+
+            try {
+                const res = await fetch(`${API_URL}/api/user/license`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        privateApplicatorLicense: {
+                            hasLicense: true,
+                            licenseNumber,
+                            state,
+                            expirationDate
+                        }
+                    })
+                });
+
+                if (res.ok) {
+                    alert('License saved! Pending verification by your representative.');
+                    loadMyLicense();
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Failed to save license');
+                }
+            } catch (error) {
+                console.error('Error saving license:', error);
+                alert('Error saving license. Please try again.');
+            }
+        }
+
+        // Load license on page load
+        loadMyLicense();
     </script>
 
     <style>
@@ -949,6 +1081,104 @@
         .empty-orders p {
             color: var(--text-light);
             margin-bottom: 20px;
+        }
+
+        /* My Applicator License Section */
+        .my-license-section {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 24px 32px;
+            box-shadow: var(--shadow);
+            margin-bottom: 24px;
+            border-left: 4px solid #2D5A27;
+        }
+
+        .my-license-content {
+            margin-top: 16px;
+        }
+
+        .license-info-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: #f9fafb;
+            border-radius: var(--radius);
+            gap: 24px;
+        }
+
+        .license-details {
+            flex: 1;
+        }
+
+        .license-number {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--primary);
+            margin-bottom: 4px;
+        }
+
+        .license-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        .license-status-tag {
+            padding: 6px 12px;
+            border-radius: 16px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .license-status-tag.verified {
+            background: #dcfce7;
+            color: #166534;
+        }
+
+        .license-status-tag.pending {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .license-status-tag.expired {
+            background: #fef2f2;
+            color: #dc2626;
+        }
+
+        .no-license-card {
+            text-align: center;
+            padding: 32px;
+            background: #f9fafb;
+            border-radius: var(--radius);
+        }
+
+        .no-license-card p {
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .add-license-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr auto;
+            gap: 12px;
+            margin-top: 16px;
+            padding: 16px;
+            background: #f0f4f0;
+            border-radius: var(--radius);
+        }
+
+        .add-license-form input, .add-license-form select {
+            padding: 10px 14px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+        }
+
+        .license-actions {
+            display: flex;
+            gap: 8px;
+            margin-top: 12px;
         }
 
         /* License & Certification Resources */
