@@ -1193,9 +1193,61 @@ app.get('/api/auth/me', authMiddleware, async (req, res) => {
             role: user.role,
             farm: user.farm,
             crops: user.crops,
-            representative: user.representative
+            representative: user.representative,
+            privateApplicatorLicense: user.privateApplicatorLicense
         }
     });
+});
+
+// Get user profile (alias for /api/auth/me)
+app.get('/api/user/profile', authMiddleware, async (req, res) => {
+    const user = await User.findById(req.user._id).populate('representative', 'name email phone');
+    res.json({
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        phone: user.phone,
+        role: user.role,
+        farm: user.farm,
+        crops: user.crops,
+        representative: user.representative,
+        privateApplicatorLicense: user.privateApplicatorLicense,
+        commercialApplicatorLicense: user.commercialApplicatorLicense
+    });
+});
+
+// Update user's applicator license
+app.put('/api/user/license', authMiddleware, async (req, res) => {
+    try {
+        const { privateApplicatorLicense } = req.body;
+
+        if (!privateApplicatorLicense) {
+            return res.status(400).json({ error: 'License data required' });
+        }
+
+        // User can submit license, but verification status defaults to pending
+        const updatedLicense = {
+            hasLicense: privateApplicatorLicense.hasLicense,
+            licenseNumber: privateApplicatorLicense.licenseNumber,
+            state: privateApplicatorLicense.state,
+            expirationDate: privateApplicatorLicense.expirationDate,
+            verificationStatus: 'pending' // Always pending until admin verifies
+        };
+
+        req.user.privateApplicatorLicense = {
+            ...req.user.privateApplicatorLicense,
+            ...updatedLicense
+        };
+
+        await req.user.save();
+
+        res.json({
+            message: 'License submitted for verification',
+            privateApplicatorLicense: req.user.privateApplicatorLicense
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
 });
 
 app.put('/api/auth/me', authMiddleware, async (req, res) => {
@@ -1562,8 +1614,8 @@ app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res
             query.$or = [
                 { name: searchRegex },
                 { email: searchRegex },
-                { farm: searchRegex },
-                { state: searchRegex }
+                { 'farm.name': searchRegex },
+                { 'farm.state': searchRegex }
             ];
         }
 
@@ -1624,16 +1676,34 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        const { name, email, phone, farm, state, acres, crops } = req.body;
+        const { name, email, phone, farm, state, acres, crops, privateApplicatorLicense } = req.body;
 
         // Update fields if provided
         if (name !== undefined) customer.name = name;
         if (email !== undefined) customer.email = email.toLowerCase();
         if (phone !== undefined) customer.phone = phone;
-        if (farm !== undefined) customer.farm = farm;
-        if (state !== undefined) customer.state = state;
-        if (acres !== undefined) customer.acres = acres;
+
+        // Update farm as an object
+        if (farm !== undefined || state !== undefined || acres !== undefined) {
+            customer.farm = {
+                ...customer.farm,
+                name: farm !== undefined ? farm : customer.farm?.name,
+                state: state !== undefined ? state : customer.farm?.state,
+                acres: acres !== undefined ? acres : customer.farm?.acres
+            };
+        }
+
         if (crops !== undefined) customer.crops = crops;
+
+        // Update private applicator license if provided
+        if (privateApplicatorLicense !== undefined) {
+            customer.privateApplicatorLicense = {
+                ...customer.privateApplicatorLicense,
+                ...privateApplicatorLicense,
+                verifiedBy: privateApplicatorLicense.hasLicense ? req.user._id : undefined,
+                verifiedAt: privateApplicatorLicense.hasLicense ? new Date() : undefined
+            };
+        }
 
         customer.updatedAt = new Date();
         await customer.save();
@@ -3733,6 +3803,197 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
         }
 
         res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- PRICE & CHEMICAL REQUEST ENDPOINTS ----
+
+// Schema for price requests and chemical requests
+const chemicalRequestSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    requestType: {
+        type: String,
+        enum: ['price_match', 'unlisted_product'],
+        required: true
+    },
+    // For price match requests
+    productName: String,
+    competitorSource: String,
+    competitorPrice: Number,
+    quantity: Number,
+    unit: String,
+    // For unlisted product requests
+    requestedProduct: String,
+    productDescription: String,
+    estimatedQuantity: Number,
+    // Common fields
+    status: {
+        type: String,
+        enum: ['pending', 'reviewing', 'sourcing', 'quoted', 'fulfilled', 'declined'],
+        default: 'pending'
+    },
+    adminNotes: String,
+    supplierQuotes: [{
+        supplierName: String,
+        price: Number,
+        notes: String,
+        quotedAt: Date
+    }],
+    emailTemplate: String, // Generated email for forwarding to suppliers
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+const ChemicalRequest = mongoose.model('ChemicalRequest', chemicalRequestSchema);
+
+// Submit "Found it Cheaper" price match request
+app.post('/api/chemical-orders/price-request', authMiddleware, async (req, res) => {
+    try {
+        const { productName, retailerSource, theirPrice, quantity, unit } = req.body;
+
+        if (!productName || !retailerSource || !theirPrice) {
+            return res.status(400).json({ error: 'Product name, source, and price are required' });
+        }
+
+        const request = new ChemicalRequest({
+            userId: req.user._id,
+            requestType: 'price_match',
+            productName,
+            competitorSource: retailerSource,
+            competitorPrice: parseFloat(theirPrice),
+            quantity: quantity || 1,
+            unit: unit || 'unit',
+            status: 'pending'
+        });
+
+        await request.save();
+
+        res.status(201).json({
+            message: 'Price match request submitted! We will pool orders and negotiate a better price.',
+            requestId: request._id
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Request an unlisted chemical - generates email template
+app.post('/api/chemical-orders/request-product', authMiddleware, async (req, res) => {
+    try {
+        const { productName, description, estimatedQuantity, unit } = req.body;
+
+        if (!productName) {
+            return res.status(400).json({ error: 'Product name is required' });
+        }
+
+        const user = await User.findById(req.user._id).populate('representative', 'name email');
+
+        // Generate email template for suppliers
+        const emailTemplate = `Subject: Request for Quote - ${productName}
+
+Dear Supplier,
+
+We are seeking competitive pricing on the following agricultural product:
+
+PRODUCT DETAILS:
+- Product: ${productName}
+- Description: ${description || 'N/A'}
+- Estimated Quantity: ${estimatedQuantity || 'TBD'} ${unit || 'units'}
+- Delivery Location: Eastern Colorado
+
+BUYER INFORMATION:
+- Farm: ${user.farm?.name || user.name}
+- Contact: ${user.name}
+- Representative: ${user.representative?.name || 'Acre Profit'}
+
+We are a group purchasing organization pooling orders from multiple farms to achieve volume pricing. Please provide:
+
+1. Your best price per unit
+2. Minimum order quantity
+3. Availability/lead time
+4. Freight terms (delivered vs. pickup)
+
+Please reply to this email or contact us at:
+- Email: ${user.representative?.email || 'orders@acreprofit.com'}
+- Phone: ${user.phone || ''}
+
+We look forward to your quote.
+
+Best regards,
+${user.name}
+via Acre Profit Group Purchasing
+`;
+
+        const request = new ChemicalRequest({
+            userId: req.user._id,
+            requestType: 'unlisted_product',
+            requestedProduct: productName,
+            productDescription: description,
+            estimatedQuantity: estimatedQuantity || 0,
+            emailTemplate,
+            status: 'pending'
+        });
+
+        await request.save();
+
+        res.status(201).json({
+            message: 'Product request created. Use the email template below to send to suppliers.',
+            requestId: request._id,
+            emailTemplate,
+            instructions: 'Copy this email and send to your preferred suppliers. Forward any quotes to your rep or orders@acreprofit.com'
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get user's chemical requests
+app.get('/api/chemical-orders/requests', authMiddleware, async (req, res) => {
+    try {
+        const requests = await ChemicalRequest.find({ userId: req.user._id })
+            .sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Get all chemical requests
+app.get('/api/admin/chemical-requests', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const requests = await ChemicalRequest.find()
+            .populate('userId', 'name email farm')
+            .sort({ createdAt: -1 });
+        res.json(requests);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Update chemical request status
+app.put('/api/admin/chemical-requests/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, adminNotes, supplierQuote } = req.body;
+        const request = await ChemicalRequest.findById(req.params.id);
+
+        if (!request) {
+            return res.status(404).json({ error: 'Request not found' });
+        }
+
+        if (status) request.status = status;
+        if (adminNotes) request.adminNotes = adminNotes;
+        if (supplierQuote) {
+            request.supplierQuotes.push({
+                ...supplierQuote,
+                quotedAt: new Date()
+            });
+        }
+        request.updatedAt = new Date();
+
+        await request.save();
+        res.json(request);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
