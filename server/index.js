@@ -2936,62 +2936,59 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             return res.status(403).json({ error: 'Invalid secret key' });
         }
 
-        const priceVersion = '2026-01-18';
+        const priceVersion = '2026-03-06';
 
-        // Products that Acre Profit will sell (sourced from CPD)
-        // costPrice = what we pay CPD, sellPrice = what we charge customers (matching CHS for now)
-        const acreProfit_CPD_Products = [
-            // Product, Pack, Unit, CPD Cost, CHS Price (our sell price to beat), Notes
-            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 30.25, sellPrice: 31.24, category: 'herbicide' },
-            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 28.25, sellPrice: 30.89, category: 'herbicide' },
-            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 30.57, sellPrice: 35.31, category: 'herbicide' },
-            { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 29.90, sellPrice: 32.43, category: 'herbicide' },
-            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 27.90, sellPrice: 30.14, category: 'herbicide' },
-            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 13.25, sellPrice: 15.00, category: 'herbicide', equivalentProduct: 'RT3/Glystar Supreme', notes: 'Glyphosate - Formulation equiv' },
-            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 13.35, sellPrice: 12.78, category: 'herbicide', notes: 'CPD higher than CHS' },
-            { productName: 'Agri-Star', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 39.25, sellPrice: 43.83, category: 'herbicide', equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
-            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 38.13, sellPrice: 42.42, category: 'herbicide', equivalentProduct: 'Level Best Pro', notes: 'Need to get equivalents' },
-            { productName: 'Agri-Star Tapran', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 19.00, sellPrice: 28.71, category: 'herbicide', equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
-            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 18.00, sellPrice: 28.16, category: 'herbicide', equivalentProduct: 'Tapran', notes: 'Need to get equivalents' },
-            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 21.00, sellPrice: 33.81, category: 'herbicide', notes: 'Need to get equivalents' },
-            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 20.00, sellPrice: 32.37, category: 'herbicide', notes: 'Need to get equivalents' },
-            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 70.50, sellPrice: 75.20, category: 'herbicide' },
-            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, sellPrice: 15.06, category: 'herbicide' },
-            // CPD-only products (no CHS equivalent)
-            { productName: 'Glufosinate', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 16.50, sellPrice: 18.00, category: 'herbicide' },
-            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gl', unitsPerPack: 250, costPrice: 16.00, sellPrice: 18.00, category: 'herbicide' },
-            { productName: 'Mesotrione', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 48.25, sellPrice: 52.00, category: 'herbicide' },
-            { productName: 'Clethodim', packSize: '2x2.5', unit: 'gl', unitsPerPack: 5, costPrice: 33.50, sellPrice: 36.00, category: 'herbicide' },
-            { productName: 'Clethodim', packSize: '135', unit: 'gl', unitsPerPack: 135, costPrice: 33.00, sellPrice: 35.50, category: 'herbicide' }
+        // Actual CPD Products with real prices (costPrice = CPD price, sellPrice = TBD by admin)
+        // sellPrice set to 0 initially - update in Pricing tab
+        const cpdProducts = [
+            // Dicamba products
+            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 30.25, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 28.25, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 30.57, sellPrice: 0, category: 'herbicide' },
+
+            // LV 6 (2,4-D)
+            { productName: 'LV 6', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 29.90, sellPrice: 0, category: 'herbicide' },
+            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 27.90, sellPrice: 0, category: 'herbicide' },
+
+            // Glyphosate - AgSaver is CPD equiv for RT3/Glystar Supreme
+            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 12.90, sellPrice: 0, category: 'herbicide', equivalentProduct: 'RT3, Glystar Supreme', notes: 'Glyphosate' },
+
+            // Atrazine
+            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
+
+            // Agri-Star is CPD equiv for Level Best Pro
+            { productName: 'Agri-Star', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 39.25, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
+            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 38.13, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
+
+            // Agri-Star Tapran is CPD equiv for Tapran
+            { productName: 'Agri-Star Tapran', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 19.00, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Tapran' },
+            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 18.00, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Tapran' },
+
+            // Aggrestrol
+            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 21.00, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 20.00, sellPrice: 0, category: 'herbicide' },
+
+            // Sulfentrazone
+            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 70.50, sellPrice: 0, category: 'herbicide' },
+
+            // Valor SX
+            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, sellPrice: 0, category: 'herbicide' },
+
+            // CPD-only products
+            { productName: 'Glufosinate', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 16.00, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 15.25, sellPrice: 0, category: 'herbicide', isRUP: true, notes: 'Restricted Use Pesticide - requires certification' },
+            { productName: 'Mesotrione', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 48.25, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Clethodim', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 33.50, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Clethodim', packSize: '135', unit: 'gal', unitsPerPack: 135, costPrice: 33.00, sellPrice: 0, category: 'herbicide' },
+
+            // AMS (Ammonium Sulfate)
+            { productName: 'AMS', packSize: '24 lb', unit: 'lb', unitsPerPack: 24, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - water conditioner/adjuvant' }
         ];
 
-        // CHS prices for reference/comparison
-        const chsPrices = [
-            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gl', price: 31.24 },
-            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gl', price: 30.89 },
-            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gl', price: 35.31 },
-            { productName: 'LV 6', packSize: '2x2.5', unit: 'gl', price: 32.43 },
-            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gl', price: 30.14 },
-            { productName: 'RT3', packSize: 'Shuttle', unit: 'gl', price: 17.50 },
-            { productName: 'Glystar Supreme', packSize: 'Shuttle', unit: 'gl', price: 15.53 },
-            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gl', price: 12.78 },
-            { productName: 'Level Best Pro', packSize: '2x2.5', unit: 'gl', price: 43.83 },
-            { productName: 'Level Best Pro', packSize: 'Shuttle', unit: 'gl', price: 42.42 },
-            { productName: 'Tapran', packSize: '2x2.5', unit: 'gl', price: 28.71 },
-            { productName: 'Tapran', packSize: 'Shuttle', unit: 'gl', price: 28.16 },
-            { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gl', price: 33.81 },
-            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gl', price: 32.37 },
-            { productName: 'Artect FI', packSize: '2x2.5', unit: 'gl', price: 84.71 },
-            { productName: 'Artect FI', packSize: 'Shuttle', unit: 'gl', price: 84.71 },
-            { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gl', price: 75.20 },
-            { productName: 'Autumn Super', packSize: '20', unit: 'oz', price: 22.58 },
-            { productName: 'Valor SX', packSize: '4x5', unit: 'lb', price: 15.06 }
-        ];
+        const results = { created: [], existing: [] };
 
-        const results = { acreProfit: [], chs: [] };
-
-        // Insert Acre Profit products (sourced from CPD)
-        for (const chem of acreProfit_CPD_Products) {
+        // Insert CPD products
+        for (const chem of cpdProducts) {
             const existing = await Chemical.findOne({
                 productName: chem.productName,
                 sourceSupplier: 'CPD',
@@ -3003,6 +3000,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                     ...chem,
                     sourceSupplier: 'CPD',
                     priceVersion,
+                    isActive: true,
+                    availableForOrder: true,
                     createdBy: req.user._id
                 });
                 await ChemicalPriceHistory.create({
@@ -3016,22 +3015,20 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                     priceVersion,
                     changedBy: req.user._id
                 });
-                results.acreProfit.push({ action: 'created', product: chem.productName });
+                results.created.push(`${chem.productName} (${chem.packSize})`);
             } else {
-                results.acreProfit.push({ action: 'exists', product: chem.productName });
+                results.existing.push(`${chem.productName} (${chem.packSize})`);
             }
         }
 
         res.json({
-            message: 'Seed data loaded',
+            message: 'CPD products loaded successfully',
             summary: {
-                acreProfit: {
-                    created: results.acreProfit.filter(r => r.action === 'created').length,
-                    existed: results.acreProfit.filter(r => r.action === 'exists').length
-                },
-                totalProducts: acreProfit_CPD_Products.length,
-                chsReferenceProducts: chsPrices.length
-            }
+                created: results.created.length,
+                alreadyExisted: results.existing.length,
+                totalProducts: cpdProducts.length
+            },
+            products: results.created
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
