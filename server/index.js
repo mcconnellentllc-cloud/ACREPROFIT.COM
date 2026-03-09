@@ -288,26 +288,6 @@ const repApplicationSchema = new mongoose.Schema({
 
 const RepApplication = mongoose.model('RepApplication', repApplicationSchema);
 
-// Merch Credit Model
-const merchCreditSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    totalSpent: { type: Number, default: 0 },
-    creditEarned: { type: Number, default: 0 },
-    creditUsed: { type: Number, default: 0 },
-    creditAvailable: { type: Number, default: 0 },
-    history: [{
-        type: { type: String, enum: ['earned', 'used'] },
-        amount: Number,
-        orderId: mongoose.Schema.Types.ObjectId,
-        description: String,
-        date: { type: Date, default: Date.now }
-    }],
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-const MerchCredit = mongoose.model('MerchCredit', merchCreditSchema);
-
 // Rep Commission Tracking Model
 const repCommissionSchema = new mongoose.Schema({
     repId: { type: String, required: true }, // 'kyle', 'ty', 'chad' or ObjectId for user-reps
@@ -2188,104 +2168,6 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
     }
 });
 
-// ---- MERCH CREDIT ROUTES ----
-
-// Get user's merch credit
-app.get('/api/merch-credit', authMiddleware, async (req, res) => {
-    try {
-        let credit = await MerchCredit.findOne({ userId: req.user._id });
-
-        if (!credit) {
-            credit = await MerchCredit.create({ userId: req.user._id });
-        }
-
-        res.json({
-            totalSpent: credit.totalSpent,
-            creditEarned: credit.creditEarned,
-            creditUsed: credit.creditUsed,
-            creditAvailable: credit.creditAvailable,
-            history: credit.history
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Calculate and add merch credit after order completion
-app.post('/api/merch-credit/add', authMiddleware, async (req, res) => {
-    try {
-        const { orderId, orderAmount } = req.body;
-
-        let credit = await MerchCredit.findOne({ userId: req.user._id });
-        if (!credit) {
-            credit = await MerchCredit.create({ userId: req.user._id });
-        }
-
-        // Calculate new credit: $20 for every $2000 spent
-        const previousTotal = credit.totalSpent;
-        const newTotal = previousTotal + orderAmount;
-
-        const previousCredits = Math.floor(previousTotal / 2000) * 20;
-        const newCredits = Math.floor(newTotal / 2000) * 20;
-        const creditToAdd = newCredits - previousCredits;
-
-        if (creditToAdd > 0) {
-            credit.history.push({
-                type: 'earned',
-                amount: creditToAdd,
-                orderId,
-                description: `Earned $${creditToAdd} merch credit from order`
-            });
-        }
-
-        credit.totalSpent = newTotal;
-        credit.creditEarned += creditToAdd;
-        credit.creditAvailable += creditToAdd;
-        credit.updatedAt = new Date();
-
-        await credit.save();
-
-        res.json({
-            totalSpent: credit.totalSpent,
-            creditEarned: credit.creditEarned,
-            creditAvailable: credit.creditAvailable,
-            newCreditAdded: creditToAdd
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Use merch credit
-app.post('/api/merch-credit/use', authMiddleware, async (req, res) => {
-    try {
-        const { amount, description } = req.body;
-
-        const credit = await MerchCredit.findOne({ userId: req.user._id });
-        if (!credit || credit.creditAvailable < amount) {
-            return res.status(400).json({ error: 'Insufficient merch credit' });
-        }
-
-        credit.creditUsed += amount;
-        credit.creditAvailable -= amount;
-        credit.history.push({
-            type: 'used',
-            amount,
-            description: description || 'Merch purchase'
-        });
-        credit.updatedAt = new Date();
-
-        await credit.save();
-
-        res.json({
-            creditUsed: amount,
-            creditAvailable: credit.creditAvailable
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
 // ---- MERCH ORDER ROUTES ----
 
 // Printify product mapping (maps our product IDs to Printify blueprint IDs)
@@ -2798,36 +2680,6 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
         order.updatedAt = new Date();
         await order.save();
 
-        // Add merch credit for the customer
-        const orderAmount = order.totalCost || 0;
-        if (orderAmount > 0) {
-            let credit = await MerchCredit.findOne({ userId: order.userId });
-            if (!credit) {
-                credit = await MerchCredit.create({ userId: order.userId });
-            }
-
-            const previousTotal = credit.totalSpent;
-            const newTotal = previousTotal + orderAmount;
-            const previousCredits = Math.floor(previousTotal / 2000) * 20;
-            const newCredits = Math.floor(newTotal / 2000) * 20;
-            const creditToAdd = newCredits - previousCredits;
-
-            if (creditToAdd > 0) {
-                credit.history.push({
-                    type: 'earned',
-                    amount: creditToAdd,
-                    orderId: order._id,
-                    description: `Earned $${creditToAdd} merch credit from order`
-                });
-            }
-
-            credit.totalSpent = newTotal;
-            credit.creditEarned += creditToAdd;
-            credit.creditAvailable += creditToAdd;
-            credit.updatedAt = new Date();
-            await credit.save();
-        }
-
         res.json({ message: 'Payment recorded', order });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -2858,36 +2710,6 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 order.status = 'confirmed';
                 order.updatedAt = new Date();
                 await order.save();
-
-                // Add merch credit
-                const orderAmount = order.totalCost || 0;
-                if (orderAmount > 0) {
-                    let credit = await MerchCredit.findOne({ userId: order.userId });
-                    if (!credit) {
-                        credit = await MerchCredit.create({ userId: order.userId });
-                    }
-
-                    const previousTotal = credit.totalSpent;
-                    const newTotal = previousTotal + orderAmount;
-                    const previousCredits = Math.floor(previousTotal / 2000) * 20;
-                    const newCredits = Math.floor(newTotal / 2000) * 20;
-                    const creditToAdd = newCredits - previousCredits;
-
-                    if (creditToAdd > 0) {
-                        credit.history.push({
-                            type: 'earned',
-                            amount: creditToAdd,
-                            orderId: order._id,
-                            description: `Earned $${creditToAdd} merch credit from order`
-                        });
-                    }
-
-                    credit.totalSpent = newTotal;
-                    credit.creditEarned += creditToAdd;
-                    credit.creditAvailable += creditToAdd;
-                    credit.updatedAt = new Date();
-                    await credit.save();
-                }
             }
         }
     }

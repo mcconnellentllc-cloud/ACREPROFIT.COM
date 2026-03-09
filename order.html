@@ -56,6 +56,34 @@
                 </div>
             </div>
 
+            <!-- Load Order Section -->
+            <div class="load-order-section" id="loadOrderSection">
+                <h2>Load Existing Order</h2>
+                <p class="load-order-subtitle">Continue working on a previous order or load by Order ID</p>
+
+                <!-- Recent Orders -->
+                <div class="recent-orders" id="recentOrdersContainer">
+                    <h4>Your Recent Orders</h4>
+                    <div class="recent-orders-list" id="recentOrdersList">
+                        <div class="loading-spinner">Loading your orders...</div>
+                    </div>
+                </div>
+
+                <!-- Manual Order ID Input -->
+                <div class="manual-order-load">
+                    <h4>Load by Order ID</h4>
+                    <div class="order-id-input-group">
+                        <input type="text" id="orderIdInput" placeholder="Enter Order ID (e.g., 65a1b2c3d4e5f6...)">
+                        <button class="btn btn-primary" onclick="loadOrderById()">Load Order</button>
+                    </div>
+                </div>
+
+                <!-- Start Fresh Option -->
+                <div class="start-fresh">
+                    <button class="btn btn-outline" onclick="startFreshOrder()">Start New Order</button>
+                </div>
+            </div>
+
             <!-- Crop Entry Sections -->
             <div class="crops-container" id="cropsContainer">
                 <h2>Enter Your Acres by Crop</h2>
@@ -859,18 +887,7 @@
                         <span class="summary-label">Order Total:</span>
                         <span class="summary-value" id="totalCostDisplay">$0.00</span>
                     </div>
-                    <div class="merch-credit-display">
-                        <div class="credit-info">
-                            <span class="credit-icon">🎁</span>
-                            <div class="credit-text">
-                                <span class="credit-label">Your Merch Credit</span>
-                                <span class="credit-amount" id="merchCreditDisplay">$0.00</span>
-                            </div>
-                        </div>
-                        <p class="credit-note">Earn $10 for every $1,000 spent!</p>
-                    </div>
                     <div class="summary-actions">
-                        <button class="btn btn-outline" onclick="openMerchModal()">Use Merch Credit</button>
                         <button class="btn btn-primary" onclick="submitOrder()">Submit Order</button>
                     </div>
 
@@ -895,33 +912,6 @@
             </div>
         </div>
     </main>
-
-    <!-- Merch Credit Modal -->
-    <div class="modal-overlay" id="merchModal">
-        <div class="modal-content">
-            <button class="modal-close" onclick="closeMerchModal()">&times;</button>
-            <h2>Use Your Merch Credit</h2>
-            <p class="modal-subtitle">Available credit: <strong id="modalCreditAmount">$0.00</strong></p>
-
-            <div class="merch-options">
-                <div class="merch-option" onclick="selectMerchOption('bank')">
-                    <span class="option-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v3m4-3v3m4-3v3"></path></svg></span>
-                    <h3>Bank It</h3>
-                    <p>Save your credit for later. It never expires!</p>
-                </div>
-                <div class="merch-option" onclick="selectMerchOption('shop')">
-                    <span class="option-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg></span>
-                    <h3>Shop Now</h3>
-                    <p>Browse our merch store and pick out some gear.</p>
-                </div>
-            </div>
-
-            <div class="modal-actions">
-                <button class="btn btn-outline" onclick="closeMerchModal()">Cancel</button>
-                <button class="btn btn-primary" id="merchActionBtn" onclick="confirmMerchChoice()">Confirm</button>
-            </div>
-        </div>
-    </div>
 
     <!-- Add Custom Chemical Modal -->
     <div class="modal-overlay" id="addChemicalModal">
@@ -1017,7 +1007,6 @@
                     <button onclick="askQuestion('how-it-works')">How does bulk buying work?</button>
                     <button onclick="askQuestion('pricing')">How is pricing determined?</button>
                     <button onclick="askQuestion('delivery')">When will I get my order?</button>
-                    <button onclick="askQuestion('merch-credit')">How do merch credits work?</button>
                     <button onclick="askQuestion('payment')">What payment methods?</button>
                     <button onclick="askQuestion('contact')">Talk to a representative</button>
                 </div>
@@ -1138,14 +1127,11 @@
         }
 
         let selectedYear = 2026;
-        let selectedMerchOption = null;
         let orderData = {
             crops: {},
             products: [],
             totalAcres: 0,
-            totalCost: 0,
-            merchCredit: 0,
-            bankedCredit: parseFloat(userData.merchCredit || 0)
+            totalCost: 0
         };
 
         // Product recommendations per crop (with rates per acre)
@@ -1181,6 +1167,233 @@
                 { name: 'Prosaro', rate: 6.5, unit: 'oz', pricePerUnit: 2.20, packageSize: 2.5, packageUnit: 'gal' }
             ]
         };
+
+        // Current loaded order ID (if editing)
+        let loadedOrderId = null;
+
+        // Load user's recent orders on page load
+        async function loadRecentOrders() {
+            const container = document.getElementById('recentOrdersList');
+
+            try {
+                const response = await fetch(`${API_URL}/api/orders`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to fetch orders');
+                }
+
+                const orders = await response.json();
+
+                if (orders.length === 0) {
+                    container.innerHTML = '<div class="no-orders-message">No previous orders found. Start a new order below!</div>';
+                    return;
+                }
+
+                // Show only the most recent 5 orders, prioritizing drafts
+                const sortedOrders = orders.sort((a, b) => {
+                    // Drafts first
+                    if (a.status === 'draft' && b.status !== 'draft') return -1;
+                    if (b.status === 'draft' && a.status !== 'draft') return 1;
+                    // Then by date
+                    return new Date(b.createdAt) - new Date(a.createdAt);
+                }).slice(0, 5);
+
+                container.innerHTML = sortedOrders.map(order => {
+                    const date = new Date(order.createdAt).toLocaleDateString();
+                    const totalAcres = order.totalAcres || order.acres || 0;
+                    const totalCost = order.totalPrice || order.totalCost || 0;
+                    const year = order.year || 2026;
+                    const status = order.status || 'draft';
+                    const orderId = order._id;
+                    const shortId = orderId.slice(-8);
+
+                    return `
+                        <div class="order-card" onclick="loadOrder('${orderId}')">
+                            <div class="order-card-info">
+                                <span class="order-card-id">${year} Order #${shortId}</span>
+                                <span class="order-card-details">${totalAcres.toLocaleString()} acres | $${totalCost.toLocaleString()} | ${date}</span>
+                            </div>
+                            <span class="order-card-status ${status}">${status}</span>
+                        </div>
+                    `;
+                }).join('');
+
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                container.innerHTML = '<div class="no-orders-message">Could not load orders. Start a new order below!</div>';
+            }
+        }
+
+        // Load a specific order by ID
+        async function loadOrder(orderId) {
+            try {
+                const response = await fetch(`${API_URL}/api/orders/${orderId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!response.ok) {
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || 'Failed to load order');
+                }
+
+                const order = await response.json();
+                populateOrderForm(order);
+                loadedOrderId = orderId;
+
+                // Scroll to the crops section
+                document.getElementById('cropsContainer').scrollIntoView({ behavior: 'smooth' });
+
+                // Show success message
+                alert(`Order #${orderId.slice(-8)} loaded successfully! You can now edit and resubmit.`);
+
+            } catch (error) {
+                console.error('Error loading order:', error);
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Load order by ID from manual input
+        function loadOrderById() {
+            const input = document.getElementById('orderIdInput');
+            const orderId = input.value.trim();
+
+            if (!orderId) {
+                alert('Please enter an Order ID');
+                return;
+            }
+
+            loadOrder(orderId);
+        }
+
+        // Populate the form with loaded order data
+        function populateOrderForm(order) {
+            // Set year
+            if (order.year) {
+                selectedYear = order.year;
+                document.querySelectorAll('.year-btn').forEach(btn => {
+                    btn.classList.remove('active');
+                    if (parseInt(btn.dataset.year) === order.year) {
+                        btn.classList.add('active');
+                    }
+                });
+            }
+
+            // Clear existing data
+            orderData.crops = {};
+            orderData.totalAcres = 0;
+            orderData.totalCost = 0;
+
+            // Populate crop acres if they exist in the order
+            if (order.crops) {
+                Object.entries(order.crops).forEach(([cropId, acreValue]) => {
+                    // Handle both simple acre values and complex crop objects
+                    const acres = typeof acreValue === 'object' ? acreValue.acres : acreValue;
+                    if (acres > 0) {
+                        const input = document.querySelector(`.acre-input[data-crop="${cropId}"]`);
+                        if (input) {
+                            input.value = acres;
+                            // Trigger the change event to update display and calculations
+                            input.dispatchEvent(new Event('input'));
+                        }
+                    }
+                });
+            }
+
+            // If order has simple crop/acres format (legacy)
+            if (order.crop && order.acres) {
+                const cropId = order.crop.toLowerCase().replace(/\s+/g, '-');
+                const input = document.querySelector(`.acre-input[data-crop="${cropId}"]`);
+                if (input) {
+                    input.value = order.acres;
+                    input.dispatchEvent(new Event('input'));
+                }
+            }
+
+            // Load quick order items if they exist
+            if (order.chemicals && order.chemicals.length > 0) {
+                quickOrderItems = order.chemicals.map(chem => ({
+                    year: order.year || 2026,
+                    location: chem.location || 'mcconnell',
+                    timing: chem.timing || 'pre-plant',
+                    product: chem.name || chem.productName,
+                    productName: chem.name || chem.productName,
+                    qty: chem.quantity || chem.packagesNeeded || 1,
+                    total: chem.totalPrice || chem.total || 0,
+                    pricePerUnit: chem.pricePerPackage || chem.pricePerUnit || 0
+                }));
+                renderOrderItems();
+                updateChemicalOrderTotal();
+            }
+
+            updateTotals();
+        }
+
+        // Start a fresh order (clear form)
+        function startFreshOrder() {
+            loadedOrderId = null;
+
+            // Reset year
+            selectedYear = 2026;
+            document.querySelectorAll('.year-btn').forEach(btn => {
+                btn.classList.remove('active');
+                if (btn.dataset.year === '2026') {
+                    btn.classList.add('active');
+                }
+            });
+
+            // Clear all acre inputs
+            document.querySelectorAll('.acre-input').forEach(input => {
+                input.value = '';
+                input.dispatchEvent(new Event('input'));
+            });
+
+            // Clear quick order items
+            quickOrderItems = [];
+            if (typeof renderOrderItems === 'function') {
+                renderOrderItems();
+            }
+
+            // Clear chemical quantities
+            document.querySelectorAll('.chem-qty, .quick-qty').forEach(input => {
+                input.value = 0;
+                const row = input.closest('tr');
+                if (row) {
+                    const subtotalCell = row.querySelector('.chem-subtotal, .quick-subtotal');
+                    if (subtotalCell) {
+                        subtotalCell.textContent = '$0.00';
+                    }
+                }
+            });
+
+            // Reset order data
+            orderData = {
+                crops: {},
+                products: [],
+                totalAcres: 0,
+                totalCost: 0
+            };
+
+            updateTotals();
+            if (typeof updateChemicalOrderTotal === 'function') {
+                updateChemicalOrderTotal();
+            }
+
+            // Scroll to crops section
+            document.getElementById('cropsContainer').scrollIntoView({ behavior: 'smooth' });
+
+            alert('Starting a fresh order. Enter your acres below!');
+        }
+
+        // Initialize: Load recent orders on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            loadRecentOrders();
+        });
 
         // Year selection
         document.querySelectorAll('.year-btn').forEach(btn => {
@@ -1271,16 +1484,10 @@
             orderData.totalAcres = totalAcres;
             orderData.totalCost = totalCost;
 
-            // Calculate merch credit earned ($10 per $1000)
-            const newCredit = Math.floor(totalCost / 1000) * 10;
-            orderData.merchCredit = newCredit + orderData.bankedCredit;
-
             // Update displays
             document.getElementById('totalAcresDisplay').textContent = totalAcres.toLocaleString();
             document.getElementById('totalProductsDisplay').textContent = `${productCount} items`;
             document.getElementById('totalCostDisplay').textContent = `$${totalCost.toFixed(2)}`;
-            document.getElementById('merchCreditDisplay').textContent = `$${orderData.merchCredit.toFixed(2)}`;
-            document.getElementById('modalCreditAmount').textContent = `$${orderData.merchCredit.toFixed(2)}`;
         }
 
         // Delivery location selection
@@ -1366,13 +1573,7 @@
             const cropTotal = orderData.totalCost || 0;
             const grandTotal = cropTotal + chemTotal + quickTotal;
 
-            // Update merch credit
-            const newCredit = Math.floor(grandTotal / 1000) * 10;
-            orderData.merchCredit = newCredit + orderData.bankedCredit;
-
             document.getElementById('totalCostDisplay').textContent = `$${grandTotal.toFixed(2)}`;
-            document.getElementById('merchCreditDisplay').textContent = `$${orderData.merchCredit.toFixed(2)}`;
-            document.getElementById('modalCreditAmount').textContent = `$${orderData.merchCredit.toFixed(2)}`;
         }
 
         function submitCheaperRequest() {
@@ -1545,30 +1746,6 @@
             updateChemicalOrderTotal();
 
             alert('Custom product added to order!');
-        }
-
-        // Merch modal functions
-        function openMerchModal() {
-            document.getElementById('merchModal').classList.add('active');
-        }
-
-        function closeMerchModal() {
-            document.getElementById('merchModal').classList.remove('active');
-        }
-
-        function selectMerchOption(option) {
-            selectedMerchOption = option;
-            document.querySelectorAll('.merch-option').forEach(el => el.classList.remove('selected'));
-            event.currentTarget.classList.add('selected');
-        }
-
-        function confirmMerchChoice() {
-            if (selectedMerchOption === 'shop') {
-                window.location.href = '/merch.html';
-            } else if (selectedMerchOption === 'bank') {
-                alert('Credit banked! It will be available for your next order.');
-                closeMerchModal();
-            }
         }
 
         // =============== Custom Chemical Modal Functions ===============
@@ -1766,8 +1943,7 @@
                     totalAcres: orderData.totalAcres,
                     totalCost: orderData.totalCost,
                     totalPrice: orderData.totalCost,
-                    acres: orderData.totalAcres,
-                    merchCredit: orderData.merchCredit
+                    acres: orderData.totalAcres
                 };
 
                 // If admin is acting as customer, use the admin endpoint
@@ -1810,7 +1986,6 @@
             'how-it-works': "Here's how bulk buying works:\n\n1. Enter your acres for each crop\n2. We calculate the products you need\n3. Your order joins other farmers' orders\n4. When we fill a truck, everyone gets bulk pricing\n5. Products are delivered to your representative for pickup\n\nThe more farmers that join, the better the pricing!",
             'pricing': "Our pricing is based on bulk truck loads. When we combine enough orders to fill a truck, everyone gets the same per-unit price that big operations pay.\n\nTypically this saves 15-30% compared to retail prices. The exact price depends on current market rates and order volume.",
             'delivery': "Delivery timing depends on when we fill a truck load for your products. Typically:\n\n• Spring products: Order by Feb 1, delivery by March\n• Fall products: Order by Aug 1, delivery by September\n\nYour representative will contact you with exact delivery dates once the truck is ordered.",
-            'merch-credit': "For every $1,000 you spend on products, you earn $10 in merch credit!\n\nYou can:\n• Use it immediately in our merch store\n• Bank it for later (it never expires)\n\nMerch includes quality farm workwear: jackets, hats, shirts, and more.",
             'payment': "We accept:\n\n• ACH bank transfer (lowest fees - 0.8% capped at $5)\n• Credit/debit card (2.9% + $0.30)\n• Check (mail to your representative)\n\nPayment is due when the truck order is confirmed. Your representative will send an invoice.",
             'contact': "Your representatives are here to help!\n\n• Kyle McConnell: (970) 571-1015, office@togoag.com\n• Ty Mollohan: (970) 520-2340, Tymollohan77@gmail.com\n• Chad Bamford: (970) 520-3716, Ckbamford@yahoo.com\n\nCall, text, or email anytime!"
         };
@@ -1860,8 +2035,6 @@
                 response = chatAnswers['delivery'];
             } else if (lowerMsg.includes('pay') || lowerMsg.includes('credit card') || lowerMsg.includes('check')) {
                 response = chatAnswers['payment'];
-            } else if (lowerMsg.includes('merch') || lowerMsg.includes('credit') || lowerMsg.includes('reward')) {
-                response = chatAnswers['merch-credit'];
             } else if (lowerMsg.includes('work') || lowerMsg.includes('how')) {
                 response = chatAnswers['how-it-works'];
             } else if (lowerMsg.includes('contact') || lowerMsg.includes('call') || lowerMsg.includes('phone') || lowerMsg.includes('rep')) {
@@ -1934,6 +2107,165 @@
             background: var(--primary);
             color: var(--white);
             border-color: var(--primary);
+        }
+
+        /* Load Order Section */
+        .load-order-section {
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            padding: 24px;
+            margin-bottom: 40px;
+            box-shadow: var(--shadow);
+        }
+
+        .load-order-section h2 {
+            font-size: 1.5rem;
+            margin-bottom: 8px;
+        }
+
+        .load-order-subtitle {
+            color: var(--text-light);
+            margin-bottom: 24px;
+        }
+
+        .recent-orders {
+            margin-bottom: 24px;
+        }
+
+        .recent-orders h4 {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        .recent-orders-list {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .order-card {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: var(--secondary);
+            border-radius: var(--radius);
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .order-card:hover {
+            border-color: var(--primary);
+            background: rgba(45, 90, 39, 0.05);
+        }
+
+        .order-card-info {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+
+        .order-card-id {
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .order-card-details {
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .order-card-status {
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .order-card-status.draft {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .order-card-status.submitted {
+            background: #dbeafe;
+            color: #1e40af;
+        }
+
+        .order-card-status.confirmed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .no-orders-message {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-light);
+            background: var(--secondary);
+            border-radius: var(--radius);
+        }
+
+        .loading-spinner {
+            padding: 20px;
+            text-align: center;
+            color: var(--text-light);
+        }
+
+        .manual-order-load {
+            margin-bottom: 24px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+        }
+
+        .manual-order-load h4 {
+            font-size: 1rem;
+            margin-bottom: 12px;
+            color: var(--text);
+        }
+
+        .order-id-input-group {
+            display: flex;
+            gap: 12px;
+        }
+
+        .order-id-input-group input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+        }
+
+        .order-id-input-group input:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .start-fresh {
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .start-fresh p {
+            color: var(--text-light);
+            margin-bottom: 12px;
+            font-size: 0.875rem;
+        }
+
+        @media (max-width: 600px) {
+            .order-id-input-group {
+                flex-direction: column;
+            }
+
+            .order-card {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 12px;
+            }
         }
 
         /* Crops Container */
@@ -2156,41 +2488,6 @@
             font-size: 1.5rem;
         }
 
-        .merch-credit-display {
-            background: linear-gradient(135deg, #fef3c7, #fde68a);
-            padding: 12px 20px;
-            border-radius: var(--radius);
-            flex: 1;
-        }
-
-        .credit-info {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .credit-icon {
-            font-size: 1.5rem;
-        }
-
-        .credit-label {
-            display: block;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .credit-amount {
-            font-size: 1.25rem;
-            font-weight: 700;
-            color: #92400e;
-        }
-
-        .credit-note {
-            font-size: 0.75rem;
-            color: #92400e;
-            margin-top: 4px;
-        }
-
         .summary-actions {
             display: flex;
             gap: 12px;
@@ -2241,47 +2538,6 @@
         .modal-subtitle {
             color: var(--text-light);
             margin-bottom: 24px;
-        }
-
-        .merch-options {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .merch-option {
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            padding: 20px;
-            text-align: center;
-            cursor: pointer;
-            transition: all 0.2s;
-        }
-
-        .merch-option:hover {
-            border-color: var(--primary);
-        }
-
-        .merch-option.selected {
-            border-color: var(--primary);
-            background: rgba(45, 90, 39, 0.05);
-        }
-
-        .option-icon {
-            font-size: 2rem;
-            display: block;
-            margin-bottom: 8px;
-        }
-
-        .merch-option h3 {
-            font-size: 1rem;
-            margin-bottom: 4px;
-        }
-
-        .merch-option p {
-            font-size: 0.875rem;
-            color: var(--text-muted);
         }
 
         .modal-actions {
@@ -2459,10 +2715,6 @@
             .chatbot-window {
                 width: calc(100vw - 48px);
                 right: -12px;
-            }
-
-            .merch-options {
-                grid-template-columns: 1fr;
             }
         }
 
