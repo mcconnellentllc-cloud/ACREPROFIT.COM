@@ -80,7 +80,9 @@
         const user = localStorage.getItem('user');
         if (token && user) {
             const userData = JSON.parse(user);
-            if (userData.role === 'superadmin' || userData.role === 'admin') {
+            if (userData.role === 'supplier') {
+                window.location.href = '/supplier-dashboard.html';
+            } else if (userData.role === 'superadmin' || userData.role === 'admin') {
                 window.location.href = '/admin.html';
             } else {
                 window.location.href = '/dashboard.html';
@@ -120,7 +122,9 @@
                 localStorage.setItem('user', JSON.stringify(result.user));
 
                 // Redirect based on role
-                if (result.user.role === 'superadmin' || result.user.role === 'admin') {
+                if (result.user.role === 'supplier') {
+                    window.location.href = '/supplier-dashboard.html';
+                } else if (result.user.role === 'superadmin' || result.user.role === 'admin') {
                     window.location.href = '/admin.html';
                 } else {
                     window.location.href = '/dashboard.html';

@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit Supplier Dashboard - Manage your products and pricing">
+    <title>Supplier Dashboard - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar admin-nav">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <div class="nav-center">
+                <span class="nav-title">Supplier Portal</span>
+            </div>
+            <div class="nav-right">
+                <span id="supplierName" class="nav-user"></span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Supplier Tab Navigation -->
+    <div class="admin-tabs-bar">
+        <div class="container">
+            <div class="admin-tabs">
+                <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
+                <a href="#products" class="admin-tab" data-tab="products">My Products</a>
+                <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
+                <a href="#profile" class="admin-tab" data-tab="profile">Profile</a>
+            </div>
+        </div>
+    </div>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="admin-header">
+                <div class="admin-welcome">
+                    <h1>Welcome, <span id="companyName">Supplier</span></h1>
+                    <span class="admin-role">Supplier Portal</span>
+                </div>
+            </div>
+
+            <!-- Dashboard Tab -->
+            <div id="dashboardTab" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalProducts">0</span>
+                            <span class="stat-label">Active Products</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon orange">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalOrders">0</span>
+                            <span class="stat-label">Recent Orders</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalValue">$0</span>
+                            <span class="stat-label">Total Order Value</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <h3>Quick Actions</h3>
+                    </div>
+                    <div class="quick-actions" style="padding: 20px; display: flex; gap: 16px; flex-wrap: wrap;">
+                        <button class="btn btn-primary" onclick="switchTab('products')">
+                            Update Prices
+                        </button>
+                        <button class="btn btn-secondary" onclick="switchTab('orders')">
+                            View Orders
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <h3>Pricing Information</h3>
+                    </div>
+                    <div style="padding: 20px;">
+                        <p style="color: var(--text-light); line-height: 1.6;">
+                            As a supplier, you set the <strong>Cost Price</strong> for your products.
+                            Acre Profit adds a small markup for administration, and distributors earn commission on sales.
+                        </p>
+                        <div class="pricing-flow" style="margin-top: 20px; padding: 16px; background: var(--surface); border-radius: 8px;">
+                            <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
+                                <div style="text-align: center;">
+                                    <div style="font-weight: 600; color: var(--primary);">Your Cost Price</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-light);">Set by you</div>
+                                </div>
+                                <div style="color: var(--text-muted);">+</div>
+                                <div style="text-align: center;">
+                                    <div style="font-weight: 600; color: var(--accent);">Admin Markup</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-light);">Acre Profit fee</div>
+                                </div>
+                                <div style="color: var(--text-muted);">+</div>
+                                <div style="text-align: center;">
+                                    <div style="font-weight: 600; color: #7c3aed;">Rep Commission</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-light);">Distributor earnings</div>
+                                </div>
+                                <div style="color: var(--text-muted)">=</div>
+                                <div style="text-align: center;">
+                                    <div style="font-weight: 600; color: var(--success);">Retail Price</div>
+                                    <div style="font-size: 0.875rem; color: var(--text-light);">Customer pays</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Products Tab -->
+            <div id="productsTab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>My Products</h3>
+                        <div class="header-actions">
+                            <button id="bulkUpdateBtn" class="btn btn-primary btn-sm" onclick="saveBulkPrices()">Save All Changes</button>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Product Name</th>
+                                    <th>Pack Size</th>
+                                    <th>Unit</th>
+                                    <th>Category</th>
+                                    <th>Cost Price ($/unit)</th>
+                                    <th>Last Updated</th>
+                                </tr>
+                            </thead>
+                            <tbody id="productsTableBody">
+                                <tr><td colspan="6" class="loading">Loading products...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Orders Tab -->
+            <div id="ordersTab" class="tab-content">
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Orders Containing Your Products</h3>
+                    </div>
+                    <div class="table-container">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th>Products</th>
+                                    <th>Your Total</th>
+                                    <th>Status</th>
+                                    <th>Date</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersTableBody">
+                                <tr><td colspan="6" class="loading">Loading orders...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Profile Tab -->
+            <div id="profileTab" class="tab-content">
+                <div class="card" style="max-width: 600px;">
+                    <div class="card-header">
+                        <h3>Supplier Profile</h3>
+                    </div>
+                    <form id="profileForm" class="form-container" style="padding: 24px;">
+                        <div class="form-group">
+                            <label for="profileCompanyName">Company Name</label>
+                            <input type="text" id="profileCompanyName" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="profileName">Contact Name</label>
+                            <input type="text" id="profileName" class="form-control" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="profileEmail">Email</label>
+                            <input type="email" id="profileEmail" class="form-control" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="profilePhone">Phone</label>
+                            <input type="tel" id="profilePhone" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="supplierCode">Supplier Code</label>
+                            <input type="text" id="supplierCode" class="form-control" readonly>
+                            <small style="color: var(--text-muted);">Your unique supplier code (cannot be changed)</small>
+                        </div>
+                        <button type="submit" class="btn btn-primary">Save Profile</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = 'https://acreprofit-com.onrender.com';
+        let token = localStorage.getItem('token');
+        let user = JSON.parse(localStorage.getItem('user') || '{}');
+        let products = [];
+        let priceChanges = {};
+
+        // Check authentication
+        if (!token || user.role !== 'supplier') {
+            window.location.href = '/login.html';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            initSupplierDashboard();
+            setupTabs();
+            setupLogout();
+        });
+
+        async function initSupplierDashboard() {
+            // Set supplier info
+            document.getElementById('supplierName').textContent = user.companyName || user.name;
+            document.getElementById('companyName').textContent = user.companyName || user.name;
+
+            // Load data
+            await Promise.all([
+                loadProducts(),
+                loadOrders(),
+                loadProfile()
+            ]);
+        }
+
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_URL}/api/supplier/products`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load products');
+
+                products = await response.json();
+                document.getElementById('totalProducts').textContent = products.length;
+
+                renderProductsTable();
+            } catch (error) {
+                console.error('Error loading products:', error);
+                document.getElementById('productsTableBody').innerHTML =
+                    '<tr><td colspan="6" class="error">Failed to load products</td></tr>';
+            }
+        }
+
+        function renderProductsTable() {
+            const tbody = document.getElementById('productsTableBody');
+
+            if (products.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No products found. Contact Acre Profit to link products to your account.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = products.map(product => `
+                <tr data-id="${product._id}">
+                    <td><strong>${product.productName}</strong></td>
+                    <td>${product.packSize}</td>
+                    <td>${product.unit}</td>
+                    <td><span class="badge badge-${product.category}">${product.category}</span></td>
+                    <td>
+                        <div class="price-input-wrapper">
+                            <span class="price-prefix">$</span>
+                            <input type="number"
+                                   class="price-input"
+                                   value="${product.costPrice.toFixed(2)}"
+                                   step="0.01"
+                                   min="0"
+                                   data-original="${product.costPrice}"
+                                   onchange="trackPriceChange('${product._id}', this.value, this.dataset.original)">
+                        </div>
+                    </td>
+                    <td>${new Date(product.updatedAt).toLocaleDateString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        function trackPriceChange(productId, newPrice, originalPrice) {
+            newPrice = parseFloat(newPrice);
+            originalPrice = parseFloat(originalPrice);
+
+            if (newPrice !== originalPrice) {
+                priceChanges[productId] = newPrice;
+            } else {
+                delete priceChanges[productId];
+            }
+
+            updateSaveButton();
+        }
+
+        function updateSaveButton() {
+            const btn = document.getElementById('bulkUpdateBtn');
+            const changeCount = Object.keys(priceChanges).length;
+
+            if (changeCount > 0) {
+                btn.textContent = `Save ${changeCount} Change${changeCount > 1 ? 's' : ''}`;
+                btn.classList.add('btn-accent');
+            } else {
+                btn.textContent = 'Save All Changes';
+                btn.classList.remove('btn-accent');
+            }
+        }
+
+        async function saveBulkPrices() {
+            const updates = Object.entries(priceChanges).map(([productId, costPrice]) => ({
+                productId,
+                costPrice
+            }));
+
+            if (updates.length === 0) {
+                alert('No price changes to save.');
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/supplier/products/bulk-price`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ updates })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) throw new Error(result.error);
+
+                alert(`Successfully updated ${result.results.filter(r => r.status === 'updated').length} product(s).`);
+
+                // Reset tracking and reload
+                priceChanges = {};
+                updateSaveButton();
+                await loadProducts();
+            } catch (error) {
+                alert('Error saving prices: ' + error.message);
+            }
+        }
+
+        async function loadOrders() {
+            try {
+                const response = await fetch(`${API_URL}/api/supplier/orders`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load orders');
+
+                const orders = await response.json();
+                document.getElementById('totalOrders').textContent = orders.length;
+
+                // Calculate total value
+                const totalValue = orders.reduce((sum, order) => sum + (order.supplierTotal || 0), 0);
+                document.getElementById('totalValue').textContent = '$' + totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                renderOrdersTable(orders);
+            } catch (error) {
+                console.error('Error loading orders:', error);
+                document.getElementById('ordersTableBody').innerHTML =
+                    '<tr><td colspan="6" class="error">Failed to load orders</td></tr>';
+            }
+        }
+
+        function renderOrdersTable(orders) {
+            const tbody = document.getElementById('ordersTableBody');
+
+            if (orders.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No orders yet containing your products.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.map(order => `
+                <tr>
+                    <td><strong>${order.orderNumber || order._id.slice(-6).toUpperCase()}</strong></td>
+                    <td>${order.customer ? order.customer.name : 'N/A'}</td>
+                    <td>
+                        ${order.items.map(item => `${item.productName} (${item.quantity})`).join(', ')}
+                    </td>
+                    <td>$${(order.supplierTotal || 0).toFixed(2)}</td>
+                    <td><span class="status-badge status-${order.status}">${order.status}</span></td>
+                    <td>${new Date(order.createdAt).toLocaleDateString()}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadProfile() {
+            try {
+                const response = await fetch(`${API_URL}/api/supplier/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load profile');
+
+                const profile = await response.json();
+
+                document.getElementById('profileCompanyName').value = profile.companyName || '';
+                document.getElementById('profileName').value = profile.name || '';
+                document.getElementById('profileEmail').value = profile.email || '';
+                document.getElementById('profilePhone').value = profile.phone || '';
+                document.getElementById('supplierCode').value = profile.supplierCode || '';
+            } catch (error) {
+                console.error('Error loading profile:', error);
+            }
+        }
+
+        // Profile form submission
+        document.getElementById('profileForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            try {
+                const response = await fetch(`${API_URL}/api/supplier/profile`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        companyName: document.getElementById('profileCompanyName').value,
+                        phone: document.getElementById('profilePhone').value
+                    })
+                });
+
+                const result = await response.json();
+
+                if (!response.ok) throw new Error(result.error);
+
+                alert('Profile updated successfully!');
+
+                // Update local storage
+                user.companyName = document.getElementById('profileCompanyName').value;
+                localStorage.setItem('user', JSON.stringify(user));
+                document.getElementById('supplierName').textContent = user.companyName;
+                document.getElementById('companyName').textContent = user.companyName;
+            } catch (error) {
+                alert('Error updating profile: ' + error.message);
+            }
+        });
+
+        // Tab navigation
+        function setupTabs() {
+            document.querySelectorAll('.admin-tab').forEach(tab => {
+                tab.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    const tabName = tab.dataset.tab;
+                    switchTab(tabName);
+                });
+            });
+
+            // Check URL hash
+            const hash = window.location.hash.slice(1);
+            if (hash && ['dashboard', 'products', 'orders', 'profile'].includes(hash)) {
+                switchTab(hash);
+            }
+        }
+
+        function switchTab(tabName) {
+            // Update tabs
+            document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+            document.querySelector(`.admin-tab[data-tab="${tabName}"]`)?.classList.add('active');
+
+            // Update content
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            document.getElementById(`${tabName}Tab`)?.classList.add('active');
+
+            // Update URL
+            window.location.hash = tabName;
+        }
+
+        // Logout
+        function setupLogout() {
+            document.getElementById('logoutBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login.html';
+            });
+        }
+    </script>
+
+    <style>
+        .price-input-wrapper {
+            display: flex;
+            align-items: center;
+            background: var(--white);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0 12px;
+            max-width: 120px;
+        }
+
+        .price-input-wrapper:focus-within {
+            border-color: var(--primary);
+        }
+
+        .price-prefix {
+            color: var(--text-muted);
+            font-weight: 500;
+        }
+
+        .price-input {
+            border: none;
+            background: transparent;
+            padding: 8px 4px;
+            font-size: 0.95rem;
+            width: 80px;
+            font-family: inherit;
+        }
+
+        .price-input:focus {
+            outline: none;
+        }
+
+        .badge {
+            display: inline-block;
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .badge-herbicide { background: #dcfce7; color: #166534; }
+        .badge-fungicide { background: #fef3c7; color: #92400e; }
+        .badge-insecticide { background: #fee2e2; color: #991b1b; }
+        .badge-adjuvant { background: #e0e7ff; color: #3730a3; }
+        .badge-fertilizer { background: #d1fae5; color: #065f46; }
+        .badge-other { background: #f3f4f6; color: #374151; }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-submitted { background: #fef3c7; color: #92400e; }
+        .status-confirmed { background: #d1fae5; color: #065f46; }
+        .status-ordered { background: #dbeafe; color: #1e40af; }
+        .status-ordered_from_supplier { background: #e0e7ff; color: #3730a3; }
+        .status-received { background: #dcfce7; color: #166534; }
+        .status-delivered { background: #bbf7d0; color: #15803d; }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .error {
+            text-align: center;
+            padding: 40px;
+            color: var(--error);
+        }
+
+        .nav-user {
+            font-weight: 500;
+            color: var(--text);
+            margin-right: 16px;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+        }
+
+        .btn-accent {
+            background: var(--accent) !important;
+            animation: pulse 1.5s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.85; }
+        }
+
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .admin-table th,
+        .admin-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .admin-table th {
+            background: var(--surface);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .admin-table tr:hover {
+            background: var(--surface);
+        }
+
+        .form-container .form-group {
+            margin-bottom: 20px;
+        }
+
+        .form-container label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-control[readonly] {
+            background: var(--surface);
+            color: var(--text-muted);
+        }
+    </style>
+</body>
+</html>

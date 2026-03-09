@@ -50,9 +50,12 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['customer', 'admin', 'superadmin'],
+        enum: ['customer', 'admin', 'superadmin', 'supplier', 'distributor'],
         default: 'customer'
     },
+    // Supplier-specific fields
+    companyName: String, // For suppliers - company/business name
+    supplierCode: String, // Unique code for supplier (e.g., "CPD", "AGRISTAR")
     representative: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For customers - their rep
     representativeId: String, // kyle, ty, or chad - for quick lookup
     // Stripe Connect for representatives
@@ -318,6 +321,7 @@ const chemicalSchema = new mongoose.Schema({
     // Product info
     productName: { type: String, required: true }, // e.g., "Dicamba DMA", "LV 6"
     sourceSupplier: { type: String, required: true }, // Where we buy from: "CPD", "Agri-Star"
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Link to supplier user account
 
     // Category and crop info
     category: { type: String, enum: ['herbicide', 'fungicide', 'insecticide', 'adjuvant', 'fertilizer', 'other'], default: 'herbicide' },
@@ -466,6 +470,7 @@ chemicalSchema.pre('save', function(next) {
 // Index for quick lookups
 chemicalSchema.index({ productName: 1, sourceSupplier: 1, packSize: 1 });
 chemicalSchema.index({ sourceSupplier: 1 });
+chemicalSchema.index({ supplierId: 1 });
 chemicalSchema.index({ category: 1 });
 chemicalSchema.index({ crops: 1 });
 chemicalSchema.index({ priceDate: -1 });
@@ -1199,6 +1204,13 @@ const superAdminMiddleware = async (req, res, next) => {
     next();
 };
 
+const supplierMiddleware = async (req, res, next) => {
+    if (req.user.role !== 'supplier') {
+        return res.status(403).json({ error: 'Supplier access required' });
+    }
+    next();
+};
+
 // ============ ROUTES ============
 
 // Health check
@@ -1300,14 +1312,23 @@ app.post('/api/auth/login', async (req, res) => {
 
         const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
 
+        // Build user response based on role
+        const userResponse = {
+            id: user._id,
+            name: user.name,
+            email: user.email,
+            role: user.role,
+            farm: user.farm
+        };
+
+        // Add supplier-specific fields
+        if (user.role === 'supplier') {
+            userResponse.companyName = user.companyName;
+            userResponse.supplierCode = user.supplierCode;
+        }
+
         res.json({
-            user: {
-                id: user._id,
-                name: user.name,
-                email: user.email,
-                role: user.role,
-                farm: user.farm
-            },
+            user: userResponse,
             token
         });
     } catch (error) {
@@ -3589,6 +3610,377 @@ app.get('/api/compliance/expiring-licenses', authMiddleware, adminMiddleware, as
         }).select('name email phone farm privateApplicatorLicense commercialApplicatorLicense');
 
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ---- SUPPLIER ROUTES ----
+
+// Get supplier profile
+app.get('/api/supplier/profile', authMiddleware, supplierMiddleware, async (req, res) => {
+    try {
+        res.json({
+            id: req.user._id,
+            name: req.user.name,
+            email: req.user.email,
+            companyName: req.user.companyName,
+            supplierCode: req.user.supplierCode,
+            phone: req.user.phone
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update supplier profile
+app.put('/api/supplier/profile', authMiddleware, supplierMiddleware, async (req, res) => {
+    try {
+        const { companyName, phone, address } = req.body;
+
+        if (companyName) req.user.companyName = companyName;
+        if (phone) req.user.phone = phone;
+        if (address) req.user.address = address;
+
+        await req.user.save();
+
+        res.json({
+            message: 'Profile updated successfully',
+            user: {
+                id: req.user._id,
+                name: req.user.name,
+                email: req.user.email,
+                companyName: req.user.companyName,
+                supplierCode: req.user.supplierCode
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get supplier's products (chemicals linked to this supplier)
+app.get('/api/supplier/products', authMiddleware, supplierMiddleware, async (req, res) => {
+    try {
+        // Find chemicals by supplierId OR by sourceSupplier matching supplierCode
+        const chemicals = await Chemical.find({
+            $or: [
+                { supplierId: req.user._id },
+                { sourceSupplier: req.user.supplierCode }
+            ],
+            isActive: true
+        }).sort({ productName: 1 });
+
+        res.json(chemicals);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update product cost price (supplier sets their price)
+app.put('/api/supplier/products/:id/price', authMiddleware, supplierMiddleware, async (req, res) => {
+    try {
+        const { costPrice } = req.body;
+
+        if (costPrice === undefined || costPrice < 0) {
+            return res.status(400).json({ error: 'Valid cost price is required' });
+        }
+
+        const chemical = await Chemical.findOne({
+            _id: req.params.id,
+            $or: [
+                { supplierId: req.user._id },
+                { sourceSupplier: req.user.supplierCode }
+            ]
+        });
+
+        if (!chemical) {
+            return res.status(404).json({ error: 'Product not found or not authorized' });
+        }
+
+        const oldCostPrice = chemical.costPrice;
+        chemical.costPrice = costPrice;
+        chemical.updatedAt = new Date();
+        await chemical.save();
+
+        // Record price history
+        await ChemicalPriceHistory.create({
+            chemicalId: chemical._id,
+            productName: chemical.productName,
+            sourceSupplier: chemical.sourceSupplier,
+            packSize: chemical.packSize,
+            unit: chemical.unit,
+            costPrice: costPrice,
+            sellPrice: chemical.sellPrice,
+            priceVersion: `supplier-update-${new Date().toISOString().split('T')[0]}`,
+            changedBy: req.user._id
+        });
+
+        res.json({
+            message: 'Price updated successfully',
+            product: {
+                id: chemical._id,
+                productName: chemical.productName,
+                packSize: chemical.packSize,
+                oldCostPrice,
+                newCostPrice: costPrice
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Bulk update product prices (supplier)
+app.put('/api/supplier/products/bulk-price', authMiddleware, supplierMiddleware, async (req, res) => {
+    try {
+        const { updates } = req.body; // Array of { productId, costPrice }
+
+        if (!Array.isArray(updates) || updates.length === 0) {
+            return res.status(400).json({ error: 'Updates array is required' });
+        }
+
+        const results = [];
+
+        for (const update of updates) {
+            const chemical = await Chemical.findOne({
+                _id: update.productId,
+                $or: [
+                    { supplierId: req.user._id },
+                    { sourceSupplier: req.user.supplierCode }
+                ]
+            });
+
+            if (chemical && update.costPrice >= 0) {
+                const oldCostPrice = chemical.costPrice;
+                chemical.costPrice = update.costPrice;
+                chemical.updatedAt = new Date();
+                await chemical.save();
+
+                await ChemicalPriceHistory.create({
+                    chemicalId: chemical._id,
+                    productName: chemical.productName,
+                    sourceSupplier: chemical.sourceSupplier,
+                    packSize: chemical.packSize,
+                    unit: chemical.unit,
+                    costPrice: update.costPrice,
+                    sellPrice: chemical.sellPrice,
+                    priceVersion: `supplier-bulk-${new Date().toISOString().split('T')[0]}`,
+                    changedBy: req.user._id
+                });
+
+                results.push({
+                    productId: chemical._id,
+                    productName: chemical.productName,
+                    oldCostPrice,
+                    newCostPrice: update.costPrice,
+                    status: 'updated'
+                });
+            } else {
+                results.push({
+                    productId: update.productId,
+                    status: 'skipped',
+                    reason: chemical ? 'Invalid price' : 'Not found or not authorized'
+                });
+            }
+        }
+
+        res.json({
+            message: 'Bulk price update completed',
+            results
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get supplier's order history (orders containing their products)
+app.get('/api/supplier/orders', authMiddleware, supplierMiddleware, async (req, res) => {
+    try {
+        // Get all chemicals for this supplier
+        const supplierChemicals = await Chemical.find({
+            $or: [
+                { supplierId: req.user._id },
+                { sourceSupplier: req.user.supplierCode }
+            ]
+        }).select('productName');
+
+        const chemicalNames = supplierChemicals.map(c => c.productName);
+
+        // Find chemical orders that include products from this supplier
+        const orders = await ChemicalOrder.find({
+            'items.productName': { $in: chemicalNames },
+            status: { $nin: ['draft', 'cancelled'] }
+        })
+        .populate('userId', 'name farm')
+        .sort({ createdAt: -1 })
+        .limit(100);
+
+        // Filter items to only show this supplier's products
+        const ordersWithSupplierItems = orders.map(order => {
+            const supplierItems = order.items.filter(item =>
+                chemicalNames.includes(item.productName)
+            );
+            return {
+                _id: order._id,
+                orderNumber: order.orderNumber,
+                status: order.status,
+                createdAt: order.createdAt,
+                customer: order.userId ? {
+                    name: order.userId.name,
+                    farm: order.userId.farm?.name
+                } : null,
+                items: supplierItems,
+                supplierTotal: supplierItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+            };
+        });
+
+        res.json(ordersWithSupplierItems);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Create supplier account
+app.post('/api/admin/suppliers', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const { name, email, password, companyName, supplierCode, phone } = req.body;
+
+        if (!name || !email || !password || !companyName || !supplierCode) {
+            return res.status(400).json({
+                error: 'Name, email, password, company name, and supplier code are required'
+            });
+        }
+
+        const existingUser = await User.findOne({ email: email.toLowerCase() });
+        if (existingUser) {
+            return res.status(400).json({ error: 'Email already registered' });
+        }
+
+        const existingCode = await User.findOne({ supplierCode: supplierCode.toUpperCase() });
+        if (existingCode) {
+            return res.status(400).json({ error: 'Supplier code already in use' });
+        }
+
+        const supplier = new User({
+            name,
+            email: email.toLowerCase(),
+            password,
+            role: 'supplier',
+            companyName,
+            supplierCode: supplierCode.toUpperCase(),
+            phone
+        });
+
+        await supplier.save();
+
+        // Link existing chemicals with this supplier code to the new supplier account
+        await Chemical.updateMany(
+            { sourceSupplier: supplierCode.toUpperCase(), supplierId: { $exists: false } },
+            { supplierId: supplier._id }
+        );
+
+        res.status(201).json({
+            message: 'Supplier created successfully',
+            supplier: {
+                id: supplier._id,
+                name: supplier.name,
+                email: supplier.email,
+                companyName: supplier.companyName,
+                supplierCode: supplier.supplierCode
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Get all suppliers
+app.get('/api/admin/suppliers', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const suppliers = await User.find({ role: 'supplier' })
+            .select('name email companyName supplierCode phone createdAt')
+            .sort({ companyName: 1 });
+
+        // Get product count for each supplier
+        const suppliersWithCounts = await Promise.all(suppliers.map(async (supplier) => {
+            const productCount = await Chemical.countDocuments({
+                $or: [
+                    { supplierId: supplier._id },
+                    { sourceSupplier: supplier.supplierCode }
+                ],
+                isActive: true
+            });
+            return {
+                ...supplier.toObject(),
+                productCount
+            };
+        }));
+
+        res.json(suppliersWithCounts);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Update supplier
+app.put('/api/admin/suppliers/:id', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const { name, companyName, phone, email } = req.body;
+
+        const supplier = await User.findOne({ _id: req.params.id, role: 'supplier' });
+        if (!supplier) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+
+        if (name) supplier.name = name;
+        if (companyName) supplier.companyName = companyName;
+        if (phone) supplier.phone = phone;
+        if (email) supplier.email = email.toLowerCase();
+
+        await supplier.save();
+
+        res.json({
+            message: 'Supplier updated successfully',
+            supplier: {
+                id: supplier._id,
+                name: supplier.name,
+                email: supplier.email,
+                companyName: supplier.companyName,
+                supplierCode: supplier.supplierCode
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Link chemical to supplier
+app.put('/api/admin/chemicals/:chemicalId/link-supplier/:supplierId', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const chemical = await Chemical.findById(req.params.chemicalId);
+        if (!chemical) {
+            return res.status(404).json({ error: 'Chemical not found' });
+        }
+
+        const supplier = await User.findOne({ _id: req.params.supplierId, role: 'supplier' });
+        if (!supplier) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+
+        chemical.supplierId = supplier._id;
+        chemical.sourceSupplier = supplier.supplierCode;
+        await chemical.save();
+
+        res.json({
+            message: 'Chemical linked to supplier successfully',
+            chemical: {
+                id: chemical._id,
+                productName: chemical.productName,
+                supplierId: supplier._id,
+                sourceSupplier: supplier.supplierCode
+            }
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
