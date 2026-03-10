@@ -1719,6 +1719,12 @@
                                     <input type="number" id="poOtherFees" step="0.01" min="0" value="0" onchange="updatePOTotal()">
                                 </div>
                             </div>
+                            <div class="form-row superadmin-only" style="display: none;">
+                                <div class="form-group">
+                                    <label>Super Admin Fee ($) <span style="color: #6b7280; font-size: 12px;">- Admin markup</span></label>
+                                    <input type="number" id="poSuperAdminFee" step="0.01" min="0" value="0" onchange="updatePOTotal()">
+                                </div>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Expected Delivery Date</label>
@@ -1742,6 +1748,10 @@
                                 <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
                                     <span>Freight + Fees:</span>
                                     <span id="poFeesDisplay">$0.00</span>
+                                </div>
+                                <div class="superadmin-only" style="display: none; justify-content: space-between; font-size: 14px; margin-bottom: 8px; color: #7c3aed;">
+                                    <span>Super Admin Fee:</span>
+                                    <span id="poSuperAdminFeeDisplay">$0.00</span>
                                 </div>
                                 <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 18px; border-top: 2px solid var(--primary); padding-top: 8px;">
                                     <span>Total:</span>
@@ -1790,6 +1800,10 @@
                                 <label style="font-size: 12px; color: #666;">Total Value</label>
                                 <div id="poDetailTotalValue" style="padding: 8px; font-weight: 700; color: var(--primary);">$0.00</div>
                             </div>
+                            <div style="flex: 1;" class="superadmin-only" id="poDetailAdminFeeWrapper">
+                                <label style="font-size: 12px; color: #7c3aed;">Admin Fee</label>
+                                <div id="poDetailAdminFee" style="padding: 8px; font-weight: 600; color: #7c3aed;">$0.00</div>
+                            </div>
                         </div>
 
                         <!-- Line Items with Editable Prices -->
@@ -1810,6 +1824,30 @@
                                 <tbody id="poDetailItemsBody">
                                 </tbody>
                             </table>
+                        </div>
+
+                        <!-- Super Admin Fee Calculator (Superadmin only) -->
+                        <div class="superadmin-only" style="display: none; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 12px; color: #7c3aed;">Acre Profit Admin Fee</h4>
+                            <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 120px;">
+                                    <label style="font-size: 12px; color: #666;">Rate per Gallon ($)</label>
+                                    <input type="number" id="poAdminFeeRate" step="0.01" min="0" value="0.07"
+                                        style="width: 100%; padding: 8px; border: 2px solid #7c3aed; border-radius: 6px;"
+                                        onchange="calculateAdminFee()">
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <label style="font-size: 12px; color: #666;">Total Gallons</label>
+                                    <div id="poTotalGallons" style="padding: 8px; font-weight: 600;">0</div>
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <label style="font-size: 12px; color: #666;">Calculated Fee</label>
+                                    <div id="poCalculatedFee" style="padding: 8px; font-weight: 700; color: #7c3aed;">$0.00</div>
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="applyAdminFee()" style="background: #7c3aed; border-color: #7c3aed;">
+                                    Apply Fee
+                                </button>
+                            </div>
                         </div>
 
                         <!-- Split Section -->
@@ -1913,6 +1951,10 @@
             document.getElementById('commissionsNav').style.display = 'block';
             document.getElementById('inventoryNav').style.display = 'block';
             document.getElementById('adminRole').textContent = 'Super Admin';
+            // Show superadmin-only fields (like Super Admin Fee)
+            document.querySelectorAll('.superadmin-only').forEach(el => {
+                el.style.display = 'flex';
+            });
             loadPricingData();
             loadCommissionData();
         } else if (userData.role === 'distributor') {
@@ -3048,10 +3090,13 @@
 
             const freight = parseFloat(document.getElementById('poFreight')?.value) || 0;
             const otherFees = parseFloat(document.getElementById('poOtherFees')?.value) || 0;
+            const superAdminFee = parseFloat(document.getElementById('poSuperAdminFee')?.value) || 0;
 
             document.getElementById('poSubtotalDisplay').textContent = '$' + subtotal.toFixed(2);
             document.getElementById('poFeesDisplay').textContent = '$' + (freight + otherFees).toFixed(2);
-            document.getElementById('poTotalDisplay').textContent = '$' + (subtotal + freight + otherFees).toFixed(2);
+            const superAdminFeeDisplay = document.getElementById('poSuperAdminFeeDisplay');
+            if (superAdminFeeDisplay) superAdminFeeDisplay.textContent = '$' + superAdminFee.toFixed(2);
+            document.getElementById('poTotalDisplay').textContent = '$' + (subtotal + freight + otherFees + superAdminFee).toFixed(2);
         }
 
         async function createPurchaseOrder() {
@@ -3097,6 +3142,7 @@
                 items,
                 freight: parseFloat(document.getElementById('poFreight').value) || 0,
                 otherFees: parseFloat(document.getElementById('poOtherFees').value) || 0,
+                superAdminFee: parseFloat(document.getElementById('poSuperAdminFee')?.value) || 0,
                 expectedDeliveryDate: document.getElementById('poExpectedDelivery').value || null,
                 deliveryLocation: document.getElementById('poDeliveryLocation').value.trim(),
                 notes: document.getElementById('poNotes').value.trim()
@@ -3145,6 +3191,14 @@
                 document.getElementById('poDetailStatus').value = currentPO.status;
                 document.getElementById('poDetailDate').textContent = currentPO.orderDate ? new Date(currentPO.orderDate).toLocaleDateString() : '-';
                 document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                // Show super admin fee if present
+                const adminFeeEl = document.getElementById('poDetailAdminFee');
+                if (adminFeeEl) {
+                    adminFeeEl.textContent = '$' + (currentPO.superAdminFee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                }
+
+                // Calculate total gallons for admin fee calculator
+                calculateTotalGallons();
 
                 // Populate items table
                 const itemsBody = document.getElementById('poDetailItemsBody');
@@ -3183,6 +3237,77 @@
         function closePODetailModal() {
             document.getElementById('poDetailModal').style.display = 'none';
             currentPO = null;
+        }
+
+        // Admin Fee Calculator Functions
+        function calculateTotalGallons() {
+            if (!currentPO || !currentPO.items) return 0;
+
+            let totalGallons = 0;
+            currentPO.items.forEach(item => {
+                // Check if unit is gallon-based or pack size mentions gallons
+                const unit = (item.unit || '').toLowerCase();
+                const packSize = (item.packSize || '').toLowerCase();
+
+                if (unit.includes('gal') || packSize.includes('gal')) {
+                    // Extract gallon amount from pack size if present (e.g., "2.5 gal", "2x2.5 gal")
+                    const galMatch = packSize.match(/(\d+(?:\.\d+)?)\s*gal/i);
+                    const multiplierMatch = packSize.match(/^(\d+)\s*x/i);
+
+                    let gallonsPerUnit = galMatch ? parseFloat(galMatch[1]) : 1;
+                    let multiplier = multiplierMatch ? parseInt(multiplierMatch[1]) : 1;
+
+                    totalGallons += item.quantityOrdered * gallonsPerUnit * multiplier;
+                } else {
+                    // Default: assume quantity is in gallons if no unit specified
+                    totalGallons += item.quantityOrdered;
+                }
+            });
+
+            document.getElementById('poTotalGallons').textContent = totalGallons.toLocaleString();
+            calculateAdminFee();
+            return totalGallons;
+        }
+
+        function calculateAdminFee() {
+            const rate = parseFloat(document.getElementById('poAdminFeeRate')?.value) || 0;
+            const gallonsText = document.getElementById('poTotalGallons')?.textContent || '0';
+            const totalGallons = parseFloat(gallonsText.replace(/,/g, '')) || 0;
+
+            const fee = rate * totalGallons;
+            document.getElementById('poCalculatedFee').textContent = '$' + fee.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            return fee;
+        }
+
+        async function applyAdminFee() {
+            if (!currentPO) return;
+
+            const fee = calculateAdminFee();
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ superAdminFee: fee })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    currentPO = data;
+                    document.getElementById('poDetailAdminFee').textContent = '$' + (fee).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    loadPurchaseOrders();
+                    alert('Admin fee applied successfully!');
+                } else {
+                    alert('Error applying admin fee');
+                }
+            } catch (error) {
+                console.error('Error applying admin fee:', error);
+                alert('Error applying admin fee');
+            }
         }
 
         async function updatePOStatus() {

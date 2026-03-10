@@ -850,6 +850,7 @@ const purchaseOrderSchema = new mongoose.Schema({
     subtotal: Number,
     freight: { type: Number, default: 0 },
     otherFees: { type: Number, default: 0 },
+    superAdminFee: { type: Number, default: 0 }, // Admin markup/fee - only visible to superadmins
     totalCost: Number,
 
     // Status workflow
@@ -4722,7 +4723,7 @@ app.get('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async
 // Create purchase order
 app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { supplier, items, freight, otherFees, expectedDeliveryDate, deliveryLocation, notes } = req.body;
+        const { supplier, items, freight, otherFees, superAdminFee, expectedDeliveryDate, deliveryLocation, notes } = req.body;
 
         // Generate PO number
         const poNumber = await generatePONumber();
@@ -4735,9 +4736,10 @@ app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (r
             quantityRemaining: item.quantityOrdered
         }));
 
-        // Calculate totals
+        // Calculate totals (superAdminFee only if user is superadmin)
         const subtotal = processedItems.reduce((sum, item) => sum + item.totalPrice, 0);
-        const totalCost = subtotal + (freight || 0) + (otherFees || 0);
+        const adminFee = req.user.role === 'superadmin' ? (superAdminFee || 0) : 0;
+        const totalCost = subtotal + (freight || 0) + (otherFees || 0) + adminFee;
 
         const purchaseOrder = new PurchaseOrder({
             poNumber,
@@ -4746,6 +4748,7 @@ app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (r
             subtotal: Math.round(subtotal * 100) / 100,
             freight: freight || 0,
             otherFees: otherFees || 0,
+            superAdminFee: adminFee,
             totalCost: Math.round(totalCost * 100) / 100,
             expectedDeliveryDate,
             deliveryLocation,
@@ -4768,7 +4771,7 @@ app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (r
 // Update purchase order (general info and status)
 app.put('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { supplier, expectedDeliveryDate, deliveryLocation, bolNumber, trackingInfo, notes, internalNotes, status } = req.body;
+        const { supplier, expectedDeliveryDate, deliveryLocation, bolNumber, trackingInfo, notes, internalNotes, status, superAdminFee } = req.body;
 
         const po = await PurchaseOrder.findById(req.params.id);
         if (!po) {
@@ -4786,6 +4789,13 @@ app.put('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async
         if (status) {
             po.status = status;
             if (status === 'received') po.receivedDate = new Date();
+        }
+
+        // Super admin fee (only superadmin can set)
+        if (superAdminFee !== undefined && req.user.role === 'superadmin') {
+            po.superAdminFee = superAdminFee;
+            // Recalculate total
+            po.totalCost = (po.subtotal || 0) + (po.freight || 0) + (po.otherFees || 0) + superAdminFee;
         }
 
         po.updatedBy = req.user._id;
