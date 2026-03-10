@@ -2153,8 +2153,9 @@ h4 {
     background: var(--secondary);
     border-bottom: 1px solid var(--border);
     position: sticky;
-    top: 0;
+    top: 72px; /* Account for fixed navbar height */
     z-index: 100;
+    margin-top: 72px; /* Push below fixed navbar */
 }
 
 .admin-tabs {
