@@ -31,19 +31,27 @@
     <!-- Admin Tab Navigation -->
     <div class="admin-tabs-bar">
         <div class="container">
-            <div class="admin-tabs">
-                <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
-                <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
-                <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
-                <a href="#bundles" class="admin-tab" data-tab="bundles">Bundles</a>
-                <a href="#products" class="admin-tab" data-tab="products">Products</a>
-                <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
-                <a href="#purchase-orders" class="admin-tab" data-tab="purchase-orders">Purchase Orders</a>
-                <a href="#compliance" class="admin-tab tab-warning" data-tab="compliance">Compliance</a>
-                <span id="pricingNav" style="display: none;"><a href="#pricing" class="admin-tab" data-tab="pricing">Pricing</a></span>
-                <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
-                <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
-                <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
+            <div class="admin-tabs-wrapper" id="tabsWrapper">
+                <button class="admin-tabs-scroll-btn left" onclick="scrollTabs(-200)" aria-label="Scroll tabs left">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                </button>
+                <div class="admin-tabs" id="adminTabs">
+                    <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
+                    <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
+                    <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
+                    <a href="#bundles" class="admin-tab" data-tab="bundles">Bundles</a>
+                    <a href="#products" class="admin-tab" data-tab="products">Products</a>
+                    <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
+                    <a href="#purchase-orders" class="admin-tab" data-tab="purchase-orders">Purchase Orders</a>
+                    <a href="#compliance" class="admin-tab tab-warning" data-tab="compliance">Compliance</a>
+                    <span id="pricingNav" style="display: none;"><a href="#pricing" class="admin-tab" data-tab="pricing">Pricing</a></span>
+                    <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
+                    <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
+                    <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
+                </div>
+                <button class="admin-tabs-scroll-btn right" onclick="scrollTabs(200)" aria-label="Scroll tabs right">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                </button>
             </div>
         </div>
     </div>
@@ -1138,40 +1146,90 @@
                     <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
                 </div>
 
-                <div class="pricing-explanation">
-                    <div class="pricing-tier-card cost">
-                        <h4>Tier 1: Cost Price</h4>
-                        <p>What we pay suppliers</p>
+                <!-- Bulk Edit Controls -->
+                <div class="pricing-bulk-controls">
+                    <div class="bulk-control-group">
+                        <label>Apply Markup to All:</label>
+                        <div class="bulk-input-row">
+                            <div class="bulk-field">
+                                <span class="field-label">Admin Markup</span>
+                                <div class="input-with-suffix">
+                                    <input type="number" id="bulkAdminMarkup" value="10" min="0" max="100" step="0.5">
+                                    <span class="suffix">%</span>
+                                </div>
+                            </div>
+                            <div class="bulk-field">
+                                <span class="field-label">Retail Markup</span>
+                                <div class="input-with-suffix">
+                                    <input type="number" id="bulkRetailMarkup" value="15" min="0" max="100" step="0.5">
+                                    <span class="suffix">%</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-outline btn-sm" onclick="applyBulkMarkup()">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                                Apply to All
+                            </button>
+                        </div>
                     </div>
-                    <div class="pricing-arrow">→</div>
-                    <div class="pricing-tier-card admin">
-                        <h4>Tier 2: Admin Price</h4>
-                        <p>Cost + Acre Profit margin</p>
-                    </div>
-                    <div class="pricing-arrow">→</div>
-                    <div class="pricing-tier-card retail">
-                        <h4>Tier 3: Retail Price</h4>
-                        <p>What customers pay</p>
+                    <div class="bulk-control-group">
+                        <label>Filter Products:</label>
+                        <div class="search-filter-row">
+                            <input type="text" id="pricingSearch" placeholder="Search by product name..." oninput="filterPricingTable()">
+                            <select id="pricingCategoryFilter" onchange="filterPricingTable()">
+                                <option value="">All Categories</option>
+                                <option value="herbicide">Herbicide</option>
+                                <option value="insecticide">Insecticide</option>
+                                <option value="fungicide">Fungicide</option>
+                                <option value="adjuvant">Adjuvant</option>
+                                <option value="fertilizer">Fertilizer</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
-                <div class="commission-note">
-                    <strong>Rep Commission</strong> = Retail Price - Admin Price (per unit sold)
+                <!-- Tier Legend -->
+                <div class="pricing-legend">
+                    <div class="legend-item cost">
+                        <span class="legend-dot"></span>
+                        <span>Cost (Supplier)</span>
+                    </div>
+                    <div class="legend-arrow">+</div>
+                    <div class="legend-item admin">
+                        <span class="legend-dot"></span>
+                        <span>Admin (AP Margin)</span>
+                    </div>
+                    <div class="legend-arrow">+</div>
+                    <div class="legend-item retail">
+                        <span class="legend-dot"></span>
+                        <span>Retail (Rep Commission)</span>
+                    </div>
                 </div>
 
-                <div class="orders-table-wrapper" style="margin-top: 24px;">
-                    <table class="admin-table" id="pricingTable">
+                <!-- Save All Button -->
+                <div class="pricing-actions-bar">
+                    <div class="unsaved-indicator" id="unsavedIndicator" style="display: none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                        <span id="unsavedCount">0</span> unsaved changes
+                    </div>
+                    <button class="btn btn-primary" id="saveAllPricingBtn" onclick="saveAllPricing()" disabled>
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        Save All Changes
+                    </button>
+                </div>
+
+                <div class="orders-table-wrapper pricing-table-wrapper" style="margin-top: 16px;">
+                    <table class="admin-table pricing-table" id="pricingTable">
                         <thead>
                             <tr>
-                                <th>Product</th>
-                                <th>Category</th>
-                                <th>Unit</th>
-                                <th style="background: #fee2e2;">Cost Price</th>
-                                <th style="background: #fef3c7;">Admin Price</th>
-                                <th style="background: #dcfce7;">Retail Price</th>
-                                <th>AP Margin</th>
-                                <th>Rep Commission</th>
-                                <th>Actions</th>
+                                <th style="width: 25%;">Product</th>
+                                <th style="width: 10%;">Category</th>
+                                <th style="width: 8%;">Unit</th>
+                                <th style="width: 12%; background: #fef2f2;">Cost</th>
+                                <th style="width: 12%; background: #fffbeb;">Admin</th>
+                                <th style="width: 12%; background: #f0fdf4;">Retail</th>
+                                <th style="width: 9%;">AP Margin</th>
+                                <th style="width: 9%;">Rep $</th>
+                                <th style="width: 3%;"></th>
                             </tr>
                         </thead>
                         <tbody id="pricingTableBody">
@@ -3684,69 +3742,278 @@
             return names[cert] || cert;
         }
 
+        // ============ TAB SCROLL FUNCTIONALITY ============
+        function scrollTabs(amount) {
+            const tabs = document.getElementById('adminTabs');
+            if (tabs) {
+                tabs.scrollBy({ left: amount, behavior: 'smooth' });
+            }
+        }
+
+        function updateTabScrollIndicators() {
+            const wrapper = document.getElementById('tabsWrapper');
+            const tabs = document.getElementById('adminTabs');
+            if (!wrapper || !tabs) return;
+
+            const canScrollLeft = tabs.scrollLeft > 10;
+            const canScrollRight = tabs.scrollLeft < (tabs.scrollWidth - tabs.clientWidth - 10);
+
+            wrapper.classList.toggle('can-scroll-left', canScrollLeft);
+            wrapper.classList.toggle('can-scroll-right', canScrollRight);
+        }
+
+        // Initialize tab scroll indicators
+        document.addEventListener('DOMContentLoaded', function() {
+            const tabs = document.getElementById('adminTabs');
+            if (tabs) {
+                tabs.addEventListener('scroll', updateTabScrollIndicators);
+                window.addEventListener('resize', updateTabScrollIndicators);
+                setTimeout(updateTabScrollIndicators, 100);
+            }
+        });
+
         // ============ 3-TIER PRICING MANAGEMENT ============
+        let pricingProducts = [];
+        let changedProducts = new Set();
+
         async function loadPricingData() {
             const tbody = document.getElementById('pricingTableBody');
             try {
                 const res = await fetch(`${API_URL}/api/chemicals`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                const products = await res.json();
+                pricingProducts = await res.json();
 
-                if (products.length === 0) {
+                if (pricingProducts.length === 0) {
                     tbody.innerHTML = '<tr><td colspan="9">No products found</td></tr>';
                     return;
                 }
 
-                tbody.innerHTML = products.map(p => {
-                    const costPrice = p.costPrice || 0;
-                    const adminPrice = p.adminPrice || costPrice * 1.10; // Default 10% admin markup
-                    const retailPrice = p.sellPrice || adminPrice * 1.15; // Default 15% rep markup
-                    const apMargin = adminPrice - costPrice;
-                    const repCommission = retailPrice - adminPrice;
-
-                    return `
-                        <tr data-id="${p._id}">
-                            <td><strong>${p.productName}</strong></td>
-                            <td><span class="category-badge cat-${p.category}">${p.category}</span></td>
-                            <td>/${p.unit}</td>
-                            <td style="background: #fef2f2;">
-                                <input type="number" step="0.01" class="pricing-input cost-input"
-                                       value="${costPrice.toFixed(2)}" data-field="costPrice">
-                            </td>
-                            <td style="background: #fffbeb;">
-                                <input type="number" step="0.01" class="pricing-input admin-input"
-                                       value="${adminPrice.toFixed(2)}" data-field="adminPrice">
-                            </td>
-                            <td style="background: #f0fdf4;">
-                                <input type="number" step="0.01" class="pricing-input retail-input"
-                                       value="${retailPrice.toFixed(2)}" data-field="sellPrice">
-                            </td>
-                            <td class="ap-margin">$${apMargin.toFixed(2)}</td>
-                            <td class="rep-commission">$${repCommission.toFixed(2)}</td>
-                            <td>
-                                <button class="btn btn-sm btn-primary" onclick="savePricing('${p._id}', this)">Save</button>
-                            </td>
-                        </tr>
-                    `;
-                }).join('');
-
-                // Add change listeners to recalculate margins
-                document.querySelectorAll('.pricing-input').forEach(input => {
-                    input.addEventListener('input', function() {
-                        const row = this.closest('tr');
-                        const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
-                        const admin = parseFloat(row.querySelector('.admin-input').value) || 0;
-                        const retail = parseFloat(row.querySelector('.retail-input').value) || 0;
-                        row.querySelector('.ap-margin').textContent = '$' + (admin - cost).toFixed(2);
-                        row.querySelector('.rep-commission').textContent = '$' + (retail - admin).toFixed(2);
-                    });
-                });
+                renderPricingTable();
+                changedProducts.clear();
+                updateUnsavedIndicator();
             } catch (error) {
                 tbody.innerHTML = '<tr><td colspan="9" style="color: #dc2626;">Error loading products</td></tr>';
             }
         }
 
+        function renderPricingTable() {
+            const tbody = document.getElementById('pricingTableBody');
+            const searchTerm = (document.getElementById('pricingSearch')?.value || '').toLowerCase();
+            const categoryFilter = document.getElementById('pricingCategoryFilter')?.value || '';
+
+            const filteredProducts = pricingProducts.filter(p => {
+                const matchesSearch = !searchTerm || p.productName.toLowerCase().includes(searchTerm);
+                const matchesCategory = !categoryFilter || p.category === categoryFilter;
+                return matchesSearch && matchesCategory;
+            });
+
+            if (filteredProducts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="9" style="color: var(--text-muted); text-align: center;">No products match your filter</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = filteredProducts.map(p => {
+                const costPrice = p.costPrice || 0;
+                const adminPrice = p.adminPrice || costPrice * 1.10;
+                const retailPrice = p.sellPrice || adminPrice * 1.15;
+                const apMargin = adminPrice - costPrice;
+                const repCommission = retailPrice - adminPrice;
+                const hasChanges = changedProducts.has(p._id);
+
+                return `
+                    <tr data-id="${p._id}" data-category="${p.category}" data-name="${p.productName.toLowerCase()}"
+                        data-orig-cost="${costPrice.toFixed(2)}" data-orig-admin="${adminPrice.toFixed(2)}" data-orig-retail="${retailPrice.toFixed(2)}"
+                        class="${hasChanges ? 'has-changes' : ''}">
+                        <td><strong>${p.productName}</strong></td>
+                        <td><span class="category-badge cat-${p.category}">${p.category}</span></td>
+                        <td>/${p.unit}</td>
+                        <td style="background: #fef2f2;">
+                            <input type="number" step="0.01" class="pricing-input cost-input ${hasChanges ? 'changed' : ''}"
+                                   value="${costPrice.toFixed(2)}" data-field="costPrice" onchange="markPricingChanged(this)">
+                        </td>
+                        <td style="background: #fffbeb;">
+                            <input type="number" step="0.01" class="pricing-input admin-input ${hasChanges ? 'changed' : ''}"
+                                   value="${adminPrice.toFixed(2)}" data-field="adminPrice" onchange="markPricingChanged(this)">
+                        </td>
+                        <td style="background: #f0fdf4;">
+                            <input type="number" step="0.01" class="pricing-input retail-input ${hasChanges ? 'changed' : ''}"
+                                   value="${retailPrice.toFixed(2)}" data-field="sellPrice" onchange="markPricingChanged(this)">
+                        </td>
+                        <td class="ap-margin">$${apMargin.toFixed(2)}</td>
+                        <td class="rep-commission">$${repCommission.toFixed(2)}</td>
+                        <td><div class="row-save-indicator ${hasChanges ? 'unsaved' : ''}"></div></td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add input listeners for live margin calculation
+            document.querySelectorAll('.pricing-input').forEach(input => {
+                input.addEventListener('input', function() {
+                    const row = this.closest('tr');
+                    const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
+                    const admin = parseFloat(row.querySelector('.admin-input').value) || 0;
+                    const retail = parseFloat(row.querySelector('.retail-input').value) || 0;
+                    row.querySelector('.ap-margin').textContent = '$' + (admin - cost).toFixed(2);
+                    row.querySelector('.rep-commission').textContent = '$' + (retail - admin).toFixed(2);
+                    markPricingChanged(this);
+                });
+            });
+        }
+
+        function markPricingChanged(input) {
+            const row = input.closest('tr');
+            const productId = row.dataset.id;
+            const origCost = row.dataset.origCost;
+            const origAdmin = row.dataset.origAdmin;
+            const origRetail = row.dataset.origRetail;
+
+            const currentCost = row.querySelector('.cost-input').value;
+            const currentAdmin = row.querySelector('.admin-input').value;
+            const currentRetail = row.querySelector('.retail-input').value;
+
+            const hasChanges = currentCost !== origCost || currentAdmin !== origAdmin || currentRetail !== origRetail;
+
+            if (hasChanges) {
+                changedProducts.add(productId);
+                row.classList.add('has-changes');
+                row.querySelectorAll('.pricing-input').forEach(i => i.classList.add('changed'));
+                row.querySelector('.row-save-indicator').classList.add('unsaved');
+            } else {
+                changedProducts.delete(productId);
+                row.classList.remove('has-changes');
+                row.querySelectorAll('.pricing-input').forEach(i => i.classList.remove('changed'));
+                row.querySelector('.row-save-indicator').classList.remove('unsaved');
+            }
+
+            updateUnsavedIndicator();
+        }
+
+        function updateUnsavedIndicator() {
+            const indicator = document.getElementById('unsavedIndicator');
+            const countEl = document.getElementById('unsavedCount');
+            const saveBtn = document.getElementById('saveAllPricingBtn');
+            const count = changedProducts.size;
+
+            if (count > 0) {
+                indicator.style.display = 'flex';
+                countEl.textContent = count;
+                saveBtn.disabled = false;
+            } else {
+                indicator.style.display = 'none';
+                saveBtn.disabled = true;
+            }
+        }
+
+        function filterPricingTable() {
+            renderPricingTable();
+        }
+
+        function applyBulkMarkup() {
+            const adminMarkup = parseFloat(document.getElementById('bulkAdminMarkup').value) || 0;
+            const retailMarkup = parseFloat(document.getElementById('bulkRetailMarkup').value) || 0;
+
+            if (!confirm(`Apply ${adminMarkup}% admin markup and ${retailMarkup}% retail markup to all visible products?`)) {
+                return;
+            }
+
+            document.querySelectorAll('#pricingTableBody tr[data-id]').forEach(row => {
+                const costInput = row.querySelector('.cost-input');
+                const adminInput = row.querySelector('.admin-input');
+                const retailInput = row.querySelector('.retail-input');
+
+                const cost = parseFloat(costInput.value) || 0;
+                const newAdmin = cost * (1 + adminMarkup / 100);
+                const newRetail = newAdmin * (1 + retailMarkup / 100);
+
+                adminInput.value = newAdmin.toFixed(2);
+                retailInput.value = newRetail.toFixed(2);
+
+                // Update margins display
+                row.querySelector('.ap-margin').textContent = '$' + (newAdmin - cost).toFixed(2);
+                row.querySelector('.rep-commission').textContent = '$' + (newRetail - newAdmin).toFixed(2);
+
+                // Mark as changed
+                markPricingChanged(adminInput);
+            });
+        }
+
+        async function saveAllPricing() {
+            if (changedProducts.size === 0) return;
+
+            const saveBtn = document.getElementById('saveAllPricingBtn');
+            saveBtn.disabled = true;
+            saveBtn.innerHTML = '<svg class="spin" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 11-6.219-8.56"></path></svg> Saving...';
+
+            let successCount = 0;
+            let errorCount = 0;
+
+            for (const productId of changedProducts) {
+                const row = document.querySelector(`tr[data-id="${productId}"]`);
+                if (!row) continue;
+
+                const costPrice = parseFloat(row.querySelector('.cost-input').value);
+                const adminPrice = parseFloat(row.querySelector('.admin-input').value);
+                const sellPrice = parseFloat(row.querySelector('.retail-input').value);
+
+                try {
+                    const res = await fetch(`${API_URL}/api/chemicals/${productId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ costPrice, adminPrice, sellPrice })
+                    });
+
+                    if (res.ok) {
+                        // Update original values
+                        row.dataset.origCost = costPrice.toFixed(2);
+                        row.dataset.origAdmin = adminPrice.toFixed(2);
+                        row.dataset.origRetail = sellPrice.toFixed(2);
+
+                        // Update local data
+                        const product = pricingProducts.find(p => p._id === productId);
+                        if (product) {
+                            product.costPrice = costPrice;
+                            product.adminPrice = adminPrice;
+                            product.sellPrice = sellPrice;
+                        }
+
+                        row.classList.remove('has-changes');
+                        row.querySelectorAll('.pricing-input').forEach(i => i.classList.remove('changed'));
+                        row.querySelector('.row-save-indicator').classList.remove('unsaved');
+                        successCount++;
+                    } else {
+                        errorCount++;
+                    }
+                } catch (error) {
+                    errorCount++;
+                }
+            }
+
+            changedProducts.clear();
+            updateUnsavedIndicator();
+
+            if (errorCount === 0) {
+                saveBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg> All Saved!';
+                saveBtn.classList.remove('btn-primary');
+                saveBtn.classList.add('btn-success');
+            } else {
+                saveBtn.innerHTML = `${successCount} saved, ${errorCount} failed`;
+                saveBtn.classList.remove('btn-primary');
+                saveBtn.classList.add('btn-warning');
+            }
+
+            setTimeout(() => {
+                saveBtn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg> Save All Changes';
+                saveBtn.classList.remove('btn-success', 'btn-warning');
+                saveBtn.classList.add('btn-primary');
+                saveBtn.disabled = true;
+            }, 2000);
+        }
+
+        // Legacy single-row save (kept for compatibility)
         async function savePricing(productId, btn) {
             const row = btn.closest('tr');
             const costPrice = parseFloat(row.querySelector('.cost-input').value);
@@ -3767,6 +4034,14 @@
                 });
 
                 if (res.ok) {
+                    row.dataset.origCost = costPrice.toFixed(2);
+                    row.dataset.origAdmin = adminPrice.toFixed(2);
+                    row.dataset.origRetail = sellPrice.toFixed(2);
+                    changedProducts.delete(productId);
+                    row.classList.remove('has-changes');
+                    row.querySelectorAll('.pricing-input').forEach(i => i.classList.remove('changed'));
+                    updateUnsavedIndicator();
+
                     btn.textContent = 'Saved!';
                     btn.classList.remove('btn-primary');
                     btn.classList.add('btn-success');
@@ -5186,46 +5461,171 @@
         }
 
         /* 3-Tier Pricing Styles */
-        .pricing-explanation {
+        .pricing-bulk-controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+            padding: 20px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+            margin-bottom: 16px;
+        }
+
+        .bulk-control-group label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 10px;
+            color: var(--text);
+        }
+
+        .bulk-input-row {
+            display: flex;
+            gap: 12px;
+            align-items: flex-end;
+        }
+
+        .bulk-field {
+            flex: 1;
+        }
+
+        .bulk-field .field-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .input-with-suffix {
+            display: flex;
+            align-items: center;
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .input-with-suffix input {
+            flex: 1;
+            border: none;
+            background: transparent;
+            padding: 10px 12px;
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        .input-with-suffix input:focus {
+            outline: none;
+        }
+
+        .input-with-suffix .suffix {
+            padding: 10px 12px;
+            background: var(--border);
+            color: var(--text-muted);
+            font-weight: 600;
+        }
+
+        .search-filter-row {
+            display: flex;
+            gap: 12px;
+        }
+
+        .search-filter-row input,
+        .search-filter-row select {
+            flex: 1;
+            padding: 10px 14px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.9rem;
+        }
+
+        .search-filter-row input:focus,
+        .search-filter-row select:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .pricing-legend {
             display: flex;
             align-items: center;
             justify-content: center;
             gap: 16px;
-            margin: 24px 0;
-            flex-wrap: wrap;
-        }
-
-        .pricing-tier-card {
-            padding: 16px 24px;
+            padding: 12px 20px;
+            background: var(--secondary);
             border-radius: var(--radius);
-            text-align: center;
-            min-width: 160px;
+            margin-bottom: 16px;
         }
 
-        .pricing-tier-card.cost {
-            background: #fef2f2;
-            border: 2px solid #fecaca;
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+            font-weight: 500;
         }
 
-        .pricing-tier-card.admin {
-            background: #fffbeb;
-            border: 2px solid #fde68a;
+        .legend-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 3px;
         }
 
-        .pricing-tier-card.retail {
-            background: #f0fdf4;
-            border: 2px solid #bbf7d0;
-        }
+        .legend-item.cost .legend-dot { background: #fecaca; border: 1px solid #f87171; }
+        .legend-item.admin .legend-dot { background: #fde68a; border: 1px solid #fbbf24; }
+        .legend-item.retail .legend-dot { background: #bbf7d0; border: 1px solid #4ade80; }
 
-        .pricing-tier-card h4 {
-            margin: 0 0 4px 0;
-            font-size: 0.9rem;
-        }
-
-        .pricing-tier-card p {
-            margin: 0;
-            font-size: 0.8rem;
+        .legend-arrow {
             color: var(--text-muted);
+            font-weight: 700;
+        }
+
+        .pricing-actions-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+        }
+
+        .unsaved-indicator {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: #d97706;
+            font-weight: 500;
+        }
+
+        .unsaved-indicator svg {
+            color: #d97706;
+        }
+
+        .pricing-table-wrapper {
+            max-height: 600px;
+            overflow-y: auto;
+        }
+
+        .pricing-table thead {
+            position: sticky;
+            top: 0;
+            z-index: 10;
+        }
+
+        .pricing-table tbody tr {
+            transition: background 0.2s;
+        }
+
+        .pricing-table tbody tr:hover {
+            background: var(--secondary);
+        }
+
+        .pricing-table tbody tr.has-changes {
+            background: #fffbeb;
+        }
+
+        .pricing-table tbody tr.has-changes:hover {
+            background: #fef3c7;
         }
 
         .pricing-arrow {
@@ -5242,21 +5642,63 @@
         }
 
         .pricing-input {
-            width: 80px;
-            padding: 6px 8px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
+            width: 100%;
+            max-width: 100px;
+            padding: 10px 12px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
             text-align: right;
             font-family: inherit;
+            font-size: 0.95rem;
+            font-weight: 500;
+            transition: all 0.2s;
         }
 
         .pricing-input:focus {
             outline: none;
             border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
         }
+
+        .pricing-input.changed {
+            border-color: #d97706;
+            background: #fffbeb;
+        }
+
+        .cost-input:focus { border-color: #f87171; box-shadow: 0 0 0 3px rgba(248, 113, 113, 0.15); }
+        .admin-input:focus { border-color: #fbbf24; box-shadow: 0 0 0 3px rgba(251, 191, 36, 0.15); }
+        .retail-input:focus { border-color: #4ade80; box-shadow: 0 0 0 3px rgba(74, 222, 128, 0.15); }
 
         .ap-margin, .rep-commission {
             font-weight: 600;
+            font-size: 0.9rem;
+        }
+
+        .ap-margin { color: #d97706; }
+        .rep-commission { color: #059669; }
+
+        .row-save-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: transparent;
+            transition: all 0.2s;
+        }
+
+        .row-save-indicator.unsaved {
+            background: #d97706;
+        }
+
+        @media (max-width: 1024px) {
+            .pricing-bulk-controls {
+                grid-template-columns: 1fr;
+            }
+
+            .pricing-input {
+                max-width: 80px;
+                padding: 8px 10px;
+                font-size: 0.85rem;
+            }
         }
 
         .tab-subtitle {
@@ -5412,6 +5854,27 @@
             .bundles-grid {
                 grid-template-columns: 1fr;
             }
+        }
+
+        /* Spin animation for loading states */
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .spin {
+            animation: spin 1s linear infinite;
+        }
+
+        .btn-warning {
+            background: #f59e0b;
+            color: white;
+            border-color: #f59e0b;
+        }
+
+        .btn-warning:hover {
+            background: #d97706;
+            border-color: #d97706;
         }
     </style>
 </body>

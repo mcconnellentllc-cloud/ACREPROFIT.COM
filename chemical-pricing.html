@@ -450,6 +450,7 @@
 
             <div class="actions-row">
                 <button class="btn btn-success" onclick="savePrices()">Save All Prices</button>
+                <button class="btn btn-primary" onclick="loadCPDProducts()">Load CPD Products</button>
                 <button class="btn btn-secondary" onclick="exportPrices()">Export to CSV</button>
                 <button class="btn btn-secondary" onclick="resetToDefaults()">Reset to Defaults</button>
             </div>
@@ -664,6 +665,45 @@
                 localStorage.removeItem('acreprofit_admin_prices');
                 renderTable();
                 updateStats();
+            }
+        }
+
+        async function loadCPDProducts() {
+            const token = localStorage.getItem('acreprofit_token');
+            if (!token) {
+                alert('Not authenticated. Please log in again.');
+                return;
+            }
+
+            if (!confirm('Load CPD products from the database? This will add any new products from the seed data.')) {
+                return;
+            }
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals/load-cpd`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    const msg = `CPD Products Loaded!\n\nCreated: ${data.summary.created}\nAlready existed: ${data.summary.alreadyExisted}\nTotal: ${data.summary.totalProducts}`;
+                    if (data.products && data.products.length > 0) {
+                        alert(msg + '\n\nNew products:\n- ' + data.products.join('\n- '));
+                    } else {
+                        alert(msg);
+                    }
+                    // Refresh the page to show new products
+                    location.reload();
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to load CPD products'));
+                }
+            } catch (error) {
+                alert('Network error: ' + error.message);
             }
         }
 
