@@ -2796,6 +2796,9 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             // Glyphosate - AgSaver is CPD equiv for RT3/Glystar Supreme
             { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 12.90, sellPrice: 0, category: 'herbicide', equivalentProduct: 'RT3, Glystar Supreme', notes: 'Glyphosate' },
 
+            // Glyphosate 5.4 lb - from JABCO/CPD
+            { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 250, costPrice: 13.25, adminPrice: 13.32, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
+
             // Atrazine
             { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
 
