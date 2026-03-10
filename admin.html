@@ -2957,7 +2957,13 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                purchaseOrders = await res.json();
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP error ${res.status}`);
+                }
+
+                const data = await res.json();
+                purchaseOrders = Array.isArray(data) ? data : [];
                 renderPurchaseOrders();
 
                 // Update stats
