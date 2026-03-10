@@ -2150,21 +2150,93 @@ h4 {
 
 /* ===== Admin Tabs Bar ===== */
 .admin-tabs-bar {
-    background: var(--secondary);
+    background: var(--white);
     border-bottom: 1px solid var(--border);
     position: sticky;
-    top: 72px; /* Account for fixed navbar height */
+    top: 72px;
     z-index: 100;
-    margin-top: 72px; /* Push below fixed navbar */
+    margin-top: 72px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+}
+
+.admin-tabs-wrapper {
+    position: relative;
+}
+
+.admin-tabs-wrapper::before,
+.admin-tabs-wrapper::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    width: 40px;
+    pointer-events: none;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.3s;
+}
+
+.admin-tabs-wrapper::before {
+    left: 0;
+    background: linear-gradient(to right, var(--white), transparent);
+}
+
+.admin-tabs-wrapper::after {
+    right: 0;
+    background: linear-gradient(to left, var(--white), transparent);
+}
+
+.admin-tabs-wrapper.can-scroll-left::before,
+.admin-tabs-wrapper.can-scroll-right::after {
+    opacity: 1;
+}
+
+.admin-tabs-scroll-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: var(--white);
+    border: 1px solid var(--border);
+    box-shadow: var(--shadow);
+    cursor: pointer;
+    z-index: 20;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    color: var(--text-light);
+    transition: all 0.2s;
+}
+
+.admin-tabs-scroll-btn:hover {
+    background: var(--primary);
+    color: white;
+    border-color: var(--primary);
+}
+
+.admin-tabs-scroll-btn.left {
+    left: 4px;
+}
+
+.admin-tabs-scroll-btn.right {
+    right: 4px;
+}
+
+.admin-tabs-wrapper.can-scroll-left .admin-tabs-scroll-btn.left,
+.admin-tabs-wrapper.can-scroll-right .admin-tabs-scroll-btn.right {
+    display: flex;
 }
 
 .admin-tabs {
     display: flex;
-    gap: 4px;
+    gap: 6px;
     overflow-x: auto;
     padding: 12px 0;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
+    scroll-behavior: smooth;
 }
 
 .admin-tabs::-webkit-scrollbar {
@@ -2172,7 +2244,7 @@ h4 {
 }
 
 .admin-tab {
-    padding: 8px 16px;
+    padding: 10px 18px;
     color: var(--text-light);
     text-decoration: none;
     font-size: 0.875rem;
@@ -2180,25 +2252,48 @@ h4 {
     border-radius: var(--radius);
     white-space: nowrap;
     transition: all 0.2s;
+    border: 1px solid transparent;
 }
 
 .admin-tab:hover {
-    background: rgba(45, 90, 39, 0.1);
+    background: var(--secondary);
     color: var(--primary);
+    border-color: var(--border);
 }
 
 .admin-tab.active {
     background: var(--primary);
     color: white;
+    border-color: var(--primary);
+    box-shadow: 0 2px 4px rgba(45, 90, 39, 0.3);
 }
 
 .admin-tab.tab-warning {
     color: #dc2626;
 }
 
+.admin-tab.tab-warning:hover {
+    background: #fef2f2;
+    border-color: #fecaca;
+}
+
 .admin-tab.tab-warning.active {
     background: #dc2626;
     color: white;
+    border-color: #dc2626;
+}
+
+/* Mobile: Show tab groups */
+@media (max-width: 768px) {
+    .admin-tabs {
+        gap: 4px;
+        padding: 8px 0;
+    }
+
+    .admin-tab {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
 }
 
 /* Adjust admin page to account for tabs bar */
