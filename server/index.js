@@ -4771,7 +4771,7 @@ app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (r
 // Update purchase order (general info and status)
 app.put('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { supplier, expectedDeliveryDate, deliveryLocation, bolNumber, trackingInfo, notes, internalNotes, status } = req.body;
+        const { supplier, expectedDeliveryDate, deliveryLocation, bolNumber, trackingInfo, notes, internalNotes, status, superAdminFee } = req.body;
 
         const po = await PurchaseOrder.findById(req.params.id);
         if (!po) {
@@ -4789,6 +4789,13 @@ app.put('/api/admin/purchase-orders/:id', authMiddleware, adminMiddleware, async
         if (status) {
             po.status = status;
             if (status === 'received') po.receivedDate = new Date();
+        }
+
+        // Super admin fee (only superadmin can set)
+        if (superAdminFee !== undefined && req.user.role === 'superadmin') {
+            po.superAdminFee = superAdminFee;
+            // Recalculate total
+            po.totalCost = (po.subtotal || 0) + (po.freight || 0) + (po.otherFees || 0) + superAdminFee;
         }
 
         po.updatedBy = req.user._id;

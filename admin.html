@@ -1826,6 +1826,30 @@
                             </table>
                         </div>
 
+                        <!-- Super Admin Fee Calculator (Superadmin only) -->
+                        <div class="superadmin-only" style="display: none; background: #f5f3ff; border: 2px solid #7c3aed; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                            <h4 style="margin-bottom: 12px; color: #7c3aed;">Acre Profit Admin Fee</h4>
+                            <div style="display: flex; gap: 16px; align-items: flex-end; flex-wrap: wrap;">
+                                <div style="flex: 1; min-width: 120px;">
+                                    <label style="font-size: 12px; color: #666;">Rate per Gallon ($)</label>
+                                    <input type="number" id="poAdminFeeRate" step="0.01" min="0" value="0.07"
+                                        style="width: 100%; padding: 8px; border: 2px solid #7c3aed; border-radius: 6px;"
+                                        onchange="calculateAdminFee()">
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <label style="font-size: 12px; color: #666;">Total Gallons</label>
+                                    <div id="poTotalGallons" style="padding: 8px; font-weight: 600;">0</div>
+                                </div>
+                                <div style="flex: 1; min-width: 120px;">
+                                    <label style="font-size: 12px; color: #666;">Calculated Fee</label>
+                                    <div id="poCalculatedFee" style="padding: 8px; font-weight: 700; color: #7c3aed;">$0.00</div>
+                                </div>
+                                <button class="btn btn-primary btn-sm" onclick="applyAdminFee()" style="background: #7c3aed; border-color: #7c3aed;">
+                                    Apply Fee
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Split Section -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <h4 style="color: var(--primary);">Load Splits (Distributor Allocations)</h4>
@@ -3173,6 +3197,9 @@
                     adminFeeEl.textContent = '$' + (currentPO.superAdminFee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
                 }
 
+                // Calculate total gallons for admin fee calculator
+                calculateTotalGallons();
+
                 // Populate items table
                 const itemsBody = document.getElementById('poDetailItemsBody');
                 itemsBody.innerHTML = currentPO.items.map((item, idx) => `
@@ -3210,6 +3237,77 @@
         function closePODetailModal() {
             document.getElementById('poDetailModal').style.display = 'none';
             currentPO = null;
+        }
+
+        // Admin Fee Calculator Functions
+        function calculateTotalGallons() {
+            if (!currentPO || !currentPO.items) return 0;
+
+            let totalGallons = 0;
+            currentPO.items.forEach(item => {
+                // Check if unit is gallon-based or pack size mentions gallons
+                const unit = (item.unit || '').toLowerCase();
+                const packSize = (item.packSize || '').toLowerCase();
+
+                if (unit.includes('gal') || packSize.includes('gal')) {
+                    // Extract gallon amount from pack size if present (e.g., "2.5 gal", "2x2.5 gal")
+                    const galMatch = packSize.match(/(\d+(?:\.\d+)?)\s*gal/i);
+                    const multiplierMatch = packSize.match(/^(\d+)\s*x/i);
+
+                    let gallonsPerUnit = galMatch ? parseFloat(galMatch[1]) : 1;
+                    let multiplier = multiplierMatch ? parseInt(multiplierMatch[1]) : 1;
+
+                    totalGallons += item.quantityOrdered * gallonsPerUnit * multiplier;
+                } else {
+                    // Default: assume quantity is in gallons if no unit specified
+                    totalGallons += item.quantityOrdered;
+                }
+            });
+
+            document.getElementById('poTotalGallons').textContent = totalGallons.toLocaleString();
+            calculateAdminFee();
+            return totalGallons;
+        }
+
+        function calculateAdminFee() {
+            const rate = parseFloat(document.getElementById('poAdminFeeRate')?.value) || 0;
+            const gallonsText = document.getElementById('poTotalGallons')?.textContent || '0';
+            const totalGallons = parseFloat(gallonsText.replace(/,/g, '')) || 0;
+
+            const fee = rate * totalGallons;
+            document.getElementById('poCalculatedFee').textContent = '$' + fee.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            return fee;
+        }
+
+        async function applyAdminFee() {
+            if (!currentPO) return;
+
+            const fee = calculateAdminFee();
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ superAdminFee: fee })
+                });
+
+                if (res.ok) {
+                    const data = await res.json();
+                    currentPO = data;
+                    document.getElementById('poDetailAdminFee').textContent = '$' + (fee).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    loadPurchaseOrders();
+                    alert('Admin fee applied successfully!');
+                } else {
+                    alert('Error applying admin fee');
+                }
+            } catch (error) {
+                console.error('Error applying admin fee:', error);
+                alert('Error applying admin fee');
+            }
         }
 
         async function updatePOStatus() {
