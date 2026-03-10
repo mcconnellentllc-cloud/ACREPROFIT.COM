@@ -210,18 +210,21 @@
 
                 <div class="tab-header">
                     <h2>All Orders</h2>
-                    <div class="filters">
-                        <select id="orderStatusFilter">
-                            <option value="">All Status</option>
-                            <option value="pending">Order Created</option>
-                            <option value="payment_pending">Payment Pending</option>
-                            <option value="payment_secured">Payment Secured</option>
-                            <option value="manufacturer_ordered">Ordered from Mfg</option>
-                            <option value="bol_assigned">BOL Assigned</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="signed_off">Signed Off</option>
-                        </select>
+                    <div class="tab-header-actions">
+                        <a href="/chemical-docs.html" target="_blank" class="btn btn-outline btn-sm">View All Labels & SDS</a>
+                        <div class="filters">
+                            <select id="orderStatusFilter">
+                                <option value="">All Status</option>
+                                <option value="pending">Order Created</option>
+                                <option value="payment_pending">Payment Pending</option>
+                                <option value="payment_secured">Payment Secured</option>
+                                <option value="manufacturer_ordered">Ordered from Mfg</option>
+                                <option value="bol_assigned">BOL Assigned</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="signed_off">Signed Off</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="orders-table-wrapper">
@@ -629,8 +632,11 @@
             <!-- Compliance Tab -->
             <div id="complianceTab" class="tab-content">
                 <div class="tab-header">
-                    <h2 style="display: flex; align-items: center; gap: 8px;"><span style="color: #dc2626;">&#9888;</span> Compliance Dashboard</h2>
-                    <p style="color: var(--text-light); margin-top: 4px;">Manage regulatory compliance, applicator licenses, and RUP sales records</p>
+                    <div>
+                        <h2 style="display: flex; align-items: center; gap: 8px;"><span style="color: #dc2626;">&#9888;</span> Compliance Dashboard</h2>
+                        <p style="color: var(--text-light); margin-top: 4px;">Manage regulatory compliance, applicator licenses, and RUP sales records</p>
+                    </div>
+                    <a href="/chemical-docs.html" target="_blank" class="btn btn-primary">View All Labels & SDS</a>
                 </div>
 
                 <!-- Compliance Stats -->
