@@ -112,7 +112,14 @@
                             <div class="form-row">
                                 <div class="form-group flex-2">
                                     <label>Product Name</label>
-                                    <input type="text" id="productName" placeholder="e.g., Glyphosate, Atrazine">
+                                    <div class="chemical-select-wrapper">
+                                        <input type="text" id="productName" placeholder="Search chemicals..." autocomplete="off">
+                                        <div id="chemicalDropdown" class="chemical-dropdown"></div>
+                                    </div>
+                                </div>
+                                <div class="form-group flex-1">
+                                    <label>Pack Size</label>
+                                    <input type="text" id="productPackSize" readonly placeholder="-">
                                 </div>
                                 <div class="form-group flex-1">
                                     <label>Quantity</label>
@@ -129,7 +136,7 @@
                                     </select>
                                 </div>
                                 <div class="form-group flex-1">
-                                    <label>Price</label>
+                                    <label>Price/Unit</label>
                                     <input type="number" id="productPrice" placeholder="$0.00" min="0" step="0.01">
                                 </div>
                                 <div class="form-group flex-shrink">
@@ -226,6 +233,8 @@
         let allCustomers = [];
         let selectedCustomer = null;
         let products = [];
+        let allChemicals = [];
+        let selectedChemical = null;
 
         // Load customers
         async function loadCustomers() {
@@ -236,6 +245,22 @@
                 allCustomers = await res.json();
             } catch (error) {
                 console.error('Error loading customers:', error);
+            }
+        }
+
+        // Load chemicals from database
+        async function loadChemicals() {
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/admin`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    allChemicals = await res.json();
+                    // Filter to only available chemicals
+                    allChemicals = allChemicals.filter(c => c.isActive !== false && c.availableForOrder !== false);
+                }
+            } catch (error) {
+                console.error('Error loading chemicals:', error);
             }
         }
 
@@ -278,7 +303,73 @@
             if (!e.target.closest('.customer-select-wrapper')) {
                 dropdown.style.display = 'none';
             }
+            if (!e.target.closest('.chemical-select-wrapper')) {
+                document.getElementById('chemicalDropdown').style.display = 'none';
+            }
         });
+
+        // Chemical search/autocomplete
+        const chemicalInput = document.getElementById('productName');
+        const chemicalDropdown = document.getElementById('chemicalDropdown');
+
+        chemicalInput.addEventListener('input', function(e) {
+            const term = e.target.value.toLowerCase().trim();
+            selectedChemical = null;
+
+            if (term.length < 2) {
+                chemicalDropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = allChemicals.filter(c =>
+                c.productName.toLowerCase().includes(term) ||
+                (c.sourceSupplier && c.sourceSupplier.toLowerCase().includes(term)) ||
+                (c.category && c.category.toLowerCase().includes(term))
+            ).slice(0, 15);
+
+            if (filtered.length === 0) {
+                chemicalDropdown.innerHTML = '<div class="dropdown-empty">No chemicals found</div>';
+            } else {
+                chemicalDropdown.innerHTML = filtered.map(c => `
+                    <div class="dropdown-item chemical-item" onclick="selectChemical('${c._id}')">
+                        <div class="chemical-info">
+                            <strong>${c.productName}</strong>
+                            <span class="chemical-details">${c.sourceSupplier || ''} | ${c.packSize} ${c.unit} | $${(c.sellPrice || 0).toFixed(2)}/${c.unit}</span>
+                        </div>
+                    </div>
+                `).join('');
+            }
+            chemicalDropdown.style.display = 'block';
+        });
+
+        // Select chemical from dropdown
+        function selectChemical(chemicalId) {
+            selectedChemical = allChemicals.find(c => c._id === chemicalId);
+            if (!selectedChemical) return;
+
+            // Fill in the form fields
+            document.getElementById('productName').value = selectedChemical.productName;
+            document.getElementById('productPackSize').value = `${selectedChemical.packSize} ${selectedChemical.unit}`;
+            document.getElementById('productPrice').value = selectedChemical.sellPrice || '';
+
+            // Set unit based on chemical's unit
+            const unitSelect = document.getElementById('productUnit');
+            const unitMap = {
+                'gl': 'gallons',
+                'gal': 'gallons',
+                'gallon': 'gallons',
+                'oz': 'oz',
+                'lb': 'lbs',
+                'lbs': 'lbs'
+            };
+            const mappedUnit = unitMap[selectedChemical.unit?.toLowerCase()] || 'gallons';
+            unitSelect.value = mappedUnit;
+
+            chemicalDropdown.style.display = 'none';
+
+            // Focus on quantity
+            document.getElementById('productQty').focus();
+        }
 
         // Select customer
         function selectCustomer(customerId) {
@@ -328,15 +419,28 @@
                 return;
             }
 
-            products.push({ name, qty, unit, price, total: qty * price });
+            const product = {
+                name,
+                qty,
+                unit,
+                price,
+                total: qty * price,
+                chemicalId: selectedChemical ? selectedChemical._id : null,
+                packSize: selectedChemical ? selectedChemical.packSize : null,
+                sourceSupplier: selectedChemical ? selectedChemical.sourceSupplier : null
+            };
+
+            products.push(product);
 
             renderProducts();
             updateSummary();
 
             // Clear form
             document.getElementById('productName').value = '';
+            document.getElementById('productPackSize').value = '-';
             document.getElementById('productQty').value = '';
             document.getElementById('productPrice').value = '';
+            selectedChemical = null;
         }
 
         // Render products list
@@ -349,10 +453,11 @@
             }
 
             list.innerHTML = products.map((p, i) => `
-                <div class="product-item">
+                <div class="product-item ${p.chemicalId ? 'linked' : 'manual'}">
                     <div class="product-item-info">
                         <strong>${p.name}</strong>
-                        <span>${p.qty} ${p.unit}</span>
+                        <span>${p.qty} ${p.unit} @ $${p.price.toFixed(2)}/${p.unit}</span>
+                        ${p.sourceSupplier ? `<span class="product-supplier">${p.sourceSupplier} - ${p.packSize}</span>` : ''}
                     </div>
                     <div class="product-item-price">
                         <span>$${p.total.toFixed(2)}</span>
@@ -453,7 +558,7 @@
         }
 
         // Initialize
-        loadCustomers().then(() => {
+        Promise.all([loadCustomers(), loadChemicals()]).then(() => {
             checkUrlCustomer();
         });
         renderProducts();
@@ -782,6 +887,77 @@
             justify-content: flex-end;
             gap: 16px;
             padding: 24px 0;
+        }
+
+        /* Chemical dropdown styles */
+        .chemical-select-wrapper {
+            position: relative;
+        }
+
+        .chemical-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border: 2px solid var(--primary);
+            border-top: none;
+            border-radius: 0 0 var(--radius) var(--radius);
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+            z-index: 100;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .chemical-item {
+            display: block;
+            padding: 10px 14px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .chemical-item:last-child {
+            border-bottom: none;
+        }
+
+        .chemical-item:hover {
+            background: var(--secondary);
+        }
+
+        .chemical-info strong {
+            display: block;
+            font-size: 0.95rem;
+        }
+
+        .chemical-details {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-top: 2px;
+        }
+
+        .product-item.linked {
+            border-left: 3px solid var(--primary);
+        }
+
+        .product-item.manual {
+            border-left: 3px solid #f59e0b;
+        }
+
+        .product-item-info {
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 4px;
+        }
+
+        .product-supplier {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
+
+        #productPackSize {
+            background: var(--secondary);
+            color: var(--text-muted);
         }
 
         @media (max-width: 768px) {
