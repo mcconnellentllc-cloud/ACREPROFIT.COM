@@ -210,18 +210,21 @@
 
                 <div class="tab-header">
                     <h2>All Orders</h2>
-                    <div class="filters">
-                        <select id="orderStatusFilter">
-                            <option value="">All Status</option>
-                            <option value="pending">Order Created</option>
-                            <option value="payment_pending">Payment Pending</option>
-                            <option value="payment_secured">Payment Secured</option>
-                            <option value="manufacturer_ordered">Ordered from Mfg</option>
-                            <option value="bol_assigned">BOL Assigned</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                            <option value="signed_off">Signed Off</option>
-                        </select>
+                    <div class="tab-header-actions">
+                        <a href="/chemical-docs.html" target="_blank" class="btn btn-outline btn-sm">View All Labels & SDS</a>
+                        <div class="filters">
+                            <select id="orderStatusFilter">
+                                <option value="">All Status</option>
+                                <option value="pending">Order Created</option>
+                                <option value="payment_pending">Payment Pending</option>
+                                <option value="payment_secured">Payment Secured</option>
+                                <option value="manufacturer_ordered">Ordered from Mfg</option>
+                                <option value="bol_assigned">BOL Assigned</option>
+                                <option value="shipped">Shipped</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="signed_off">Signed Off</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
                 <div class="orders-table-wrapper">
@@ -629,8 +632,11 @@
             <!-- Compliance Tab -->
             <div id="complianceTab" class="tab-content">
                 <div class="tab-header">
-                    <h2 style="display: flex; align-items: center; gap: 8px;"><span style="color: #dc2626;">&#9888;</span> Compliance Dashboard</h2>
-                    <p style="color: var(--text-light); margin-top: 4px;">Manage regulatory compliance, applicator licenses, and RUP sales records</p>
+                    <div>
+                        <h2 style="display: flex; align-items: center; gap: 8px;"><span style="color: #dc2626;">&#9888;</span> Compliance Dashboard</h2>
+                        <p style="color: var(--text-light); margin-top: 4px;">Manage regulatory compliance, applicator licenses, and RUP sales records</p>
+                    </div>
+                    <a href="/chemical-docs.html" target="_blank" class="btn btn-primary">View All Labels & SDS</a>
                 </div>
 
                 <!-- Compliance Stats -->
@@ -1452,6 +1458,46 @@
                         <div class="stat-content">
                             <span class="stat-value" id="inventoryCategories">0</span>
                             <span class="stat-label">Categories</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Low Inventory Alert Section -->
+                <div id="lowInventoryAlert" class="low-inventory-alert" style="display: none;">
+                    <div class="alert-header">
+                        <div class="alert-title">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                            <h3>Low Inventory Alert - Reorder Needed</h3>
+                        </div>
+                        <div class="alert-actions">
+                            <button class="btn btn-sm btn-primary" onclick="generateReorderReport()">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
+                                Export Reorder List
+                            </button>
+                            <button class="btn btn-sm btn-outline" onclick="toggleLowInventoryDetails()">
+                                <span id="toggleLowInvText">Show Details</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div id="lowInventoryDetails" class="low-inventory-details" style="display: none;">
+                        <table class="reorder-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Category</th>
+                                    <th>Current Qty</th>
+                                    <th>Threshold</th>
+                                    <th>Suggested Order</th>
+                                    <th>Est. Cost</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="lowInventoryTableBody">
+                            </tbody>
+                        </table>
+                        <div class="reorder-summary">
+                            <span id="reorderSummaryText">0 items need reordering</span>
+                            <span id="reorderTotalCost">Estimated total: $0.00</span>
                         </div>
                     </div>
                 </div>
@@ -2957,7 +3003,13 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
-                purchaseOrders = await res.json();
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP error ${res.status}`);
+                }
+
+                const data = await res.json();
+                purchaseOrders = Array.isArray(data) ? data : [];
                 renderPurchaseOrders();
 
                 // Update stats
@@ -4464,13 +4516,138 @@
         function updateInventoryStats() {
             const totalItems = allInventory.length;
             const totalValue = allInventory.reduce((sum, item) => sum + ((item.quantity || 0) * (item.costPerUnit || 0)), 0);
-            const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold).length;
+            const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold);
             const categories = [...new Set(allInventory.map(item => item.category).filter(Boolean))].length;
 
             document.getElementById('totalInventoryItems').textContent = totalItems;
             document.getElementById('totalInventoryValue').textContent = '$' + totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            document.getElementById('lowStockCount').textContent = lowStockItems;
+            document.getElementById('lowStockCount').textContent = lowStockItems.length;
             document.getElementById('inventoryCategories').textContent = categories;
+
+            // Update low inventory alert
+            updateLowInventoryAlert(lowStockItems);
+        }
+
+        // Update low inventory alert section
+        function updateLowInventoryAlert(lowStockItems) {
+            const alertSection = document.getElementById('lowInventoryAlert');
+            const tableBody = document.getElementById('lowInventoryTableBody');
+            const summaryText = document.getElementById('reorderSummaryText');
+            const totalCostEl = document.getElementById('reorderTotalCost');
+
+            if (lowStockItems.length === 0) {
+                alertSection.style.display = 'none';
+                return;
+            }
+
+            alertSection.style.display = 'block';
+
+            // Sort by urgency (items at 0 first, then by percentage of threshold remaining)
+            lowStockItems.sort((a, b) => {
+                const aUrgency = a.quantity === 0 ? -1 : a.quantity / a.lowStockThreshold;
+                const bUrgency = b.quantity === 0 ? -1 : b.quantity / b.lowStockThreshold;
+                return aUrgency - bUrgency;
+            });
+
+            let totalReorderCost = 0;
+
+            tableBody.innerHTML = lowStockItems.map(item => {
+                const isCritical = item.quantity === 0;
+                const suggestedOrder = Math.max(item.lowStockThreshold * 2, (item.lowStockThreshold - item.quantity) + item.lowStockThreshold);
+                const estCost = suggestedOrder * (item.costPerUnit || 0);
+                totalReorderCost += estCost;
+
+                const qtyClass = isCritical ? 'critical' : 'low';
+                const rowClass = isCritical ? 'critical' : '';
+
+                return `
+                    <tr class="${rowClass}">
+                        <td>
+                            <strong>${item.productName || 'Unknown'}</strong>
+                            ${item.sku ? `<br><span style="color: #666; font-size: 0.8rem;">SKU: ${item.sku}</span>` : ''}
+                        </td>
+                        <td><span class="status-tag status-${item.category || 'other'}">${item.category || 'Other'}</span></td>
+                        <td><span class="qty-badge ${qtyClass}">${isCritical ? '⚠️ OUT' : item.quantity} ${item.unit || ''}</span></td>
+                        <td>${item.lowStockThreshold} ${item.unit || ''}</td>
+                        <td><span class="suggested-qty">+${suggestedOrder} ${item.unit || ''}</span></td>
+                        <td><strong>$${estCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                        <td><button class="btn-reorder" onclick="createPOForItem('${item.id || item._id}')">Create PO</button></td>
+                    </tr>
+                `;
+            }).join('');
+
+            summaryText.textContent = `${lowStockItems.length} item${lowStockItems.length > 1 ? 's' : ''} need${lowStockItems.length === 1 ? 's' : ''} reordering`;
+            totalCostEl.textContent = `Estimated total: $${totalReorderCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+        }
+
+        // Toggle low inventory details
+        function toggleLowInventoryDetails() {
+            const details = document.getElementById('lowInventoryDetails');
+            const toggleText = document.getElementById('toggleLowInvText');
+            if (details.style.display === 'none') {
+                details.style.display = 'block';
+                toggleText.textContent = 'Hide Details';
+            } else {
+                details.style.display = 'none';
+                toggleText.textContent = 'Show Details';
+            }
+        }
+
+        // Generate reorder report
+        function generateReorderReport() {
+            const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold);
+
+            if (lowStockItems.length === 0) {
+                alert('No items currently need reordering.');
+                return;
+            }
+
+            let csvContent = 'Product Name,SKU,Category,Current Qty,Unit,Threshold,Suggested Order,Cost Per Unit,Est. Reorder Cost,Location,Notes\n';
+
+            let totalCost = 0;
+            lowStockItems.forEach(item => {
+                const suggestedOrder = Math.max(item.lowStockThreshold * 2, (item.lowStockThreshold - item.quantity) + item.lowStockThreshold);
+                const estCost = suggestedOrder * (item.costPerUnit || 0);
+                totalCost += estCost;
+
+                csvContent += `"${item.productName || ''}","${item.sku || ''}","${item.category || ''}",${item.quantity || 0},"${item.unit || ''}",${item.lowStockThreshold || 0},${suggestedOrder},${item.costPerUnit || 0},${estCost.toFixed(2)},"${item.location || ''}","${(item.notes || '').replace(/"/g, '""')}"\n`;
+            });
+
+            csvContent += `\n"TOTAL","","","","","","","","${totalCost.toFixed(2)}","",""\n`;
+            csvContent += `\n"Report Generated","${new Date().toLocaleString()}","","","","","","","","",""\n`;
+
+            // Download the CSV
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            const url = URL.createObjectURL(blob);
+            link.setAttribute('href', url);
+            link.setAttribute('download', `reorder-report-${new Date().toISOString().split('T')[0]}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        // Create PO for specific item
+        function createPOForItem(itemId) {
+            const item = allInventory.find(i => (i.id || i._id) === itemId);
+            if (!item) return;
+
+            const suggestedOrder = Math.max(item.lowStockThreshold * 2, (item.lowStockThreshold - item.quantity) + item.lowStockThreshold);
+
+            // Pre-fill PO modal if it exists, otherwise alert
+            if (typeof openCreatePOModal === 'function') {
+                openCreatePOModal();
+                // Try to pre-fill the PO form
+                setTimeout(() => {
+                    const productInput = document.getElementById('poProduct');
+                    const qtyInput = document.getElementById('poQuantity');
+                    if (productInput) productInput.value = item.productName || '';
+                    if (qtyInput) qtyInput.value = suggestedOrder;
+                }, 100);
+            } else {
+                alert(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: $${(suggestedOrder * (item.costPerUnit || 0)).toFixed(2)}`);
+            }
         }
 
         // Filter inventory
@@ -6000,6 +6177,157 @@
         .btn-warning:hover {
             background: #d97706;
             border-color: #d97706;
+        }
+
+        /* Low Inventory Alert Styles */
+        .low-inventory-alert {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            border: 2px solid #ef4444;
+            border-radius: var(--radius-lg);
+            padding: 20px;
+            margin-bottom: 24px;
+            animation: pulseAlert 2s ease-in-out infinite;
+        }
+
+        @keyframes pulseAlert {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.2); }
+            50% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+        }
+
+        .alert-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .alert-title {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            color: #dc2626;
+        }
+
+        .alert-title svg {
+            color: #ef4444;
+        }
+
+        .alert-title h3 {
+            font-size: 1.1rem;
+            font-weight: 700;
+            margin: 0;
+        }
+
+        .alert-actions {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 8px 14px;
+            font-size: 0.85rem;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .low-inventory-details {
+            margin-top: 16px;
+            background: white;
+            border-radius: var(--radius);
+            overflow: hidden;
+        }
+
+        .reorder-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .reorder-table th {
+            background: #fef2f2;
+            padding: 12px;
+            text-align: left;
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: #991b1b;
+            text-transform: uppercase;
+        }
+
+        .reorder-table td {
+            padding: 12px;
+            border-bottom: 1px solid #fee2e2;
+        }
+
+        .reorder-table tr:hover {
+            background: #fff5f5;
+        }
+
+        .reorder-table .critical {
+            background: #fef2f2;
+        }
+
+        .reorder-table .critical td {
+            color: #dc2626;
+            font-weight: 600;
+        }
+
+        .qty-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .qty-badge.critical {
+            background: #fee2e2;
+            color: #dc2626;
+        }
+
+        .qty-badge.low {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .suggested-qty {
+            background: #d1fae5;
+            color: #059669;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-weight: 600;
+            font-size: 0.85rem;
+        }
+
+        .reorder-summary {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 16px;
+            background: #fef2f2;
+            font-weight: 600;
+        }
+
+        #reorderTotalCost {
+            color: #dc2626;
+            font-size: 1.1rem;
+        }
+
+        .btn-reorder {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 0.8rem;
+            font-weight: 600;
+        }
+
+        .btn-reorder:hover {
+            background: #047857;
         }
     </style>
 </body>
