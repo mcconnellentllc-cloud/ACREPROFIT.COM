@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit - Review and Pay for Your Order">
+    <title>Checkout - Acre Profit</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2D5A27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://js.stripe.com/v3/"></script>
+    <style>
+        .checkout-page {
+            padding: 100px 0 40px;
+            min-height: 100vh;
+            background: #f8f9fa;
+        }
+
+        .checkout-container {
+            max-width: 1000px;
+            margin: 0 auto;
+            display: grid;
+            grid-template-columns: 1fr 380px;
+            gap: 30px;
+            padding: 0 20px;
+        }
+
+        @media (max-width: 900px) {
+            .checkout-container {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .checkout-main {
+            background: white;
+            border-radius: 12px;
+            padding: 32px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .checkout-sidebar {
+            position: sticky;
+            top: 100px;
+            height: fit-content;
+        }
+
+        .checkout-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 8px;
+        }
+
+        .checkout-subtitle {
+            color: #666;
+            margin-bottom: 32px;
+        }
+
+        .section-title {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid #2D5A27;
+        }
+
+        /* Order Items */
+        .order-items-section {
+            margin-bottom: 32px;
+        }
+
+        .order-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 16px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .order-item:last-child {
+            border-bottom: none;
+        }
+
+        .order-item-info {
+            flex: 1;
+        }
+
+        .order-item-name {
+            font-weight: 600;
+            color: #1a1a2e;
+            margin-bottom: 4px;
+        }
+
+        .order-item-meta {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .order-item-qty {
+            background: #f0f0f0;
+            padding: 4px 10px;
+            border-radius: 4px;
+            font-size: 0.85rem;
+            margin: 0 16px;
+        }
+
+        .order-item-price {
+            font-weight: 600;
+            color: #2D5A27;
+            min-width: 90px;
+            text-align: right;
+        }
+
+        /* Delivery Info */
+        .delivery-section {
+            margin-bottom: 32px;
+        }
+
+        .delivery-card {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .delivery-icon {
+            width: 48px;
+            height: 48px;
+            background: #2D5A27;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 1.5rem;
+        }
+
+        .delivery-info h4 {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .delivery-info p {
+            font-size: 0.9rem;
+            color: #666;
+        }
+
+        /* Payment Methods */
+        .payment-section {
+            margin-bottom: 32px;
+        }
+
+        .payment-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .payment-option {
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            padding: 16px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .payment-option:hover {
+            border-color: #2D5A27;
+        }
+
+        .payment-option.selected {
+            border-color: #2D5A27;
+            background: rgba(45, 90, 39, 0.05);
+        }
+
+        .payment-option input[type="radio"] {
+            width: 20px;
+            height: 20px;
+            accent-color: #2D5A27;
+        }
+
+        .payment-option-info {
+            flex: 1;
+        }
+
+        .payment-option-title {
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .payment-option-desc {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .payment-option-fee {
+            font-size: 0.85rem;
+            color: #2D5A27;
+            font-weight: 500;
+        }
+
+        /* ACH Bank Form */
+        .ach-form {
+            margin-top: 16px;
+            padding: 16px;
+            background: #f8f9fa;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .ach-form.active {
+            display: block;
+        }
+
+        .ach-form .form-group {
+            margin-bottom: 16px;
+        }
+
+        .ach-form label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .ach-form input, .ach-form select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .ach-form input:focus, .ach-form select:focus {
+            outline: none;
+            border-color: #2D5A27;
+        }
+
+        #link-authentication-element,
+        #payment-element {
+            margin-bottom: 16px;
+        }
+
+        /* Check Instructions */
+        .check-instructions {
+            margin-top: 16px;
+            padding: 16px;
+            background: #fff3cd;
+            border-radius: 8px;
+            display: none;
+        }
+
+        .check-instructions.active {
+            display: block;
+        }
+
+        .check-instructions h4 {
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: #856404;
+        }
+
+        .check-instructions p {
+            font-size: 0.9rem;
+            color: #856404;
+            margin-bottom: 8px;
+        }
+
+        .check-address {
+            background: white;
+            padding: 12px;
+            border-radius: 4px;
+            font-family: monospace;
+            margin-top: 12px;
+        }
+
+        /* Contact Info */
+        .contact-section {
+            margin-bottom: 32px;
+        }
+
+        .contact-form {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .contact-form .form-group.full-width {
+            grid-column: 1 / -1;
+        }
+
+        .contact-form label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 500;
+            margin-bottom: 6px;
+        }
+
+        .contact-form input {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+        }
+
+        .contact-form input:focus {
+            outline: none;
+            border-color: #2D5A27;
+        }
+
+        /* Order Summary Sidebar */
+        .order-summary-card {
+            background: white;
+            border-radius: 12px;
+            padding: 24px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+        }
+
+        .order-summary-card h3 {
+            font-size: 1.25rem;
+            margin-bottom: 20px;
+        }
+
+        .summary-line {
+            display: flex;
+            justify-content: space-between;
+            padding: 10px 0;
+            border-bottom: 1px solid #eee;
+        }
+
+        .summary-line:last-of-type {
+            border-bottom: none;
+        }
+
+        .summary-line.total {
+            font-size: 1.25rem;
+            font-weight: 700;
+            border-top: 2px solid #1a1a2e;
+            margin-top: 10px;
+            padding-top: 16px;
+        }
+
+        .summary-line.total .amount {
+            color: #2D5A27;
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 16px;
+            background: #2D5A27;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            font-size: 1.1rem;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 20px;
+            transition: background 0.2s;
+        }
+
+        .submit-btn:hover:not(:disabled) {
+            background: #1f4a1c;
+        }
+
+        .submit-btn:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+
+        .submit-btn.loading {
+            position: relative;
+            color: transparent;
+        }
+
+        .submit-btn.loading::after {
+            content: "";
+            position: absolute;
+            width: 20px;
+            height: 20px;
+            top: 50%;
+            left: 50%;
+            margin: -10px 0 0 -10px;
+            border: 3px solid transparent;
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .secure-badge {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            margin-top: 16px;
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .secure-badge svg {
+            width: 16px;
+            height: 16px;
+            color: #2D5A27;
+        }
+
+        /* Error/Success Messages */
+        .message {
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            display: none;
+        }
+
+        .message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+            display: block;
+        }
+
+        .message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+            display: block;
+        }
+
+        /* Empty State */
+        .empty-cart {
+            text-align: center;
+            padding: 60px 20px;
+        }
+
+        .empty-cart h2 {
+            color: #666;
+            margin-bottom: 16px;
+        }
+
+        .empty-cart p {
+            color: #888;
+            margin-bottom: 24px;
+        }
+
+        /* Order Notes */
+        .notes-section {
+            margin-bottom: 32px;
+        }
+
+        .notes-section textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 1rem;
+            min-height: 100px;
+            resize: vertical;
+        }
+
+        .notes-section textarea:focus {
+            outline: none;
+            border-color: #2D5A27;
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <div class="nav-center">
+                <a href="/order.html" class="nav-back">&larr; Back to Order</a>
+                <span class="nav-title">Checkout</span>
+            </div>
+            <div class="nav-right">
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="checkout-page">
+        <div class="container">
+            <!-- Empty State (shown when no items) -->
+            <div class="empty-cart" id="emptyCart" style="display: none;">
+                <h2>Your cart is empty</h2>
+                <p>Add some products to your order before checking out.</p>
+                <a href="/order.html" class="btn btn-primary">Go to Order Page</a>
+            </div>
+
+            <!-- Checkout Content -->
+            <div class="checkout-container" id="checkoutContent">
+                <div class="checkout-main">
+                    <h1 class="checkout-title">Review Your Order</h1>
+                    <p class="checkout-subtitle">Confirm your items and complete your purchase</p>
+
+                    <div id="messageBox" class="message"></div>
+
+                    <!-- Order Items -->
+                    <div class="order-items-section">
+                        <h3 class="section-title">Order Items</h3>
+                        <div id="orderItemsList">
+                            <!-- Populated by JS -->
+                        </div>
+                    </div>
+
+                    <!-- Delivery Info -->
+                    <div class="delivery-section">
+                        <h3 class="section-title">Pickup Location</h3>
+                        <div class="delivery-card">
+                            <div class="delivery-icon">&#x1F4CD;</div>
+                            <div class="delivery-info">
+                                <h4 id="deliveryLocation">McConnell</h4>
+                                <p id="deliveryRep">Kyle McConnell - (970) 571-1015</p>
+                                <p id="deliveryTiming">Delivery timing based on truck fill</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Contact Info -->
+                    <div class="contact-section">
+                        <h3 class="section-title">Contact Information</h3>
+                        <div class="contact-form">
+                            <div class="form-group">
+                                <label>Full Name *</label>
+                                <input type="text" id="customerName" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Phone *</label>
+                                <input type="tel" id="customerPhone" required>
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Email *</label>
+                                <input type="email" id="customerEmail" required>
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Farm Name (optional)</label>
+                                <input type="text" id="customerFarm">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Methods -->
+                    <div class="payment-section">
+                        <h3 class="section-title">Payment Method</h3>
+                        <div class="payment-options">
+                            <label class="payment-option selected" onclick="selectPayment('ach')">
+                                <input type="radio" name="paymentMethod" value="ach" checked>
+                                <div class="payment-option-info">
+                                    <div class="payment-option-title">Bank Transfer (ACH)</div>
+                                    <div class="payment-option-desc">Pay directly from your bank account</div>
+                                </div>
+                                <div class="payment-option-fee">0.8% fee (max $5)</div>
+                            </label>
+
+                            <label class="payment-option" onclick="selectPayment('check')">
+                                <input type="radio" name="paymentMethod" value="check">
+                                <div class="payment-option-info">
+                                    <div class="payment-option-title">Pay by Check</div>
+                                    <div class="payment-option-desc">Mail a check to your representative</div>
+                                </div>
+                                <div class="payment-option-fee">No fee</div>
+                            </label>
+                        </div>
+
+                        <!-- ACH Payment Form (Stripe Elements) -->
+                        <div class="ach-form active" id="achForm">
+                            <p style="margin-bottom: 16px; color: #666;">Enter your bank details below. Your information is securely processed by Stripe.</p>
+                            <div id="payment-element"></div>
+                            <div id="payment-message" style="color: #dc3545; font-size: 0.9rem; margin-top: 8px;"></div>
+                        </div>
+
+                        <!-- Check Payment Instructions -->
+                        <div class="check-instructions" id="checkInstructions">
+                            <h4>Check Payment Instructions</h4>
+                            <p>Your order will be placed immediately. Please mail your check within 7 days to:</p>
+                            <div class="check-address" id="checkAddress">
+                                <strong>Acre Profit</strong><br>
+                                c/o Kyle McConnell<br>
+                                <span id="repAddress">Address provided after order submission</span>
+                            </div>
+                            <p style="margin-top: 12px;"><strong>Note:</strong> Write your Order ID (provided after checkout) on the check memo line.</p>
+                        </div>
+                    </div>
+
+                    <!-- Order Notes -->
+                    <div class="notes-section">
+                        <h3 class="section-title">Order Notes (optional)</h3>
+                        <textarea id="orderNotes" placeholder="Any special instructions or notes for your order..."></textarea>
+                    </div>
+                </div>
+
+                <!-- Order Summary Sidebar -->
+                <div class="checkout-sidebar">
+                    <div class="order-summary-card">
+                        <h3>Order Summary</h3>
+
+                        <div class="summary-line">
+                            <span>Items (<span id="itemCount">0</span>)</span>
+                            <span id="itemsSubtotal">$0.00</span>
+                        </div>
+
+                        <div class="summary-line">
+                            <span>Delivery</span>
+                            <span>Pickup (FREE)</span>
+                        </div>
+
+                        <div class="summary-line" id="achFeeRow" style="display: none;">
+                            <span>Processing Fee (ACH)</span>
+                            <span id="achFee">$0.00</span>
+                        </div>
+
+                        <div class="summary-line total">
+                            <span>Total</span>
+                            <span class="amount" id="orderTotal">$0.00</span>
+                        </div>
+
+                        <button type="button" class="submit-btn" id="submitBtn" onclick="submitOrder()">
+                            Place Order
+                        </button>
+
+                        <div class="secure-badge">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
+                            <span>Secure checkout powered by Stripe</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001'
+            : 'https://acreprofit-com.onrender.com';
+
+        // Check auth
+        const token = localStorage.getItem('token');
+        const user = localStorage.getItem('user');
+
+        if (!token || !user) {
+            window.location.href = '/login.html';
+        }
+
+        const userData = JSON.parse(user);
+
+        // Logout handler
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/';
+        });
+
+        // Get order data from session storage
+        let orderData = null;
+        let stripe = null;
+        let elements = null;
+        let paymentElement = null;
+        let selectedPaymentMethod = 'ach';
+        let processingFee = 0;
+
+        // Rep info
+        const reps = {
+            'mcconnell': { name: 'Kyle McConnell', phone: '(970) 571-1015', email: 'office@togoag.com' },
+            'bamford': { name: 'Chad Bamford', phone: '(970) 520-3716', email: 'Ckbamford@yahoo.com' },
+            'mollohan': { name: 'Ty Mollohan', phone: '(970) 520-2340', email: 'Tymollohan77@gmail.com' }
+        };
+
+        async function initCheckout() {
+            // Get order data from session
+            const savedOrder = sessionStorage.getItem('checkoutOrder');
+
+            if (!savedOrder) {
+                document.getElementById('emptyCart').style.display = 'block';
+                document.getElementById('checkoutContent').style.display = 'none';
+                return;
+            }
+
+            orderData = JSON.parse(savedOrder);
+
+            // Populate contact info from user data
+            document.getElementById('customerName').value = userData.name || '';
+            document.getElementById('customerEmail').value = userData.email || '';
+            document.getElementById('customerPhone').value = userData.phone || '';
+            document.getElementById('customerFarm').value = userData.farm?.name || '';
+
+            // Render order items
+            renderOrderItems();
+
+            // Set delivery info
+            const location = orderData.location || 'mcconnell';
+            const rep = reps[location] || reps.mcconnell;
+            document.getElementById('deliveryLocation').textContent = location.charAt(0).toUpperCase() + location.slice(1);
+            document.getElementById('deliveryRep').textContent = `${rep.name} - ${rep.phone}`;
+
+            // Update totals
+            updateTotals();
+
+            // Initialize Stripe
+            await initStripe();
+        }
+
+        function renderOrderItems() {
+            const container = document.getElementById('orderItemsList');
+            const items = orderData.items || [];
+
+            if (items.length === 0) {
+                container.innerHTML = '<p style="color: #666;">No items in order</p>';
+                return;
+            }
+
+            container.innerHTML = items.map(item => `
+                <div class="order-item">
+                    <div class="order-item-info">
+                        <div class="order-item-name">${item.productName || item.name}</div>
+                        <div class="order-item-meta">${item.timing ? item.timing.replace('-', ' ') : ''} ${item.packSize || ''}</div>
+                    </div>
+                    <div class="order-item-qty">x${item.qty || item.quantity || 1}</div>
+                    <div class="order-item-price">$${(item.total || item.price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                </div>
+            `).join('');
+        }
+
+        function updateTotals() {
+            const items = orderData.items || [];
+            const subtotal = items.reduce((sum, item) => sum + (item.total || item.price || 0), 0);
+
+            document.getElementById('itemCount').textContent = items.length;
+            document.getElementById('itemsSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+
+            // Calculate ACH fee if applicable
+            if (selectedPaymentMethod === 'ach') {
+                processingFee = Math.min(subtotal * 0.008, 5); // 0.8% capped at $5
+                document.getElementById('achFeeRow').style.display = 'flex';
+                document.getElementById('achFee').textContent = '$' + processingFee.toFixed(2);
+            } else {
+                processingFee = 0;
+                document.getElementById('achFeeRow').style.display = 'none';
+            }
+
+            const total = subtotal + processingFee;
+            document.getElementById('orderTotal').textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2});
+            orderData.subtotal = subtotal;
+            orderData.processingFee = processingFee;
+            orderData.total = total;
+        }
+
+        function selectPayment(method) {
+            selectedPaymentMethod = method;
+
+            // Update UI
+            document.querySelectorAll('.payment-option').forEach(opt => {
+                opt.classList.remove('selected');
+            });
+            document.querySelector(`input[value="${method}"]`).closest('.payment-option').classList.add('selected');
+
+            // Show/hide forms
+            document.getElementById('achForm').classList.toggle('active', method === 'ach');
+            document.getElementById('checkInstructions').classList.toggle('active', method === 'check');
+
+            // Update button text
+            if (method === 'check') {
+                document.getElementById('submitBtn').textContent = 'Place Order (Pay by Check)';
+            } else {
+                document.getElementById('submitBtn').textContent = 'Place Order';
+            }
+
+            updateTotals();
+        }
+
+        async function initStripe() {
+            try {
+                // Get publishable key from server
+                const response = await fetch(`${API_URL}/api/stripe/config`);
+                if (!response.ok) {
+                    console.log('Stripe config not available, using check payment only');
+                    document.querySelector('.payment-option[onclick*="ach"]').style.display = 'none';
+                    selectPayment('check');
+                    return;
+                }
+
+                const { publishableKey } = await response.json();
+                if (!publishableKey) {
+                    console.log('No Stripe key configured');
+                    return;
+                }
+
+                stripe = Stripe(publishableKey);
+
+                // Create setup intent for ACH
+                const setupResponse = await fetch(`${API_URL}/api/payments/setup-intent`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!setupResponse.ok) {
+                    throw new Error('Failed to initialize payment');
+                }
+
+                const { clientSecret } = await setupResponse.json();
+
+                elements = stripe.elements({
+                    clientSecret,
+                    appearance: {
+                        theme: 'stripe',
+                        variables: {
+                            colorPrimary: '#2D5A27',
+                            borderRadius: '6px'
+                        }
+                    }
+                });
+
+                paymentElement = elements.create('payment', {
+                    layout: 'tabs',
+                    paymentMethodOrder: ['us_bank_account']
+                });
+                paymentElement.mount('#payment-element');
+
+            } catch (error) {
+                console.error('Stripe init error:', error);
+                showMessage('Payment initialization failed. You can still pay by check.', 'error');
+            }
+        }
+
+        function showMessage(text, type = 'error') {
+            const box = document.getElementById('messageBox');
+            box.textContent = text;
+            box.className = 'message ' + type;
+            box.style.display = 'block';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        async function submitOrder() {
+            const btn = document.getElementById('submitBtn');
+
+            // Validate contact info
+            const name = document.getElementById('customerName').value.trim();
+            const email = document.getElementById('customerEmail').value.trim();
+            const phone = document.getElementById('customerPhone').value.trim();
+
+            if (!name || !email || !phone) {
+                showMessage('Please fill in all required contact fields.', 'error');
+                return;
+            }
+
+            btn.disabled = true;
+            btn.classList.add('loading');
+
+            try {
+                // Prepare order data
+                const orderPayload = {
+                    year: orderData.year || 2026,
+                    location: orderData.location || 'mcconnell',
+                    items: orderData.items,
+                    subtotal: orderData.subtotal,
+                    processingFee: orderData.processingFee,
+                    total: orderData.total,
+                    paymentMethod: selectedPaymentMethod,
+                    customerName: name,
+                    customerEmail: email,
+                    customerPhone: phone,
+                    customerFarm: document.getElementById('customerFarm').value.trim(),
+                    notes: document.getElementById('orderNotes').value.trim()
+                };
+
+                if (selectedPaymentMethod === 'ach' && stripe && elements) {
+                    // Submit Stripe payment
+                    const { error: submitError } = await elements.submit();
+                    if (submitError) {
+                        throw new Error(submitError.message);
+                    }
+
+                    // Create order first
+                    const orderResponse = await fetch(`${API_URL}/api/chemical-orders/checkout`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(orderPayload)
+                    });
+
+                    if (!orderResponse.ok) {
+                        const err = await orderResponse.json();
+                        throw new Error(err.error || 'Failed to create order');
+                    }
+
+                    const orderResult = await orderResponse.json();
+
+                    // Confirm payment with Stripe
+                    const { error: confirmError } = await stripe.confirmSetup({
+                        elements,
+                        confirmParams: {
+                            return_url: `${window.location.origin}/order-confirmation.html?order=${orderResult.orderId}`
+                        },
+                        redirect: 'if_required'
+                    });
+
+                    if (confirmError) {
+                        throw new Error(confirmError.message);
+                    }
+
+                    // Payment success - redirect to confirmation
+                    sessionStorage.removeItem('checkoutOrder');
+                    sessionStorage.setItem('completedOrder', JSON.stringify(orderResult));
+                    window.location.href = `/order-confirmation.html?order=${orderResult.orderId}`;
+
+                } else {
+                    // Check payment - just create order
+                    orderPayload.paymentMethod = 'check';
+                    orderPayload.paymentStatus = 'pending';
+
+                    const orderResponse = await fetch(`${API_URL}/api/chemical-orders/checkout`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(orderPayload)
+                    });
+
+                    if (!orderResponse.ok) {
+                        const err = await orderResponse.json();
+                        throw new Error(err.error || 'Failed to create order');
+                    }
+
+                    const orderResult = await orderResponse.json();
+
+                    // Success - redirect to confirmation
+                    sessionStorage.removeItem('checkoutOrder');
+                    sessionStorage.setItem('completedOrder', JSON.stringify(orderResult));
+                    window.location.href = `/order-confirmation.html?order=${orderResult.orderId}`;
+                }
+
+            } catch (error) {
+                console.error('Checkout error:', error);
+                showMessage(error.message || 'Failed to process order. Please try again.', 'error');
+                btn.disabled = false;
+                btn.classList.remove('loading');
+            }
+        }
+
+        // Initialize on load
+        document.addEventListener('DOMContentLoaded', initCheckout);
+    </script>
+</body>
+</html>

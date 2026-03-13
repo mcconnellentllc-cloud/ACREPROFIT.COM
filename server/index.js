@@ -621,6 +621,8 @@ const chemicalOrderSchema = new mongoose.Schema({
         quantity: Number, // Number of packs
         unitPrice: Number, // Price per unit at time of order
         totalPrice: Number,
+        timing: String, // Delivery timing (early-spring, pre-plant, etc.)
+        isCustom: { type: Boolean, default: false },
         // For program orders
         acres: Number,
         rate: Number,
@@ -637,7 +639,20 @@ const chemicalOrderSchema = new mongoose.Schema({
     subtotal: Number,
     discount: { type: Number, default: 0 },
     discountReason: String,
+    processingFee: { type: Number, default: 0 },
     total: Number,
+
+    // Pickup & Year
+    pickupLocation: String,
+    year: Number,
+
+    // Contact info (for checkout)
+    contactInfo: {
+        name: String,
+        email: String,
+        phone: String,
+        farm: String
+    },
 
     // Status tracking
     status: {
@@ -647,8 +662,8 @@ const chemicalOrderSchema = new mongoose.Schema({
     },
 
     // Payment
-    paymentStatus: { type: String, enum: ['pending', 'paid', 'partial'], default: 'pending' },
-    paymentMethod: String,
+    paymentStatus: { type: String, enum: ['pending', 'processing', 'paid', 'partial', 'failed'], default: 'pending' },
+    paymentMethod: { type: String, enum: ['ach', 'check', 'card', 'stripe_ach'], default: 'check' },
 
     // Dates
     submittedAt: Date,
@@ -4042,6 +4057,134 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
+});
+
+// ============ CHECKOUT ENDPOINT ============
+// Full checkout flow - creates order with payment info
+app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
+    try {
+        const {
+            year,
+            location,
+            items,
+            subtotal,
+            processingFee,
+            total,
+            paymentMethod,
+            customerName,
+            customerEmail,
+            customerPhone,
+            customerFarm,
+            notes
+        } = req.body;
+
+        // Validate required fields
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: 'No items in order' });
+        }
+
+        if (!paymentMethod) {
+            return res.status(400).json({ error: 'Payment method required' });
+        }
+
+        // Find or assign representative based on location
+        let representativeId = req.user.representative;
+        const repMap = {
+            'mcconnell': 'kyle',
+            'bamford': 'chad',
+            'mollohan': 'ty'
+        };
+        const repCode = repMap[location] || 'kyle';
+
+        // Try to find the rep user
+        if (!representativeId) {
+            const repUser = await User.findOne({
+                $or: [
+                    { representativeId: repCode },
+                    { email: { $regex: new RegExp(repCode, 'i') } }
+                ],
+                role: { $in: ['admin', 'superadmin'] }
+            });
+            if (repUser) {
+                representativeId = repUser._id;
+            }
+        }
+
+        // Build order items
+        const orderItems = items.map(item => ({
+            productName: item.productName || item.name,
+            packSize: item.packSize || '',
+            unit: item.unit || 'pack',
+            quantity: item.qty || item.quantity || 1,
+            unitPrice: item.price || 0,
+            totalPrice: item.total || 0,
+            timing: item.timing || '',
+            isCustom: item.isCustom || false
+        }));
+
+        // Calculate totals if not provided
+        const calculatedSubtotal = subtotal || items.reduce((sum, item) => sum + (item.total || 0), 0);
+        const calculatedTotal = total || calculatedSubtotal + (processingFee || 0);
+
+        // Create the order
+        const order = new ChemicalOrder({
+            userId: req.user._id,
+            representativeId: representativeId,
+            orderType: 'direct',
+            items: orderItems,
+            totalAcres: 0,
+            subtotal: calculatedSubtotal,
+            processingFee: processingFee || 0,
+            total: calculatedTotal,
+            customerNotes: notes,
+            status: 'submitted',
+            paymentMethod: paymentMethod,
+            paymentStatus: paymentMethod === 'check' ? 'pending' : 'processing',
+            submittedAt: new Date(),
+            // Extra fields for contact info
+            contactInfo: {
+                name: customerName || req.user.name,
+                email: customerEmail || req.user.email,
+                phone: customerPhone || req.user.phone,
+                farm: customerFarm
+            },
+            pickupLocation: location,
+            year: year || new Date().getFullYear()
+        });
+
+        await order.save();
+
+        // Update user info if provided
+        if (customerPhone && !req.user.phone) {
+            req.user.phone = customerPhone;
+            await req.user.save();
+        }
+
+        res.status(201).json({
+            success: true,
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            total: order.total,
+            itemCount: order.items.length,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: order.paymentStatus,
+            location: location,
+            items: order.items
+        });
+
+    } catch (error) {
+        console.error('Checkout error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get Stripe publishable key
+app.get('/api/stripe/config', (req, res) => {
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+    if (!publishableKey) {
+        return res.status(400).json({ error: 'Stripe not configured' });
+    }
+    res.json({ publishableKey });
 });
 
 // Get customer's chemical orders
