@@ -888,7 +888,7 @@
                         <span class="summary-value" id="totalCostDisplay">$0.00</span>
                     </div>
                     <div class="summary-actions">
-                        <button class="btn btn-primary" onclick="submitOrder()">Submit Order</button>
+                        <button class="btn btn-primary btn-checkout" onclick="submitOrder()">Proceed to Checkout</button>
                     </div>
 
                     <!-- RUP Warning (shown if order contains RUP) -->
@@ -1034,7 +1034,7 @@
 
         // Check for admin preview mode (general site preview)
         const isAdminPreview = localStorage.getItem('adminPreviewMode') === 'true';
-        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin')) {
+        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin' || userData.role === 'distributor')) {
             const banner = document.getElementById('adminPreviewBanner');
             if (banner) {
                 banner.style.display = 'block';
@@ -1048,7 +1048,7 @@
         // Check if admin is acting as a customer
         let actingAsCustomer = null;
         const actingAsData = sessionStorage.getItem('actingAsCustomer');
-        if (actingAsData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+        if (actingAsData && (userData.role === 'admin' || userData.role === 'superadmin' || userData.role === 'distributor')) {
             actingAsCustomer = JSON.parse(actingAsData);
             showActingAsBanner();
         }
@@ -1929,57 +1929,84 @@
             loadUserChemicals();
         });
 
-        // Submit order
+        // Submit order - Collects all items and redirects to checkout
         async function submitOrder() {
-            if (orderData.totalAcres === 0) {
-                alert('Please enter acres for at least one crop.');
+            // Collect all order items
+            const allItems = [];
+            let grandTotal = 0;
+
+            // 1. Collect quick order items (products added via quick add)
+            quickOrderItems.forEach(item => {
+                allItems.push({
+                    productName: item.productName || item.product,
+                    timing: item.timing,
+                    location: item.location,
+                    qty: item.qty,
+                    price: item.price,
+                    total: item.total,
+                    packSize: item.packSize,
+                    isCustom: item.isCustom || false,
+                    isUserChemical: item.isUserChemical || false
+                });
+                grandTotal += item.total;
+            });
+
+            // 2. Collect timing-based chemical quantities
+            document.querySelectorAll('.chem-qty').forEach(input => {
+                const qty = parseInt(input.value) || 0;
+                if (qty > 0) {
+                    const row = input.closest('tr');
+                    const price = parseFloat(input.dataset.price) || 0;
+                    const timing = input.dataset.timing;
+                    const productName = row.querySelector('strong')?.textContent || 'Unknown Product';
+                    const packSize = row.querySelector('td:nth-child(2)')?.textContent || '';
+                    const total = qty * price;
+
+                    allItems.push({
+                        productName: productName,
+                        timing: timing,
+                        location: selectedLocation || 'mcconnell',
+                        qty: qty,
+                        price: price,
+                        total: total,
+                        packSize: packSize
+                    });
+                    grandTotal += total;
+                }
+            });
+
+            // Check if there are any items to order
+            if (allItems.length === 0) {
+                alert('Please add products to your order before checking out.\n\nYou can:\n- Add chemicals in the timing sections above\n- Use Quick Add to select products\n- Add custom chemicals');
                 return;
             }
 
-            try {
-                let endpoint = `${API_URL}/api/orders`;
-                let orderPayload = {
-                    year: selectedYear,
-                    crops: orderData.crops,
-                    totalAcres: orderData.totalAcres,
-                    totalCost: orderData.totalCost,
-                    totalPrice: orderData.totalCost,
-                    acres: orderData.totalAcres
-                };
-
-                // If admin is acting as customer, use the admin endpoint
-                if (actingAsCustomer) {
-                    endpoint = `${API_URL}/api/admin/orders/for-customer`;
-                    orderPayload.customerId = actingAsCustomer.id;
-                    orderPayload.status = 'draft';
-                }
-
-                const response = await fetch(endpoint, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(orderPayload)
-                });
-
-                if (response.ok) {
-                    if (actingAsCustomer) {
-                        sessionStorage.removeItem('actingAsCustomer');
-                        alert(`Order created successfully for ${actingAsCustomer.name}!`);
-                        window.location.href = '/admin.html';
-                    } else {
-                        alert('Order submitted successfully! Your representative will contact you soon.');
-                        window.location.href = '/dashboard.html';
-                    }
-                } else {
-                    const errorData = await response.json();
-                    throw new Error(errorData.error || 'Failed to submit order');
-                }
-            } catch (error) {
-                console.error('Error:', error);
-                alert(error.message || 'Order saved locally. Please contact your representative to confirm.');
+            // Check pickup location
+            const location = selectedLocation || document.getElementById('quickLocation')?.value || 'mcconnell';
+            if (!location) {
+                alert('Please select a pickup location.');
+                return;
             }
+
+            // Prepare checkout data
+            const checkoutData = {
+                year: selectedYear,
+                location: location,
+                items: allItems,
+                totalAcres: orderData.totalAcres,
+                crops: orderData.crops,
+                total: grandTotal,
+                loadedOrderId: loadedOrderId
+            };
+
+            // If admin is acting as customer, handle differently
+            if (actingAsCustomer) {
+                checkoutData.actingAsCustomer = actingAsCustomer;
+            }
+
+            // Save to session storage and redirect to checkout
+            sessionStorage.setItem('checkoutOrder', JSON.stringify(checkoutData));
+            window.location.href = '/checkout.html';
         }
 
         // Chatbot functions
@@ -2492,6 +2519,21 @@
         .summary-actions {
             display: flex;
             gap: 12px;
+            margin-left: auto;
+        }
+
+        .btn-checkout {
+            padding: 14px 32px;
+            font-size: 1.1rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, #2D5A27 0%, #4a7c44 100%);
+            box-shadow: 0 4px 12px rgba(45, 90, 39, 0.3);
+            transition: all 0.3s ease;
+        }
+
+        .btn-checkout:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(45, 90, 39, 0.4);
         }
 
         /* Modal */

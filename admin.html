@@ -48,6 +48,7 @@
                     <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
                     <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
                     <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
+                    <span id="companySettingsNav" style="display: none;"><a href="#company-settings" class="admin-tab" data-tab="company-settings">Company</a></span>
                 </div>
                 <button class="admin-tabs-scroll-btn right" onclick="scrollTabs(200)" aria-label="Scroll tabs right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -155,6 +156,17 @@
                                 </div>
                                 <span class="bundle-qty">45/180 ordered</span>
                             </div>
+                        </div>
+                    </div>
+
+                    <!-- License & Compliance Reminders (Superadmin Only) -->
+                    <div class="card reminders-card superadmin-only" id="dashboardRemindersCard" style="display: none;">
+                        <div class="card-header">
+                            <h3>Reminders & Compliance</h3>
+                            <a href="#company-settings" class="nav-tab" data-tab="company-settings">View All</a>
+                        </div>
+                        <div id="dashboardReminders" class="reminders-list">
+                            <p class="loading">Loading reminders...</p>
                         </div>
                     </div>
                 </div>
@@ -809,6 +821,144 @@
                 </div>
                 <div class="applications-list" id="applicationsList">
                     <p class="loading">Loading applications...</p>
+                </div>
+            </div>
+
+            <!-- Company Settings Tab (Superadmin only) -->
+            <div id="company-settingsTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Company Settings</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">Manage business licenses, credentials, and reminders</p>
+                </div>
+
+                <!-- License Info Card -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <h3>Colorado Pesticide Dealer License</h3>
+                        <span id="licenseStatusBadge" class="status-badge status-active">Active</span>
+                    </div>
+                    <div style="padding: 24px;">
+                        <div class="license-display-grid">
+                            <div class="license-field">
+                                <label>Colorado Dealer ID</label>
+                                <div class="license-value" id="displayDealerId">90575</div>
+                            </div>
+                            <div class="license-field">
+                                <label>State</label>
+                                <div class="license-value">Colorado (CO)</div>
+                            </div>
+                            <div class="license-field">
+                                <label>Status</label>
+                                <div class="license-value" id="displayLicenseStatus">Active</div>
+                            </div>
+                            <div class="license-field">
+                                <label>Expiration Date</label>
+                                <div class="license-value" id="displayExpirationDate">December 31, 2026</div>
+                            </div>
+                        </div>
+
+                        <div class="license-options" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="displayOnInvoices" checked>
+                                <span>Display license number on invoices</span>
+                            </label>
+                            <label class="checkbox-label">
+                                <input type="checkbox" id="displayToDistributors" checked>
+                                <span>Show license info to distributors</span>
+                            </label>
+                        </div>
+
+                        <button class="btn btn-primary" style="margin-top: 16px;" onclick="savePublicLicenseSettings()">Save Display Settings</button>
+                    </div>
+                </div>
+
+                <!-- Confidential Info Card (Superadmin Only) -->
+                <div class="card confidential-card" style="margin-bottom: 24px; border: 2px solid #dc3545;">
+                    <div class="card-header" style="background: #fff5f5;">
+                        <h3 style="color: #dc3545;">Confidential License Credentials</h3>
+                        <span class="badge" style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">SUPER ADMIN ONLY</span>
+                    </div>
+                    <div style="padding: 24px;">
+                        <p style="color: #dc3545; margin-bottom: 16px; font-size: 0.9rem;">This information is only visible to super admins. Do not share these credentials.</p>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>AgLicense ID</label>
+                                <input type="text" id="agLicenseId" class="form-control" value="0050BD">
+                            </div>
+                            <div class="form-group">
+                                <label>PIN</label>
+                                <input type="password" id="licensePin" class="form-control" value="110081">
+                                <button type="button" class="btn btn-sm" style="margin-top: 8px;" onclick="togglePinVisibility()">Show/Hide PIN</button>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>License Portal URL</label>
+                            <div style="display: flex; gap: 8px;">
+                                <input type="url" id="portalUrl" class="form-control" value="https://www.ag.state.co.us/elicense/SecurityLogin.aspx" style="flex: 1;">
+                                <a href="https://www.ag.state.co.us/elicense/SecurityLogin.aspx" target="_blank" class="btn btn-outline">Open Portal</a>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Admin Notes</label>
+                            <textarea id="licenseNotes" class="form-control" rows="3" placeholder="Any important notes about the license..."></textarea>
+                        </div>
+
+                        <button class="btn btn-primary" onclick="saveConfidentialSettings()">Save Confidential Info</button>
+                    </div>
+                </div>
+
+                <!-- Reminders Card -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <h3>License Reminders & Tasks</h3>
+                        <button class="btn btn-primary btn-sm" onclick="openAddReminderModal()">+ Add Reminder</button>
+                    </div>
+                    <div id="remindersContainer" style="padding: 16px;">
+                        <div class="reminder-item" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #fff3cd; border-radius: 8px; margin-bottom: 12px;">
+                            <div>
+                                <strong>Pesticide Dealer License Renewal</strong>
+                                <p style="color: #856404; font-size: 0.9rem; margin-top: 4px;">Renew Colorado Pesticide Dealer License before December 31</p>
+                                <span style="font-size: 0.85rem; color: #666;">Due: December 1, 2026</span>
+                            </div>
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-sm btn-outline" onclick="completeReminder(this)">Mark Complete</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contact Info -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>CDA Contact Information</h3>
+                    </div>
+                    <div style="padding: 24px;">
+                        <div class="contact-info-grid">
+                            <div class="contact-item">
+                                <strong>Pesticide Dealer Program</strong>
+                                <p>Email: <a href="mailto:cda_pesticide_dealers@state.co.us">cda_pesticide_dealers@state.co.us</a></p>
+                            </div>
+                            <div class="contact-item">
+                                <strong>Jolynn Morris</strong>
+                                <p>Pesticide Dealer Program Manager</p>
+                                <p>Phone: 303.869.9060 | Cell: 720.688.2044</p>
+                            </div>
+                            <div class="contact-item">
+                                <strong>Beth Bramer</strong>
+                                <p>Administrative Assistant III</p>
+                                <p>Phone: 303.869.9061 | Cell: 303.968.4295</p>
+                            </div>
+                            <div class="contact-item">
+                                <strong>Address</strong>
+                                <p>305 Interlocken Pkwy, Broomfield, CO 80021</p>
+                                <p><a href="https://ag.colorado.gov" target="_blank">ag.colorado.gov</a></p>
+                            </div>
+                        </div>
+                        <div style="margin-top: 16px; padding: 12px; background: #e7f3ff; border-radius: 8px;">
+                            <p style="color: #0c5460; font-size: 0.9rem;"><strong>Note:</strong> CDA is migrating to a new database in Spring 2026. Ensure your account information in AgLicense is accurate and up to date.</p>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -1996,6 +2146,7 @@
             document.getElementById('pricingNav').style.display = 'block';
             document.getElementById('commissionsNav').style.display = 'block';
             document.getElementById('inventoryNav').style.display = 'block';
+            document.getElementById('companySettingsNav').style.display = 'block';
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
@@ -2003,6 +2154,8 @@
             });
             loadPricingData();
             loadCommissionData();
+            loadCompanySettings();
+            loadDashboardReminders();
         } else if (userData.role === 'distributor') {
             document.getElementById('adminRole').textContent = 'Distributor';
             document.getElementById('inventoryNav').style.display = 'block';
@@ -2176,6 +2329,43 @@
                 `).join('') : '<p class="empty">No applications pending</p>';
             } catch (error) {
                 console.error('Error loading applications:', error);
+            }
+        }
+
+        // Load dashboard reminders (superadmin only)
+        async function loadDashboardReminders() {
+            if (userData.role !== 'superadmin') return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/reminders`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const reminders = data.reminders || [];
+
+                const container = document.getElementById('dashboardReminders');
+                if (reminders.length === 0) {
+                    container.innerHTML = '<p class="empty" style="padding: 16px; color: var(--text-muted);">No active reminders</p>';
+                    return;
+                }
+
+                container.innerHTML = reminders.slice(0, 3).map(r => {
+                    const dueDate = new Date(r.dueDate);
+                    const daysUntil = Math.ceil((dueDate - new Date()) / (1000 * 60 * 60 * 24));
+                    const isUrgent = daysUntil <= 30;
+
+                    return `
+                        <div class="reminder-mini" style="display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid var(--border); ${isUrgent ? 'background: #fff3cd;' : ''}">
+                            <div>
+                                <strong style="color: ${isUrgent ? '#856404' : 'var(--text)'};">${r.title}</strong>
+                                <span style="font-size: 0.85rem; color: #666; margin-left: 8px;">Due: ${dueDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}</span>
+                            </div>
+                            ${daysUntil <= 30 ? `<span style="background: #ffc107; color: #000; padding: 2px 8px; border-radius: 4px; font-size: 0.75rem; font-weight: 600;">${daysUntil} days</span>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading reminders:', error);
             }
         }
 
@@ -3948,6 +4138,228 @@
                 setTimeout(updateTabScrollIndicators, 100);
             }
         });
+
+        // ============ COMPANY SETTINGS MANAGEMENT ============
+        let companySettings = null;
+
+        async function loadCompanySettings() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/company-settings`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load settings');
+
+                companySettings = await res.json();
+
+                // Populate form fields
+                if (companySettings.pesticideDealerLicense) {
+                    const license = companySettings.pesticideDealerLicense;
+                    document.getElementById('displayDealerId').textContent = license.licenseNumber || '90575';
+                    document.getElementById('displayLicenseStatus').textContent = license.status || 'Active';
+
+                    if (license.expirationDate) {
+                        const expDate = new Date(license.expirationDate);
+                        document.getElementById('displayExpirationDate').textContent = expDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+                        // Update status badge
+                        const badge = document.getElementById('licenseStatusBadge');
+                        if (license.status === 'active') {
+                            badge.className = 'status-badge status-active';
+                            badge.textContent = 'Active';
+                        } else if (license.status === 'expired') {
+                            badge.className = 'status-badge status-expired';
+                            badge.textContent = 'Expired';
+                        } else {
+                            badge.className = 'status-badge status-pending';
+                            badge.textContent = license.status;
+                        }
+                    }
+
+                    document.getElementById('displayOnInvoices').checked = license.displayOnInvoices !== false;
+                    document.getElementById('displayToDistributors').checked = license.displayToDistributors !== false;
+                }
+
+                if (companySettings.confidentialLicenseInfo) {
+                    const conf = companySettings.confidentialLicenseInfo;
+                    document.getElementById('agLicenseId').value = conf.agLicenseId || '';
+                    document.getElementById('licensePin').value = conf.pin || '';
+                    document.getElementById('portalUrl').value = conf.portalUrl || '';
+                    document.getElementById('licenseNotes').value = conf.notes || '';
+                }
+
+                // Load reminders
+                renderReminders(companySettings.reminders || []);
+
+            } catch (error) {
+                console.error('Error loading company settings:', error);
+            }
+        }
+
+        function renderReminders(reminders) {
+            const container = document.getElementById('remindersContainer');
+            const activeReminders = reminders.filter(r => r.status === 'pending');
+
+            if (activeReminders.length === 0) {
+                container.innerHTML = '<p style="color: var(--text-muted); padding: 16px;">No active reminders</p>';
+                return;
+            }
+
+            container.innerHTML = activeReminders.map(r => {
+                const dueDate = new Date(r.dueDate);
+                const isOverdue = dueDate < new Date();
+                const bgColor = isOverdue ? '#f8d7da' : '#fff3cd';
+                const textColor = isOverdue ? '#721c24' : '#856404';
+
+                return `
+                    <div class="reminder-item" data-id="${r._id}" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: ${bgColor}; border-radius: 8px; margin-bottom: 12px;">
+                        <div>
+                            <strong>${r.title}</strong>
+                            ${r.description ? `<p style="color: ${textColor}; font-size: 0.9rem; margin-top: 4px;">${r.description}</p>` : ''}
+                            <span style="font-size: 0.85rem; color: #666;">Due: ${dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                            ${isOverdue ? '<span style="margin-left: 8px; color: #dc3545; font-weight: 600;">OVERDUE</span>' : ''}
+                        </div>
+                        <div style="display: flex; gap: 8px;">
+                            <button class="btn btn-sm btn-primary" onclick="markReminderComplete('${r._id}')">Mark Complete</button>
+                            <button class="btn btn-sm btn-outline" onclick="dismissReminder('${r._id}')">Dismiss</button>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function savePublicLicenseSettings() {
+            try {
+                const updates = {
+                    pesticideDealerLicense: {
+                        displayOnInvoices: document.getElementById('displayOnInvoices').checked,
+                        displayToDistributors: document.getElementById('displayToDistributors').checked
+                    }
+                };
+
+                const res = await fetch(`${API_URL}/api/admin/company-settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(updates)
+                });
+
+                if (!res.ok) throw new Error('Failed to save settings');
+
+                alert('Display settings saved successfully!');
+            } catch (error) {
+                alert('Error saving settings: ' + error.message);
+            }
+        }
+
+        async function saveConfidentialSettings() {
+            try {
+                const updates = {
+                    confidentialLicenseInfo: {
+                        agLicenseId: document.getElementById('agLicenseId').value,
+                        pin: document.getElementById('licensePin').value,
+                        portalUrl: document.getElementById('portalUrl').value,
+                        notes: document.getElementById('licenseNotes').value
+                    }
+                };
+
+                const res = await fetch(`${API_URL}/api/admin/company-settings`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(updates)
+                });
+
+                if (!res.ok) throw new Error('Failed to save settings');
+
+                alert('Confidential settings saved successfully!');
+            } catch (error) {
+                alert('Error saving settings: ' + error.message);
+            }
+        }
+
+        function togglePinVisibility() {
+            const pinInput = document.getElementById('licensePin');
+            pinInput.type = pinInput.type === 'password' ? 'text' : 'password';
+        }
+
+        async function markReminderComplete(reminderId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/company-settings/reminders/${reminderId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status: 'completed' })
+                });
+
+                if (!res.ok) throw new Error('Failed to update reminder');
+
+                // Reload settings to refresh reminders list
+                await loadCompanySettings();
+            } catch (error) {
+                alert('Error updating reminder: ' + error.message);
+            }
+        }
+
+        async function dismissReminder(reminderId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/company-settings/reminders/${reminderId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status: 'dismissed' })
+                });
+
+                if (!res.ok) throw new Error('Failed to dismiss reminder');
+
+                await loadCompanySettings();
+            } catch (error) {
+                alert('Error dismissing reminder: ' + error.message);
+            }
+        }
+
+        function openAddReminderModal() {
+            const title = prompt('Reminder title:');
+            if (!title) return;
+
+            const description = prompt('Description (optional):');
+            const dueDate = prompt('Due date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+            if (!dueDate) return;
+
+            addReminder(title, description, dueDate);
+        }
+
+        async function addReminder(title, description, dueDate) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/company-settings/reminders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title,
+                        description,
+                        dueDate,
+                        reminderType: 'license_renewal'
+                    })
+                });
+
+                if (!res.ok) throw new Error('Failed to add reminder');
+
+                await loadCompanySettings();
+            } catch (error) {
+                alert('Error adding reminder: ' + error.message);
+            }
+        }
 
         // ============ 3-TIER PRICING MANAGEMENT ============
         let pricingProducts = [];
@@ -6328,6 +6740,99 @@
 
         .btn-reorder:hover {
             background: #047857;
+        }
+
+        /* Company Settings Styles */
+        .license-display-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+        }
+
+        .license-field {
+            padding: 16px;
+            background: var(--surface);
+            border-radius: 8px;
+        }
+
+        .license-field label {
+            display: block;
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin-bottom: 4px;
+        }
+
+        .license-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .license-options {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .checkbox-label {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+        }
+
+        .checkbox-label input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: var(--primary);
+        }
+
+        .contact-info-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+        }
+
+        .contact-item {
+            padding: 16px;
+            background: var(--surface);
+            border-radius: 8px;
+        }
+
+        .contact-item strong {
+            display: block;
+            margin-bottom: 8px;
+            color: var(--primary);
+        }
+
+        .contact-item p {
+            margin: 4px 0;
+            font-size: 0.9rem;
+            color: var(--text);
+        }
+
+        .contact-item a {
+            color: var(--primary);
+            text-decoration: none;
+        }
+
+        .contact-item a:hover {
+            text-decoration: underline;
+        }
+
+        .status-badge.status-active {
+            background: #d4edda;
+            color: #155724;
+        }
+
+        .status-badge.status-expired {
+            background: #f8d7da;
+            color: #721c24;
+        }
+
+        .status-badge.status-pending {
+            background: #fff3cd;
+            color: #856404;
         }
     </style>
 </body>

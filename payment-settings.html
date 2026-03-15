@@ -205,7 +205,7 @@
         }
 
         // Show appropriate sections based on role
-        const isRep = user.role === 'admin' || user.role === 'superadmin';
+        const isRep = user.role === 'admin' || user.role === 'superadmin' || user.role === 'distributor';
         if (isRep) {
             document.getElementById('repSection').style.display = 'block';
         }

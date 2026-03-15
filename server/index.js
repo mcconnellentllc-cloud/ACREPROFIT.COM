@@ -603,6 +603,72 @@ rupSaleRecordSchema.index({ status: 1 });
 
 const RupSaleRecord = mongoose.model('RupSaleRecord', rupSaleRecordSchema);
 
+// ============ COMPANY SETTINGS MODEL ============
+// Stores business settings, licenses, and credentials
+// Confidential fields are only accessible to superadmin
+const companySettingsSchema = new mongoose.Schema({
+    // Company Info (public)
+    companyName: { type: String, default: 'AcreProfit, LLC' },
+    companyAddress: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
+    companyPhone: String,
+    companyEmail: String,
+
+    // Colorado Pesticide Dealer License (public fields)
+    pesticideDealerLicense: {
+        licenseNumber: { type: String }, // CO Dealer ID: 90575
+        state: { type: String, default: 'CO' },
+        issuedDate: Date,
+        expirationDate: Date, // December 31 of current year
+        status: {
+            type: String,
+            enum: ['active', 'expired', 'pending', 'suspended'],
+            default: 'active'
+        },
+        // Show on invoices and to distributors
+        displayOnInvoices: { type: Boolean, default: true },
+        displayToDistributors: { type: Boolean, default: true }
+    },
+
+    // Confidential License Details (superadmin only)
+    confidentialLicenseInfo: {
+        agLicenseId: String,  // AgLicense ID: 0050BD
+        pin: String,         // Pin: 110081
+        portalUrl: String,   // https://www.ag.state.co.us/elicense/SecurityLogin.aspx
+        portalUsername: String,
+        notes: String        // Any admin notes
+    },
+
+    // Reminders
+    reminders: [{
+        title: String,
+        description: String,
+        dueDate: Date,
+        reminderType: {
+            type: String,
+            enum: ['license_renewal', 'compliance', 'payment', 'other'],
+            default: 'other'
+        },
+        status: {
+            type: String,
+            enum: ['pending', 'completed', 'dismissed'],
+            default: 'pending'
+        },
+        createdAt: { type: Date, default: Date.now },
+        completedAt: Date,
+        completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+
+    updatedAt: { type: Date, default: Date.now },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
+
+const CompanySettings = mongoose.model('CompanySettings', companySettingsSchema);
+
 // Chemical Order Model
 const chemicalOrderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -621,6 +687,8 @@ const chemicalOrderSchema = new mongoose.Schema({
         quantity: Number, // Number of packs
         unitPrice: Number, // Price per unit at time of order
         totalPrice: Number,
+        timing: String, // Delivery timing (early-spring, pre-plant, etc.)
+        isCustom: { type: Boolean, default: false },
         // For program orders
         acres: Number,
         rate: Number,
@@ -637,7 +705,20 @@ const chemicalOrderSchema = new mongoose.Schema({
     subtotal: Number,
     discount: { type: Number, default: 0 },
     discountReason: String,
+    processingFee: { type: Number, default: 0 },
     total: Number,
+
+    // Pickup & Year
+    pickupLocation: String,
+    year: Number,
+
+    // Contact info (for checkout)
+    contactInfo: {
+        name: String,
+        email: String,
+        phone: String,
+        farm: String
+    },
 
     // Status tracking
     status: {
@@ -647,8 +728,8 @@ const chemicalOrderSchema = new mongoose.Schema({
     },
 
     // Payment
-    paymentStatus: { type: String, enum: ['pending', 'paid', 'partial'], default: 'pending' },
-    paymentMethod: String,
+    paymentStatus: { type: String, enum: ['pending', 'processing', 'paid', 'partial', 'failed'], default: 'pending' },
+    paymentMethod: { type: String, enum: ['ach', 'check', 'card', 'stripe_ach'], default: 'check' },
 
     // Dates
     submittedAt: Date,
@@ -1192,10 +1273,21 @@ const authMiddleware = async (req, res, next) => {
 };
 
 const adminMiddleware = async (req, res, next) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    // Allow admin, distributor, and superadmin roles
+    if (req.user.role !== 'admin' && req.user.role !== 'distributor' && req.user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Admin access required' });
     }
     next();
+};
+
+// Helper function to check if user has admin-level access
+const isAdminLevel = (user) => {
+    return user.role === 'admin' || user.role === 'distributor' || user.role === 'superadmin';
+};
+
+// Helper function to check if user is a non-superadmin staff member (distributor/admin)
+const isDistributor = (user) => {
+    return user.role === 'admin' || user.role === 'distributor';
 };
 
 const superAdminMiddleware = async (req, res, next) => {
@@ -1427,7 +1519,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
 
 app.get('/api/representatives', async (req, res) => {
     try {
-        const reps = await User.find({ role: { $in: ['admin', 'superadmin'] } })
+        const reps = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin'] } })
             .select('name email phone');
         res.json(reps);
     } catch (error) {
@@ -1759,7 +1851,7 @@ app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res
         let query = { role: 'customer' };
 
         // If not superadmin, only show their own customers
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representative = req.user._id;
         }
 
@@ -1795,8 +1887,8 @@ app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only see their customers)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -1825,8 +1917,8 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only edit their customers)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -1878,8 +1970,8 @@ app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddlewa
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only see their customers' orders)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -1905,8 +1997,8 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only create orders for their customers)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied - not your customer' });
         }
@@ -1943,7 +2035,7 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
         let query = { _id: req.params.orderId };
 
         // If not superadmin, can only edit their own customers' orders
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -1980,7 +2072,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
         let query = {};
 
         // If not superadmin, only show orders for their customers
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2001,7 +2093,7 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
         let query = { _id: req.params.orderId };
 
         // If not superadmin, can only update their own customers' orders
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2048,7 +2140,7 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
 app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let query = {};
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2060,7 +2152,7 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
         ]);
 
         let customerQuery = { role: 'customer' };
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             customerQuery.representative = req.user._id;
         }
         const totalCustomers = await User.countDocuments(customerQuery);
@@ -2169,7 +2261,7 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
             return res.status(404).json({ error: 'Application not found' });
         }
 
-        // If approved, create admin user
+        // If approved, create distributor user
         if (status === 'approved') {
             const existingUser = await User.findOne({ email: application.email.toLowerCase() });
             if (!existingUser) {
@@ -2179,7 +2271,7 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
                     email: application.email,
                     password: tempPassword,
                     phone: application.phone,
-                    role: 'admin'
+                    role: 'distributor'
                 });
             }
         }
@@ -3322,8 +3414,8 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
         const { userId } = req.params;
         const updateData = req.body;
 
-        // Only admin or the user themselves can update
-        if (req.user.role !== 'admin' && req.user.role !== 'superadmin' && req.user._id.toString() !== userId) {
+        // Only admin/distributor or the user themselves can update
+        if (!isAdminLevel(req.user) && req.user._id.toString() !== userId) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -3335,7 +3427,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
         // Update license fields
         if (updateData.privateApplicatorLicense) {
             user.privateApplicatorLicense = { ...user.privateApplicatorLicense?.toObject(), ...updateData.privateApplicatorLicense };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.privateApplicatorLicense.verifiedBy = req.user._id;
                 user.privateApplicatorLicense.verifiedAt = new Date();
             }
@@ -3343,7 +3435,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
 
         if (updateData.commercialApplicatorLicense) {
             user.commercialApplicatorLicense = { ...user.commercialApplicatorLicense?.toObject(), ...updateData.commercialApplicatorLicense };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.commercialApplicatorLicense.verifiedBy = req.user._id;
                 user.commercialApplicatorLicense.verifiedAt = new Date();
             }
@@ -3351,7 +3443,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
 
         if (updateData.paraquatCertification) {
             user.paraquatCertification = { ...user.paraquatCertification?.toObject(), ...updateData.paraquatCertification };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.paraquatCertification.verifiedBy = req.user._id;
                 user.paraquatCertification.verifiedAt = new Date();
             }
@@ -3359,7 +3451,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
 
         if (updateData.dicambaCertification) {
             user.dicambaCertification = { ...user.dicambaCertification?.toObject(), ...updateData.dicambaCertification };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.dicambaCertification.verifiedBy = req.user._id;
                 user.dicambaCertification.verifiedAt = new Date();
             }
@@ -3614,6 +3706,191 @@ app.get('/api/compliance/expiring-licenses', authMiddleware, adminMiddleware, as
         }).select('name email phone farm privateApplicatorLicense commercialApplicatorLicense');
 
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============ COMPANY SETTINGS ROUTES ============
+
+// Get public company settings (license info for invoices/distributors)
+app.get('/api/company/license', async (req, res) => {
+    try {
+        let settings = await CompanySettings.findOne();
+
+        if (!settings) {
+            // Return default if no settings exist
+            return res.json({
+                companyName: 'AcreProfit, LLC',
+                pesticideDealerLicense: null
+            });
+        }
+
+        // Only return public license information
+        const publicInfo = {
+            companyName: settings.companyName,
+            pesticideDealerLicense: settings.pesticideDealerLicense?.displayOnInvoices ? {
+                licenseNumber: settings.pesticideDealerLicense.licenseNumber,
+                state: settings.pesticideDealerLicense.state,
+                status: settings.pesticideDealerLicense.status
+            } : null
+        };
+
+        res.json(publicInfo);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get full company settings (superadmin only)
+app.get('/api/admin/company-settings', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        let settings = await CompanySettings.findOne();
+
+        if (!settings) {
+            // Create default settings if none exist
+            settings = new CompanySettings({
+                companyName: 'AcreProfit, LLC',
+                pesticideDealerLicense: {
+                    licenseNumber: '90575',
+                    state: 'CO',
+                    expirationDate: new Date('2026-12-31'),
+                    status: 'active',
+                    displayOnInvoices: true,
+                    displayToDistributors: true
+                },
+                confidentialLicenseInfo: {
+                    agLicenseId: '0050BD',
+                    pin: '110081',
+                    portalUrl: 'https://www.ag.state.co.us/elicense/SecurityLogin.aspx'
+                },
+                reminders: [{
+                    title: 'Pesticide Dealer License Renewal',
+                    description: 'Renew Colorado Pesticide Dealer License before December 31',
+                    dueDate: new Date('2026-12-01'),
+                    reminderType: 'license_renewal',
+                    status: 'pending'
+                }]
+            });
+            await settings.save();
+        }
+
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update company settings (superadmin only)
+app.put('/api/admin/company-settings', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const updates = req.body;
+
+        let settings = await CompanySettings.findOne();
+
+        if (!settings) {
+            settings = new CompanySettings(updates);
+        } else {
+            // Update allowed fields
+            if (updates.companyName) settings.companyName = updates.companyName;
+            if (updates.companyAddress) settings.companyAddress = updates.companyAddress;
+            if (updates.companyPhone) settings.companyPhone = updates.companyPhone;
+            if (updates.companyEmail) settings.companyEmail = updates.companyEmail;
+            if (updates.pesticideDealerLicense) {
+                settings.pesticideDealerLicense = {
+                    ...settings.pesticideDealerLicense,
+                    ...updates.pesticideDealerLicense
+                };
+            }
+            if (updates.confidentialLicenseInfo) {
+                settings.confidentialLicenseInfo = {
+                    ...settings.confidentialLicenseInfo,
+                    ...updates.confidentialLicenseInfo
+                };
+            }
+        }
+
+        settings.updatedAt = new Date();
+        settings.updatedBy = req.user._id;
+
+        await settings.save();
+        res.json({ message: 'Settings updated successfully', settings });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add reminder (admin/superadmin)
+app.post('/api/admin/company-settings/reminders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { title, description, dueDate, reminderType } = req.body;
+
+        let settings = await CompanySettings.findOne();
+        if (!settings) {
+            settings = new CompanySettings();
+        }
+
+        settings.reminders.push({
+            title,
+            description,
+            dueDate: new Date(dueDate),
+            reminderType: reminderType || 'other',
+            status: 'pending'
+        });
+
+        settings.updatedAt = new Date();
+        await settings.save();
+
+        res.json({ message: 'Reminder added', reminders: settings.reminders });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update reminder status (admin/superadmin)
+app.put('/api/admin/company-settings/reminders/:reminderId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { reminderId } = req.params;
+        const { status } = req.body;
+
+        const settings = await CompanySettings.findOne();
+        if (!settings) {
+            return res.status(404).json({ error: 'Settings not found' });
+        }
+
+        const reminder = settings.reminders.id(reminderId);
+        if (!reminder) {
+            return res.status(404).json({ error: 'Reminder not found' });
+        }
+
+        reminder.status = status;
+        if (status === 'completed') {
+            reminder.completedAt = new Date();
+            reminder.completedBy = req.user._id;
+        }
+
+        settings.updatedAt = new Date();
+        await settings.save();
+
+        res.json({ message: 'Reminder updated', reminder });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get active reminders (for admin dashboard)
+app.get('/api/admin/reminders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const settings = await CompanySettings.findOne();
+        if (!settings) {
+            return res.json({ reminders: [] });
+        }
+
+        const activeReminders = settings.reminders.filter(r =>
+            r.status === 'pending' && new Date(r.dueDate) >= new Date()
+        ).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+        res.json({ reminders: activeReminders });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
@@ -4044,6 +4321,134 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     }
 });
 
+// ============ CHECKOUT ENDPOINT ============
+// Full checkout flow - creates order with payment info
+app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
+    try {
+        const {
+            year,
+            location,
+            items,
+            subtotal,
+            processingFee,
+            total,
+            paymentMethod,
+            customerName,
+            customerEmail,
+            customerPhone,
+            customerFarm,
+            notes
+        } = req.body;
+
+        // Validate required fields
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: 'No items in order' });
+        }
+
+        if (!paymentMethod) {
+            return res.status(400).json({ error: 'Payment method required' });
+        }
+
+        // Find or assign representative based on location
+        let representativeId = req.user.representative;
+        const repMap = {
+            'mcconnell': 'kyle',
+            'bamford': 'chad',
+            'mollohan': 'ty'
+        };
+        const repCode = repMap[location] || 'kyle';
+
+        // Try to find the rep user
+        if (!representativeId) {
+            const repUser = await User.findOne({
+                $or: [
+                    { representativeId: repCode },
+                    { email: { $regex: new RegExp(repCode, 'i') } }
+                ],
+                role: { $in: ['admin', 'distributor', 'superadmin'] }
+            });
+            if (repUser) {
+                representativeId = repUser._id;
+            }
+        }
+
+        // Build order items
+        const orderItems = items.map(item => ({
+            productName: item.productName || item.name,
+            packSize: item.packSize || '',
+            unit: item.unit || 'pack',
+            quantity: item.qty || item.quantity || 1,
+            unitPrice: item.price || 0,
+            totalPrice: item.total || 0,
+            timing: item.timing || '',
+            isCustom: item.isCustom || false
+        }));
+
+        // Calculate totals if not provided
+        const calculatedSubtotal = subtotal || items.reduce((sum, item) => sum + (item.total || 0), 0);
+        const calculatedTotal = total || calculatedSubtotal + (processingFee || 0);
+
+        // Create the order
+        const order = new ChemicalOrder({
+            userId: req.user._id,
+            representativeId: representativeId,
+            orderType: 'direct',
+            items: orderItems,
+            totalAcres: 0,
+            subtotal: calculatedSubtotal,
+            processingFee: processingFee || 0,
+            total: calculatedTotal,
+            customerNotes: notes,
+            status: 'submitted',
+            paymentMethod: paymentMethod,
+            paymentStatus: paymentMethod === 'check' ? 'pending' : 'processing',
+            submittedAt: new Date(),
+            // Extra fields for contact info
+            contactInfo: {
+                name: customerName || req.user.name,
+                email: customerEmail || req.user.email,
+                phone: customerPhone || req.user.phone,
+                farm: customerFarm
+            },
+            pickupLocation: location,
+            year: year || new Date().getFullYear()
+        });
+
+        await order.save();
+
+        // Update user info if provided
+        if (customerPhone && !req.user.phone) {
+            req.user.phone = customerPhone;
+            await req.user.save();
+        }
+
+        res.status(201).json({
+            success: true,
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            total: order.total,
+            itemCount: order.items.length,
+            paymentMethod: order.paymentMethod,
+            paymentStatus: order.paymentStatus,
+            location: location,
+            items: order.items
+        });
+
+    } catch (error) {
+        console.error('Checkout error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get Stripe publishable key
+app.get('/api/stripe/config', (req, res) => {
+    const publishableKey = process.env.STRIPE_PUBLISHABLE_KEY;
+    if (!publishableKey) {
+        return res.status(400).json({ error: 'Stripe not configured' });
+    }
+    res.json({ publishableKey });
+});
+
 // Get customer's chemical orders
 app.get('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
@@ -4099,7 +4504,7 @@ app.put('/api/chemical-orders/:id/submit', authMiddleware, async (req, res) => {
 app.get('/api/admin/chemical-orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let query = {};
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -4549,9 +4954,9 @@ app.delete('/api/user-chemicals/:id', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Submission not found' });
         }
 
-        // Check if user owns this or is admin
+        // Check if user owns this or is admin/distributor
         if (submission.userId.toString() !== req.user._id.toString() &&
-            req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            !isAdminLevel(req.user)) {
             return res.status(403).json({ error: 'Not authorized to delete this submission' });
         }
 
@@ -4599,10 +5004,10 @@ app.get('/api/admin/ledger/summary', authMiddleware, adminMiddleware, async (req
     try {
         let repFilter = {};
 
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             repFilter = { _id: req.user._id };
         } else {
-            repFilter = { role: { $in: ['admin', 'superadmin'] } };
+            repFilter = { role: { $in: ['admin', 'distributor', 'superadmin'] } };
         }
 
         const reps = await User.find(repFilter).select('name email role');
@@ -4647,7 +5052,7 @@ app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) 
         }
 
         let targetRepId = representativeId;
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             targetRepId = req.user._id;
         }
 
@@ -5266,8 +5671,8 @@ app.post('/api/spray-programs', authMiddleware, async (req, res) => {
     try {
         const { name, description, crop, applications, type } = req.body;
 
-        // Only admins can create recommended programs
-        const programType = (req.user.role === 'admin' || req.user.role === 'superadmin') ? (type || 'template') : 'custom';
+        // Only admins/distributors can create recommended programs
+        const programType = isAdminLevel(req.user) ? (type || 'template') : 'custom';
         const isPublic = programType === 'recommended';
 
         const program = new SprayProgram({
