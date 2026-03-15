@@ -603,6 +603,72 @@ rupSaleRecordSchema.index({ status: 1 });
 
 const RupSaleRecord = mongoose.model('RupSaleRecord', rupSaleRecordSchema);
 
+// ============ COMPANY SETTINGS MODEL ============
+// Stores business settings, licenses, and credentials
+// Confidential fields are only accessible to superadmin
+const companySettingsSchema = new mongoose.Schema({
+    // Company Info (public)
+    companyName: { type: String, default: 'AcreProfit, LLC' },
+    companyAddress: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
+    companyPhone: String,
+    companyEmail: String,
+
+    // Colorado Pesticide Dealer License (public fields)
+    pesticideDealerLicense: {
+        licenseNumber: { type: String }, // CO Dealer ID: 90575
+        state: { type: String, default: 'CO' },
+        issuedDate: Date,
+        expirationDate: Date, // December 31 of current year
+        status: {
+            type: String,
+            enum: ['active', 'expired', 'pending', 'suspended'],
+            default: 'active'
+        },
+        // Show on invoices and to distributors
+        displayOnInvoices: { type: Boolean, default: true },
+        displayToDistributors: { type: Boolean, default: true }
+    },
+
+    // Confidential License Details (superadmin only)
+    confidentialLicenseInfo: {
+        agLicenseId: String,  // AgLicense ID: 0050BD
+        pin: String,         // Pin: 110081
+        portalUrl: String,   // https://www.ag.state.co.us/elicense/SecurityLogin.aspx
+        portalUsername: String,
+        notes: String        // Any admin notes
+    },
+
+    // Reminders
+    reminders: [{
+        title: String,
+        description: String,
+        dueDate: Date,
+        reminderType: {
+            type: String,
+            enum: ['license_renewal', 'compliance', 'payment', 'other'],
+            default: 'other'
+        },
+        status: {
+            type: String,
+            enum: ['pending', 'completed', 'dismissed'],
+            default: 'pending'
+        },
+        createdAt: { type: Date, default: Date.now },
+        completedAt: Date,
+        completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+
+    updatedAt: { type: Date, default: Date.now },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
+
+const CompanySettings = mongoose.model('CompanySettings', companySettingsSchema);
+
 // Chemical Order Model
 const chemicalOrderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
@@ -3629,6 +3695,191 @@ app.get('/api/compliance/expiring-licenses', authMiddleware, adminMiddleware, as
         }).select('name email phone farm privateApplicatorLicense commercialApplicatorLicense');
 
         res.json(users);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// ============ COMPANY SETTINGS ROUTES ============
+
+// Get public company settings (license info for invoices/distributors)
+app.get('/api/company/license', async (req, res) => {
+    try {
+        let settings = await CompanySettings.findOne();
+
+        if (!settings) {
+            // Return default if no settings exist
+            return res.json({
+                companyName: 'AcreProfit, LLC',
+                pesticideDealerLicense: null
+            });
+        }
+
+        // Only return public license information
+        const publicInfo = {
+            companyName: settings.companyName,
+            pesticideDealerLicense: settings.pesticideDealerLicense?.displayOnInvoices ? {
+                licenseNumber: settings.pesticideDealerLicense.licenseNumber,
+                state: settings.pesticideDealerLicense.state,
+                status: settings.pesticideDealerLicense.status
+            } : null
+        };
+
+        res.json(publicInfo);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get full company settings (superadmin only)
+app.get('/api/admin/company-settings', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        let settings = await CompanySettings.findOne();
+
+        if (!settings) {
+            // Create default settings if none exist
+            settings = new CompanySettings({
+                companyName: 'AcreProfit, LLC',
+                pesticideDealerLicense: {
+                    licenseNumber: '90575',
+                    state: 'CO',
+                    expirationDate: new Date('2026-12-31'),
+                    status: 'active',
+                    displayOnInvoices: true,
+                    displayToDistributors: true
+                },
+                confidentialLicenseInfo: {
+                    agLicenseId: '0050BD',
+                    pin: '110081',
+                    portalUrl: 'https://www.ag.state.co.us/elicense/SecurityLogin.aspx'
+                },
+                reminders: [{
+                    title: 'Pesticide Dealer License Renewal',
+                    description: 'Renew Colorado Pesticide Dealer License before December 31',
+                    dueDate: new Date('2026-12-01'),
+                    reminderType: 'license_renewal',
+                    status: 'pending'
+                }]
+            });
+            await settings.save();
+        }
+
+        res.json(settings);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update company settings (superadmin only)
+app.put('/api/admin/company-settings', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const updates = req.body;
+
+        let settings = await CompanySettings.findOne();
+
+        if (!settings) {
+            settings = new CompanySettings(updates);
+        } else {
+            // Update allowed fields
+            if (updates.companyName) settings.companyName = updates.companyName;
+            if (updates.companyAddress) settings.companyAddress = updates.companyAddress;
+            if (updates.companyPhone) settings.companyPhone = updates.companyPhone;
+            if (updates.companyEmail) settings.companyEmail = updates.companyEmail;
+            if (updates.pesticideDealerLicense) {
+                settings.pesticideDealerLicense = {
+                    ...settings.pesticideDealerLicense,
+                    ...updates.pesticideDealerLicense
+                };
+            }
+            if (updates.confidentialLicenseInfo) {
+                settings.confidentialLicenseInfo = {
+                    ...settings.confidentialLicenseInfo,
+                    ...updates.confidentialLicenseInfo
+                };
+            }
+        }
+
+        settings.updatedAt = new Date();
+        settings.updatedBy = req.user._id;
+
+        await settings.save();
+        res.json({ message: 'Settings updated successfully', settings });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Add reminder (admin/superadmin)
+app.post('/api/admin/company-settings/reminders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { title, description, dueDate, reminderType } = req.body;
+
+        let settings = await CompanySettings.findOne();
+        if (!settings) {
+            settings = new CompanySettings();
+        }
+
+        settings.reminders.push({
+            title,
+            description,
+            dueDate: new Date(dueDate),
+            reminderType: reminderType || 'other',
+            status: 'pending'
+        });
+
+        settings.updatedAt = new Date();
+        await settings.save();
+
+        res.json({ message: 'Reminder added', reminders: settings.reminders });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Update reminder status (admin/superadmin)
+app.put('/api/admin/company-settings/reminders/:reminderId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { reminderId } = req.params;
+        const { status } = req.body;
+
+        const settings = await CompanySettings.findOne();
+        if (!settings) {
+            return res.status(404).json({ error: 'Settings not found' });
+        }
+
+        const reminder = settings.reminders.id(reminderId);
+        if (!reminder) {
+            return res.status(404).json({ error: 'Reminder not found' });
+        }
+
+        reminder.status = status;
+        if (status === 'completed') {
+            reminder.completedAt = new Date();
+            reminder.completedBy = req.user._id;
+        }
+
+        settings.updatedAt = new Date();
+        await settings.save();
+
+        res.json({ message: 'Reminder updated', reminder });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get active reminders (for admin dashboard)
+app.get('/api/admin/reminders', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const settings = await CompanySettings.findOne();
+        if (!settings) {
+            return res.json({ reminders: [] });
+        }
+
+        const activeReminders = settings.reminders.filter(r =>
+            r.status === 'pending' && new Date(r.dueDate) >= new Date()
+        ).sort((a, b) => new Date(a.dueDate) - new Date(b.dueDate));
+
+        res.json({ reminders: activeReminders });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
