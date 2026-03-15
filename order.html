@@ -1034,7 +1034,7 @@
 
         // Check for admin preview mode (general site preview)
         const isAdminPreview = localStorage.getItem('adminPreviewMode') === 'true';
-        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin')) {
+        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin' || userData.role === 'distributor')) {
             const banner = document.getElementById('adminPreviewBanner');
             if (banner) {
                 banner.style.display = 'block';
@@ -1048,7 +1048,7 @@
         // Check if admin is acting as a customer
         let actingAsCustomer = null;
         const actingAsData = sessionStorage.getItem('actingAsCustomer');
-        if (actingAsData && (userData.role === 'admin' || userData.role === 'superadmin')) {
+        if (actingAsData && (userData.role === 'admin' || userData.role === 'superadmin' || userData.role === 'distributor')) {
             actingAsCustomer = JSON.parse(actingAsData);
             showActingAsBanner();
         }

@@ -95,7 +95,7 @@
 
         // Check for admin preview mode
         const isAdminPreview = localStorage.getItem('adminPreviewMode') === 'true';
-        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin')) {
+        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin' || userData.role === 'distributor')) {
             const banner = document.getElementById('adminPreviewBanner');
             if (banner) {
                 banner.style.display = 'block';

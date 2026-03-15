@@ -363,7 +363,7 @@
         const user = localStorage.getItem('user');
         const userData = user ? JSON.parse(user) : {};
         const isAdminPreview = localStorage.getItem('adminPreviewMode') === 'true';
-        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin')) {
+        if (isAdminPreview && (userData.role === 'superadmin' || userData.role === 'admin' || userData.role === 'distributor')) {
             const banner = document.getElementById('adminPreviewBanner');
             if (banner) {
                 banner.style.display = 'block';

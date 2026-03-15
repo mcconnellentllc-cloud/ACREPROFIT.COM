@@ -216,8 +216,8 @@
 
         const userData = JSON.parse(user);
 
-        // Check if admin
-        if (userData.role !== 'superadmin' && userData.role !== 'admin') {
+        // Check if admin/distributor
+        if (userData.role !== 'superadmin' && userData.role !== 'admin' && userData.role !== 'distributor') {
             window.location.href = '/dashboard.html';
         }
 

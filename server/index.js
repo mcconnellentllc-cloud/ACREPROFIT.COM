@@ -1273,10 +1273,21 @@ const authMiddleware = async (req, res, next) => {
 };
 
 const adminMiddleware = async (req, res, next) => {
-    if (req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+    // Allow admin, distributor, and superadmin roles
+    if (req.user.role !== 'admin' && req.user.role !== 'distributor' && req.user.role !== 'superadmin') {
         return res.status(403).json({ error: 'Admin access required' });
     }
     next();
+};
+
+// Helper function to check if user has admin-level access
+const isAdminLevel = (user) => {
+    return user.role === 'admin' || user.role === 'distributor' || user.role === 'superadmin';
+};
+
+// Helper function to check if user is a non-superadmin staff member (distributor/admin)
+const isDistributor = (user) => {
+    return user.role === 'admin' || user.role === 'distributor';
 };
 
 const superAdminMiddleware = async (req, res, next) => {
@@ -1508,7 +1519,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
 
 app.get('/api/representatives', async (req, res) => {
     try {
-        const reps = await User.find({ role: { $in: ['admin', 'superadmin'] } })
+        const reps = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin'] } })
             .select('name email phone');
         res.json(reps);
     } catch (error) {
@@ -1840,7 +1851,7 @@ app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res
         let query = { role: 'customer' };
 
         // If not superadmin, only show their own customers
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representative = req.user._id;
         }
 
@@ -1876,8 +1887,8 @@ app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only see their customers)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -1906,8 +1917,8 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only edit their customers)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -1959,8 +1970,8 @@ app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddlewa
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only see their customers' orders)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied' });
         }
@@ -1986,8 +1997,8 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Check access for non-superadmin
-        if (req.user.role === 'admin' &&
+        // Check access for non-superadmin (distributors can only create orders for their customers)
+        if (isDistributor(req.user) &&
             customer.representative?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Access denied - not your customer' });
         }
@@ -2024,7 +2035,7 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
         let query = { _id: req.params.orderId };
 
         // If not superadmin, can only edit their own customers' orders
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2061,7 +2072,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
         let query = {};
 
         // If not superadmin, only show orders for their customers
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2082,7 +2093,7 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
         let query = { _id: req.params.orderId };
 
         // If not superadmin, can only update their own customers' orders
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2129,7 +2140,7 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
 app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let query = {};
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -2141,7 +2152,7 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
         ]);
 
         let customerQuery = { role: 'customer' };
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             customerQuery.representative = req.user._id;
         }
         const totalCustomers = await User.countDocuments(customerQuery);
@@ -2250,7 +2261,7 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
             return res.status(404).json({ error: 'Application not found' });
         }
 
-        // If approved, create admin user
+        // If approved, create distributor user
         if (status === 'approved') {
             const existingUser = await User.findOne({ email: application.email.toLowerCase() });
             if (!existingUser) {
@@ -2260,7 +2271,7 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
                     email: application.email,
                     password: tempPassword,
                     phone: application.phone,
-                    role: 'admin'
+                    role: 'distributor'
                 });
             }
         }
@@ -3403,8 +3414,8 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
         const { userId } = req.params;
         const updateData = req.body;
 
-        // Only admin or the user themselves can update
-        if (req.user.role !== 'admin' && req.user.role !== 'superadmin' && req.user._id.toString() !== userId) {
+        // Only admin/distributor or the user themselves can update
+        if (!isAdminLevel(req.user) && req.user._id.toString() !== userId) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
@@ -3416,7 +3427,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
         // Update license fields
         if (updateData.privateApplicatorLicense) {
             user.privateApplicatorLicense = { ...user.privateApplicatorLicense?.toObject(), ...updateData.privateApplicatorLicense };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.privateApplicatorLicense.verifiedBy = req.user._id;
                 user.privateApplicatorLicense.verifiedAt = new Date();
             }
@@ -3424,7 +3435,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
 
         if (updateData.commercialApplicatorLicense) {
             user.commercialApplicatorLicense = { ...user.commercialApplicatorLicense?.toObject(), ...updateData.commercialApplicatorLicense };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.commercialApplicatorLicense.verifiedBy = req.user._id;
                 user.commercialApplicatorLicense.verifiedAt = new Date();
             }
@@ -3432,7 +3443,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
 
         if (updateData.paraquatCertification) {
             user.paraquatCertification = { ...user.paraquatCertification?.toObject(), ...updateData.paraquatCertification };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.paraquatCertification.verifiedBy = req.user._id;
                 user.paraquatCertification.verifiedAt = new Date();
             }
@@ -3440,7 +3451,7 @@ app.put('/api/compliance/user/:userId/license', authMiddleware, async (req, res)
 
         if (updateData.dicambaCertification) {
             user.dicambaCertification = { ...user.dicambaCertification?.toObject(), ...updateData.dicambaCertification };
-            if (req.user.role === 'admin' || req.user.role === 'superadmin') {
+            if (isAdminLevel(req.user)) {
                 user.dicambaCertification.verifiedBy = req.user._id;
                 user.dicambaCertification.verifiedAt = new Date();
             }
@@ -4354,7 +4365,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                     { representativeId: repCode },
                     { email: { $regex: new RegExp(repCode, 'i') } }
                 ],
-                role: { $in: ['admin', 'superadmin'] }
+                role: { $in: ['admin', 'distributor', 'superadmin'] }
             });
             if (repUser) {
                 representativeId = repUser._id;
@@ -4493,7 +4504,7 @@ app.put('/api/chemical-orders/:id/submit', authMiddleware, async (req, res) => {
 app.get('/api/admin/chemical-orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let query = {};
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             query.representativeId = req.user._id;
         }
 
@@ -4943,9 +4954,9 @@ app.delete('/api/user-chemicals/:id', authMiddleware, async (req, res) => {
             return res.status(404).json({ error: 'Submission not found' });
         }
 
-        // Check if user owns this or is admin
+        // Check if user owns this or is admin/distributor
         if (submission.userId.toString() !== req.user._id.toString() &&
-            req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            !isAdminLevel(req.user)) {
             return res.status(403).json({ error: 'Not authorized to delete this submission' });
         }
 
@@ -4993,10 +5004,10 @@ app.get('/api/admin/ledger/summary', authMiddleware, adminMiddleware, async (req
     try {
         let repFilter = {};
 
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             repFilter = { _id: req.user._id };
         } else {
-            repFilter = { role: { $in: ['admin', 'superadmin'] } };
+            repFilter = { role: { $in: ['admin', 'distributor', 'superadmin'] } };
         }
 
         const reps = await User.find(repFilter).select('name email role');
@@ -5041,7 +5052,7 @@ app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) 
         }
 
         let targetRepId = representativeId;
-        if (req.user.role === 'admin') {
+        if (isDistributor(req.user)) {
             targetRepId = req.user._id;
         }
 
@@ -5660,8 +5671,8 @@ app.post('/api/spray-programs', authMiddleware, async (req, res) => {
     try {
         const { name, description, crop, applications, type } = req.body;
 
-        // Only admins can create recommended programs
-        const programType = (req.user.role === 'admin' || req.user.role === 'superadmin') ? (type || 'template') : 'custom';
+        // Only admins/distributors can create recommended programs
+        const programType = isAdminLevel(req.user) ? (type || 'template') : 'custom';
         const isPublic = programType === 'recommended';
 
         const program = new SprayProgram({
