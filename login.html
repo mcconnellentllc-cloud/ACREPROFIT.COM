@@ -74,19 +74,37 @@
 
     <script>
         const API_URL = 'https://acreprofit-com.onrender.com';
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 5000;
+
+        function redirectByRole(role) {
+            if (role === 'supplier') {
+                window.location.href = '/supplier-dashboard.html';
+            } else if (role === 'superadmin' || role === 'admin' || role === 'distributor') {
+                window.location.href = '/admin.html';
+            } else {
+                window.location.href = '/dashboard.html';
+            }
+        }
 
         // Check if already logged in
         const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
         if (token && user) {
-            const userData = JSON.parse(user);
-            if (userData.role === 'supplier') {
-                window.location.href = '/supplier-dashboard.html';
-            } else if (userData.role === 'superadmin' || userData.role === 'admin' || userData.role === 'distributor') {
-                window.location.href = '/admin.html';
-            } else {
-                window.location.href = '/dashboard.html';
+            redirectByRole(JSON.parse(user).role);
+        }
+
+        async function attemptLogin(data, attempt) {
+            const response = await fetch(`${API_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Login failed');
             }
+            return result;
         }
 
         document.getElementById('loginForm').addEventListener('submit', async function(e) {
@@ -104,51 +122,44 @@
                 password: document.getElementById('password').value
             };
 
-            try {
-                const response = await fetch(`${API_URL}/api/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(data)
-                });
+            let lastError = null;
 
-                const result = await response.json();
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    const result = await attemptLogin(data, attempt);
 
-                if (!response.ok) {
-                    throw new Error(result.error || 'Login failed');
-                }
+                    // Store token and user data
+                    localStorage.setItem('token', result.token);
+                    localStorage.setItem('user', JSON.stringify(result.user));
 
-                // Store token and user data
-                localStorage.setItem('token', result.token);
-                localStorage.setItem('user', JSON.stringify(result.user));
+                    redirectByRole(result.user.role);
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    const isNetworkError = error.message === 'Failed to fetch' || error.message.includes('Load failed');
 
-                // Redirect based on role
-                if (result.user.role === 'supplier') {
-                    window.location.href = '/supplier-dashboard.html';
-                } else if (result.user.role === 'superadmin' || result.user.role === 'admin' || result.user.role === 'distributor') {
-                    window.location.href = '/admin.html';
-                } else {
-                    window.location.href = '/dashboard.html';
-                }
-            } catch (error) {
-                // If server is down, check for demo user
-                if (error.message === 'Failed to fetch' || error.message.includes('Load failed')) {
-                    const savedUser = localStorage.getItem('user');
-                    if (savedUser) {
-                        const user = JSON.parse(savedUser);
-                        if (user.email === data.email) {
-                            alert('Note: Running in demo mode. Logging in with saved account.');
-                            window.location.href = '/dashboard.html';
-                            return;
-                        }
+                    if (!isNetworkError) {
+                        // Auth error (wrong password, etc.) — don't retry
+                        break;
                     }
-                    errorDiv.textContent = 'Server is currently unavailable. Please try again later or create a new account.';
-                } else {
-                    errorDiv.textContent = error.message;
+
+                    if (attempt < MAX_RETRIES) {
+                        submitBtn.textContent = `Server waking up... retry ${attempt}/${MAX_RETRIES - 1}`;
+                        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                    }
                 }
-                errorDiv.style.display = 'block';
-                submitBtn.disabled = false;
-                submitBtn.textContent = 'Sign In';
             }
+
+            // All retries exhausted or non-network error
+            const isNetworkError = lastError.message === 'Failed to fetch' || lastError.message.includes('Load failed');
+            if (isNetworkError) {
+                errorDiv.textContent = 'Server is currently unavailable. It may be starting up — please wait a moment and try again.';
+            } else {
+                errorDiv.textContent = lastError.message;
+            }
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Sign In';
         });
     </script>
 

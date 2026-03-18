@@ -168,6 +168,8 @@
 
     <script>
         const API_URL = 'https://acreprofit-com.onrender.com';
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 5000;
         let userData = {};
 
         // Step 1: Collect basic info
@@ -209,46 +211,50 @@
             // Generate a simple password (user can reset later via email)
             userData.password = 'temp_' + Date.now();
 
-            try {
-                const response = await fetch(`${API_URL}/api/auth/signup`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(userData)
-                });
+            let lastError = null;
 
-                const result = await response.json();
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    const response = await fetch(`${API_URL}/api/auth/signup`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(userData)
+                    });
 
-                if (!response.ok) {
-                    throw new Error(result.error || 'Signup failed');
-                }
+                    const result = await response.json();
 
-                // Store token and redirect to producer portal
-                localStorage.setItem('token', result.token);
-                localStorage.setItem('user', JSON.stringify(result.user));
-                window.location.href = '/dashboard.html';
-            } catch (error) {
-                // If server is down, allow demo mode
-                if (error.message === 'Failed to fetch' || error.message.includes('Load failed')) {
-                    const demoUser = {
-                        _id: 'demo_' + Date.now(),
-                        name: userData.name,
-                        email: userData.email,
-                        phone: userData.phone,
-                        address: userData.address,
-                        representativeId: userData.representativeId,
-                        role: 'customer'
-                    };
-                    localStorage.setItem('token', 'demo_token');
-                    localStorage.setItem('user', JSON.stringify(demoUser));
-                    alert('Note: Running in demo mode. Your account will be synced when the server is available.');
+                    if (!response.ok) {
+                        throw new Error(result.error || 'Signup failed');
+                    }
+
+                    // Store token and redirect to producer portal
+                    localStorage.setItem('token', result.token);
+                    localStorage.setItem('user', JSON.stringify(result.user));
                     window.location.href = '/dashboard.html';
-                } else {
-                    errorDiv.textContent = error.message;
-                    errorDiv.style.display = 'block';
-                    submitBtn.disabled = false;
-                    submitBtn.textContent = 'Complete Signup';
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    const isNetworkError = error.message === 'Failed to fetch' || error.message.includes('Load failed');
+
+                    if (!isNetworkError) break;
+
+                    if (attempt < MAX_RETRIES) {
+                        submitBtn.textContent = `Server waking up... retry ${attempt}/${MAX_RETRIES - 1}`;
+                        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
+                    }
                 }
             }
+
+            // All retries exhausted or non-network error
+            const isNetworkError = lastError.message === 'Failed to fetch' || lastError.message.includes('Load failed');
+            if (isNetworkError) {
+                errorDiv.textContent = 'Server is currently unavailable. It may be starting up — please wait a moment and try again.';
+            } else {
+                errorDiv.textContent = lastError.message;
+            }
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Complete Signup';
         });
     </script>
 
