@@ -1436,9 +1436,9 @@ app.post('/api/auth/login', async (req, res) => {
 // Create email transporter
 const createEmailTransporter = () => {
     // Use environment variables for email configuration
-    // Supports Gmail, SendGrid, or any SMTP service
+    // Supports Microsoft 365/Outlook, Gmail, SendGrid, or any SMTP service
     if (process.env.SMTP_HOST) {
-        return nodemailer.createTransport({
+        const config = {
             host: process.env.SMTP_HOST,
             port: parseInt(process.env.SMTP_PORT) || 587,
             secure: process.env.SMTP_SECURE === 'true',
@@ -1446,7 +1446,15 @@ const createEmailTransporter = () => {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS
             }
-        });
+        };
+        // Office 365 requires TLS
+        if (process.env.SMTP_HOST.includes('office365') || process.env.SMTP_HOST.includes('outlook')) {
+            config.tls = {
+                ciphers: 'SSLv3',
+                rejectUnauthorized: false
+            };
+        }
+        return nodemailer.createTransport(config);
     }
     // Default to Gmail if GMAIL_USER and GMAIL_APP_PASSWORD are set
     if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
