@@ -254,8 +254,18 @@
         }
 
         #link-authentication-element,
-        #payment-element {
+        #payment-element,
+        #card-element {
             margin-bottom: 16px;
+            padding: 12px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            background: white;
+        }
+
+        #card-element:focus-within {
+            border-color: #2D5A27;
+            box-shadow: 0 0 0 2px rgba(45, 90, 39, 0.1);
         }
 
         /* Check Instructions */
@@ -564,8 +574,17 @@
                     <div class="payment-section">
                         <h3 class="section-title">Payment Method</h3>
                         <div class="payment-options">
-                            <label class="payment-option selected" onclick="selectPayment('ach')">
-                                <input type="radio" name="paymentMethod" value="ach" checked>
+                            <label class="payment-option selected" onclick="selectPayment('card')">
+                                <input type="radio" name="paymentMethod" value="card" checked>
+                                <div class="payment-option-info">
+                                    <div class="payment-option-title">Credit/Debit Card</div>
+                                    <div class="payment-option-desc">Visa, Mastercard, American Express</div>
+                                </div>
+                                <div class="payment-option-fee">2.9% + $0.30 fee</div>
+                            </label>
+
+                            <label class="payment-option" onclick="selectPayment('ach')">
+                                <input type="radio" name="paymentMethod" value="ach">
                                 <div class="payment-option-info">
                                     <div class="payment-option-title">Bank Transfer (ACH)</div>
                                     <div class="payment-option-desc">Pay directly from your bank account</div>
@@ -583,8 +602,15 @@
                             </label>
                         </div>
 
+                        <!-- Card Payment Form (Stripe Elements) -->
+                        <div class="ach-form active" id="cardForm">
+                            <p style="margin-bottom: 16px; color: #666;">Enter your card details below. Your information is securely processed by Stripe.</p>
+                            <div id="card-element"></div>
+                            <div id="card-message" style="color: #dc3545; font-size: 0.9rem; margin-top: 8px;"></div>
+                        </div>
+
                         <!-- ACH Payment Form (Stripe Elements) -->
-                        <div class="ach-form active" id="achForm">
+                        <div class="ach-form" id="achForm">
                             <p style="margin-bottom: 16px; color: #666;">Enter your bank details below. Your information is securely processed by Stripe.</p>
                             <div id="payment-element"></div>
                             <div id="payment-message" style="color: #dc3545; font-size: 0.9rem; margin-top: 8px;"></div>
@@ -625,9 +651,9 @@
                             <span>Pickup (FREE)</span>
                         </div>
 
-                        <div class="summary-line" id="achFeeRow" style="display: none;">
-                            <span>Processing Fee (ACH)</span>
-                            <span id="achFee">$0.00</span>
+                        <div class="summary-line" id="processingFeeRow">
+                            <span id="feeLabel">Processing Fee (Card)</span>
+                            <span id="processingFeeAmount">$0.00</span>
                         </div>
 
                         <div class="summary-line total">
@@ -678,8 +704,9 @@
         let orderData = null;
         let stripe = null;
         let elements = null;
+        let cardElement = null;
         let paymentElement = null;
-        let selectedPaymentMethod = 'ach';
+        let selectedPaymentMethod = 'card';
         let processingFee = 0;
 
         // Rep info
@@ -751,14 +778,24 @@
             document.getElementById('itemCount').textContent = items.length;
             document.getElementById('itemsSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
 
-            // Calculate ACH fee if applicable
-            if (selectedPaymentMethod === 'ach') {
+            // Calculate processing fee based on payment method
+            const feeRow = document.getElementById('processingFeeRow');
+            const feeLabel = document.getElementById('feeLabel');
+            const feeAmount = document.getElementById('processingFeeAmount');
+
+            if (selectedPaymentMethod === 'card') {
+                processingFee = (subtotal * 0.029) + 0.30; // 2.9% + $0.30
+                feeRow.style.display = 'flex';
+                feeLabel.textContent = 'Processing Fee (Card)';
+                feeAmount.textContent = '$' + processingFee.toFixed(2);
+            } else if (selectedPaymentMethod === 'ach') {
                 processingFee = Math.min(subtotal * 0.008, 5); // 0.8% capped at $5
-                document.getElementById('achFeeRow').style.display = 'flex';
-                document.getElementById('achFee').textContent = '$' + processingFee.toFixed(2);
+                feeRow.style.display = 'flex';
+                feeLabel.textContent = 'Processing Fee (ACH)';
+                feeAmount.textContent = '$' + processingFee.toFixed(2);
             } else {
                 processingFee = 0;
-                document.getElementById('achFeeRow').style.display = 'none';
+                feeRow.style.display = 'none';
             }
 
             const total = subtotal + processingFee;
@@ -778,14 +815,17 @@
             document.querySelector(`input[value="${method}"]`).closest('.payment-option').classList.add('selected');
 
             // Show/hide forms
+            document.getElementById('cardForm').classList.toggle('active', method === 'card');
             document.getElementById('achForm').classList.toggle('active', method === 'ach');
             document.getElementById('checkInstructions').classList.toggle('active', method === 'check');
 
             // Update button text
             if (method === 'check') {
                 document.getElementById('submitBtn').textContent = 'Place Order (Pay by Check)';
+            } else if (method === 'card') {
+                document.getElementById('submitBtn').textContent = 'Pay with Card';
             } else {
-                document.getElementById('submitBtn').textContent = 'Place Order';
+                document.getElementById('submitBtn').textContent = 'Pay with Bank Account';
             }
 
             updateTotals();
@@ -797,6 +837,7 @@
                 const response = await fetch(`${API_URL}/api/stripe/config`);
                 if (!response.ok) {
                     console.log('Stripe config not available, using check payment only');
+                    document.querySelector('.payment-option[onclick*="card"]').style.display = 'none';
                     document.querySelector('.payment-option[onclick*="ach"]').style.display = 'none';
                     selectPayment('check');
                     return;
@@ -810,23 +851,8 @@
 
                 stripe = Stripe(publishableKey);
 
-                // Create setup intent for ACH
-                const setupResponse = await fetch(`${API_URL}/api/payments/setup-intent`, {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${token}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-
-                if (!setupResponse.ok) {
-                    throw new Error('Failed to initialize payment');
-                }
-
-                const { clientSecret } = await setupResponse.json();
-
-                elements = stripe.elements({
-                    clientSecret,
+                // Create card element
+                const cardElements = stripe.elements({
                     appearance: {
                         theme: 'stripe',
                         variables: {
@@ -836,11 +862,55 @@
                     }
                 });
 
-                paymentElement = elements.create('payment', {
-                    layout: 'tabs',
-                    paymentMethodOrder: ['us_bank_account']
+                cardElement = cardElements.create('card', {
+                    style: {
+                        base: {
+                            fontSize: '16px',
+                            color: '#1a1a2e',
+                            '::placeholder': { color: '#999' }
+                        }
+                    }
                 });
-                paymentElement.mount('#payment-element');
+                cardElement.mount('#card-element');
+
+                cardElement.on('change', (event) => {
+                    const cardMessage = document.getElementById('card-message');
+                    if (event.error) {
+                        cardMessage.textContent = event.error.message;
+                    } else {
+                        cardMessage.textContent = '';
+                    }
+                });
+
+                // Create setup intent for ACH
+                const setupResponse = await fetch(`${API_URL}/api/payments/setup-intent`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (setupResponse.ok) {
+                    const { clientSecret } = await setupResponse.json();
+
+                    elements = stripe.elements({
+                        clientSecret,
+                        appearance: {
+                            theme: 'stripe',
+                            variables: {
+                                colorPrimary: '#2D5A27',
+                                borderRadius: '6px'
+                            }
+                        }
+                    });
+
+                    paymentElement = elements.create('payment', {
+                        layout: 'tabs',
+                        paymentMethodOrder: ['us_bank_account']
+                    });
+                    paymentElement.mount('#payment-element');
+                }
 
             } catch (error) {
                 console.error('Stripe init error:', error);
@@ -889,8 +959,72 @@
                     notes: document.getElementById('orderNotes').value.trim()
                 };
 
-                if (selectedPaymentMethod === 'ach' && stripe && elements) {
-                    // Submit Stripe payment
+                if (selectedPaymentMethod === 'card' && stripe && cardElement) {
+                    // Create order first
+                    const orderResponse = await fetch(`${API_URL}/api/chemical-orders/checkout`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(orderPayload)
+                    });
+
+                    if (!orderResponse.ok) {
+                        const err = await orderResponse.json();
+                        throw new Error(err.error || 'Failed to create order');
+                    }
+
+                    const orderResult = await orderResponse.json();
+
+                    // Create payment intent for card
+                    const intentResponse = await fetch(`${API_URL}/api/payments/create-intent`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            orderId: orderResult.orderId,
+                            paymentMethod: 'card',
+                            amount: Math.round(orderData.total * 100)
+                        })
+                    });
+
+                    if (!intentResponse.ok) {
+                        const err = await intentResponse.json();
+                        throw new Error(err.error || 'Failed to create payment');
+                    }
+
+                    const { clientSecret } = await intentResponse.json();
+
+                    // Confirm card payment
+                    const { error: confirmError, paymentIntent } = await stripe.confirmCardPayment(clientSecret, {
+                        payment_method: {
+                            card: cardElement,
+                            billing_details: {
+                                name: name,
+                                email: email,
+                                phone: phone
+                            }
+                        }
+                    });
+
+                    if (confirmError) {
+                        throw new Error(confirmError.message);
+                    }
+
+                    if (paymentIntent.status === 'succeeded') {
+                        // Payment success - redirect to confirmation
+                        sessionStorage.removeItem('checkoutOrder');
+                        sessionStorage.setItem('completedOrder', JSON.stringify(orderResult));
+                        window.location.href = `/order-confirmation.html?order=${orderResult.orderId}`;
+                    } else {
+                        throw new Error('Payment was not completed. Please try again.');
+                    }
+
+                } else if (selectedPaymentMethod === 'ach' && stripe && elements) {
+                    // Submit Stripe ACH payment
                     const { error: submitError } = await elements.submit();
                     if (submitError) {
                         throw new Error(submitError.message);

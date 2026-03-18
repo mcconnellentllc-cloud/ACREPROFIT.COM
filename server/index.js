@@ -2693,13 +2693,21 @@ app.delete('/api/payments/methods', authMiddleware, async (req, res) => {
 // Create payment intent for an order (ACH or Card)
 app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
     try {
-        const { orderId, paymentMethod } = req.body;
+        const { orderId, paymentMethod, amount } = req.body;
 
         if (!stripe) {
             return res.status(400).json({ error: 'Stripe not configured' });
         }
 
-        const order = await Order.findById(orderId).populate('representativeId');
+        // Try to find the order in both Order and ChemicalOrder collections
+        let order = await Order.findById(orderId).populate('representativeId');
+        let isChemicalOrder = false;
+
+        if (!order) {
+            order = await ChemicalOrder.findById(orderId).populate('representativeId');
+            isChemicalOrder = true;
+        }
+
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
         }
@@ -2708,37 +2716,43 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
-        const rep = order.representativeId;
-        if (!rep.stripeAccountId || rep.stripeAccountStatus !== 'active') {
-            return res.status(400).json({
-                error: 'Representative has not set up payment processing. Please pay by check.',
-                checkPayableTo: rep.checkPayableTo || rep.name,
-                checkMailingAddress: rep.checkMailingAddress
-            });
+        // Get the order amount
+        const orderAmount = amount || order.total || order.totalCost || 0;
+        if (orderAmount <= 0) {
+            return res.status(400).json({ error: 'Invalid order amount' });
         }
+
+        // Get representative for Stripe Connect (optional - if not set, payment goes to platform)
+        let rep = order.representativeId;
+        let useStripeConnect = rep && rep.stripeAccountId && rep.stripeAccountStatus === 'active';
 
         // Calculate platform fee (optional - 0% for now, can add later)
         const platformFeePercent = 0;
-        const applicationFee = Math.round(order.totalCost * 100 * platformFeePercent);
+        const applicationFee = Math.round(orderAmount * 100 * platformFeePercent);
 
-        // Create payment intent with Stripe Connect
+        // Create payment intent params
         const paymentIntentParams = {
-            amount: Math.round(order.totalCost * 100), // Convert to cents
+            amount: Math.round(orderAmount * 100), // Convert to cents
             currency: 'usd',
             payment_method_types: paymentMethod === 'ach' ? ['us_bank_account'] : ['card'],
-            transfer_data: {
-                destination: rep.stripeAccountId
-            },
             metadata: {
                 orderId: order._id.toString(),
+                orderType: isChemicalOrder ? 'chemical' : 'regular',
                 customerId: req.user._id.toString(),
-                customerName: req.user.name,
-                repName: rep.name
+                customerName: req.user.name
             }
         };
 
-        if (applicationFee > 0) {
-            paymentIntentParams.application_fee_amount = applicationFee;
+        // If rep has Stripe Connect, use transfer (sends funds to their account)
+        if (useStripeConnect) {
+            paymentIntentParams.transfer_data = {
+                destination: rep.stripeAccountId
+            };
+            paymentIntentParams.metadata.repName = rep.name;
+
+            if (applicationFee > 0) {
+                paymentIntentParams.application_fee_amount = applicationFee;
+            }
         }
 
         // For ACH, add specific options
@@ -2756,7 +2770,7 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
 
         // Update order with payment intent
         order.stripePaymentIntentId = paymentIntent.id;
-        order.paymentMethod = 'stripe_ach'; // ACH only - no credit cards
+        order.paymentMethod = paymentMethod === 'ach' ? 'stripe_ach' : 'stripe_card';
         order.paymentStatus = 'processing';
         await order.save();
 
@@ -2815,15 +2829,28 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
     if (event.type === 'payment_intent.succeeded') {
         const paymentIntent = event.data.object;
         const orderId = paymentIntent.metadata.orderId;
+        const orderType = paymentIntent.metadata.orderType;
 
         if (orderId) {
-            const order = await Order.findById(orderId);
+            // Try to find the order in the appropriate collection
+            let order;
+            if (orderType === 'chemical') {
+                order = await ChemicalOrder.findById(orderId);
+            } else {
+                order = await Order.findById(orderId);
+                // Fallback to ChemicalOrder if not found in Order
+                if (!order) {
+                    order = await ChemicalOrder.findById(orderId);
+                }
+            }
+
             if (order) {
                 order.paymentStatus = 'paid';
                 order.paidAt = new Date();
                 order.status = 'confirmed';
                 order.updatedAt = new Date();
                 await order.save();
+                console.log(`Payment confirmed for order ${orderId}`);
             }
         }
     }
@@ -2831,13 +2858,24 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
     if (event.type === 'payment_intent.payment_failed') {
         const paymentIntent = event.data.object;
         const orderId = paymentIntent.metadata.orderId;
+        const orderType = paymentIntent.metadata.orderType;
 
         if (orderId) {
-            const order = await Order.findById(orderId);
+            let order;
+            if (orderType === 'chemical') {
+                order = await ChemicalOrder.findById(orderId);
+            } else {
+                order = await Order.findById(orderId);
+                if (!order) {
+                    order = await ChemicalOrder.findById(orderId);
+                }
+            }
+
             if (order) {
                 order.paymentStatus = 'failed';
                 order.updatedAt = new Date();
                 await order.save();
+                console.log(`Payment failed for order ${orderId}`);
             }
         }
     }
