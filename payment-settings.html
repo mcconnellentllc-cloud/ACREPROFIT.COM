@@ -212,7 +212,22 @@
 
         // Initialize Stripe
         let stripe = null;
-        const stripePublicKey = 'pk_test_your_key'; // Will need to be configured
+
+        // Fetch Stripe config and initialize
+        async function initStripe() {
+            try {
+                const response = await fetch(`${API_URL}/api/stripe/config`);
+                if (response.ok) {
+                    const config = await response.json();
+                    stripe = Stripe(config.publishableKey);
+                    console.log('Stripe initialized successfully');
+                } else {
+                    console.warn('Stripe not configured on server');
+                }
+            } catch (error) {
+                console.error('Could not initialize Stripe:', error);
+            }
+        }
 
         // ============ REP FUNCTIONS ============
 
@@ -312,35 +327,224 @@
 
         // Add bank account
         document.getElementById('addBankAccount')?.addEventListener('click', async () => {
+            if (!stripe) {
+                alert('Payment system is not configured. Please contact support.');
+                return;
+            }
+
             const shouldSave = getSavePreference();
 
             // Show confirmation based on choice
             let confirmMsg = shouldSave
-                ? 'You chose to SAVE your bank account for future orders. Continue?'
-                : 'You chose NOT to save your bank account. You will need to enter it again for each order. Continue?';
+                ? 'You chose to SAVE your bank account for future orders. Continue to link your bank?'
+                : 'You chose NOT to save your bank account. Continue to link your bank for this session?';
 
             if (!confirm(confirmMsg)) return;
 
-            alert(`Bank account setup would open here.\n\nSave preference: ${shouldSave ? 'YES - Save for future' : 'NO - One-time only'}\n\nNote: Stripe integration needs your publishable key to be configured.`);
+            try {
+                // Save preference first
+                await fetch(`${API_URL}/api/payments/save-preference`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ savePaymentMethod: shouldSave })
+                });
 
-            // TODO: Implement actual Stripe bank account setup
-            // This requires:
-            // 1. STRIPE_PUBLISHABLE_KEY in environment
-            // 2. Stripe.js loaded
-            // 3. Financial Connections or manual bank entry
+                // Get setup intent from server
+                const btn = document.getElementById('addBankAccount');
+                btn.disabled = true;
+                btn.innerHTML = '<span>Connecting...</span>';
+
+                const response = await fetch(`${API_URL}/api/payments/setup-intent`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to start bank setup');
+                }
+
+                const { clientSecret } = await response.json();
+
+                // Use Stripe to collect bank account
+                const { setupIntent, error } = await stripe.collectBankAccountForSetup({
+                    clientSecret: clientSecret,
+                    params: {
+                        payment_method_type: 'us_bank_account',
+                        payment_method_data: {
+                            billing_details: {
+                                name: user.name || 'Account Holder',
+                                email: user.email
+                            }
+                        }
+                    }
+                });
+
+                if (error) {
+                    throw new Error(error.message);
+                }
+
+                if (setupIntent.status === 'requires_payment_method') {
+                    // User closed the modal
+                    throw new Error('Bank account setup was cancelled');
+                }
+
+                if (setupIntent.status === 'requires_confirmation') {
+                    // Confirm the setup
+                    const { error: confirmError } = await stripe.confirmUsBankAccountSetup(clientSecret);
+                    if (confirmError) {
+                        throw new Error(confirmError.message);
+                    }
+                }
+
+                // Success!
+                alert('Bank account linked successfully!' + (shouldSave ? ' It will be saved for future orders.' : ''));
+                loadSavedPaymentMethods();
+
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                const btn = document.getElementById('addBankAccount');
+                btn.disabled = false;
+                updateButtonText();
+            }
         });
 
         // Update button text based on preference
+        function updateButtonText() {
+            const addBankText = document.getElementById('addBankText');
+            if (getSavePreference()) {
+                addBankText.textContent = 'Add & Save Bank Account';
+            } else {
+                addBankText.textContent = 'Add Bank Account (One-Time)';
+            }
+        }
+
         document.querySelectorAll('input[name="savePreference"]').forEach(radio => {
-            radio.addEventListener('change', () => {
-                const addBankText = document.getElementById('addBankText');
-                if (getSavePreference()) {
-                    addBankText.textContent = 'Add & Save Bank Account';
-                } else {
-                    addBankText.textContent = 'Add Bank Account (One-Time)';
-                }
-            });
+            radio.addEventListener('change', updateButtonText);
         });
+
+        // Load saved payment methods
+        async function loadSavedPaymentMethods() {
+            try {
+                const response = await fetch(`${API_URL}/api/payments/methods`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) return;
+
+                const { paymentMethods } = await response.json();
+
+                if (paymentMethods && paymentMethods.length > 0) {
+                    // Update status
+                    document.getElementById('achStatus').textContent = `${paymentMethods.length} account(s) saved`;
+                    document.getElementById('achStatusBadge').textContent = 'Active';
+                    document.getElementById('achStatusBadge').classList.add('status-active');
+
+                    // Show saved methods card
+                    document.getElementById('savedMethodsCard').style.display = 'block';
+
+                    // Render methods list
+                    document.getElementById('paymentMethodsList').innerHTML = paymentMethods.map(pm => `
+                        <div class="saved-method">
+                            <div class="method-info">
+                                <span class="method-icon">
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                        <path d="M3 21h18M3 10h18M5 6l7-3 7 3M4 10v11m16-11v11M8 14v3m4-3v3m4-3v3"></path>
+                                    </svg>
+                                </span>
+                                <div>
+                                    <strong>${pm.bankName || 'Bank Account'}</strong>
+                                    <span class="method-detail">••••${pm.last4} (${pm.accountType || 'checking'})</span>
+                                </div>
+                            </div>
+                            <button class="btn btn-sm btn-danger-outline" onclick="removePaymentMethod('${pm.id}')">Remove</button>
+                        </div>
+                    `).join('');
+
+                    document.getElementById('removeAllBtn').style.display = 'block';
+                } else {
+                    document.getElementById('savedMethodsCard').style.display = 'none';
+                }
+            } catch (error) {
+                console.error('Error loading payment methods:', error);
+            }
+        }
+
+        // Remove single payment method
+        async function removePaymentMethod(paymentMethodId) {
+            if (!confirm('Remove this bank account?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/payments/methods/${paymentMethodId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    loadSavedPaymentMethods();
+                } else {
+                    const error = await response.json();
+                    alert(error.error || 'Failed to remove');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Remove all payment methods
+        document.getElementById('removeAllBtn')?.addEventListener('click', async () => {
+            if (!confirm('Remove ALL saved payment methods? You will need to re-enter your bank info for future orders.')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/payments/methods`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    document.getElementById('achStatus').textContent = 'No bank account saved';
+                    document.getElementById('achStatusBadge').textContent = 'Not Set Up';
+                    document.getElementById('achStatusBadge').classList.remove('status-active');
+                    document.getElementById('savedMethodsCard').style.display = 'none';
+                    alert('All payment methods removed');
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        });
+
+        // Load rep's check info
+        async function loadCheckInfo() {
+            if (!isRep) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/user`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (response.ok) {
+                    const userData = await response.json();
+                    if (userData.checkPayableTo) {
+                        document.getElementById('checkPayableTo').value = userData.checkPayableTo;
+                    }
+                    if (userData.checkMailingAddress) {
+                        document.getElementById('checkStreet').value = userData.checkMailingAddress.street || '';
+                        document.getElementById('checkCity').value = userData.checkMailingAddress.city || '';
+                        document.getElementById('checkState').value = userData.checkMailingAddress.state || '';
+                        document.getElementById('checkZip').value = userData.checkMailingAddress.zip || '';
+                    }
+                }
+            } catch (error) {
+                console.log('Could not load check info');
+            }
+        }
 
         // Logout
         document.getElementById('logoutBtn').addEventListener('click', (e) => {
@@ -351,7 +555,14 @@
         });
 
         // Initialize
-        checkStripeConnectStatus();
+        async function init() {
+            await initStripe();
+            checkStripeConnectStatus();
+            loadSavedPaymentMethods();
+            loadCheckInfo();
+        }
+
+        init();
     </script>
 
     <style>
