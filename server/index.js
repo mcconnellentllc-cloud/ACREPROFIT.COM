@@ -5,6 +5,8 @@ const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 
 const app = express();
 
@@ -1426,6 +1428,174 @@ app.post('/api/auth/login', async (req, res) => {
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- PASSWORD RESET ROUTES ----
+
+// Create email transporter
+const createEmailTransporter = () => {
+    // Use environment variables for email configuration
+    // Supports Gmail, SendGrid, or any SMTP service
+    if (process.env.SMTP_HOST) {
+        return nodemailer.createTransport({
+            host: process.env.SMTP_HOST,
+            port: parseInt(process.env.SMTP_PORT) || 587,
+            secure: process.env.SMTP_SECURE === 'true',
+            auth: {
+                user: process.env.SMTP_USER,
+                pass: process.env.SMTP_PASS
+            }
+        });
+    }
+    // Default to Gmail if GMAIL_USER and GMAIL_APP_PASSWORD are set
+    if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
+        return nodemailer.createTransport({
+            service: 'gmail',
+            auth: {
+                user: process.env.GMAIL_USER,
+                pass: process.env.GMAIL_APP_PASSWORD
+            }
+        });
+    }
+    return null;
+};
+
+// Request password reset
+app.post('/api/auth/forgot-password', async (req, res) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ error: 'Email is required' });
+        }
+
+        const user = await User.findOne({ email: email.toLowerCase() });
+
+        // Always return success to prevent email enumeration
+        if (!user) {
+            return res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
+        }
+
+        // Generate a secure token
+        const token = crypto.randomBytes(32).toString('hex');
+        const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour from now
+
+        // Invalidate any existing tokens for this user
+        await PasswordResetToken.updateMany(
+            { userId: user._id, used: false },
+            { used: true }
+        );
+
+        // Create new token
+        await PasswordResetToken.create({
+            userId: user._id,
+            token,
+            expiresAt
+        });
+
+        // Send email
+        const transporter = createEmailTransporter();
+        const resetUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/reset-password.html?token=${token}`;
+
+        if (transporter) {
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: user.email,
+                subject: 'Reset Your Acre Profit Password',
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <div style="background-color: #2d5a27; padding: 20px; text-align: center;">
+                            <h1 style="color: white; margin: 0;">Acre Profit</h1>
+                        </div>
+                        <div style="padding: 30px; background-color: #f9f9f9;">
+                            <h2 style="color: #333;">Reset Your Password</h2>
+                            <p style="color: #666; line-height: 1.6;">
+                                Hi ${user.name},
+                            </p>
+                            <p style="color: #666; line-height: 1.6;">
+                                We received a request to reset your password. Click the button below to create a new password:
+                            </p>
+                            <div style="text-align: center; margin: 30px 0;">
+                                <a href="${resetUrl}" style="background-color: #d4a017; color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                                    Reset Password
+                                </a>
+                            </div>
+                            <p style="color: #666; line-height: 1.6;">
+                                This link will expire in 1 hour. If you didn't request this, you can safely ignore this email.
+                            </p>
+                            <hr style="border: none; border-top: 1px solid #ddd; margin: 30px 0;">
+                            <p style="color: #999; font-size: 12px;">
+                                If the button doesn't work, copy and paste this link into your browser:<br>
+                                <a href="${resetUrl}" style="color: #2d5a27;">${resetUrl}</a>
+                            </p>
+                        </div>
+                        <div style="padding: 20px; text-align: center; background-color: #333;">
+                            <p style="color: #999; font-size: 12px; margin: 0;">
+                                &copy; 2026 Acre Profit. Farmers Helping Farmers.
+                            </p>
+                        </div>
+                    </div>
+                `
+            });
+            console.log(`Password reset email sent to ${user.email}`);
+        } else {
+            console.log(`Password reset requested for ${user.email}. Token: ${token}`);
+            console.log(`Reset URL: ${resetUrl}`);
+            console.log('Note: Email not sent - no email service configured. Set SMTP or Gmail environment variables.');
+        }
+
+        res.json({ message: 'If an account exists with this email, a password reset link has been sent.' });
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({ error: 'Failed to process request' });
+    }
+});
+
+// Reset password with token
+app.post('/api/auth/reset-password', async (req, res) => {
+    try {
+        const { token, password } = req.body;
+
+        if (!token || !password) {
+            return res.status(400).json({ error: 'Token and password are required' });
+        }
+
+        if (password.length < 8) {
+            return res.status(400).json({ error: 'Password must be at least 8 characters' });
+        }
+
+        // Find valid token
+        const resetToken = await PasswordResetToken.findOne({
+            token,
+            used: false,
+            expiresAt: { $gt: new Date() }
+        });
+
+        if (!resetToken) {
+            return res.status(400).json({ error: 'Invalid or expired reset link' });
+        }
+
+        // Find user and update password
+        const user = await User.findById(resetToken.userId);
+        if (!user) {
+            return res.status(400).json({ error: 'User not found' });
+        }
+
+        // Update password (the pre-save hook will hash it)
+        user.password = password;
+        await user.save();
+
+        // Mark token as used
+        resetToken.used = true;
+        await resetToken.save();
+
+        console.log(`Password reset successful for ${user.email}`);
+
+        res.json({ message: 'Password reset successfully' });
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({ error: 'Failed to reset password' });
     }
 });
 
@@ -4852,6 +5022,17 @@ const userSubmittedChemicalSchema = new mongoose.Schema({
 });
 
 const UserSubmittedChemical = mongoose.model('UserSubmittedChemical', userSubmittedChemicalSchema);
+
+// Password Reset Token Model
+const passwordResetTokenSchema = new mongoose.Schema({
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    token: { type: String, required: true },
+    expiresAt: { type: Date, required: true },
+    used: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now }
+});
+
+const PasswordResetToken = mongoose.model('PasswordResetToken', passwordResetTokenSchema);
 
 // Submit a new chemical to the database
 app.post('/api/user-chemicals', authMiddleware, async (req, res) => {
