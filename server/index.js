@@ -50,6 +50,8 @@ const connectDB = async () => {
             console.log('MongoDB connected successfully');
             // Initialize admin users
             await initializeAdmins();
+            // Seed initial inventory
+            await seedJabcoInventory();
         } else {
             console.log('No MongoDB URI provided, running without database');
         }
@@ -1587,6 +1589,107 @@ async function initializeAdmins() {
         } catch (error) {
             console.log(`Admin ${admin.email} may already exist`);
         }
+    }
+}
+
+// Seed Jabco Glyphosate Inventory (PO#2119 - 4,240 gal @ $13.25)
+async function seedJabcoInventory() {
+    try {
+        // Check if batch already exists
+        const existingBatch = await InventoryBatch.findOne({ lotNumber: 'jabco2119' });
+        if (existingBatch) {
+            console.log('Jabco inventory (jabco2119) already exists');
+            return;
+        }
+
+        // Find or create the product
+        let product = await Chemical.findOne({
+            productName: 'XSATE Glyphosate 53.8%',
+            packSize: '265 gal'
+        });
+
+        if (!product) {
+            product = await Chemical.create({
+                productName: 'XSATE Glyphosate 53.8%',
+                packSize: '265 gal',
+                unit: 'gal',
+                unitsPerPack: 265,
+                costPrice: 13.25,
+                adminPrice: 0,
+                sellPrice: 0,
+                category: 'herbicide',
+                sourceSupplier: 'Jabco',
+                epaRegistrationNumber: '89343-5',
+                signalWord: 'CAUTION',
+                notes: '5.4 lb/gal glyphosate - Xingfa USA',
+                activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }]
+            });
+            console.log('Created XSATE Glyphosate 53.8% product');
+        }
+
+        // Create inventory record
+        let inventory = await Inventory.findOne({ chemicalId: product._id, location: 'main' });
+        if (!inventory) {
+            inventory = await Inventory.create({
+                chemicalId: product._id,
+                productName: 'XSATE Glyphosate 53.8%',
+                packSize: '265 gal',
+                unit: 'gal',
+                location: 'main',
+                quantityOnHand: 4240,
+                quantityReserved: 0,
+                quantityAvailable: 4240,
+                averageCost: 13.25,
+                lastCost: 13.25,
+                lastReceivedDate: new Date('2026-03-09')
+            });
+        } else {
+            // Update existing inventory
+            inventory.quantityOnHand += 4240;
+            inventory.quantityAvailable = inventory.quantityOnHand - inventory.quantityReserved;
+            inventory.lastCost = 13.25;
+            inventory.lastReceivedDate = new Date('2026-03-09');
+            await inventory.save();
+        }
+
+        // Create batch record
+        await InventoryBatch.create({
+            chemicalId: product._id,
+            productName: 'XSATE Glyphosate 53.8%',
+            packSize: '265 gal',
+            unit: 'gal',
+            poNumber: 'JABCO-2119',
+            lotNumber: 'jabco2119',
+            quantityReceived: 4240,
+            quantityRemaining: 4240,
+            costPerUnit: 13.25,
+            totalCost: 56180.00,
+            location: 'main',
+            supplierName: 'Jabco',
+            status: 'active',
+            receivedDate: new Date('2026-03-09')
+        });
+
+        // Create transaction record
+        await InventoryTransaction.create({
+            inventoryId: inventory._id,
+            chemicalId: product._id,
+            productName: 'XSATE Glyphosate 53.8%',
+            type: 'receive',
+            quantityChange: 4240,
+            previousQuantity: 0,
+            newQuantity: 4240,
+            unitCost: 13.25,
+            totalCost: 56180.00,
+            referenceType: 'PurchaseOrder',
+            referenceNumber: 'JABCO-2119',
+            location: 'main',
+            notes: 'Initial Jabco inventory - Sales Order #2119'
+        });
+
+        console.log('Seeded Jabco inventory: 4,240 gal XSATE Glyphosate @ $13.25/gal (lot: jabco2119)');
+    } catch (error) {
+        console.error('Error seeding Jabco inventory:', error.message);
     }
 }
 
