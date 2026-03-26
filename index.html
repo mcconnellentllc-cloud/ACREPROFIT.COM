@@ -3,316 +3,296 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="AcreProfit - Bulk agricultural chemicals at wholesale prices. Save on herbicides, insecticides, fungicides, and more.">
-    <title>AcreProfit - Bulk Ag Chemicals for Farmers</title>
+    <meta name="description" content="Acre Profit - Farmers helping farmers. Join our bulk buying co-op for farm chemistry and products.">
+    <title>Acre Profit - Farmers Helping Farmers</title>
 
-    <meta name="theme-color" content="#16a34a">
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2d5a27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
 <body>
-    <div class="page-wrapper">
-        <!-- Header -->
-        <header class="header">
-            <div class="header-inner">
-                <a href="index.html" class="logo">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                        <path d="M2 17l10 5 10-5"/>
-                        <path d="M2 12l10 5 10-5"/>
-                    </svg>
-                    <span>AcreProfit</span>
-                </a>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="container">
+            <a href="/" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <ul class="nav-links">
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="/login.html" class="btn btn-outline btn-sm">Sign In</a></li>
+                <li><a href="/signup.html" class="btn btn-primary btn-sm">Sign Up</a></li>
+            </ul>
+            <button class="mobile-menu-btn" aria-label="Menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
 
-                <nav class="nav" id="main-nav">
-                    <a href="shop.html" class="nav-link">Shop Products</a>
-                    <a href="calculator.html" class="nav-link">Calculator</a>
-                    <a href="#how-it-works" class="nav-link">How It Works</a>
-                    <a href="#contact" class="nav-link">Contact</a>
-                </nav>
-
-                <div class="nav-actions">
-                    <a href="login.html" class="btn btn-secondary" id="login-btn">Sign In</a>
-                    <a href="signup.html" class="btn btn-primary" id="signup-btn">Get Started</a>
-                </div>
-
-                <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        <line x1="3" y1="12" x2="21" y2="12"/>
-                        <line x1="3" y1="6" x2="21" y2="6"/>
-                        <line x1="3" y1="18" x2="21" y2="18"/>
-                    </svg>
-                </button>
+    <!-- Hero Section -->
+    <header class="hero">
+        <div class="container">
+            <div class="hero-content">
+                <span class="hero-tag">Farmers Helping Farmers</span>
+                <h1>Buy Smarter. <span class="highlight">Save Together.</span></h1>
+                <p class="hero-subtitle">We're farmers just like you. By pooling our orders, we fill trucks and get bulk pricing on the chemistry and products we all need. Join us and keep more profit in your pocket.</p>
             </div>
-        </header>
 
-        <!-- Hero Section -->
-        <section class="hero">
-            <div class="container">
-                <h1>Bulk Ag Chemicals at Wholesale Prices</h1>
-                <p>Cut your input costs by buying direct. Quality herbicides, insecticides, fungicides, and adjuvants delivered to your farm.</p>
-                <div class="hero-actions">
-                    <a href="shop.html" class="btn btn-primary btn-lg">Browse Products</a>
-                    <a href="calculator.html" class="btn btn-outline btn-lg" style="border-color: white; color: white;">Calculate Your Needs</a>
+            <!-- Auth CTA Cards -->
+            <div class="auth-cards">
+                <div class="auth-card">
+                    <h2>New to Acre Profit?</h2>
+                    <p>Join our farmer co-op and start saving on bulk orders.</p>
+                    <a href="/signup.html" class="btn btn-accent btn-lg">Create Account</a>
+                </div>
+                <div class="auth-card auth-card-alt">
+                    <h2>Already a Member?</h2>
+                    <p>Sign in to view your orders and enter your acres.</p>
+                    <a href="/login.html" class="btn btn-white btn-lg">Sign In</a>
                 </div>
             </div>
-        </section>
+        </div>
+    </header>
 
-        <!-- Features Section -->
-        <section class="features" id="how-it-works">
-            <div class="container">
-                <h2 class="text-center mb-xl">How It Works</h2>
-                <div class="features-grid">
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="12" cy="12" r="10"/>
-                                <path d="M12 6v6l4 2"/>
-                            </svg>
-                        </div>
-                        <h3>1. Enter Your Acres</h3>
-                        <p>Tell us your farm size and what crops you grow. Our calculator recommends exactly what you need.</p>
-                    </div>
+    <!-- How It Works Section -->
+    <section id="how-it-works" class="how-it-works-section">
+        <div class="container">
+            <div class="section-header">
+                <h2>How It Works</h2>
+                <p>Simple bulk buying that saves you money</p>
+            </div>
 
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <circle cx="9" cy="21" r="1"/>
-                                <circle cx="20" cy="21" r="1"/>
-                                <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
-                            </svg>
-                        </div>
-                        <h3>2. Order Products</h3>
-                        <p>Browse our inventory of name-brand chemicals. Buy by the gallon, case, or drum at bulk pricing.</p>
-                    </div>
+            <div class="steps-grid">
+                <div class="step-card">
+                    <div class="step-number">1</div>
+                    <h3>Enter Your Acres</h3>
+                    <p>Tell us how many acres you're farming and what crops you're growing.</p>
+                </div>
 
-                    <div class="feature-card">
-                        <div class="feature-icon">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <rect x="1" y="3" width="15" height="13"/>
-                                <polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/>
-                                <circle cx="5.5" cy="18.5" r="2.5"/>
-                                <circle cx="18.5" cy="18.5" r="2.5"/>
-                            </svg>
-                        </div>
-                        <h3>3. Get It Delivered</h3>
-                        <p>We ship direct to your farm. Track your order and get notified when it arrives.</p>
-                    </div>
+                <div class="step-card">
+                    <div class="step-number">2</div>
+                    <h3>See Available Products</h3>
+                    <p>Browse the chemistry and products we're ordering in bulk this season.</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">3</div>
+                    <h3>Join the Order</h3>
+                    <p>Add your quantities to the group order. The more farmers join, the better the price.</p>
+                </div>
+
+                <div class="step-card">
+                    <div class="step-number">4</div>
+                    <h3>We Fill the Truck</h3>
+                    <p>Once we hit volume, we lock in bulk pricing and coordinate delivery.</p>
                 </div>
             </div>
-        </section>
+        </div>
+    </section>
 
-        <!-- Featured Products -->
-        <section class="main-content" style="background: var(--gray-50);">
-            <div class="container">
-                <div class="flex justify-between items-center mb-xl">
-                    <h2>Featured Products</h2>
-                    <a href="shop.html" class="btn btn-secondary">View All Products</a>
+    <!-- CTA Section -->
+    <section class="cta-section">
+        <div class="container">
+            <div class="cta-content">
+                <h2>Ready to Get Started?</h2>
+                <p>Sign in or create an account to continue.</p>
+                <a href="/signup.html" class="btn btn-accent btn-lg">Get Started</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <div class="container">
+            <div class="footer-content">
+                <div class="footer-brand">
+                    <img src="logo-dark.svg" alt="Acre Profit" class="footer-logo">
+                    <p>Farmers helping farmers through bulk buying.</p>
                 </div>
-
-                <div class="products-grid" id="featured-products">
-                    <!-- Products loaded dynamically -->
-                    <div class="product-card skeleton" style="height: 350px;"></div>
-                    <div class="product-card skeleton" style="height: 350px;"></div>
-                    <div class="product-card skeleton" style="height: 350px;"></div>
-                    <div class="product-card skeleton" style="height: 350px;"></div>
+                <div class="footer-links">
+                    <h4>Quick Links</h4>
+                    <ul>
+                        <li><a href="#how-it-works">How It Works</a></li>
+                        <li><a href="/login.html">Sign In</a></li>
+                        <li><a href="/signup.html">Create Account</a></li>
+                    </ul>
                 </div>
             </div>
-        </section>
-
-        <!-- CTA Section -->
-        <section style="background: var(--primary); padding: var(--space-3xl) 0; color: white; text-align: center;">
-            <div class="container">
-                <h2 style="color: white; margin-bottom: var(--space-md);">Ready to Save on Your Input Costs?</h2>
-                <p style="font-size: 1.125rem; opacity: 0.9; margin-bottom: var(--space-xl);">Join hundreds of farmers already saving with AcreProfit bulk pricing.</p>
-                <a href="signup.html" class="btn btn-lg" style="background: white; color: var(--primary);">Create Free Account</a>
+            <div class="footer-bottom">
+                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
             </div>
-        </section>
+        </div>
+    </footer>
 
-        <!-- Contact Section -->
-        <section class="main-content" id="contact">
-            <div class="container container-sm">
-                <h2 class="text-center mb-xl">Get In Touch</h2>
-                <div class="card">
-                    <div class="card-body">
-                        <div class="grid grid-2" style="gap: var(--space-xl);">
-                            <div>
-                                <h4>Contact Us</h4>
-                                <p class="text-muted">Questions about products or pricing? We're here to help.</p>
-                                <p><strong>Email:</strong> support@acreprofit.com</p>
-                                <p><strong>Phone:</strong> (555) 123-4567</p>
-                            </div>
-                            <div>
-                                <h4>Hours</h4>
-                                <p class="text-muted">Available during business hours.</p>
-                                <p>Monday - Friday: 8am - 5pm</p>
-                                <p>Saturday: 8am - 12pm</p>
-                            </div>
-                        </div>
-                    </div>
+    <!-- Chatbot Widget -->
+    <div class="chatbot-widget" id="chatbot">
+        <button class="chatbot-toggle" onclick="toggleChatbot()">
+            <span class="chat-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg></span>
+            <span class="chat-label">Questions?</span>
+        </button>
+        <div class="chatbot-window" id="chatbotWindow">
+            <div class="chatbot-header">
+                <h4>Acre Profit</h4>
+                <button class="chatbot-close" onclick="toggleChatbot()">&times;</button>
+            </div>
+            <div class="chatbot-messages" id="chatMessages">
+                <div class="chat-message bot">
+                    <p>As a producer, would you like factory direct pricing?</p>
+                </div>
+                <div class="quick-questions">
+                    <button onclick="askQuestion('how')">How does it work?</button>
+                    <button onclick="askQuestion('delivery')">What about delivery?</button>
+                    <button onclick="askQuestion('signup')">How do I join?</button>
                 </div>
             </div>
-        </section>
-
-        <!-- Footer -->
-        <footer class="footer">
-            <div class="container">
-                <div class="footer-grid">
-                    <div class="footer-brand">
-                        <div class="logo">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                                <path d="M2 17l10 5 10-5"/>
-                                <path d="M2 12l10 5 10-5"/>
-                            </svg>
-                            <span>AcreProfit</span>
-                        </div>
-                        <p>Bulk agricultural chemicals at wholesale prices. Helping farmers reduce input costs since 2024.</p>
-                    </div>
-
-                    <div>
-                        <h4 class="footer-title">Products</h4>
-                        <div class="footer-links">
-                            <a href="shop.html?category=herbicide">Herbicides</a>
-                            <a href="shop.html?category=insecticide">Insecticides</a>
-                            <a href="shop.html?category=fungicide">Fungicides</a>
-                            <a href="shop.html?category=adjuvant">Adjuvants</a>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="footer-title">Account</h4>
-                        <div class="footer-links">
-                            <a href="login.html">Sign In</a>
-                            <a href="signup.html">Create Account</a>
-                            <a href="dashboard.html">My Dashboard</a>
-                            <a href="my-orders.html">Order History</a>
-                        </div>
-                    </div>
-
-                    <div>
-                        <h4 class="footer-title">Support</h4>
-                        <div class="footer-links">
-                            <a href="#contact">Contact Us</a>
-                            <a href="calculator.html">Product Calculator</a>
-                            <a href="#">Shipping Info</a>
-                            <a href="#">FAQs</a>
-                        </div>
-                    </div>
-                </div>
-
-                <div class="footer-bottom">
-                    <p>&copy; 2024 AcreProfit. All rights reserved.</p>
-                    <div>
-                        <a href="#" style="color: var(--gray-400); margin-right: 1rem;">Privacy Policy</a>
-                        <a href="#" style="color: var(--gray-400);">Terms of Service</a>
-                    </div>
-                </div>
-            </div>
-        </footer>
+        </div>
     </div>
 
+    <style>
+        .chatbot-widget {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 150;
+        }
+        .chatbot-toggle {
+            background: var(--primary);
+            color: var(--white);
+            border: none;
+            border-radius: 50px;
+            padding: 12px 20px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            transition: transform 0.2s;
+        }
+        .chatbot-toggle:hover { transform: scale(1.05); }
+        .chat-icon { font-size: 1.25rem; }
+        .chat-label { font-weight: 600; }
+        .chatbot-window {
+            display: none;
+            position: absolute;
+            bottom: 60px;
+            right: 0;
+            width: 320px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.2);
+            overflow: hidden;
+        }
+        .chatbot-window.active { display: flex; flex-direction: column; }
+        .chatbot-header {
+            background: var(--primary);
+            color: var(--white);
+            padding: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chatbot-header h4 { margin: 0; }
+        .chatbot-close {
+            background: none;
+            border: none;
+            color: var(--white);
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+        .chatbot-messages {
+            padding: 16px;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        .chat-message { margin-bottom: 12px; }
+        .chat-message p {
+            padding: 12px 16px;
+            border-radius: 16px;
+            font-size: 0.875rem;
+            line-height: 1.5;
+        }
+        .chat-message.bot p {
+            background: var(--secondary);
+            border-bottom-left-radius: 4px;
+        }
+        .quick-questions {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 12px;
+        }
+        .quick-questions button {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: 20px;
+            padding: 8px 12px;
+            font-size: 0.75rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        .quick-questions button:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+        @media (max-width: 768px) {
+            .chatbot-window { width: calc(100vw - 48px); }
+        }
+    </style>
+
+    <script src="app.js"></script>
     <script>
-        // API Configuration
-        const API_URL = window.location.hostname === 'localhost'
-            ? 'http://localhost:3001/api'
-            : '/api';
+        // Register Service Worker for PWA
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('/sw.js')
+                    .then(reg => console.log('Service Worker registered'))
+                    .catch(err => console.log('Service Worker registration failed:', err));
+            });
+        }
 
-        // Check if logged in and update nav
+        // Check if user is already logged in
         const token = localStorage.getItem('token');
-        const user = JSON.parse(localStorage.getItem('user') || 'null');
+        if (token) {
+            // Update nav for logged-in users
+            const navLinks = document.querySelector('.nav-links');
+            navLinks.innerHTML = `
+                <li><a href="#how-it-works">How It Works</a></li>
+                <li><a href="/order.html" class="btn btn-primary btn-sm">My Orders</a></li>
+            `;
+        }
 
-        if (token && user) {
-            const loginBtn = document.getElementById('login-btn');
-            const signupBtn = document.getElementById('signup-btn');
+        // Chatbot functions
+        function toggleChatbot() {
+            document.getElementById('chatbotWindow').classList.toggle('active');
+        }
 
-            if (user.role === 'admin') {
-                loginBtn.textContent = 'Admin';
-                loginBtn.href = 'admin.html';
-            } else {
-                loginBtn.textContent = 'Dashboard';
-                loginBtn.href = 'dashboard.html';
-            }
-
-            signupBtn.textContent = 'Logout';
-            signupBtn.href = '#';
-            signupBtn.onclick = (e) => {
-                e.preventDefault();
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
-                window.location.reload();
+        function askQuestion(questionId) {
+            const messages = document.getElementById('chatMessages');
+            const answers = {
+                'how': "The idea is easy—it's all logistics. We order together for truck load pricing, then have the trucks deliver to pre-determined locations. You pick up your products the day they come in.",
+                'delivery': "The truck comes to a convenient pickup location. If you need delivery to your farm, that can be arranged—$500 for anywhere within a 50-mile radius of the drop-off location. Other arrangements available on a per-customer basis.",
+                'signup': "Ready to get started? <a href='/signup.html' style='color: var(--primary); font-weight: 600;'>Create an account</a> and we'll get you set up with factory direct pricing."
             };
+
+            const questionText = event.target.textContent;
+            messages.innerHTML += '<div class="chat-message user"><p>' + questionText + '</p></div>';
+
+            setTimeout(() => {
+                messages.innerHTML += '<div class="chat-message bot"><p>' + answers[questionId] + '</p></div>';
+                messages.scrollTop = messages.scrollHeight;
+            }, 300);
         }
-
-        // Mobile menu toggle
-        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
-            document.getElementById('main-nav').classList.toggle('open');
-        });
-
-        // Load featured products
-        async function loadFeaturedProducts() {
-            try {
-                const response = await fetch(`${API_URL}/products?featured=true`);
-                const data = await response.json();
-
-                if (data.success && data.data.products.length > 0) {
-                    const container = document.getElementById('featured-products');
-                    container.innerHTML = data.data.products.slice(0, 4).map(product => `
-                        <a href="product.html?id=${product._id}" class="product-card">
-                            <div class="product-card-image">
-                                ${product.imageUrl
-                                    ? `<img src="${product.imageUrl}" alt="${product.name}">`
-                                    : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                        <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                        <circle cx="8.5" cy="8.5" r="1.5"/>
-                                        <path d="M21 15l-5-5L5 21"/>
-                                    </svg>`
-                                }
-                            </div>
-                            <div class="product-card-body">
-                                <span class="product-card-category">${product.category}</span>
-                                <h3 class="product-card-title">${product.name}</h3>
-                                <p class="product-card-price">
-                                    ${product.packageSizes.length > 0
-                                        ? `$${product.packageSizes[0].price.toFixed(2)} <span>/ ${product.packageSizes[0].volume} ${product.packageSizes[0].unit}</span>`
-                                        : 'Contact for pricing'
-                                    }
-                                </p>
-                            </div>
-                        </a>
-                    `).join('');
-                } else {
-                    // Show placeholder products
-                    const container = document.getElementById('featured-products');
-                    container.innerHTML = `
-                        <div class="empty-state" style="grid-column: 1 / -1;">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                                <rect x="3" y="3" width="18" height="18" rx="2"/>
-                                <circle cx="8.5" cy="8.5" r="1.5"/>
-                                <path d="M21 15l-5-5L5 21"/>
-                            </svg>
-                            <h3>Products Coming Soon</h3>
-                            <p>We're stocking up our inventory. Check back soon!</p>
-                        </div>
-                    `;
-                }
-            } catch (error) {
-                console.error('Error loading products:', error);
-                const container = document.getElementById('featured-products');
-                container.innerHTML = `
-                    <div class="empty-state" style="grid-column: 1 / -1;">
-                        <h3>Products Coming Soon</h3>
-                        <p>Check back soon for our full product lineup.</p>
-                    </div>
-                `;
-            }
-        }
-
-        // Load products on page load
-        loadFeaturedProducts();
     </script>
 </body>
 </html>
