@@ -163,10 +163,24 @@
             return true;
         }
 
-        // Load products
+        // Load products with user's distributor pricing if logged in
         async function loadProducts() {
             try {
-                const response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                const token = localStorage.getItem('token');
+                let response;
+
+                if (token) {
+                    // Use authenticated endpoint with distributor pricing
+                    response = await fetch(`${API_URL}/api/chemicals/for-customer`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                }
+
+                // Fall back to public endpoint if not logged in or auth failed
+                if (!response || !response.ok) {
+                    response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                }
+
                 if (!response.ok) throw new Error('Failed to load');
                 products = await response.json();
                 renderProducts();

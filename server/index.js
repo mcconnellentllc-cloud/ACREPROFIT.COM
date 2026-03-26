@@ -3662,6 +3662,63 @@ app.get('/api/chemicals', async (req, res) => {
     }
 });
 
+// Get chemicals with customer's distributor pricing (authenticated customers)
+app.get('/api/chemicals/for-customer', authMiddleware, async (req, res) => {
+    try {
+        const { category, crop } = req.query;
+        let query = { isActive: true, availableForOrder: true };
+
+        if (category) query.category = category;
+        if (crop) query.crops = crop;
+
+        const chemicals = await Chemical.find(query).sort({ productName: 1, packSize: 1 });
+
+        // Get the customer's representative/distributor
+        const repId = req.user.representative || req.user.representativeId;
+
+        // Get distributor pricing for this rep
+        let distributorPricing = [];
+        if (repId) {
+            distributorPricing = await DistributorPricing.find({
+                distributorId: repId,
+                isAvailable: true
+            });
+        }
+
+        // Create a map for quick lookup
+        const pricingMap = {};
+        distributorPricing.forEach(dp => {
+            pricingMap[dp.chemicalId.toString()] = dp.retailPrice;
+        });
+
+        // Return products with the correct price for this customer
+        const customerChemicals = chemicals.map(c => {
+            const distributorPrice = pricingMap[c._id.toString()];
+            return {
+                _id: c._id,
+                productName: c.productName,
+                sourceSupplier: c.sourceSupplier,
+                category: c.category,
+                crops: c.crops,
+                packSize: c.packSize,
+                unit: c.unit,
+                unitsPerPack: c.unitsPerPack,
+                // Use distributor's retail price if set, otherwise fall back to base sellPrice
+                sellPrice: distributorPrice || c.sellPrice,
+                price: distributorPrice || c.sellPrice,
+                defaultRate: c.defaultRate,
+                rateUnit: c.rateUnit,
+                equivalentProduct: c.equivalentProduct,
+                notes: c.notes
+            };
+        });
+
+        res.json(customerChemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Get all chemicals with FULL pricing (admin only)
 app.get('/api/chemicals/admin', authMiddleware, adminMiddleware, async (req, res) => {
     try {
