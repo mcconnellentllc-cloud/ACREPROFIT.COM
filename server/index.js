@@ -4054,57 +4054,6 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
-// Fix pricing for products where costPrice is 0 but sellPrice has value (admin only)
-app.post('/api/chemicals/fix-pricing', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const { adminMargin = 10, retailMargin = 15 } = req.body;
-
-        // Find products where costPrice is 0/null but sellPrice has a value
-        const productsToFix = await Chemical.find({
-            $or: [
-                { costPrice: 0 },
-                { costPrice: { $exists: false } },
-                { costPrice: null },
-                { adminPrice: { $exists: false } },
-                { adminPrice: null },
-                { adminPrice: 0 }
-            ],
-            sellPrice: { $gt: 0 }
-        });
-
-        const results = [];
-
-        for (const product of productsToFix) {
-            // If costPrice is 0 but sellPrice has value, sellPrice is likely the actual cost
-            const actualCost = product.costPrice > 0 ? product.costPrice : product.sellPrice;
-            const newAdminPrice = actualCost * (1 + adminMargin / 100);
-            const newSellPrice = newAdminPrice * (1 + retailMargin / 100);
-
-            product.costPrice = actualCost;
-            product.adminPrice = newAdminPrice;
-            product.sellPrice = newSellPrice;
-            product.updatedAt = new Date();
-            await product.save();
-
-            results.push({
-                productName: product.productName,
-                packSize: product.packSize,
-                costPrice: actualCost,
-                adminPrice: newAdminPrice,
-                sellPrice: newSellPrice
-            });
-        }
-
-        res.json({
-            message: `Fixed pricing for ${results.length} products`,
-            fixed: results.length,
-            products: results
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
 // Delete chemical (admin only)
 app.delete('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
