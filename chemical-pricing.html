@@ -417,10 +417,12 @@
         <div class="card">
             <h2>Global Margin Settings</h2>
             <div class="margin-controls">
-                <label>Default Margin %:</label>
-                <input type="number" id="defaultMargin" value="15" min="0" max="100" onchange="applyDefaultMargin()">
+                <label>Default Admin Margin %:</label>
+                <input type="number" id="defaultAdminMargin" value="10" min="0" max="100">
+                <label>Default Regular Margin %:</label>
+                <input type="number" id="defaultRegularMargin" value="10" min="0" max="100">
                 <button class="btn btn-primary" onclick="applyDefaultMargin()">Apply to All Products</button>
-                <span style="color: #666; font-size: 0.9rem;">This sets the margin for all products at once</span>
+                <span style="color: #666; font-size: 0.9rem;">Sets both margins for all products</span>
             </div>
         </div>
 
@@ -437,9 +439,11 @@
                             <th>Category</th>
                             <th>Package</th>
                             <th>Our Cost</th>
+                            <th>Admin Margin %</th>
+                            <th>Admin Price</th>
+                            <th>Regular Margin %</th>
                             <th>Sell Price</th>
-                            <th>Margin $</th>
-                            <th>Margin %</th>
+                            <th>Total Margin</th>
                         </tr>
                     </thead>
                     <tbody id="pricingBody">
@@ -463,37 +467,37 @@
             ? 'http://localhost:3000'
             : 'https://acreprofit-com.onrender.com';
 
-        // Default cost prices (what we pay CPD)
+        // Default cost prices (what we pay CPD) - with two-tier margins
         const defaultProducts = [
-            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 12.90, marginPct: 15, notes: 'Glyphosate 4.17 lb AE/gal - Best value' },
-            { id: '2', name: 'Glystar Supreme', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 14.50, marginPct: 15, notes: 'Premium glyphosate' },
-            { id: '3', name: 'Dicamba DMA (4lb)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 28.25, marginPct: 15, notes: 'Broadleaf control' },
-            { id: '4', name: 'LV 6 (2,4-D Ester)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 27.90, marginPct: 15, notes: '2,4-D LV ester' },
-            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 13.35, marginPct: 15, notes: 'Atrazine 4 lb/gal (Grp 5) - Corn/Sorghum' },
-            { id: '6', name: 'Paraquat 3SL', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 16.00, marginPct: 15, notes: 'Contact burndown', rup: true },
-            { id: '7', name: 'Glufosinate 2.34', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 16.50, marginPct: 15, notes: 'Liberty-link systems' },
-            { id: '8', name: 'Mesotrione 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 48.25, marginPct: 15, notes: 'Callisto generic' },
-            { id: '9', name: 'Clethodim 2EC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 33.50, marginPct: 15, notes: 'Grass control' },
-            { id: '10', name: 'Sulfentrazone 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 70.50, marginPct: 15, notes: 'Palmer Amaranth residual' },
-            { id: '11', name: 'Valor SX (flumioxazin)', category: 'herbicide', package: '4x5 lb', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, marginPct: 15, notes: 'Burndown + residual' },
-            { id: '12', name: 'Autumn Super', category: 'herbicide', package: '4x5 lb', unit: 'lb', unitsPerPack: 20, costPrice: 11.42, marginPct: 15, notes: 'Fall burndown wheat' },
-            { id: '13', name: 'Level Best Pro', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 10.15, marginPct: 15, notes: '2,4-D + Dicamba premix' },
-            { id: '14', name: 'Tapran (Trifluralin)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 16.45, marginPct: 15, notes: 'Pre-emerge grass' },
-            { id: '15', name: 'Aggrestrol 4L', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 10.35, marginPct: 15, notes: 'MCPA ester' },
-            { id: '16', name: 'Artect FI', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 11.30, marginPct: 15, notes: 'Broadleaf burndown' },
-            { id: '17', name: 'Hydrovant', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 95.00, marginPct: 34, notes: 'Premium water conditioner & drift control - MAIN ADJUVANT. Distributor cost $95/gl, Retail $145/gl. Commission on sales over $95.' },
-            { id: '18', name: 'MSO (Methylated Seed Oil)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 12.50, marginPct: 10, notes: 'Spray adjuvant' },
-            { id: '19', name: 'Crop Oil Concentrate', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 8.75, marginPct: 10, notes: 'Spray adjuvant' },
-            { id: '20', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', package: '50 lb bag', unit: 'lb', unitsPerPack: 50, costPrice: 0.35, marginPct: 10, notes: 'Water conditioner' },
-            { id: '21', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 14.00, marginPct: 10, notes: 'Spray adjuvant' },
-            { id: '22', name: 'FulTime NXT', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 20.00, marginPct: 15, notes: 'Acetochlor+Atrazine (Grp 15+5) - Post/At Planting' },
-            { id: '23', name: 'S-Metolachlor (Dual II Magnum)', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 38.00, marginPct: 15, notes: 'S-Metolachlor 7.62 lb/gal (Grp 15) - Corn residual' },
-            { id: '24', name: 'Clarifier', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 32.00, marginPct: 15, notes: 'Dicamba DGA 4lb AE + safener (Grp 4)' },
-            { id: '25', name: 'Impact', category: 'herbicide', package: '1 gl', unit: 'gl', unitsPerPack: 1, costPrice: 340.00, marginPct: 15, notes: 'Topramezone 2.8 lb/gal (Grp 27) - Corn late post' },
-            { id: '26', name: 'StareDown', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 100.00, marginPct: 15, notes: 'Fluroxypyr 2.8 lb AE/gal (Grp 4) - Sorghum' },
-            { id: '27', name: 'Ally XP', category: 'herbicide', package: '10x1 oz', unit: 'oz', unitsPerPack: 10, costPrice: 8.00, marginPct: 15, notes: 'Metsulfuron-methyl 60% WDG (Grp 2 ALS) - Wheat' },
-            { id: '28', name: '32-0-0 (UAN)', category: 'fertilizer', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 2.32, marginPct: 10, notes: 'Urea Ammonium Nitrate - $435/ton' },
-            { id: '29', name: '12-0-0-26 (Thiosol)', category: 'fertilizer', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 2.99, marginPct: 10, notes: 'Ammonium Thiosulfate - $550/ton' }
+            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 12.90, adminMarginPct: 10, regularMarginPct: 10, notes: 'Glyphosate 4.17 lb AE/gal - Best value' },
+            { id: '2', name: 'Glystar Supreme', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 14.50, adminMarginPct: 10, regularMarginPct: 10, notes: 'Premium glyphosate' },
+            { id: '3', name: 'Dicamba DMA (4lb)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 28.25, adminMarginPct: 10, regularMarginPct: 10, notes: 'Broadleaf control' },
+            { id: '4', name: 'LV 6 (2,4-D Ester)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 27.90, adminMarginPct: 10, regularMarginPct: 10, notes: '2,4-D LV ester' },
+            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 13.35, adminMarginPct: 10, regularMarginPct: 10, notes: 'Atrazine 4 lb/gal (Grp 5) - Corn/Sorghum' },
+            { id: '6', name: 'Paraquat 3SL', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 16.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'Contact burndown', rup: true },
+            { id: '7', name: 'Glufosinate 2.34', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 16.50, adminMarginPct: 10, regularMarginPct: 10, notes: 'Liberty-link systems' },
+            { id: '8', name: 'Mesotrione 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 48.25, adminMarginPct: 10, regularMarginPct: 10, notes: 'Callisto generic' },
+            { id: '9', name: 'Clethodim 2EC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 33.50, adminMarginPct: 10, regularMarginPct: 10, notes: 'Grass control' },
+            { id: '10', name: 'Sulfentrazone 4SC', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 70.50, adminMarginPct: 10, regularMarginPct: 10, notes: 'Palmer Amaranth residual' },
+            { id: '11', name: 'Valor SX (flumioxazin)', category: 'herbicide', package: '4x5 lb', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, adminMarginPct: 10, regularMarginPct: 10, notes: 'Burndown + residual' },
+            { id: '12', name: 'Autumn Super', category: 'herbicide', package: '4x5 lb', unit: 'lb', unitsPerPack: 20, costPrice: 11.42, adminMarginPct: 10, regularMarginPct: 10, notes: 'Fall burndown wheat' },
+            { id: '13', name: 'Level Best Pro', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 10.15, adminMarginPct: 10, regularMarginPct: 10, notes: '2,4-D + Dicamba premix' },
+            { id: '14', name: 'Tapran (Trifluralin)', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 16.45, adminMarginPct: 10, regularMarginPct: 10, notes: 'Pre-emerge grass' },
+            { id: '15', name: 'Aggrestrol 4L', category: 'herbicide', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 10.35, adminMarginPct: 10, regularMarginPct: 10, notes: 'MCPA ester' },
+            { id: '16', name: 'Artect FI', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 11.30, adminMarginPct: 10, regularMarginPct: 10, notes: 'Broadleaf burndown' },
+            { id: '17', name: 'Hydrovant', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 95.00, adminMarginPct: 20, regularMarginPct: 17, notes: 'Premium water conditioner & drift control - MAIN ADJUVANT. Distributor cost $95/gl, Retail $145/gl. Commission on sales over $95.' },
+            { id: '18', name: 'MSO (Methylated Seed Oil)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 12.50, adminMarginPct: 5, regularMarginPct: 5, notes: 'Spray adjuvant' },
+            { id: '19', name: 'Crop Oil Concentrate', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 8.75, adminMarginPct: 5, regularMarginPct: 5, notes: 'Spray adjuvant' },
+            { id: '20', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', package: '50 lb bag', unit: 'lb', unitsPerPack: 50, costPrice: 0.35, adminMarginPct: 5, regularMarginPct: 5, notes: 'Water conditioner' },
+            { id: '21', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 14.00, adminMarginPct: 5, regularMarginPct: 5, notes: 'Spray adjuvant' },
+            { id: '22', name: 'FulTime NXT', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 20.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'Acetochlor+Atrazine (Grp 15+5) - Post/At Planting' },
+            { id: '23', name: 'S-Metolachlor (Dual II Magnum)', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 38.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'S-Metolachlor 7.62 lb/gal (Grp 15) - Corn residual' },
+            { id: '24', name: 'Clarifier', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 32.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'Dicamba DGA 4lb AE + safener (Grp 4)' },
+            { id: '25', name: 'Impact', category: 'herbicide', package: '1 gl', unit: 'gl', unitsPerPack: 1, costPrice: 340.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'Topramezone 2.8 lb/gal (Grp 27) - Corn late post' },
+            { id: '26', name: 'StareDown', category: 'herbicide', package: '2x2.5 gl', unit: 'gl', unitsPerPack: 5, costPrice: 100.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'Fluroxypyr 2.8 lb AE/gal (Grp 4) - Sorghum' },
+            { id: '27', name: 'Ally XP', category: 'herbicide', package: '10x1 oz', unit: 'oz', unitsPerPack: 10, costPrice: 8.00, adminMarginPct: 10, regularMarginPct: 10, notes: 'Metsulfuron-methyl 60% WDG (Grp 2 ALS) - Wheat' },
+            { id: '28', name: '32-0-0 (UAN)', category: 'fertilizer', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 2.32, adminMarginPct: 5, regularMarginPct: 5, notes: 'Urea Ammonium Nitrate - $435/ton' },
+            { id: '29', name: '12-0-0-26 (Thiosol)', category: 'fertilizer', package: 'Tote (265 gl)', unit: 'gl', unitsPerPack: 265, costPrice: 2.99, adminMarginPct: 5, regularMarginPct: 5, notes: 'Ammonium Thiosulfate - $550/ton' }
         ];
 
         let products = [];
@@ -544,14 +548,25 @@
             updateStats();
         }
 
-        function calculateSellPrice(costPrice, marginPct) {
-            return costPrice * (1 + marginPct / 100);
+        // Calculate prices with two-tier margins
+        function calculateAdminPrice(costPrice, adminMarginPct) {
+            return costPrice / (1 - adminMarginPct / 100);
+        }
+
+        function calculateSellPrice(adminPrice, regularMarginPct) {
+            return adminPrice / (1 - regularMarginPct / 100);
+        }
+
+        function calculateTotalMargin(costPrice, sellPrice) {
+            return sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice) * 100 : 0;
         }
 
         function renderTable() {
             const tbody = document.getElementById('pricingBody');
             tbody.innerHTML = products.map((p, idx) => {
-                const sellPrice = calculateSellPrice(p.costPrice, p.marginPct);
+                const adminPrice = calculateAdminPrice(p.costPrice, p.adminMarginPct || 0);
+                const sellPrice = calculateSellPrice(adminPrice, p.regularMarginPct || 0);
+                const totalMargin = calculateTotalMargin(p.costPrice, sellPrice);
                 const marginAmt = sellPrice - p.costPrice;
                 return `
                     <tr>
@@ -563,45 +578,44 @@
                         <td>${p.package}<br><small style="color:#666">(${p.unitsPerPack} ${p.unit})</small></td>
                         <td class="cost-price">$${p.costPrice.toFixed(2)}/${p.unit}</td>
                         <td>
-                            <input type="number" class="editable-input sell-price-input"
-                                   data-idx="${idx}"
-                                   value="${sellPrice.toFixed(2)}"
-                                   step="0.01"
-                                   onchange="updateFromSellPrice(${idx}, this.value)">
-                            <span style="color:#666">/${p.unit}</span>
+                            <input type="number" class="editable-input" style="width:60px; color:#dc3545;"
+                                   value="${p.adminMarginPct || 0}"
+                                   min="0" max="100" step="0.1"
+                                   onchange="updateAdminMargin(${idx}, this.value)">%
                         </td>
-                        <td class="margin-amount">$${marginAmt.toFixed(2)}</td>
+                        <td style="color:#888;">$${adminPrice.toFixed(2)}/${p.unit}</td>
                         <td>
                             <input type="number" class="editable-input" style="width:60px; color:#D4A017;"
-                                   data-idx="${idx}"
-                                   value="${p.marginPct}"
-                                   min="0" max="100"
-                                   onchange="updateMargin(${idx}, this.value)">%
+                                   value="${p.regularMarginPct || 0}"
+                                   min="0" max="100" step="0.1"
+                                   onchange="updateRegularMargin(${idx}, this.value)">%
                         </td>
+                        <td class="sell-price">$${sellPrice.toFixed(2)}/${p.unit}</td>
+                        <td class="margin-amount">${totalMargin.toFixed(1)}%<br><small style="color:#888;">$${marginAmt.toFixed(2)}</small></td>
                     </tr>
                 `;
             }).join('');
         }
 
-        function updateFromSellPrice(idx, sellPrice) {
-            sellPrice = parseFloat(sellPrice) || 0;
-            const costPrice = products[idx].costPrice;
-            if (costPrice > 0) {
-                products[idx].marginPct = ((sellPrice / costPrice) - 1) * 100;
-            }
+        function updateAdminMargin(idx, marginPct) {
+            products[idx].adminMarginPct = parseFloat(marginPct) || 0;
             renderTable();
             updateStats();
         }
 
-        function updateMargin(idx, marginPct) {
-            products[idx].marginPct = parseFloat(marginPct) || 0;
+        function updateRegularMargin(idx, marginPct) {
+            products[idx].regularMarginPct = parseFloat(marginPct) || 0;
             renderTable();
             updateStats();
         }
 
         function applyDefaultMargin() {
-            const margin = parseFloat(document.getElementById('defaultMargin').value) || 15;
-            products.forEach(p => p.marginPct = margin);
+            const adminMargin = parseFloat(document.getElementById('defaultAdminMargin').value) || 10;
+            const regularMargin = parseFloat(document.getElementById('defaultRegularMargin').value) || 10;
+            products.forEach(p => {
+                p.adminMarginPct = adminMargin;
+                p.regularMarginPct = regularMargin;
+            });
             renderTable();
             updateStats();
         }
@@ -613,9 +627,11 @@
             let totalMarginPct = 0;
 
             products.forEach(p => {
+                const adminPrice = calculateAdminPrice(p.costPrice, p.adminMarginPct || 0);
+                const sellPrice = calculateSellPrice(adminPrice, p.regularMarginPct || 0);
                 totalCost += p.costPrice;
-                totalSell += calculateSellPrice(p.costPrice, p.marginPct);
-                totalMarginPct += p.marginPct;
+                totalSell += sellPrice;
+                totalMarginPct += calculateTotalMargin(p.costPrice, sellPrice);
             });
 
             document.getElementById('totalProducts').textContent = totalProducts;
@@ -645,10 +661,12 @@
         }
 
         function exportPrices() {
-            let csv = 'Product,Category,Package,Cost Price,Margin %,Sell Price\n';
+            let csv = 'Product,Category,Package,Cost Price,Admin Margin %,Admin Price,Regular Margin %,Sell Price,Total Margin %\n';
             products.forEach(p => {
-                const sellPrice = calculateSellPrice(p.costPrice, p.marginPct);
-                csv += `"${p.name}","${p.category}","${p.package}",${p.costPrice},${p.marginPct},${sellPrice.toFixed(2)}\n`;
+                const adminPrice = calculateAdminPrice(p.costPrice, p.adminMarginPct || 0);
+                const sellPrice = calculateSellPrice(adminPrice, p.regularMarginPct || 0);
+                const totalMargin = calculateTotalMargin(p.costPrice, sellPrice);
+                csv += `"${p.name}","${p.category}","${p.package}",${p.costPrice},${p.adminMarginPct || 0},${adminPrice.toFixed(2)},${p.regularMarginPct || 0},${sellPrice.toFixed(2)},${totalMargin.toFixed(1)}\n`;
             });
 
             const blob = new Blob([csv], { type: 'text/csv' });

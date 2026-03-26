@@ -362,12 +362,14 @@ const chemicalSchema = new mongoose.Schema({
     unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
     unitsPerPack: { type: Number }, // e.g., 250 for a Shuttle (250 gal)
 
-    // Pricing - 3-tier pricing model
+    // Pricing - 3-tier pricing model with two margins
     costPrice: { type: Number, required: true }, // Tier 1: What we pay the supplier (per unit)
-    adminPrice: { type: Number }, // Tier 2: Cost + Acre Profit admin margin (per unit)
+    adminMargin: { type: Number, default: 0 }, // Admin margin % applied to costPrice
+    adminPrice: { type: Number }, // Tier 2: Cost + admin margin (per unit) - auto-calculated
+    regularMargin: { type: Number, default: 0 }, // Regular margin % applied to adminPrice
     sellPrice: { type: Number, required: true }, // Tier 3: Retail price - what customer pays (per unit)
     // Rep commission = sellPrice - adminPrice (goes to the customer's assigned rep)
-    margin: { type: Number }, // Calculated: (sellPrice - costPrice) / sellPrice * 100
+    margin: { type: Number }, // Total margin: (sellPrice - costPrice) / sellPrice * 100
 
     // Application info (for program building)
     defaultRate: { type: Number }, // Default application rate
@@ -489,10 +491,22 @@ const chemicalSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-// Auto-calculate margin before save
+// Auto-calculate adminPrice and margins before save
 chemicalSchema.pre('save', function(next) {
-    if (this.sellPrice && this.costPrice) {
-        this.margin = Math.round(((this.sellPrice - this.costPrice) / this.sellPrice) * 100 * 100) / 100;
+    if (this.costPrice) {
+        // Calculate adminPrice from costPrice + adminMargin
+        const adminMarginPct = this.adminMargin || 0;
+        this.adminPrice = Math.round((this.costPrice / (1 - adminMarginPct / 100)) * 100) / 100;
+
+        // If sellPrice is set, calculate the total margin
+        if (this.sellPrice) {
+            this.margin = Math.round(((this.sellPrice - this.costPrice) / this.sellPrice) * 100 * 100) / 100;
+
+            // Calculate regularMargin from adminPrice to sellPrice (if not explicitly set)
+            if (this.adminPrice > 0 && this.sellPrice > this.adminPrice) {
+                this.regularMargin = Math.round(((this.sellPrice - this.adminPrice) / this.sellPrice) * 100 * 100) / 100;
+            }
+        }
     }
     next();
 });

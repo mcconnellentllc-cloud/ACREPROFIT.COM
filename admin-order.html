@@ -189,29 +189,53 @@
                 <div class="step-header">
                     <span class="step-number">3</span>
                     <h2>Review & Submit</h2>
+                    <button class="btn btn-sm btn-outline" style="margin-left: auto;" onclick="scrollToStep2()">Edit Order Details</button>
                 </div>
                 <div class="step-content">
                     <div class="order-summary">
                         <div class="summary-row">
                             <span>Customer:</span>
                             <strong id="summaryCustomer">-</strong>
+                            <button class="btn-edit" onclick="clearCustomer()" title="Change customer">Change</button>
                         </div>
-                        <div class="summary-row">
+                        <div class="summary-row editable-row">
                             <span>Crop:</span>
-                            <strong id="summaryCrop">-</strong>
+                            <strong id="summaryCrop" class="editable-value">-</strong>
+                            <select id="summaryCropEdit" class="summary-edit-input" style="display:none;" onchange="updateCropFromSummary(this.value)">
+                                <option value="">Select crop...</option>
+                                <option value="irrigated-corn">Irrigated Corn</option>
+                                <option value="dryland-corn">Dryland Corn</option>
+                                <option value="milo">Milo (Grain Sorghum)</option>
+                                <option value="millet">Millet</option>
+                                <option value="summer-fallow">Summer Fallow</option>
+                                <option value="wheat">Wheat</option>
+                                <option value="soybeans">Soybeans</option>
+                            </select>
+                            <button class="btn-edit" onclick="toggleSummaryEdit('Crop')" title="Edit">Edit</button>
                         </div>
-                        <div class="summary-row">
+                        <div class="summary-row editable-row">
                             <span>Acres:</span>
-                            <strong id="summaryAcres">-</strong>
+                            <strong id="summaryAcres" class="editable-value">-</strong>
+                            <input type="number" id="summaryAcresEdit" class="summary-edit-input" style="display:none;" onchange="updateAcresFromSummary(this.value)" min="0">
+                            <button class="btn-edit" onclick="toggleSummaryEdit('Acres')" title="Edit">Edit</button>
                         </div>
-                        <div class="summary-row">
+                        <div class="summary-row editable-row">
                             <span>GPA:</span>
-                            <strong id="summaryGPA">-</strong>
+                            <strong id="summaryGPA" class="editable-value">-</strong>
+                            <input type="number" id="summaryGPAEdit" class="summary-edit-input" style="display:none;" onchange="updateGPAFromSummary(this.value)" min="0" step="0.1">
+                            <button class="btn-edit" onclick="toggleSummaryEdit('GPA')" title="Edit">Edit</button>
                         </div>
                         <div class="summary-row">
                             <span>Products:</span>
                             <strong id="summaryProducts">0 items</strong>
+                            <button class="btn-edit" onclick="scrollToProducts()" title="Edit products">Edit</button>
                         </div>
+
+                        <!-- Editable Products List in Summary -->
+                        <div id="summaryProductsList" class="summary-products-list">
+                            <!-- Products rendered here -->
+                        </div>
+
                         <div class="summary-row total">
                             <span>Total Price:</span>
                             <strong id="summaryTotal">$0.00</strong>
@@ -526,6 +550,9 @@
             const total = products.reduce((sum, p) => sum + p.total, 0);
             document.getElementById('summaryTotal').textContent = `$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
 
+            // Render editable products in summary
+            renderSummaryProducts();
+
             // Enable/disable submit button
             const canSubmit = selectedCustomer &&
                               document.getElementById('orderCrop').value &&
@@ -537,6 +564,118 @@
         document.getElementById('orderCrop').addEventListener('change', updateSummary);
         document.getElementById('orderAcres').addEventListener('input', updateSummary);
         document.getElementById('orderGPA').addEventListener('input', updateSummary);
+
+        // Scroll to Step 2 for editing
+        function scrollToStep2() {
+            document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Scroll to products section
+        function scrollToProducts() {
+            document.querySelector('.products-section').scrollIntoView({ behavior: 'smooth' });
+        }
+
+        // Toggle summary field edit mode
+        function toggleSummaryEdit(field) {
+            const valueEl = document.getElementById('summary' + field);
+            const editEl = document.getElementById('summary' + field + 'Edit');
+
+            if (editEl.style.display === 'none') {
+                // Show edit input
+                editEl.style.display = 'inline-block';
+                valueEl.style.display = 'none';
+                // Set current value
+                if (field === 'Crop') {
+                    editEl.value = document.getElementById('orderCrop').value;
+                } else if (field === 'Acres') {
+                    editEl.value = document.getElementById('orderAcres').value;
+                } else if (field === 'GPA') {
+                    editEl.value = document.getElementById('orderGPA').value;
+                }
+                editEl.focus();
+            } else {
+                // Hide edit input
+                editEl.style.display = 'none';
+                valueEl.style.display = 'inline';
+            }
+        }
+
+        // Update crop from summary edit
+        function updateCropFromSummary(value) {
+            document.getElementById('orderCrop').value = value;
+            document.getElementById('summaryCrop').textContent = value || '-';
+            document.getElementById('summaryCropEdit').style.display = 'none';
+            document.getElementById('summaryCrop').style.display = 'inline';
+            updateSummary();
+        }
+
+        // Update acres from summary edit
+        function updateAcresFromSummary(value) {
+            document.getElementById('orderAcres').value = value;
+            document.getElementById('summaryAcres').textContent = value || '-';
+            document.getElementById('summaryAcresEdit').style.display = 'none';
+            document.getElementById('summaryAcres').style.display = 'inline';
+            updateSummary();
+        }
+
+        // Update GPA from summary edit
+        function updateGPAFromSummary(value) {
+            document.getElementById('orderGPA').value = value;
+            document.getElementById('summaryGPA').textContent = value || '-';
+            document.getElementById('summaryGPAEdit').style.display = 'none';
+            document.getElementById('summaryGPA').style.display = 'inline';
+            updateSummary();
+        }
+
+        // Update product quantity inline in summary
+        function updateProductQty(index, newQty) {
+            newQty = parseFloat(newQty) || 0;
+            if (newQty <= 0) {
+                removeProduct(index);
+                return;
+            }
+            products[index].qty = newQty;
+            products[index].total = newQty * products[index].price;
+            renderProducts();
+            updateSummary();
+        }
+
+        // Update product price inline in summary
+        function updateProductPrice(index, newPrice) {
+            newPrice = parseFloat(newPrice) || 0;
+            products[index].price = newPrice;
+            products[index].total = products[index].qty * newPrice;
+            renderProducts();
+            updateSummary();
+        }
+
+        // Render summary products with edit capability
+        function renderSummaryProducts() {
+            const container = document.getElementById('summaryProductsList');
+            if (!container) return;
+
+            if (products.length === 0) {
+                container.innerHTML = '<p class="no-products">No products added</p>';
+                return;
+            }
+
+            container.innerHTML = products.map((p, i) => `
+                <div class="summary-product-row">
+                    <div class="summary-product-name">${p.name}</div>
+                    <div class="summary-product-qty">
+                        <input type="number" value="${p.qty}" min="0" step="1" class="summary-qty-input" onchange="updateProductQty(${i}, this.value)">
+                        <span>${p.unit}</span>
+                    </div>
+                    <div class="summary-product-price">
+                        <span>@</span>
+                        <input type="number" value="${p.price.toFixed(2)}" min="0" step="0.01" class="summary-price-input" onchange="updateProductPrice(${i}, this.value)">
+                        <span>/${p.unit}</span>
+                    </div>
+                    <div class="summary-product-total">$${p.total.toFixed(2)}</div>
+                    <button class="btn-remove-sm" onclick="removeProduct(${i})" title="Remove">&times;</button>
+                </div>
+            `).join('');
+        }
 
         // Submit order
         async function submitOrder() {
@@ -1248,6 +1387,141 @@
             .catalog-filters select,
             .catalog-filters input {
                 flex: 1;
+            }
+        }
+
+        /* Inline Edit Styles for Summary */
+        .summary-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .summary-row .btn-edit {
+            margin-left: auto;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            background: transparent;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            color: var(--primary);
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .summary-row .btn-edit:hover {
+            background: var(--primary);
+            color: white;
+            border-color: var(--primary);
+        }
+
+        .summary-edit-input {
+            padding: 6px 10px;
+            border: 2px solid var(--primary);
+            border-radius: 4px;
+            font-size: 1rem;
+            min-width: 120px;
+        }
+
+        .summary-edit-input:focus {
+            outline: none;
+            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
+        }
+
+        /* Summary Products List - Editable */
+        .summary-products-list {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px dashed var(--border);
+        }
+
+        .summary-product-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 10px 0;
+            border-bottom: 1px solid #f0f0f0;
+        }
+
+        .summary-product-row:last-child {
+            border-bottom: none;
+        }
+
+        .summary-product-name {
+            flex: 2;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .summary-product-qty,
+        .summary-product-price {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.9rem;
+        }
+
+        .summary-qty-input,
+        .summary-price-input {
+            width: 70px;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            text-align: right;
+            font-size: 0.9rem;
+        }
+
+        .summary-qty-input:focus,
+        .summary-price-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 2px rgba(45, 90, 39, 0.1);
+        }
+
+        .summary-product-total {
+            font-weight: 600;
+            color: var(--primary);
+            min-width: 80px;
+            text-align: right;
+        }
+
+        .btn-remove-sm {
+            width: 24px;
+            height: 24px;
+            border: none;
+            background: #fee;
+            color: #c00;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 1.2rem;
+            line-height: 1;
+            transition: all 0.2s;
+        }
+
+        .btn-remove-sm:hover {
+            background: #c00;
+            color: white;
+        }
+
+        .no-products {
+            text-align: center;
+            color: var(--text-muted);
+            font-style: italic;
+            padding: 16px;
+        }
+
+        .editable-row {
+            position: relative;
+        }
+
+        @media (max-width: 768px) {
+            .summary-product-row {
+                flex-wrap: wrap;
+            }
+
+            .summary-product-name {
+                flex: 1 1 100%;
+                margin-bottom: 8px;
             }
         }
     </style>
