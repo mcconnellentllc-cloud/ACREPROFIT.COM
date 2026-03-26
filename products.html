@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit - Available Products & Pricing">
+    <title>Products - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        .products-page {
+            padding: 2rem 0 4rem;
+        }
+
+        .products-header {
+            text-align: center;
+            margin-bottom: 3rem;
+        }
+
+        .products-header h1 {
+            font-size: 2.5rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .products-header p {
+            color: #666;
+            font-size: 1.1rem;
+        }
+
+        .category-section {
+            margin-bottom: 3rem;
+        }
+
+        .category-header {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding-bottom: 0.75rem;
+            border-bottom: 2px solid #e5e7eb;
+        }
+
+        .category-header h2 {
+            font-size: 1.5rem;
+            color: #1a1a2e;
+        }
+
+        .category-badge {
+            background: #2d5a27;
+            color: white;
+            padding: 0.25rem 0.75rem;
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-weight: 600;
+        }
+
+        .products-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 1.5rem;
+        }
+
+        .product-card {
+            background: white;
+            border-radius: 12px;
+            padding: 1.5rem;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            border: 1px solid #e5e7eb;
+            transition: all 0.2s;
+        }
+
+        .product-card:hover {
+            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+            transform: translateY(-2px);
+        }
+
+        .product-name {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: #1a1a2e;
+            margin-bottom: 0.5rem;
+        }
+
+        .product-notes {
+            font-size: 0.9rem;
+            color: #666;
+            margin-bottom: 1rem;
+            min-height: 40px;
+        }
+
+        .product-details {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            margin-top: auto;
+        }
+
+        .product-package {
+            font-size: 0.85rem;
+            color: #888;
+        }
+
+        .product-price {
+            text-align: right;
+        }
+
+        .price-amount {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: #2d5a27;
+        }
+
+        .price-unit {
+            font-size: 0.85rem;
+            color: #666;
+        }
+
+        .rup-badge {
+            display: inline-block;
+            background: #dc3545;
+            color: white;
+            padding: 0.15rem 0.5rem;
+            border-radius: 4px;
+            font-size: 0.7rem;
+            font-weight: 700;
+            margin-left: 0.5rem;
+            vertical-align: middle;
+        }
+
+        .hydrovant-pricing {
+            background: #f8f9fa;
+            border-radius: 8px;
+            padding: 1rem;
+            margin-top: 1rem;
+        }
+
+        .hydrovant-pricing h4 {
+            font-size: 0.85rem;
+            color: #666;
+            margin-bottom: 0.5rem;
+        }
+
+        .tier-list {
+            display: flex;
+            flex-direction: column;
+            gap: 0.25rem;
+        }
+
+        .tier-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.9rem;
+        }
+
+        .tier-qty {
+            color: #666;
+        }
+
+        .tier-price {
+            font-weight: 600;
+            color: #2d5a27;
+        }
+
+        .search-filter {
+            display: flex;
+            gap: 1rem;
+            margin-bottom: 2rem;
+            flex-wrap: wrap;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 250px;
+            padding: 0.75rem 1rem;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 1rem;
+        }
+
+        .search-input:focus {
+            outline: none;
+            border-color: #2d5a27;
+            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
+        }
+
+        .filter-buttons {
+            display: flex;
+            gap: 0.5rem;
+        }
+
+        .filter-btn {
+            padding: 0.75rem 1.25rem;
+            border: 1px solid #ddd;
+            background: white;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .filter-btn:hover {
+            border-color: #2d5a27;
+        }
+
+        .filter-btn.active {
+            background: #2d5a27;
+            color: white;
+            border-color: #2d5a27;
+        }
+
+        .availability-note {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            border-radius: 8px;
+            padding: 1rem 1.5rem;
+            margin-bottom: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+        }
+
+        .availability-note svg {
+            flex-shrink: 0;
+            color: #856404;
+        }
+
+        .availability-note p {
+            color: #856404;
+            margin: 0;
+        }
+
+        @media (max-width: 768px) {
+            .products-header h1 {
+                font-size: 2rem;
+            }
+
+            .products-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .search-filter {
+                flex-direction: column;
+            }
+
+            .filter-buttons {
+                flex-wrap: wrap;
+            }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <div class="nav-links" id="navLinks">
+                <a href="/dashboard.html" class="nav-link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                    Dashboard
+                </a>
+                <a href="/products.html" class="nav-link active">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
+                    Products
+                </a>
+                <a href="/chemicals.html" class="nav-link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
+                    Shop
+                </a>
+                <a href="/order.html" class="nav-link">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
+                    Orders
+                </a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="navUserName">User</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                <span></span>
+                <span></span>
+                <span></span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="products-page">
+        <div class="container">
+            <div class="products-header">
+                <h1>Product Availability</h1>
+                <p>Quality ag inputs at competitive buying group prices</p>
+            </div>
+
+            <div class="availability-note">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
+                <p>Prices shown are retail member prices. Contact us for volume discounts on large orders.</p>
+            </div>
+
+            <div class="search-filter">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search products...">
+                <div class="filter-buttons">
+                    <button class="filter-btn active" data-filter="all">All</button>
+                    <button class="filter-btn" data-filter="herbicide">Herbicides</button>
+                    <button class="filter-btn" data-filter="adjuvant">Adjuvants</button>
+                    <button class="filter-btn" data-filter="fertilizer">Fertilizers</button>
+                </div>
+            </div>
+
+            <div id="productsContainer">
+                <!-- Products loaded dynamically -->
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3000'
+            : 'https://acreprofit-com.onrender.com';
+
+        // Products with RETAIL prices only (no cost shown to customers)
+        const products = [
+            // Herbicides
+            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 14.84, notes: 'Glyphosate 4.17 lb AE/gal - Best value' },
+            { id: '2', name: 'Glystar Supreme', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 16.68, notes: 'Premium glyphosate' },
+            { id: '3', name: 'Dicamba DMA (4lb)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 32.49, notes: 'Broadleaf control' },
+            { id: '4', name: 'LV 6 (2,4-D Ester)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 32.09, notes: '2,4-D LV ester' },
+            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 15.35, notes: 'Atrazine 4 lb/gal - Corn/Sorghum' },
+            { id: '6', name: 'Paraquat 3SL', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 18.40, notes: 'Contact burndown', rup: true },
+            { id: '7', name: 'Glufosinate 2.34', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 18.98, notes: 'Liberty-link systems' },
+            { id: '8', name: 'Mesotrione 4SC', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 55.49, notes: 'Callisto generic - HPPD inhibitor' },
+            { id: '9', name: 'Clethodim 2EC', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 38.53, notes: 'Grass control in broadleaves' },
+            { id: '10', name: 'Sulfentrazone 4SC', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 81.08, notes: 'Palmer Amaranth residual' },
+            { id: '11', name: 'Valor SX (flumioxazin)', category: 'herbicide', package: '4x5 lb', unit: 'lb', retailPrice: 16.39, notes: 'Burndown + residual control' },
+            { id: '12', name: 'Autumn Super', category: 'herbicide', package: '4x5 lb', unit: 'lb', retailPrice: 13.13, notes: 'Fall burndown for wheat' },
+            { id: '13', name: 'Level Best Pro', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 11.67, notes: '2,4-D + Dicamba premix' },
+            { id: '14', name: 'Tapran (Trifluralin)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 18.92, notes: 'Pre-emerge grass control' },
+            { id: '15', name: 'Aggrestrol 4L', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 11.90, notes: 'MCPA ester' },
+            { id: '16', name: 'Artect FI', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 13.00, notes: 'Broadleaf burndown' },
+            { id: '22', name: 'FulTime NXT', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 23.00, notes: 'Acetochlor + Atrazine - Post/At Planting' },
+            { id: '23', name: 'S-Metolachlor (Dual II Magnum)', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 43.70, notes: 'Corn residual control' },
+            { id: '24', name: 'Clarifier', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 36.80, notes: 'Dicamba DGA + safener' },
+            { id: '25', name: 'Impact', category: 'herbicide', package: '1 gal', unit: 'gal', retailPrice: 391.00, notes: 'Topramezone - Corn late post' },
+            { id: '26', name: 'StareDown', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 115.00, notes: 'Fluroxypyr - Sorghum' },
+            { id: '27', name: 'Ally XP', category: 'herbicide', package: '10x1 oz', unit: 'oz', retailPrice: 9.20, notes: 'Metsulfuron-methyl - Wheat' },
+            { id: '30', name: 'Anthem Max', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 175.00, notes: 'Pyroxasulfone + fluthiacet - Residual' },
+
+            // Adjuvants
+            { id: '17', name: 'Hydrovant', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 165.00, notes: 'Premium NIS, water conditioner & drift control', tieredPricing: true },
+            { id: '18', name: 'MSO (Methylated Seed Oil)', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 13.75, notes: 'Oil-based spray adjuvant' },
+            { id: '19', name: 'Crop Oil Concentrate', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 9.63, notes: 'Petroleum-based adjuvant' },
+            { id: '20', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', package: '50 lb bag', unit: 'lb', retailPrice: 0.39, notes: 'Water conditioner - improves hard water' },
+            { id: '21', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 15.40, notes: 'Spreader-sticker adjuvant' },
+
+            // Fertilizers
+            { id: '28', name: '32-0-0 (UAN)', category: 'fertilizer', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 2.55, notes: 'Urea Ammonium Nitrate solution' },
+            { id: '29', name: '12-0-0-26 (Thiosol)', category: 'fertilizer', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 3.29, notes: 'Ammonium Thiosulfate - sulfur source' }
+        ];
+
+        let currentFilter = 'all';
+        let searchTerm = '';
+
+        function renderProducts() {
+            const container = document.getElementById('productsContainer');
+
+            // Filter products
+            let filtered = products.filter(p => {
+                const matchesFilter = currentFilter === 'all' || p.category === currentFilter;
+                const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                     p.notes.toLowerCase().includes(searchTerm.toLowerCase());
+                return matchesFilter && matchesSearch;
+            });
+
+            // Group by category
+            const categories = {
+                herbicide: { name: 'Herbicides', products: [] },
+                adjuvant: { name: 'Adjuvants', products: [] },
+                fertilizer: { name: 'Fertilizers', products: [] }
+            };
+
+            filtered.forEach(p => {
+                if (categories[p.category]) {
+                    categories[p.category].products.push(p);
+                }
+            });
+
+            let html = '';
+
+            for (const [key, cat] of Object.entries(categories)) {
+                if (cat.products.length === 0) continue;
+
+                html += `
+                    <div class="category-section">
+                        <div class="category-header">
+                            <h2>${cat.name}</h2>
+                            <span class="category-badge">${cat.products.length} products</span>
+                        </div>
+                        <div class="products-grid">
+                            ${cat.products.map(p => renderProductCard(p)).join('')}
+                        </div>
+                    </div>
+                `;
+            }
+
+            if (html === '') {
+                html = '<p style="text-align: center; color: #666; padding: 3rem;">No products found matching your search.</p>';
+            }
+
+            container.innerHTML = html;
+        }
+
+        function renderProductCard(product) {
+            const rupBadge = product.rup ? '<span class="rup-badge">RUP</span>' : '';
+
+            let priceSection = '';
+            if (product.tieredPricing) {
+                priceSection = `
+                    <div class="hydrovant-pricing">
+                        <h4>Volume Pricing</h4>
+                        <div class="tier-list">
+                            <div class="tier-item">
+                                <span class="tier-qty">1-9 gal</span>
+                                <span class="tier-price">$165/gal</span>
+                            </div>
+                            <div class="tier-item">
+                                <span class="tier-qty">10-60 gal</span>
+                                <span class="tier-price">$135/gal</span>
+                            </div>
+                            <div class="tier-item">
+                                <span class="tier-qty">61+ gal</span>
+                                <span class="tier-price">$125/gal</span>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else {
+                priceSection = `
+                    <div class="product-details">
+                        <div class="product-package">${product.package}</div>
+                        <div class="product-price">
+                            <span class="price-amount">$${product.retailPrice.toFixed(2)}</span>
+                            <span class="price-unit">/${product.unit}</span>
+                        </div>
+                    </div>
+                `;
+            }
+
+            return `
+                <div class="product-card">
+                    <div class="product-name">${product.name}${rupBadge}</div>
+                    <div class="product-notes">${product.notes}</div>
+                    ${priceSection}
+                </div>
+            `;
+        }
+
+        // Search handler
+        document.getElementById('searchInput').addEventListener('input', function(e) {
+            searchTerm = e.target.value;
+            renderProducts();
+        });
+
+        // Filter buttons
+        document.querySelectorAll('.filter-btn').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentFilter = this.dataset.filter;
+                renderProducts();
+            });
+        });
+
+        // Auth check and user info
+        function checkAuth() {
+            const token = localStorage.getItem('acreprofit_token');
+            const userStr = localStorage.getItem('acreprofit_user');
+
+            if (!token || !userStr) {
+                window.location.href = '/login.html';
+                return;
+            }
+
+            try {
+                const user = JSON.parse(userStr);
+                document.getElementById('navUserName').textContent = user.name || user.email;
+            } catch (e) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+
+        // Mobile menu
+        document.getElementById('mobileMenuBtn').addEventListener('click', function() {
+            document.getElementById('navLinks').classList.toggle('active');
+        });
+
+        // Initialize
+        checkAuth();
+        renderProducts();
+    </script>
+</body>
+</html>
