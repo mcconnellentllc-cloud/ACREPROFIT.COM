@@ -186,9 +186,18 @@
                         <input type="number" id="costPrice" step="0.01" required placeholder="What you pay" oninput="updatePricePreview()">
                     </div>
                     <div class="form-group">
-                        <label>Margin %</label>
-                        <input type="number" id="marginPct" step="0.1" value="15" placeholder="15" oninput="updatePricePreview()">
-                        <small>Enter margin OR retail price</small>
+                        <label>Admin Margin %</label>
+                        <input type="number" id="adminMarginPct" step="0.1" value="10" placeholder="10" oninput="updatePricePreview()">
+                        <small>Acre Profit's base margin</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Admin Price (per unit)</label>
+                        <input type="number" id="adminPrice" step="0.01" readonly placeholder="Auto-calculated" style="background: #f5f5f5;">
+                    </div>
+                    <div class="form-group">
+                        <label>Regular Margin %</label>
+                        <input type="number" id="regularMarginPct" step="0.1" value="10" placeholder="10" oninput="updatePricePreview()">
+                        <small>Additional margin on admin price</small>
                     </div>
                     <div class="form-group">
                         <label>Retail Price (per unit) *</label>
@@ -223,8 +232,11 @@
                 <div class="price-preview" id="pricePreview">
                     <h4>Price Summary</h4>
                     <div class="price-row"><span>Cost:</span> <span id="previewCost">$0.00</span></div>
+                    <div class="price-row"><span>Admin Margin:</span> <span id="previewAdminMargin">0%</span></div>
+                    <div class="price-row"><span>Admin Price:</span> <span id="previewAdminPrice">$0.00</span></div>
+                    <div class="price-row"><span>Regular Margin:</span> <span id="previewRegularMargin">0%</span></div>
                     <div class="price-row"><span>Retail:</span> <span id="previewRetail">$0.00</span></div>
-                    <div class="price-row"><span>Margin:</span> <span id="previewMargin">0%</span></div>
+                    <div class="price-row" style="border-top: 1px solid #ddd; margin-top: 0.5rem; padding-top: 0.5rem;"><span><strong>Total Margin:</strong></span> <span id="previewMargin"><strong>0%</strong></span></div>
                     <div class="price-row"><span>Profit/Unit:</span> <span id="previewProfit">$0.00</span></div>
                 </div>
                 <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
@@ -296,30 +308,37 @@
                 <thead>
                     <tr>
                         <th>Product</th>
-                        <th>Category</th>
+                        <th>Supplier</th>
                         <th>Pack Size</th>
-                        <th class="price-cell">Cost</th>
-                        <th class="price-cell">Retail</th>
-                        <th>Margin</th>
-                        <th>Status</th>
+                        <th class="price-cell">Cost Price</th>
+                        <th class="price-cell">Sell Price</th>
+                        <th>Margin %</th>
+                        <th>Inventory</th>
                         <th>Actions</th>
                     </tr>
                 </thead>
                 <tbody>`;
 
             filtered.forEach(p => {
-                const margin = p.margin || (p.sellPrice && p.costPrice ? Math.round(((p.sellPrice - p.costPrice) / p.sellPrice) * 100) : 0);
-                const marginClass = margin >= 20 ? 'margin-good' : margin >= 10 ? 'margin-low' : 'margin-negative';
+                const totalMargin = p.margin || (p.sellPrice && p.costPrice ? Math.round(((p.sellPrice - p.costPrice) / p.sellPrice) * 100) : 0);
+                const adminMargin = p.adminMargin || 0;
+                const regularMargin = p.regularMargin || 0;
+                const marginClass = totalMargin >= 20 ? 'margin-good' : totalMargin >= 10 ? 'margin-low' : 'margin-negative';
                 const catClass = `cat-${p.category}`;
-                const status = p.availableForOrder !== false ? '<span style="color: green;">Active</span>' : '<span style="color: #999;">Inactive</span>';
+                const status = p.availableForOrder !== false ? '<span style="color: green;">0</span>' : '<span style="color: red;">Out of stock</span>';
+
+                // Format margin display
+                const marginDisplay = adminMargin > 0 || regularMargin > 0
+                    ? `<span class="margin-badge ${marginClass}">${totalMargin.toFixed(1)}%</span><br><small style="color: #888;">$${(p.sellPrice - p.costPrice).toFixed(2)}/unit</small>`
+                    : `<span class="margin-badge ${marginClass}">${totalMargin.toFixed(1)}%</span><br><small style="color: #888;">$${(p.sellPrice - p.costPrice).toFixed(2)}/unit</small>`;
 
                 html += `<tr>
-                    <td><strong>${p.productName}</strong>${p.isRestrictedUse ? ' <span style="color: red; font-size: 0.75rem;">(RUP)</span>' : ''}<br><small style="color: #666;">${p.notes || ''}</small></td>
-                    <td><span class="category-badge ${catClass}">${p.category}</span></td>
-                    <td>${p.packSize || '-'}<br><small>${p.unitsPerPack ? p.unitsPerPack + ' ' + p.unit : p.unit}</small></td>
-                    <td class="price-cell price-cost">$${(p.costPrice || 0).toFixed(2)}/${p.unit}</td>
-                    <td class="price-cell price-retail">$${(p.sellPrice || 0).toFixed(2)}/${p.unit}</td>
-                    <td><span class="margin-badge ${marginClass}">${margin}%</span></td>
+                    <td><strong>${p.productName}</strong>${p.isRestrictedUse ? ' <span style="color: red; font-size: 0.75rem;">(RUP)</span>' : ''}<br><small class="category-badge ${catClass}">${p.category}</small></td>
+                    <td>${p.sourceSupplier || 'CPD'}</td>
+                    <td>${p.packSize || '-'}<br><small>(${p.unit})</small></td>
+                    <td class="price-cell price-cost">$${(p.costPrice || 0).toFixed(2)}</td>
+                    <td class="price-cell price-retail">$${(p.sellPrice || 0).toFixed(2)}</td>
+                    <td>${marginDisplay}</td>
                     <td>${status}</td>
                     <td class="actions">
                         <button class="btn btn-sm btn-secondary" onclick="editProduct('${p._id}')">Edit</button>
@@ -366,8 +385,10 @@
             document.getElementById('unit').value = p.unit || 'gal';
             document.getElementById('unitsPerPack').value = p.unitsPerPack || '';
             document.getElementById('costPrice').value = p.costPrice || '';
+            document.getElementById('adminMarginPct').value = p.adminMargin || 10;
+            document.getElementById('adminPrice').value = p.adminPrice || '';
+            document.getElementById('regularMarginPct').value = p.regularMargin || 10;
             document.getElementById('sellPrice').value = p.sellPrice || '';
-            document.getElementById('marginPct').value = p.margin || '';
             document.getElementById('defaultRate').value = p.defaultRate || '';
             document.getElementById('rateUnit').value = p.rateUnit || 'oz/acre';
             document.getElementById('notes').value = p.notes || '';
@@ -382,31 +403,57 @@
             document.getElementById('productModal').classList.remove('active');
         }
 
-        // Price calculations
+        // Price calculations with two-tier margins
         function updatePricePreview() {
             const cost = parseFloat(document.getElementById('costPrice').value) || 0;
-            const marginPct = parseFloat(document.getElementById('marginPct').value) || 0;
-            const retail = cost / (1 - marginPct / 100);
+            const adminMarginPct = parseFloat(document.getElementById('adminMarginPct').value) || 0;
+            const regularMarginPct = parseFloat(document.getElementById('regularMarginPct').value) || 0;
 
+            // Calculate admin price: cost / (1 - adminMargin%)
+            const adminPrice = adminMarginPct > 0 ? cost / (1 - adminMarginPct / 100) : cost;
+
+            // Calculate retail price: adminPrice / (1 - regularMargin%)
+            const retail = regularMarginPct > 0 ? adminPrice / (1 - regularMarginPct / 100) : adminPrice;
+
+            // Calculate total margin from cost to retail
+            const totalMargin = retail > 0 ? ((retail - cost) / retail) * 100 : 0;
+
+            document.getElementById('adminPrice').value = adminPrice.toFixed(2);
             document.getElementById('sellPrice').value = retail.toFixed(2);
 
             document.getElementById('previewCost').textContent = '$' + cost.toFixed(2);
+            document.getElementById('previewAdminMargin').textContent = adminMarginPct.toFixed(1) + '%';
+            document.getElementById('previewAdminPrice').textContent = '$' + adminPrice.toFixed(2);
+            document.getElementById('previewRegularMargin').textContent = regularMarginPct.toFixed(1) + '%';
             document.getElementById('previewRetail').textContent = '$' + retail.toFixed(2);
-            document.getElementById('previewMargin').textContent = marginPct.toFixed(1) + '%';
+            document.getElementById('previewMargin').innerHTML = '<strong>' + totalMargin.toFixed(1) + '%</strong>';
             document.getElementById('previewProfit').textContent = '$' + (retail - cost).toFixed(2);
         }
 
         function updateMarginFromPrice() {
             const cost = parseFloat(document.getElementById('costPrice').value) || 0;
             const retail = parseFloat(document.getElementById('sellPrice').value) || 0;
+            const adminMarginPct = parseFloat(document.getElementById('adminMarginPct').value) || 0;
 
             if (retail > 0 && cost > 0) {
-                const margin = ((retail - cost) / retail) * 100;
-                document.getElementById('marginPct').value = margin.toFixed(1);
+                // Calculate admin price from cost and admin margin
+                const adminPrice = adminMarginPct > 0 ? cost / (1 - adminMarginPct / 100) : cost;
+
+                // Calculate regular margin from admin price to retail
+                const regularMargin = adminPrice > 0 && retail > adminPrice ? ((retail - adminPrice) / retail) * 100 : 0;
+
+                // Calculate total margin
+                const totalMargin = ((retail - cost) / retail) * 100;
+
+                document.getElementById('adminPrice').value = adminPrice.toFixed(2);
+                document.getElementById('regularMarginPct').value = regularMargin.toFixed(1);
 
                 document.getElementById('previewCost').textContent = '$' + cost.toFixed(2);
+                document.getElementById('previewAdminMargin').textContent = adminMarginPct.toFixed(1) + '%';
+                document.getElementById('previewAdminPrice').textContent = '$' + adminPrice.toFixed(2);
+                document.getElementById('previewRegularMargin').textContent = regularMargin.toFixed(1) + '%';
                 document.getElementById('previewRetail').textContent = '$' + retail.toFixed(2);
-                document.getElementById('previewMargin').textContent = margin.toFixed(1) + '%';
+                document.getElementById('previewMargin').innerHTML = '<strong>' + totalMargin.toFixed(1) + '%</strong>';
                 document.getElementById('previewProfit').textContent = '$' + (retail - cost).toFixed(2);
             }
         }
@@ -424,6 +471,9 @@
                 unit: document.getElementById('unit').value,
                 unitsPerPack: parseFloat(document.getElementById('unitsPerPack').value) || null,
                 costPrice: parseFloat(document.getElementById('costPrice').value),
+                adminMargin: parseFloat(document.getElementById('adminMarginPct').value) || 0,
+                adminPrice: parseFloat(document.getElementById('adminPrice').value) || null,
+                regularMargin: parseFloat(document.getElementById('regularMarginPct').value) || 0,
                 sellPrice: parseFloat(document.getElementById('sellPrice').value),
                 defaultRate: parseFloat(document.getElementById('defaultRate').value) || null,
                 rateUnit: document.getElementById('rateUnit').value,
