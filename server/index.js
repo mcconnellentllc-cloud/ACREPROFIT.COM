@@ -3950,7 +3950,7 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
 // Bulk import chemicals (admin only)
 app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { chemicals, sourceSupplier, priceVersion } = req.body;
+        const { chemicals, sourceSupplier, priceVersion, adminMargin = 10, retailMargin = 15 } = req.body;
 
         if (!Array.isArray(chemicals)) {
             return res.status(400).json({ error: 'chemicals must be an array' });
@@ -3960,6 +3960,13 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
         const version = priceVersion || new Date().toISOString().slice(0, 10);
 
         for (const chem of chemicals) {
+            // Calculate 3-tier pricing
+            const costPrice = chem.costPrice || 0;
+            const adminPrice = chem.adminPrice || costPrice * (1 + adminMargin / 100);
+            const sellPrice = chem.sellPrice && chem.sellPrice !== costPrice
+                ? chem.sellPrice
+                : adminPrice * (1 + retailMargin / 100);
+
             let existing = await Chemical.findOne({
                 productName: chem.productName,
                 sourceSupplier: sourceSupplier || chem.sourceSupplier,
@@ -3967,21 +3974,27 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
             });
 
             if (existing) {
-                if (existing.costPrice !== chem.costPrice || existing.sellPrice !== chem.sellPrice) {
+                // Always update if costPrice changed OR if adminPrice is missing
+                const needsUpdate = existing.costPrice !== costPrice ||
+                                   !existing.adminPrice ||
+                                   existing.adminPrice === 0;
+
+                if (needsUpdate) {
                     await ChemicalPriceHistory.create({
                         chemicalId: existing._id,
                         productName: existing.productName,
                         sourceSupplier: existing.sourceSupplier,
                         packSize: existing.packSize,
                         unit: existing.unit,
-                        costPrice: chem.costPrice,
-                        sellPrice: chem.sellPrice,
+                        costPrice: costPrice,
+                        sellPrice: sellPrice,
                         priceVersion: version,
                         changedBy: req.user._id
                     });
 
-                    existing.costPrice = chem.costPrice;
-                    existing.sellPrice = chem.sellPrice;
+                    existing.costPrice = costPrice;
+                    existing.adminPrice = adminPrice;
+                    existing.sellPrice = sellPrice;
                     existing.priceDate = new Date();
                     existing.priceVersion = version;
                     existing.updatedAt = new Date();
@@ -3998,8 +4011,9 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
                     packSize: chem.packSize,
                     unit: chem.unit,
                     unitsPerPack: chem.unitsPerPack,
-                    costPrice: chem.costPrice,
-                    sellPrice: chem.sellPrice,
+                    costPrice: costPrice,
+                    adminPrice: adminPrice,
+                    sellPrice: sellPrice,
                     category: chem.category || 'herbicide',
                     priceVersion: version,
                     equivalentProduct: chem.equivalentProduct,
@@ -4033,6 +4047,57 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
         };
 
         res.json({ summary, results });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Fix pricing for products where costPrice is 0 but sellPrice has value (admin only)
+app.post('/api/chemicals/fix-pricing', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { adminMargin = 10, retailMargin = 15 } = req.body;
+
+        // Find products where costPrice is 0/null but sellPrice has a value
+        const productsToFix = await Chemical.find({
+            $or: [
+                { costPrice: 0 },
+                { costPrice: { $exists: false } },
+                { costPrice: null },
+                { adminPrice: { $exists: false } },
+                { adminPrice: null },
+                { adminPrice: 0 }
+            ],
+            sellPrice: { $gt: 0 }
+        });
+
+        const results = [];
+
+        for (const product of productsToFix) {
+            // If costPrice is 0 but sellPrice has value, sellPrice is likely the actual cost
+            const actualCost = product.costPrice > 0 ? product.costPrice : product.sellPrice;
+            const newAdminPrice = actualCost * (1 + adminMargin / 100);
+            const newSellPrice = newAdminPrice * (1 + retailMargin / 100);
+
+            product.costPrice = actualCost;
+            product.adminPrice = newAdminPrice;
+            product.sellPrice = newSellPrice;
+            product.updatedAt = new Date();
+            await product.save();
+
+            results.push({
+                productName: product.productName,
+                packSize: product.packSize,
+                costPrice: actualCost,
+                adminPrice: newAdminPrice,
+                sellPrice: newSellPrice
+            });
+        }
+
+        res.json({
+            message: `Fixed pricing for ${results.length} products`,
+            fixed: results.length,
+            products: results
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
