@@ -70,6 +70,13 @@
                                 <span>Sorghum</span>
                             </div>
                         </label>
+                        <label class="crop-card">
+                            <input type="radio" name="crop" value="dryland-corn">
+                            <div class="crop-content">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/><line x1="4" y1="22" x2="20" y2="22" stroke-dasharray="2,2"/></svg>
+                                <span>Dryland Corn</span>
+                            </div>
+                        </label>
                     </div>
                 </div>
 
@@ -87,6 +94,14 @@
                                 <input type="number" id="acresInput" min="1" placeholder="500">
                                 <span class="suffix">acres</span>
                             </div>
+                        </div>
+                        <div class="form-group" style="margin-top: 1rem;">
+                            <label for="sprayVolumeInput">Spray Rate (GPA)</label>
+                            <div class="input-with-suffix">
+                                <input type="number" id="sprayVolumeInput" min="5" max="30" value="10" step="1">
+                                <span class="suffix">gal/acre</span>
+                            </div>
+                            <span class="field-note" style="font-size: 0.85rem; color: #666; margin-top: 0.25rem; display: block;">Used to calculate Hydrovant (0.1% of spray volume)</span>
                         </div>
                     </div>
                 </div>
@@ -331,12 +346,36 @@
                         { name: 'Dicamba', defaultRate: 8, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85 }
                     ]
                 }
+            },
+            'dryland-corn': {
+                'wheat-stubble-fall': {
+                    name: 'Option 1 - Wheat Stubble Fall',
+                    description: 'Wheat stubble with atrazine & valor applied in fall - 30 days pre-plant',
+                    chemicals: [
+                        { name: 'Glyphosate', defaultRate: 22, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
+                        { name: 'Valor SX', defaultRate: 3, unit: 'oz/acre', packageSize: 5, packageUnit: 'lb jug', pricePerUnit: 72 },
+                        { name: 'Atrazine', defaultRate: 1, unit: 'lb/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 12 },
+                        { name: 'Hydrovant', defaultRate: 0.1, unit: '% v/v', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 125, isAdjuvant: true }
+                    ]
+                },
+                'wheat-stubble-post-fall': {
+                    name: 'Option 2 - Wheat Stubble (Fall Atrazine Applied)',
+                    description: 'Wheat stubble that has had fall application of atrazine - post-emerge',
+                    chemicals: [
+                        { name: 'Glyphosate', defaultRate: 22, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
+                        { name: 'Mesotrione', defaultRate: 6, unit: 'oz/acre', packageSize: 1, packageUnit: 'gal jug', pricePerUnit: 280 },
+                        { name: 'Dicamba', defaultRate: 4, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85 },
+                        { name: 'Anthem Max', defaultRate: 3, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 175 },
+                        { name: 'Hydrovant', defaultRate: 0.1, unit: '% v/v', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 125, isAdjuvant: true }
+                    ]
+                }
             }
         };
 
         let selectedCrop = null;
         let selectedProgram = null;
         let selectedAcres = 0;
+        let sprayVolume = 10; // Default GPA
         let customRates = {};
 
         // Step 1: Crop selection
@@ -361,6 +400,11 @@
                 loadPrograms();
                 document.getElementById('step3').style.display = 'block';
             }
+        });
+
+        // Spray volume (GPA) input
+        document.getElementById('sprayVolumeInput').addEventListener('input', function() {
+            sprayVolume = parseFloat(this.value) || 10;
         });
 
         // Load programs for selected crop

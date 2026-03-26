@@ -1139,6 +1139,29 @@ const sprayPrograms = {
                 { name: 'Metribuzin', defaultRate: 0.5, rateUnit: 'lb/acre', packageSize: 50, packageUnit: 'lb', pricePerPackage: 0 }
             ]
         }
+    },
+    'dryland-corn': {
+        'wheat-stubble-fall': {
+            name: 'Option 1 - Wheat Stubble Fall',
+            description: 'Wheat stubble with atrazine & valor applied in fall - 30 days pre-plant',
+            chemicals: [
+                { name: 'Glyphosate', defaultRate: 22, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Valor SX', defaultRate: 3, rateUnit: 'oz/acre', packageSize: 5, packageUnit: 'lb', pricePerPackage: 0 },
+                { name: 'Atrazine 4L', defaultRate: 1, rateUnit: 'lb/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Hydrovant', defaultRate: 0.1, rateUnit: '% v/v', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0, isAdjuvant: true }
+            ]
+        },
+        'wheat-stubble-post-fall': {
+            name: 'Option 2 - Wheat Stubble (Fall Atrazine Applied)',
+            description: 'Wheat stubble that has had fall application of atrazine - post-emerge',
+            chemicals: [
+                { name: 'Glyphosate', defaultRate: 22, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Mesotrione', defaultRate: 6, rateUnit: 'oz/acre', packageSize: 1, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Dicamba DMA', defaultRate: 4, rateUnit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Anthem Max', defaultRate: 3, rateUnit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Hydrovant', defaultRate: 0.1, rateUnit: '% v/v', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0, isAdjuvant: true }
+            ]
+        }
     }
 };
 
