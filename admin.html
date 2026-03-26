@@ -5391,22 +5391,18 @@
         // Load inventory data
         async function loadInventory() {
             try {
-                const res = await fetch(`${API_URL}/api/inventory`, {
+                const res = await fetch(`${API_URL}/api/admin/inventory`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) {
-                    // If no inventory endpoint exists, use localStorage as fallback
-                    allInventory = JSON.parse(localStorage.getItem('inventory') || '[]');
-                } else {
-                    allInventory = await res.json();
+                    throw new Error('Failed to load inventory');
                 }
+                allInventory = await res.json();
                 renderInventory(allInventory);
                 updateInventoryStats();
             } catch (error) {
-                console.log('Using local inventory storage');
-                allInventory = JSON.parse(localStorage.getItem('inventory') || '[]');
-                renderInventory(allInventory);
-                updateInventoryStats();
+                console.error('Error loading inventory:', error);
+                document.getElementById('inventoryTableBody').innerHTML = '<tr><td colspan="10" class="empty">Error loading inventory. Please try again.</td></tr>';
             }
         }
 
@@ -5421,30 +5417,31 @@
             }
 
             tbody.innerHTML = items.map(item => {
-                const isOwner = item.addedById === currentUserId || userData.role === 'superadmin';
-                const isLowStock = item.lowStockThreshold && item.quantity <= item.lowStockThreshold;
-                const statusClass = isLowStock ? 'status-pending' : 'status-confirmed';
-                const statusText = isLowStock ? 'Low Stock' : 'In Stock';
-                const availableClass = item.availableToSell ? 'status-confirmed' : 'status-pending';
-                const availableText = item.availableToSell ? 'Listed' : 'Not Listed';
+                // Map Inventory model fields
+                const qty = item.quantityOnHand || item.quantity || 0;
+                const cost = item.averageCost || item.costPerUnit || 0;
+                const sellPrice = item.chemicalId?.sellPrice || item.sellPrice || 0;
+                const category = item.chemicalId?.category || item.category || '-';
+                const isLowStock = item.reorderPoint && qty <= item.reorderPoint;
+                const margin = sellPrice > 0 && cost > 0 ? Math.round(((sellPrice - cost) / sellPrice) * 100) : 0;
+
+                const statusClass = isLowStock ? 'status-pending' : qty > 0 ? 'status-confirmed' : 'status-cancelled';
+                const statusText = qty === 0 ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock';
 
                 return `
                     <tr>
-                        <td><strong>${item.productName}</strong>${item.manufacturer ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.manufacturer}</span>` : ''}</td>
-                        <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${item.category || '-'}</span></td>
-                        <td><strong>${item.quantity?.toLocaleString() || 0}</strong></td>
+                        <td><strong>${item.productName}</strong>${item.packSize ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.packSize}</span>` : ''}</td>
+                        <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${category}</span></td>
+                        <td><strong>${qty.toLocaleString()}</strong></td>
                         <td>${item.unit || '-'}</td>
-                        <td class="cost-column">${isOwner ? '$' + (item.costPerUnit?.toFixed(2) || '0.00') : '<span style="color:#999;">Hidden</span>'}</td>
-                        <td class="cost-column">${isOwner ? (item.margin || 0) + '%' : '<span style="color:#999;">-</span>'}</td>
-                        <td><strong style="color: var(--primary);">$${item.sellPrice?.toFixed(2) || '0.00'}</strong></td>
-                        <td><span class="order-status ${availableClass}">${availableText}</span></td>
+                        <td class="cost-column">$${cost.toFixed(2)}</td>
+                        <td class="cost-column">${margin}%</td>
+                        <td><strong style="color: var(--primary);">$${sellPrice.toFixed(2)}</strong></td>
+                        <td><span class="order-status status-confirmed">${item.location || 'main'}</span></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
-                            ${isOwner ? `
-                                <button class="btn btn-sm btn-outline" onclick="editInventory('${item.id || item._id}')">Edit</button>
-                                <button class="btn btn-sm" onclick="adjustInventory('${item.id || item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
-                                <button class="btn btn-sm" onclick="deleteInventory('${item.id || item._id}')" style="background: #dc2626; color: white;">Delete</button>
-                            ` : '<span style="color:#999; font-size: 0.8rem;">View Only</span>'}
+                            <button class="btn btn-sm btn-outline" onclick="viewInventoryHistory('${item._id}')">History</button>
+                            <button class="btn btn-sm" onclick="adjustInventory('${item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
                         </td>
                     </tr>
                 `;
@@ -5454,14 +5451,21 @@
         // Update inventory stats
         function updateInventoryStats() {
             const totalItems = allInventory.length;
-            const totalValue = allInventory.reduce((sum, item) => sum + ((item.quantity || 0) * (item.costPerUnit || 0)), 0);
-            const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold);
-            const categories = [...new Set(allInventory.map(item => item.category).filter(Boolean))].length;
+            const totalValue = allInventory.reduce((sum, item) => {
+                const qty = item.quantityOnHand || item.quantity || 0;
+                const cost = item.averageCost || item.costPerUnit || 0;
+                return sum + (qty * cost);
+            }, 0);
+            const lowStockItems = allInventory.filter(item => {
+                const qty = item.quantityOnHand || item.quantity || 0;
+                return item.reorderPoint && qty <= item.reorderPoint;
+            });
+            const locations = [...new Set(allInventory.map(item => item.location).filter(Boolean))].length;
 
             document.getElementById('totalInventoryItems').textContent = totalItems;
             document.getElementById('totalInventoryValue').textContent = '$' + totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('lowStockCount').textContent = lowStockItems.length;
-            document.getElementById('inventoryCategories').textContent = categories;
+            document.getElementById('inventoryCategories').textContent = locations || 1;
 
             // Update low inventory alert
             updateLowInventoryAlert(lowStockItems);
