@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My Orders - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .orders-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .orders-header { margin-bottom: 2rem; display: flex; justify-content: space-between; align-items: center; }
+        .orders-header h1 { margin: 0; }
+
+        .orders-list { display: flex; flex-direction: column; gap: 1rem; }
+
+        .order-card { background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .order-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; background: #f8f9fa; border-bottom: 1px solid #eee; flex-wrap: wrap; gap: 1rem; }
+        .order-id { font-weight: 700; font-size: 1.1rem; }
+        .order-date { color: #666; font-size: 0.9rem; }
+        .order-status { padding: 0.35rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-confirmed { background: #cce5ff; color: #004085; }
+        .status-processing { background: #d4edda; color: #155724; }
+        .status-shipped { background: #d1ecf1; color: #0c5460; }
+        .status-delivered { background: #d4edda; color: #155724; }
+        .status-cancelled { background: #f8d7da; color: #721c24; }
+
+        .order-body { padding: 1.5rem; }
+        .order-items { margin-bottom: 1rem; }
+        .order-item { display: flex; justify-content: space-between; padding: 0.5rem 0; border-bottom: 1px solid #f0f0f0; }
+        .order-item:last-child { border-bottom: none; }
+        .item-name { font-weight: 500; }
+        .item-qty { color: #666; }
+        .item-price { font-weight: 600; }
+
+        .order-total { display: flex; justify-content: space-between; padding-top: 1rem; border-top: 2px solid #eee; font-size: 1.1rem; font-weight: 700; }
+
+        .order-actions { display: flex; gap: 0.5rem; margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; }
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-outline { background: white; border: 1px solid #ddd; color: #333; }
+
+        .empty-state { text-align: center; padding: 4rem 2rem; background: white; border-radius: 12px; }
+        .empty-state h2 { margin: 0 0 1rem; color: #666; }
+        .empty-state p { color: #888; margin-bottom: 2rem; }
+
+        /* Invoice Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; border-radius: 12px; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1rem 1.5rem; border-bottom: 1px solid #eee; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; }
+
+        .invoice { padding: 2rem; }
+        .invoice-header { display: flex; justify-content: space-between; margin-bottom: 2rem; padding-bottom: 1rem; border-bottom: 2px solid #2d5a27; }
+        .invoice-logo { font-size: 1.5rem; font-weight: 800; color: #2d5a27; }
+        .invoice-title { text-align: right; }
+        .invoice-title h2 { margin: 0; font-size: 1.5rem; }
+        .invoice-title p { margin: 0.25rem 0 0; color: #666; }
+
+        .invoice-parties { display: grid; grid-template-columns: 1fr 1fr; gap: 2rem; margin-bottom: 2rem; }
+        .invoice-from, .invoice-to { }
+        .invoice-from h4, .invoice-to h4 { margin: 0 0 0.5rem; font-size: 0.85rem; text-transform: uppercase; color: #666; }
+        .invoice-from p, .invoice-to p { margin: 0.25rem 0; }
+
+        .invoice-table { width: 100%; border-collapse: collapse; margin-bottom: 2rem; }
+        .invoice-table th, .invoice-table td { padding: 0.75rem; text-align: left; border-bottom: 1px solid #eee; }
+        .invoice-table th { background: #f8f9fa; font-weight: 600; }
+        .invoice-table .text-right { text-align: right; }
+
+        .invoice-totals { display: flex; justify-content: flex-end; }
+        .invoice-totals table { width: 250px; }
+        .invoice-totals td { padding: 0.5rem; }
+        .invoice-totals .total-row { font-size: 1.2rem; font-weight: 700; border-top: 2px solid #2d5a27; }
+
+        .invoice-footer { margin-top: 2rem; padding-top: 1rem; border-top: 1px solid #eee; text-align: center; color: #666; font-size: 0.9rem; }
+
+        @media print {
+            body * { visibility: hidden; }
+            .modal-content, .modal-content * { visibility: visible; }
+            .modal-content { position: absolute; left: 0; top: 0; width: 100%; max-width: none; box-shadow: none; }
+            .modal-header { display: none; }
+            .no-print { display: none !important; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/shop.html" class="nav-link">Shop</a>
+                <a href="/my-orders.html" class="nav-link active">My Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">User</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="orders-page">
+        <div class="container">
+            <div class="orders-header">
+                <h1>My Orders</h1>
+                <a href="/shop.html" class="btn btn-primary">+ New Order</a>
+            </div>
+
+            <div class="orders-list" id="ordersList">
+                <div style="text-align: center; padding: 2rem; color: #666;">Loading orders...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Invoice Modal -->
+    <div class="modal" id="invoiceModal">
+        <div class="modal-content">
+            <div class="modal-header no-print">
+                <h3>Invoice</h3>
+                <div>
+                    <button class="btn btn-primary" onclick="window.print()">Print Invoice</button>
+                    <button class="close-btn" onclick="closeInvoice()">&times;</button>
+                </div>
+            </div>
+            <div class="invoice" id="invoiceContent">
+                <!-- Invoice content loaded dynamically -->
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        let token = localStorage.getItem('acreprofit_token');
+        let currentUser = null;
+        let orders = [];
+
+        function checkAuth() {
+            const userStr = localStorage.getItem('acreprofit_user');
+            if (!token || !userStr) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            currentUser = JSON.parse(userStr);
+            document.getElementById('userName').textContent = currentUser.name || currentUser.email;
+            return true;
+        }
+
+        async function loadOrders() {
+            try {
+                const response = await fetch(`${API_URL}/api/chemical-orders`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load orders');
+                orders = await response.json();
+                renderOrders();
+            } catch (error) {
+                document.getElementById('ordersList').innerHTML = `
+                    <div class="empty-state">
+                        <h2>Unable to load orders</h2>
+                        <p>Please try refreshing the page.</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderOrders() {
+            const container = document.getElementById('ordersList');
+
+            if (!orders || orders.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <h2>No orders yet</h2>
+                        <p>Start shopping to place your first order!</p>
+                        <a href="/shop.html" class="btn btn-primary">Browse Products</a>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = orders.map(order => {
+                const statusClass = `status-${(order.status || 'pending').toLowerCase()}`;
+                const date = new Date(order.createdAt).toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric'
+                });
+                const orderId = order._id ? order._id.slice(-8).toUpperCase() : 'N/A';
+                const items = order.items || [];
+                const total = order.totalAmount || items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+
+                return `
+                    <div class="order-card">
+                        <div class="order-header">
+                            <div>
+                                <span class="order-id">Order #${orderId}</span>
+                                <span class="order-date">${date}</span>
+                            </div>
+                            <span class="order-status ${statusClass}">${order.status || 'Pending'}</span>
+                        </div>
+                        <div class="order-body">
+                            <div class="order-items">
+                                ${items.slice(0, 3).map(item => `
+                                    <div class="order-item">
+                                        <span class="item-name">${item.productName}</span>
+                                        <span class="item-qty">${item.quantity} ${item.unit}</span>
+                                        <span class="item-price">$${(item.totalPrice || 0).toFixed(2)}</span>
+                                    </div>
+                                `).join('')}
+                                ${items.length > 3 ? `<p style="color: #666; font-size: 0.9rem;">+ ${items.length - 3} more items</p>` : ''}
+                            </div>
+                            <div class="order-total">
+                                <span>Total:</span>
+                                <span>$${total.toFixed(2)}</span>
+                            </div>
+                            <div class="order-actions">
+                                <button class="btn btn-primary" onclick="viewInvoice('${order._id}')">View Invoice</button>
+                                ${order.status === 'pending' ? `<button class="btn btn-outline" onclick="cancelOrder('${order._id}')">Cancel</button>` : ''}
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        function viewInvoice(orderId) {
+            const order = orders.find(o => o._id === orderId);
+            if (!order) return;
+
+            const date = new Date(order.createdAt).toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+            const invoiceNum = order._id.slice(-8).toUpperCase();
+            const items = order.items || [];
+            const subtotal = items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+            const total = order.totalAmount || subtotal;
+
+            document.getElementById('invoiceContent').innerHTML = `
+                <div class="invoice-header">
+                    <div class="invoice-logo">ACRE PROFIT</div>
+                    <div class="invoice-title">
+                        <h2>INVOICE</h2>
+                        <p>#${invoiceNum}</p>
+                    </div>
+                </div>
+
+                <div class="invoice-parties">
+                    <div class="invoice-from">
+                        <h4>From</h4>
+                        <p><strong>Acre Profit</strong></p>
+                        <p>Agricultural Buying Group</p>
+                        <p>contact@acreprofit.com</p>
+                    </div>
+                    <div class="invoice-to">
+                        <h4>Bill To</h4>
+                        <p><strong>${currentUser.name || currentUser.email}</strong></p>
+                        <p>${currentUser.email}</p>
+                        ${currentUser.phone ? `<p>${currentUser.phone}</p>` : ''}
+                        ${currentUser.farm?.name ? `<p>${currentUser.farm.name}</p>` : ''}
+                    </div>
+                </div>
+
+                <p><strong>Invoice Date:</strong> ${date}</p>
+                <p><strong>Status:</strong> ${order.status || 'Pending'}</p>
+
+                <table class="invoice-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th>Quantity</th>
+                            <th class="text-right">Unit Price</th>
+                            <th class="text-right">Total</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${items.map(item => `
+                            <tr>
+                                <td>${item.productName}</td>
+                                <td>${item.quantity} ${item.unit}</td>
+                                <td class="text-right">$${(item.pricePerUnit || 0).toFixed(2)}</td>
+                                <td class="text-right">$${(item.totalPrice || 0).toFixed(2)}</td>
+                            </tr>
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <div class="invoice-totals">
+                    <table>
+                        <tr>
+                            <td>Subtotal:</td>
+                            <td class="text-right">$${subtotal.toFixed(2)}</td>
+                        </tr>
+                        <tr class="total-row">
+                            <td>Total:</td>
+                            <td class="text-right">$${total.toFixed(2)}</td>
+                        </tr>
+                    </table>
+                </div>
+
+                ${order.notes ? `<p style="margin-top: 1.5rem;"><strong>Notes:</strong> ${order.notes}</p>` : ''}
+
+                <div class="invoice-footer">
+                    <p>Thank you for your business!</p>
+                    <p>Questions? Contact us at contact@acreprofit.com</p>
+                </div>
+            `;
+
+            document.getElementById('invoiceModal').classList.add('active');
+        }
+
+        function closeInvoice() {
+            document.getElementById('invoiceModal').classList.remove('active');
+        }
+
+        async function cancelOrder(orderId) {
+            if (!confirm('Are you sure you want to cancel this order?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemical-orders/${orderId}/submit`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status: 'cancelled' })
+                });
+                if (!response.ok) throw new Error('Failed to cancel');
+                loadOrders();
+            } catch (error) {
+                alert('Unable to cancel order. Please try again.');
+            }
+        }
+
+        // Event listeners
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+
+        // Close modal on outside click
+        document.getElementById('invoiceModal').addEventListener('click', e => {
+            if (e.target === document.getElementById('invoiceModal')) closeInvoice();
+        });
+
+        // Initialize
+        if (checkAuth()) {
+            loadOrders();
+        }
+    </script>
+</body>
+</html>

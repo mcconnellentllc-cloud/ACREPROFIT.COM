@@ -320,56 +320,53 @@
             ? 'http://localhost:3000'
             : 'https://acreprofit-com.onrender.com';
 
-        // Products with RETAIL prices only (no cost shown to customers)
-        const products = [
-            // Herbicides
-            { id: '1', name: 'AgSaver (Glyphosate 4lb)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 14.84, notes: 'Glyphosate 4.17 lb AE/gal - Best value' },
-            { id: '2', name: 'Glystar Supreme', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 16.68, notes: 'Premium glyphosate' },
-            { id: '3', name: 'Dicamba DMA (4lb)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 32.49, notes: 'Broadleaf control' },
-            { id: '4', name: 'LV 6 (2,4-D Ester)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 32.09, notes: '2,4-D LV ester' },
-            { id: '5', name: 'Aatrex 4L (Atrazine)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 15.35, notes: 'Atrazine 4 lb/gal - Corn/Sorghum' },
-            { id: '6', name: 'Paraquat 3SL', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 18.40, notes: 'Contact burndown', rup: true },
-            { id: '7', name: 'Glufosinate 2.34', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 18.98, notes: 'Liberty-link systems' },
-            { id: '8', name: 'Mesotrione 4SC', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 55.49, notes: 'Callisto generic - HPPD inhibitor' },
-            { id: '9', name: 'Clethodim 2EC', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 38.53, notes: 'Grass control in broadleaves' },
-            { id: '10', name: 'Sulfentrazone 4SC', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 81.08, notes: 'Palmer Amaranth residual' },
-            { id: '11', name: 'Valor SX (flumioxazin)', category: 'herbicide', package: '4x5 lb', unit: 'lb', retailPrice: 16.39, notes: 'Burndown + residual control' },
-            { id: '12', name: 'Autumn Super', category: 'herbicide', package: '4x5 lb', unit: 'lb', retailPrice: 13.13, notes: 'Fall burndown for wheat' },
-            { id: '13', name: 'Level Best Pro', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 11.67, notes: '2,4-D + Dicamba premix' },
-            { id: '14', name: 'Tapran (Trifluralin)', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 18.92, notes: 'Pre-emerge grass control' },
-            { id: '15', name: 'Aggrestrol 4L', category: 'herbicide', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 11.90, notes: 'MCPA ester' },
-            { id: '16', name: 'Artect FI', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 13.00, notes: 'Broadleaf burndown' },
-            { id: '22', name: 'FulTime NXT', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 23.00, notes: 'Acetochlor + Atrazine - Post/At Planting' },
-            { id: '23', name: 'S-Metolachlor (Dual II Magnum)', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 43.70, notes: 'Corn residual control' },
-            { id: '24', name: 'Clarifier', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 36.80, notes: 'Dicamba DGA + safener' },
-            { id: '25', name: 'Impact', category: 'herbicide', package: '1 gal', unit: 'gal', retailPrice: 391.00, notes: 'Topramezone - Corn late post' },
-            { id: '26', name: 'StareDown', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 115.00, notes: 'Fluroxypyr - Sorghum' },
-            { id: '27', name: 'Ally XP', category: 'herbicide', package: '10x1 oz', unit: 'oz', retailPrice: 9.20, notes: 'Metsulfuron-methyl - Wheat' },
-            { id: '30', name: 'Anthem Max', category: 'herbicide', package: '2x2.5 gal', unit: 'gal', retailPrice: 175.00, notes: 'Pyroxasulfone + fluthiacet - Residual' },
-
-            // Adjuvants
-            { id: '17', name: 'Hydrovant', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 145.00, notes: 'Premium NIS, water conditioner & drift control' },
-            { id: '18', name: 'MSO (Methylated Seed Oil)', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 13.75, notes: 'Oil-based spray adjuvant' },
-            { id: '19', name: 'Crop Oil Concentrate', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 9.63, notes: 'Petroleum-based adjuvant' },
-            { id: '20', name: 'AMS (Ammonium Sulfate)', category: 'adjuvant', package: '50 lb bag', unit: 'lb', retailPrice: 0.39, notes: 'Water conditioner - improves hard water' },
-            { id: '21', name: 'NIS (Non-ionic Surfactant)', category: 'adjuvant', package: '2x2.5 gal', unit: 'gal', retailPrice: 15.40, notes: 'Spreader-sticker adjuvant' },
-
-            // Fertilizers
-            { id: '28', name: '32-0-0 (UAN)', category: 'fertilizer', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 2.55, notes: 'Urea Ammonium Nitrate solution' },
-            { id: '29', name: '12-0-0-26 (Thiosol)', category: 'fertilizer', package: 'Tote (265 gal)', unit: 'gal', retailPrice: 3.29, notes: 'Ammonium Thiosulfate - sulfur source' }
-        ];
-
+        // Products loaded from API
+        let products = [];
         let currentFilter = 'all';
         let searchTerm = '';
+
+        // Load products from API
+        async function loadProducts() {
+            const container = document.getElementById('productsContainer');
+            container.innerHTML = '<p style="text-align: center; padding: 3rem; color: #666;">Loading products...</p>';
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                if (!response.ok) throw new Error('Failed to load products');
+
+                const data = await response.json();
+                // Transform API data to display format (hide cost, show only retail)
+                products = data.map(p => ({
+                    id: p._id,
+                    name: p.productName,
+                    category: p.category,
+                    package: p.packSize,
+                    unit: p.unit,
+                    retailPrice: p.sellPrice || 0,
+                    notes: p.notes || '',
+                    rup: p.isRestrictedUse
+                }));
+
+                renderProducts();
+            } catch (error) {
+                console.error('Error loading products:', error);
+                container.innerHTML = '<p style="text-align: center; padding: 3rem; color: #dc3545;">Unable to load products. Please try again later.</p>';
+            }
+        }
 
         function renderProducts() {
             const container = document.getElementById('productsContainer');
 
+            if (products.length === 0) {
+                container.innerHTML = '<p style="text-align: center; padding: 3rem; color: #666;">No products available yet.</p>';
+                return;
+            }
+
             // Filter products
             let filtered = products.filter(p => {
                 const matchesFilter = currentFilter === 'all' || p.category === currentFilter;
-                const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                     p.notes.toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                     (p.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
                 return matchesFilter && matchesSearch;
             });
 
@@ -505,7 +502,7 @@
 
         // Initialize
         checkAuth();
-        renderProducts();
+        loadProducts();
     </script>
 </body>
 </html>

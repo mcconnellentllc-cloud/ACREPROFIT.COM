@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Shop - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .shop-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .shop-layout { display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
+        @media (max-width: 900px) { .shop-layout { grid-template-columns: 1fr; } }
+
+        .shop-header { margin-bottom: 2rem; }
+        .shop-header h1 { margin: 0 0 0.5rem; }
+        .shop-header p { color: #666; margin: 0; }
+
+        .products-section { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
+        .filter-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .filter-row input { flex: 1; min-width: 200px; padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; }
+        .filter-row select { padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; }
+
+        .products-list { display: flex; flex-direction: column; gap: 1rem; max-height: 600px; overflow-y: auto; }
+        .product-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #eee; border-radius: 8px; transition: all 0.2s; }
+        .product-item:hover { border-color: #2d5a27; background: #f9f9f9; }
+        .product-info h4 { margin: 0 0 0.25rem; font-size: 1rem; }
+        .product-info p { margin: 0; font-size: 0.85rem; color: #666; }
+        .product-price { font-size: 1.25rem; font-weight: 700; color: #2d5a27; white-space: nowrap; }
+        .product-price small { font-weight: 400; font-size: 0.8rem; color: #666; }
+        .product-actions { display: flex; align-items: center; gap: 0.5rem; }
+        .qty-input { width: 60px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; text-align: center; }
+        .rup-tag { background: #dc3545; color: white; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px; margin-left: 0.5rem; }
+
+        .cart-section { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: sticky; top: 1rem; }
+        .cart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+        .cart-header h3 { margin: 0; }
+        .cart-count { background: #2d5a27; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; }
+
+        .cart-items { max-height: 300px; overflow-y: auto; margin-bottom: 1rem; }
+        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f0f0f0; }
+        .cart-item:last-child { border-bottom: none; }
+        .cart-item-info { flex: 1; }
+        .cart-item-info h5 { margin: 0 0 0.25rem; font-size: 0.9rem; }
+        .cart-item-info p { margin: 0; font-size: 0.8rem; color: #666; }
+        .cart-item-total { font-weight: 600; color: #2d5a27; }
+        .remove-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.2rem; padding: 0.25rem; }
+
+        .cart-empty { text-align: center; padding: 2rem; color: #666; }
+
+        .cart-summary { border-top: 2px solid #eee; padding-top: 1rem; margin-top: 1rem; }
+        .summary-row { display: flex; justify-content: space-between; padding: 0.5rem 0; }
+        .summary-row.total { font-size: 1.25rem; font-weight: 700; border-top: 1px solid #eee; margin-top: 0.5rem; padding-top: 1rem; }
+
+        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; width: 100%; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
+        .btn-secondary { background: #6c757d; color: white; margin-top: 0.5rem; }
+        .btn-add { background: #2d5a27; color: white; padding: 0.5rem 1rem; font-size: 0.9rem; }
+
+        .checkout-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; }
+        .checkout-form .form-group { margin-bottom: 1rem; }
+        .checkout-form label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        .checkout-form textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; resize: vertical; min-height: 80px; }
+
+        .loading { text-align: center; padding: 2rem; color: #666; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
+
+        .order-confirmation { text-align: center; padding: 2rem; }
+        .order-confirmation h2 { color: #2d5a27; margin-bottom: 1rem; }
+        .order-number { font-size: 1.5rem; font-weight: 700; background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/shop.html" class="nav-link active">Shop</a>
+                <a href="/my-orders.html" class="nav-link">My Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">User</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="shop-page">
+        <div class="container">
+            <div class="shop-header">
+                <h1>Shop Chemicals</h1>
+                <p>Add products to your cart and submit your order</p>
+            </div>
+
+            <div id="messageArea"></div>
+
+            <div class="shop-layout">
+                <div class="products-section">
+                    <div class="filter-row">
+                        <input type="text" id="searchInput" placeholder="Search products...">
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                            <option value="herbicide">Herbicides</option>
+                            <option value="adjuvant">Adjuvants</option>
+                            <option value="fertilizer">Fertilizers</option>
+                        </select>
+                    </div>
+                    <div class="products-list" id="productsList">
+                        <div class="loading">Loading products...</div>
+                    </div>
+                </div>
+
+                <div class="cart-section">
+                    <div class="cart-header">
+                        <h3>Your Cart</h3>
+                        <span class="cart-count" id="cartCount">0</span>
+                    </div>
+
+                    <div class="cart-items" id="cartItems">
+                        <div class="cart-empty">Your cart is empty</div>
+                    </div>
+
+                    <div class="cart-summary" id="cartSummary" style="display: none;">
+                        <div class="summary-row total">
+                            <span>Total:</span>
+                            <span id="cartTotal">$0.00</span>
+                        </div>
+                    </div>
+
+                    <div class="checkout-form" id="checkoutForm" style="display: none;">
+                        <div class="form-group">
+                            <label>Delivery Notes (optional)</label>
+                            <textarea id="orderNotes" placeholder="Special instructions, delivery preferences, etc."></textarea>
+                        </div>
+                        <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder()">Submit Order</button>
+                        <button class="btn btn-secondary" onclick="clearCart()">Clear Cart</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        let products = [];
+        let cart = JSON.parse(localStorage.getItem('acreprofit_cart') || '[]');
+        let token = localStorage.getItem('acreprofit_token');
+        let currentUser = null;
+
+        // Auth check
+        function checkAuth() {
+            const userStr = localStorage.getItem('acreprofit_user');
+            if (!token || !userStr) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            currentUser = JSON.parse(userStr);
+            document.getElementById('userName').textContent = currentUser.name || currentUser.email;
+            return true;
+        }
+
+        // Load products
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                if (!response.ok) throw new Error('Failed to load');
+                products = await response.json();
+                renderProducts();
+            } catch (error) {
+                document.getElementById('productsList').innerHTML = '<div class="error-msg">Unable to load products. Please refresh.</div>';
+            }
+        }
+
+        // Render products
+        function renderProducts() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+
+            let filtered = products.filter(p => {
+                const matchSearch = p.productName.toLowerCase().includes(search) || (p.notes || '').toLowerCase().includes(search);
+                const matchCategory = !category || p.category === category;
+                const available = p.availableForOrder !== false;
+                return matchSearch && matchCategory && available;
+            });
+
+            if (filtered.length === 0) {
+                document.getElementById('productsList').innerHTML = '<div class="cart-empty">No products found</div>';
+                return;
+            }
+
+            document.getElementById('productsList').innerHTML = filtered.map(p => `
+                <div class="product-item" data-id="${p._id}">
+                    <div class="product-info">
+                        <h4>${p.productName}${p.isRestrictedUse ? '<span class="rup-tag">RUP</span>' : ''}</h4>
+                        <p>${p.packSize || ''} ${p.unitsPerPack ? '(' + p.unitsPerPack + ' ' + p.unit + ')' : ''}</p>
+                        <p style="color: #888; font-size: 0.8rem;">${p.notes || ''}</p>
+                    </div>
+                    <div class="product-price">
+                        $${(p.sellPrice || 0).toFixed(2)}<small>/${p.unit}</small>
+                    </div>
+                    <div class="product-actions">
+                        <input type="number" class="qty-input" id="qty-${p._id}" min="1" value="1" step="1">
+                        <button class="btn btn-add" onclick="addToCart('${p._id}')">Add</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        // Add to cart
+        function addToCart(productId) {
+            const product = products.find(p => p._id === productId);
+            if (!product) return;
+
+            const qty = parseFloat(document.getElementById(`qty-${productId}`).value) || 1;
+            const existingIndex = cart.findIndex(item => item.productId === productId);
+
+            if (existingIndex >= 0) {
+                cart[existingIndex].quantity += qty;
+            } else {
+                cart.push({
+                    productId: product._id,
+                    productName: product.productName,
+                    packSize: product.packSize,
+                    unit: product.unit,
+                    unitsPerPack: product.unitsPerPack,
+                    price: product.sellPrice,
+                    quantity: qty
+                });
+            }
+
+            saveCart();
+            renderCart();
+            showMessage('Added to cart!', 'success');
+        }
+
+        // Remove from cart
+        function removeFromCart(index) {
+            cart.splice(index, 1);
+            saveCart();
+            renderCart();
+        }
+
+        // Clear cart
+        function clearCart() {
+            cart = [];
+            saveCart();
+            renderCart();
+        }
+
+        // Save cart to localStorage
+        function saveCart() {
+            localStorage.setItem('acreprofit_cart', JSON.stringify(cart));
+        }
+
+        // Render cart
+        function renderCart() {
+            const cartItems = document.getElementById('cartItems');
+            const cartCount = document.getElementById('cartCount');
+            const cartSummary = document.getElementById('cartSummary');
+            const checkoutForm = document.getElementById('checkoutForm');
+
+            cartCount.textContent = cart.length;
+
+            if (cart.length === 0) {
+                cartItems.innerHTML = '<div class="cart-empty">Your cart is empty</div>';
+                cartSummary.style.display = 'none';
+                checkoutForm.style.display = 'none';
+                return;
+            }
+
+            let total = 0;
+            cartItems.innerHTML = cart.map((item, index) => {
+                const itemTotal = item.price * item.quantity;
+                total += itemTotal;
+                return `
+                    <div class="cart-item">
+                        <div class="cart-item-info">
+                            <h5>${item.productName}</h5>
+                            <p>${item.quantity} ${item.unit} @ $${item.price.toFixed(2)}/${item.unit}</p>
+                        </div>
+                        <div class="cart-item-total">$${itemTotal.toFixed(2)}</div>
+                        <button class="remove-btn" onclick="removeFromCart(${index})">&times;</button>
+                    </div>
+                `;
+            }).join('');
+
+            document.getElementById('cartTotal').textContent = '$' + total.toFixed(2);
+            cartSummary.style.display = 'block';
+            checkoutForm.style.display = 'block';
+        }
+
+        // Submit order
+        async function submitOrder() {
+            if (cart.length === 0) return;
+
+            const btn = document.getElementById('submitOrderBtn');
+            btn.disabled = true;
+            btn.textContent = 'Submitting...';
+
+            try {
+                const orderData = {
+                    items: cart.map(item => ({
+                        chemicalId: item.productId,
+                        productName: item.productName,
+                        quantity: item.quantity,
+                        unit: item.unit,
+                        pricePerUnit: item.price,
+                        totalPrice: item.price * item.quantity
+                    })),
+                    notes: document.getElementById('orderNotes').value,
+                    totalAmount: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+                };
+
+                const response = await fetch(`${API_URL}/api/chemical-orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(orderData)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'Failed to submit order');
+                }
+
+                const order = await response.json();
+
+                // Clear cart
+                cart = [];
+                saveCart();
+
+                // Show confirmation
+                document.querySelector('.shop-layout').innerHTML = `
+                    <div class="order-confirmation" style="grid-column: 1 / -1;">
+                        <h2>Order Submitted!</h2>
+                        <p>Thank you for your order. We'll process it shortly.</p>
+                        <div class="order-number">Order #${order._id ? order._id.slice(-8).toUpperCase() : 'PENDING'}</div>
+                        <p>Total: <strong>$${orderData.totalAmount.toFixed(2)}</strong></p>
+                        <p style="color: #666; margin-top: 1rem;">You'll receive an invoice via email.</p>
+                        <div style="margin-top: 2rem;">
+                            <a href="/my-orders.html" class="btn btn-primary" style="display: inline-block; width: auto; margin-right: 1rem;">View My Orders</a>
+                            <a href="/shop.html" class="btn btn-secondary" style="display: inline-block; width: auto;">Continue Shopping</a>
+                        </div>
+                    </div>
+                `;
+
+            } catch (error) {
+                showMessage(error.message, 'error');
+                btn.disabled = false;
+                btn.textContent = 'Submit Order';
+            }
+        }
+
+        function showMessage(msg, type) {
+            const area = document.getElementById('messageArea');
+            area.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${msg}</div>`;
+            setTimeout(() => area.innerHTML = '', 3000);
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', renderProducts);
+        document.getElementById('categoryFilter').addEventListener('change', renderProducts);
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+
+        // Initialize
+        if (checkAuth()) {
+            loadProducts();
+            renderCart();
+        }
+    </script>
+</body>
+</html>

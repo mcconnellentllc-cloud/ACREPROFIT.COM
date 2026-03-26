@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Management - Admin | Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h1 { margin: 0; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.9rem; text-transform: uppercase; }
+        .stat-card .value { font-size: 2rem; font-weight: 700; color: #2d5a27; }
+
+        .toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .toolbar input, .toolbar select { padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+        .toolbar input { flex: 1; min-width: 200px; }
+
+        .products-table { width: 100%; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .products-table th, .products-table td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; }
+        .products-table th { background: #1a1a2e; color: white; font-weight: 600; position: sticky; top: 0; }
+        .products-table tr:hover { background: #f9f9f9; }
+        .products-table .actions { display: flex; gap: 0.5rem; }
+
+        .price-cell { text-align: right; }
+        .price-cost { color: #666; }
+        .price-retail { color: #2d5a27; font-weight: 600; }
+        .margin-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .margin-good { background: #d4edda; color: #155724; }
+        .margin-low { background: #fff3cd; color: #856404; }
+        .margin-negative { background: #f8d7da; color: #721c24; }
+
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+        .btn-danger { background: #dc3545; color: white; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; max-width: 600px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .modal-header h2 { margin: 0; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+        .form-group textarea { resize: vertical; min-height: 80px; }
+        .form-group small { color: #666; font-size: 0.85rem; }
+
+        .price-preview { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-top: 1rem; }
+        .price-preview h4 { margin: 0 0 0.5rem; }
+        .price-row { display: flex; justify-content: space-between; padding: 0.25rem 0; }
+
+        .category-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .cat-herbicide { background: #cce5ff; color: #004085; }
+        .cat-adjuvant { background: #d4edda; color: #155724; }
+        .cat-fertilizer { background: #fff3cd; color: #856404; }
+
+        .loading { text-align: center; padding: 3rem; color: #666; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .products-table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin-inventory.html" class="nav-link active">Inventory</a>
+                <a href="/admin.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">Admin</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="admin-header">
+                <h1>Inventory Management</h1>
+                <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+            </div>
+
+            <div id="message"></div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <h3>Total Products</h3>
+                    <div class="value" id="totalProducts">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Herbicides</h3>
+                    <div class="value" id="herbicideCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Adjuvants</h3>
+                    <div class="value" id="adjuvantCount">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Avg Margin</h3>
+                    <div class="value" id="avgMargin">0%</div>
+                </div>
+            </div>
+
+            <div class="toolbar">
+                <input type="text" id="searchInput" placeholder="Search products...">
+                <select id="categoryFilter">
+                    <option value="">All Categories</option>
+                    <option value="herbicide">Herbicides</option>
+                    <option value="adjuvant">Adjuvants</option>
+                    <option value="fertilizer">Fertilizers</option>
+                </select>
+            </div>
+
+            <div id="tableContainer">
+                <div class="loading">Loading products...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Add/Edit Product Modal -->
+    <div class="modal" id="productModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Add Product</h2>
+                <button class="close-btn" onclick="closeModal()">&times;</button>
+            </div>
+            <form id="productForm" onsubmit="saveProduct(event)">
+                <input type="hidden" id="productId">
+                <div class="form-grid">
+                    <div class="form-group full-width">
+                        <label>Product Name *</label>
+                        <input type="text" id="productName" required placeholder="e.g., Glyphosate 4lb">
+                    </div>
+                    <div class="form-group">
+                        <label>Category *</label>
+                        <select id="category" required>
+                            <option value="herbicide">Herbicide</option>
+                            <option value="adjuvant">Adjuvant</option>
+                            <option value="fertilizer">Fertilizer</option>
+                            <option value="insecticide">Insecticide</option>
+                            <option value="fungicide">Fungicide</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier</label>
+                        <input type="text" id="sourceSupplier" placeholder="e.g., CPD">
+                    </div>
+                    <div class="form-group">
+                        <label>Pack Size *</label>
+                        <input type="text" id="packSize" required placeholder="e.g., 2x2.5 gal, Tote">
+                    </div>
+                    <div class="form-group">
+                        <label>Unit *</label>
+                        <select id="unit" required>
+                            <option value="gal">Gallon (gal)</option>
+                            <option value="lb">Pound (lb)</option>
+                            <option value="oz">Ounce (oz)</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Units Per Pack</label>
+                        <input type="number" id="unitsPerPack" step="0.01" placeholder="e.g., 5">
+                    </div>
+                    <div class="form-group">
+                        <label>Cost Price (per unit) *</label>
+                        <input type="number" id="costPrice" step="0.01" required placeholder="What you pay" oninput="updatePricePreview()">
+                    </div>
+                    <div class="form-group">
+                        <label>Margin %</label>
+                        <input type="number" id="marginPct" step="0.1" value="15" placeholder="15" oninput="updatePricePreview()">
+                        <small>Enter margin OR retail price</small>
+                    </div>
+                    <div class="form-group">
+                        <label>Retail Price (per unit) *</label>
+                        <input type="number" id="sellPrice" step="0.01" required placeholder="Customer pays" oninput="updateMarginFromPrice()">
+                    </div>
+                    <div class="form-group">
+                        <label>Default Rate</label>
+                        <input type="number" id="defaultRate" step="0.1" placeholder="e.g., 32">
+                    </div>
+                    <div class="form-group">
+                        <label>Rate Unit</label>
+                        <select id="rateUnit">
+                            <option value="oz/acre">oz/acre</option>
+                            <option value="pt/acre">pt/acre</option>
+                            <option value="qt/acre">qt/acre</option>
+                            <option value="gal/acre">gal/acre</option>
+                            <option value="lb/acre">lb/acre</option>
+                            <option value="% v/v">% v/v</option>
+                        </select>
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Notes</label>
+                        <textarea id="notes" placeholder="Product notes, equivalent products, etc."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="isRestrictedUse"> Restricted Use Product (RUP)</label>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="availableForOrder" checked> Available for Order</label>
+                    </div>
+                </div>
+                <div class="price-preview" id="pricePreview">
+                    <h4>Price Summary</h4>
+                    <div class="price-row"><span>Cost:</span> <span id="previewCost">$0.00</span></div>
+                    <div class="price-row"><span>Retail:</span> <span id="previewRetail">$0.00</span></div>
+                    <div class="price-row"><span>Margin:</span> <span id="previewMargin">0%</span></div>
+                    <div class="price-row"><span>Profit/Unit:</span> <span id="previewProfit">$0.00</span></div>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Product</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        let products = [];
+        let token = localStorage.getItem('acreprofit_token');
+
+        // Check auth
+        function checkAuth() {
+            const userStr = localStorage.getItem('acreprofit_user');
+            if (!token || !userStr) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            const user = JSON.parse(userStr);
+            if (!['admin', 'superadmin'].includes(user.role)) {
+                window.location.href = '/dashboard.html';
+                return false;
+            }
+            document.getElementById('userName').textContent = user.name || user.email;
+            return true;
+        }
+
+        // Load products from API
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals/admin`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load products');
+                products = await response.json();
+                renderTable();
+                updateStats();
+            } catch (error) {
+                console.error('Error loading products:', error);
+                // If API fails, show empty state
+                document.getElementById('tableContainer').innerHTML = `
+                    <div class="error-msg">Unable to load products from server. <button class="btn btn-sm btn-primary" onclick="loadProducts()">Retry</button></div>
+                    <p style="text-align: center; color: #666;">Add your first product using the button above.</p>
+                `;
+            }
+        }
+
+        // Render products table
+        function renderTable() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const category = document.getElementById('categoryFilter').value;
+
+            let filtered = products.filter(p => {
+                const matchSearch = p.productName.toLowerCase().includes(search) || (p.notes || '').toLowerCase().includes(search);
+                const matchCategory = !category || p.category === category;
+                return matchSearch && matchCategory;
+            });
+
+            if (filtered.length === 0) {
+                document.getElementById('tableContainer').innerHTML = '<p style="text-align: center; padding: 2rem; color: #666;">No products found. Add your first product!</p>';
+                return;
+            }
+
+            let html = `<table class="products-table">
+                <thead>
+                    <tr>
+                        <th>Product</th>
+                        <th>Category</th>
+                        <th>Pack Size</th>
+                        <th class="price-cell">Cost</th>
+                        <th class="price-cell">Retail</th>
+                        <th>Margin</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            filtered.forEach(p => {
+                const margin = p.margin || (p.sellPrice && p.costPrice ? Math.round(((p.sellPrice - p.costPrice) / p.sellPrice) * 100) : 0);
+                const marginClass = margin >= 20 ? 'margin-good' : margin >= 10 ? 'margin-low' : 'margin-negative';
+                const catClass = `cat-${p.category}`;
+                const status = p.availableForOrder !== false ? '<span style="color: green;">Active</span>' : '<span style="color: #999;">Inactive</span>';
+
+                html += `<tr>
+                    <td><strong>${p.productName}</strong>${p.isRestrictedUse ? ' <span style="color: red; font-size: 0.75rem;">(RUP)</span>' : ''}<br><small style="color: #666;">${p.notes || ''}</small></td>
+                    <td><span class="category-badge ${catClass}">${p.category}</span></td>
+                    <td>${p.packSize || '-'}<br><small>${p.unitsPerPack ? p.unitsPerPack + ' ' + p.unit : p.unit}</small></td>
+                    <td class="price-cell price-cost">$${(p.costPrice || 0).toFixed(2)}/${p.unit}</td>
+                    <td class="price-cell price-retail">$${(p.sellPrice || 0).toFixed(2)}/${p.unit}</td>
+                    <td><span class="margin-badge ${marginClass}">${margin}%</span></td>
+                    <td>${status}</td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-secondary" onclick="editProduct('${p._id}')">Edit</button>
+                        <button class="btn btn-sm btn-danger" onclick="deleteProduct('${p._id}')">Delete</button>
+                    </td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('tableContainer').innerHTML = html;
+        }
+
+        // Update stats
+        function updateStats() {
+            document.getElementById('totalProducts').textContent = products.length;
+            document.getElementById('herbicideCount').textContent = products.filter(p => p.category === 'herbicide').length;
+            document.getElementById('adjuvantCount').textContent = products.filter(p => p.category === 'adjuvant').length;
+
+            const margins = products.filter(p => p.margin).map(p => p.margin);
+            const avgMargin = margins.length ? Math.round(margins.reduce((a, b) => a + b, 0) / margins.length) : 0;
+            document.getElementById('avgMargin').textContent = avgMargin + '%';
+        }
+
+        // Modal functions
+        function openAddModal() {
+            document.getElementById('modalTitle').textContent = 'Add Product';
+            document.getElementById('productForm').reset();
+            document.getElementById('productId').value = '';
+            document.getElementById('availableForOrder').checked = true;
+            updatePricePreview();
+            document.getElementById('productModal').classList.add('active');
+        }
+
+        function editProduct(id) {
+            const p = products.find(prod => prod._id === id);
+            if (!p) return;
+
+            document.getElementById('modalTitle').textContent = 'Edit Product';
+            document.getElementById('productId').value = p._id;
+            document.getElementById('productName').value = p.productName || '';
+            document.getElementById('category').value = p.category || 'herbicide';
+            document.getElementById('sourceSupplier').value = p.sourceSupplier || '';
+            document.getElementById('packSize').value = p.packSize || '';
+            document.getElementById('unit').value = p.unit || 'gal';
+            document.getElementById('unitsPerPack').value = p.unitsPerPack || '';
+            document.getElementById('costPrice').value = p.costPrice || '';
+            document.getElementById('sellPrice').value = p.sellPrice || '';
+            document.getElementById('marginPct').value = p.margin || '';
+            document.getElementById('defaultRate').value = p.defaultRate || '';
+            document.getElementById('rateUnit').value = p.rateUnit || 'oz/acre';
+            document.getElementById('notes').value = p.notes || '';
+            document.getElementById('isRestrictedUse').checked = p.isRestrictedUse || false;
+            document.getElementById('availableForOrder').checked = p.availableForOrder !== false;
+
+            updatePricePreview();
+            document.getElementById('productModal').classList.add('active');
+        }
+
+        function closeModal() {
+            document.getElementById('productModal').classList.remove('active');
+        }
+
+        // Price calculations
+        function updatePricePreview() {
+            const cost = parseFloat(document.getElementById('costPrice').value) || 0;
+            const marginPct = parseFloat(document.getElementById('marginPct').value) || 0;
+            const retail = cost / (1 - marginPct / 100);
+
+            document.getElementById('sellPrice').value = retail.toFixed(2);
+
+            document.getElementById('previewCost').textContent = '$' + cost.toFixed(2);
+            document.getElementById('previewRetail').textContent = '$' + retail.toFixed(2);
+            document.getElementById('previewMargin').textContent = marginPct.toFixed(1) + '%';
+            document.getElementById('previewProfit').textContent = '$' + (retail - cost).toFixed(2);
+        }
+
+        function updateMarginFromPrice() {
+            const cost = parseFloat(document.getElementById('costPrice').value) || 0;
+            const retail = parseFloat(document.getElementById('sellPrice').value) || 0;
+
+            if (retail > 0 && cost > 0) {
+                const margin = ((retail - cost) / retail) * 100;
+                document.getElementById('marginPct').value = margin.toFixed(1);
+
+                document.getElementById('previewCost').textContent = '$' + cost.toFixed(2);
+                document.getElementById('previewRetail').textContent = '$' + retail.toFixed(2);
+                document.getElementById('previewMargin').textContent = margin.toFixed(1) + '%';
+                document.getElementById('previewProfit').textContent = '$' + (retail - cost).toFixed(2);
+            }
+        }
+
+        // Save product
+        async function saveProduct(e) {
+            e.preventDefault();
+
+            const id = document.getElementById('productId').value;
+            const data = {
+                productName: document.getElementById('productName').value,
+                category: document.getElementById('category').value,
+                sourceSupplier: document.getElementById('sourceSupplier').value || 'Direct',
+                packSize: document.getElementById('packSize').value,
+                unit: document.getElementById('unit').value,
+                unitsPerPack: parseFloat(document.getElementById('unitsPerPack').value) || null,
+                costPrice: parseFloat(document.getElementById('costPrice').value),
+                sellPrice: parseFloat(document.getElementById('sellPrice').value),
+                defaultRate: parseFloat(document.getElementById('defaultRate').value) || null,
+                rateUnit: document.getElementById('rateUnit').value,
+                notes: document.getElementById('notes').value,
+                isRestrictedUse: document.getElementById('isRestrictedUse').checked,
+                availableForOrder: document.getElementById('availableForOrder').checked
+            };
+
+            try {
+                const url = id ? `${API_URL}/api/chemicals/${id}` : `${API_URL}/api/chemicals`;
+                const method = id ? 'PUT' : 'POST';
+
+                const response = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(data)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.message || 'Failed to save product');
+                }
+
+                showMessage('Product saved successfully!', 'success');
+                closeModal();
+                loadProducts();
+            } catch (error) {
+                showMessage(error.message, 'error');
+            }
+        }
+
+        // Delete product
+        async function deleteProduct(id) {
+            if (!confirm('Are you sure you want to delete this product?')) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/chemicals/${id}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to delete product');
+
+                showMessage('Product deleted', 'success');
+                loadProducts();
+            } catch (error) {
+                showMessage(error.message, 'error');
+            }
+        }
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('message');
+            el.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${msg}</div>`;
+            setTimeout(() => el.innerHTML = '', 3000);
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', renderTable);
+        document.getElementById('categoryFilter').addEventListener('change', renderTable);
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+
+        // Initialize
+        if (checkAuth()) {
+            loadProducts();
+        }
+    </script>
+</body>
+</html>
