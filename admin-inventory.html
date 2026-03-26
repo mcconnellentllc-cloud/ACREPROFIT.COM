@@ -94,7 +94,10 @@
         <div class="container">
             <div class="admin-header">
                 <h1>Inventory Management</h1>
-                <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-secondary" onclick="seedInitialProducts()">Load Starter Products</button>
+                    <button class="btn btn-primary" onclick="openAddModal()">+ Add Product</button>
+                </div>
             </div>
 
             <div id="message"></div>
@@ -478,6 +481,76 @@
             const el = document.getElementById('message');
             el.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${msg}</div>`;
             setTimeout(() => el.innerHTML = '', 3000);
+        }
+
+        // Seed initial products (Glyphosate and Hydrovant)
+        async function seedInitialProducts() {
+            if (!confirm('This will add Glyphosate and Hydrovant to your inventory. Continue?')) return;
+
+            const starterProducts = [
+                {
+                    productName: 'Glyphosate 4lb (AgSaver)',
+                    category: 'herbicide',
+                    sourceSupplier: 'CPD',
+                    packSize: 'Tote (265 gal)',
+                    unit: 'gal',
+                    unitsPerPack: 265,
+                    costPrice: 12.90,
+                    sellPrice: 14.84,
+                    defaultRate: 22,
+                    rateUnit: 'oz/acre',
+                    notes: 'Glyphosate 4.17 lb AE/gal - Best value burndown',
+                    isRestrictedUse: false,
+                    availableForOrder: true
+                },
+                {
+                    productName: 'Hydrovant',
+                    category: 'adjuvant',
+                    sourceSupplier: 'CPD',
+                    packSize: '2x2.5 gal',
+                    unit: 'gal',
+                    unitsPerPack: 5,
+                    costPrice: 110.00,
+                    sellPrice: 145.00,
+                    defaultRate: 0.1,
+                    rateUnit: '% v/v',
+                    notes: 'Premium NIS, water conditioner & drift control',
+                    isRestrictedUse: false,
+                    availableForOrder: true
+                }
+            ];
+
+            let added = 0;
+            for (const product of starterProducts) {
+                try {
+                    // Check if product already exists
+                    const exists = products.find(p =>
+                        p.productName.toLowerCase().includes(product.productName.toLowerCase().split(' ')[0])
+                    );
+                    if (exists) {
+                        console.log(`${product.productName} already exists, skipping`);
+                        continue;
+                    }
+
+                    const response = await fetch(`${API_URL}/api/chemicals`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(product)
+                    });
+
+                    if (response.ok) {
+                        added++;
+                    }
+                } catch (error) {
+                    console.error(`Failed to add ${product.productName}:`, error);
+                }
+            }
+
+            showMessage(`Added ${added} starter products!`, 'success');
+            loadProducts();
         }
 
         // Event listeners
