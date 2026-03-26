@@ -207,8 +207,11 @@ const orderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     crop: { type: String, required: true },
-    program: { type: String, required: true },
+    program: { type: String },
     acres: { type: Number, required: true },
+    gpa: { type: Number }, // Gallons per acre
+    year: { type: Number, default: () => new Date().getFullYear() },
+    notes: { type: String },
     chemicals: [{
         name: String,
         rate: Number,
@@ -2783,7 +2786,7 @@ app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddlewa
 // Create order on behalf of a customer (admin only)
 app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { customerId, crop, programId, acres, chemicals, seeds, pivotBio, totalPrice, status } = req.body;
+        const { customerId, crop, programId, acres, gpa, year, chemicals, seeds, pivotBio, totalPrice, status, notes } = req.body;
 
         // Validate customer exists and admin has access
         const customer = await User.findById(customerId);
@@ -2805,12 +2808,15 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             crop,
             program: programId,
             acres,
+            gpa,
+            year: year || new Date().getFullYear(),
             chemicals,
             seeds,
             pivotBio,
             totalPrice,
             costPerAcre,
             status: status || 'draft',
+            notes,
             createdBy: req.user._id // Track who created this order
         });
 

@@ -378,8 +378,13 @@
 
             // Fill in the form fields
             document.getElementById('productName').value = selectedChemical.productName;
-            document.getElementById('productPackSize').value = `${selectedChemical.packSize} ${selectedChemical.unit}`;
-            document.getElementById('productPrice').value = selectedChemical.sellPrice || '';
+            // Show pack size (avoid duplicating unit if already in packSize)
+            const packDisplay = selectedChemical.unitsPerPack
+                ? `${selectedChemical.packSize} (${selectedChemical.unitsPerPack} ${selectedChemical.unit})`
+                : selectedChemical.packSize || '-';
+            document.getElementById('productPackSize').value = packDisplay;
+            // Always use retail price (sellPrice), not cost
+            document.getElementById('productPrice').value = selectedChemical.sellPrice || 0;
 
             // Set unit based on chemical's unit
             const unitSelect = document.getElementById('productUnit');
