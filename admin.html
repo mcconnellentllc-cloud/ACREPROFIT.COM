@@ -1940,6 +1940,13 @@
                                 <textarea id="poNotes" rows="2" placeholder="Additional notes for this order"></textarea>
                             </div>
 
+                            <h4 style="margin: 20px 0 12px; color: var(--primary);">Attach Document</h4>
+                            <div class="form-group">
+                                <label>PDF Invoice/Quote (optional)</label>
+                                <input type="file" id="poDocument" accept=".pdf,.png,.jpg,.jpeg" style="padding: 8px; border: 2px dashed var(--border); border-radius: 8px; width: 100%; cursor: pointer;">
+                                <small style="color: #6b7280;">Accepted: PDF, PNG, JPG</small>
+                            </div>
+
                             <div style="background: #f0fdf4; border: 2px solid var(--primary); border-radius: 8px; padding: 16px; margin-top: 16px;">
                                 <div style="display: flex; justify-content: space-between; font-size: 14px; margin-bottom: 8px;">
                                     <span>Subtotal:</span>
@@ -3571,6 +3578,23 @@
                 });
 
                 if (res.ok) {
+                    const newPO = await res.json();
+
+                    // Upload document if one was selected
+                    const fileInput = document.getElementById('poDocument');
+                    if (fileInput.files.length > 0) {
+                        const formData = new FormData();
+                        formData.append('document', fileInput.files[0]);
+
+                        await fetch(`${API_URL}/api/admin/purchase-orders/${newPO._id}/documents`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: formData
+                        });
+                    }
+
                     closeCreatePOModal();
                     loadPurchaseOrders();
                     alert('Purchase order created!');
