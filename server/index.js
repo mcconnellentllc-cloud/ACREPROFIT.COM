@@ -1615,8 +1615,8 @@ async function seedJabcoInventory() {
                 unit: 'gal',
                 unitsPerPack: 265,
                 costPrice: 13.25,
-                adminPrice: 0,
-                sellPrice: 0,
+                adminPrice: 14.50,
+                sellPrice: 16.00,
                 category: 'herbicide',
                 sourceSupplier: 'Jabco',
                 epaRegistrationNumber: '89343-5',
@@ -1625,6 +1625,12 @@ async function seedJabcoInventory() {
                 activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }]
             });
             console.log('Created XSATE Glyphosate 53.8% product');
+        } else if (product.sellPrice === 0) {
+            // Update prices if not set
+            product.adminPrice = 14.50;
+            product.sellPrice = 16.00;
+            await product.save();
+            console.log('Updated XSATE Glyphosate prices');
         }
 
         // Create inventory record
@@ -3718,10 +3724,10 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             // Glyphosate 5.4 lb - from JABCO/CPD
             { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 250, costPrice: 13.25, adminPrice: 13.32, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
 
-            // XSATE Glyphosate 53.8% - Xingfa USA via Jabco (EPA 89343-5) - $13.25/gal from PO#2119
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminPrice: 0, sellPrice: 0, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 13.25, adminPrice: 0, sellPrice: 0, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminPrice: 0, sellPrice: 0, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            // XSATE Glyphosate 53.8% - Xingfa USA via Jabco (EPA 89343-5) - $13.25/gal cost, $16/gal retail
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminPrice: 14.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 13.25, adminPrice: 14.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminPrice: 14.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
 
             // Atrazine
             { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
