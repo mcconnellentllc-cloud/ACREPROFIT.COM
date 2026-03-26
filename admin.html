@@ -44,7 +44,6 @@
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
                     <a href="#purchase-orders" class="admin-tab" data-tab="purchase-orders">Purchase Orders</a>
                     <a href="#compliance" class="admin-tab tab-warning" data-tab="compliance">Compliance</a>
-                    <span id="pricingNav" style="display: none;"><a href="#pricing" class="admin-tab" data-tab="pricing">Pricing</a></span>
                     <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
                     <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
                     <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
@@ -1285,100 +1284,6 @@
                 </div>
             </div>
 
-            <!-- Pricing Tiers Tab (Superadmin Only) -->
-            <div id="pricingTab" class="tab-content">
-                <div class="tab-header">
-                    <div>
-                        <h2>3-Tier Pricing Management</h2>
-                        <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
-                    </div>
-                    <div class="tab-header-actions">
-                        <button class="btn btn-primary" onclick="loadJabcoPrices()" id="loadJabcoBtn">
-                            Load Jabco/CPD Prices
-                        </button>
-                        <button class="btn btn-outline" onclick="syncPricesFromSharePoint()" id="syncPricesBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                            Sync Prices
-                        </button>
-                        <label class="btn btn-outline" style="cursor: pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            Upload Excel
-                            <input type="file" id="priceFileUpload" accept=".xlsx,.xls,.csv" style="display: none;" onchange="uploadPriceFile(this)">
-                        </label>
-                        <span id="lastSyncInfo" style="font-size: 12px; color: #666; margin-left: 8px;"></span>
-                    </div>
-                </div>
-
-                <!-- Filter Controls -->
-                <div class="pricing-bulk-controls">
-                    <div class="bulk-control-group">
-                        <label>Filter Products:</label>
-                        <div class="search-filter-row">
-                            <input type="text" id="pricingSearch" placeholder="Search by product name..." oninput="filterPricingTable()">
-                            <select id="pricingCategoryFilter" onchange="filterPricingTable()">
-                                <option value="">All Categories</option>
-                                <option value="herbicide">Herbicide</option>
-                                <option value="insecticide">Insecticide</option>
-                                <option value="fungicide">Fungicide</option>
-                                <option value="adjuvant">Adjuvant</option>
-                                <option value="fertilizer">Fertilizer</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tier Legend -->
-                <div class="pricing-legend">
-                    <div class="legend-item cost">
-                        <span class="legend-dot"></span>
-                        <span>Cost (Supplier)</span>
-                    </div>
-                    <div class="legend-arrow">+</div>
-                    <div class="legend-item admin">
-                        <span class="legend-dot"></span>
-                        <span>Admin (AP Margin)</span>
-                    </div>
-                    <div class="legend-arrow">+</div>
-                    <div class="legend-item retail">
-                        <span class="legend-dot"></span>
-                        <span>Retail (Rep Commission)</span>
-                    </div>
-                </div>
-
-                <!-- Save All Button -->
-                <div class="pricing-actions-bar">
-                    <div class="unsaved-indicator" id="unsavedIndicator" style="display: none;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        <span id="unsavedCount">0</span> unsaved changes
-                    </div>
-                    <button class="btn btn-primary" id="saveAllPricingBtn" onclick="saveAllPricing()" disabled>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                        Save All Changes
-                    </button>
-                </div>
-
-                <div class="orders-table-wrapper pricing-table-wrapper" style="margin-top: 16px;">
-                    <table class="admin-table pricing-table" id="pricingTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 25%;">Product</th>
-                                <th style="width: 10%;">Category</th>
-                                <th style="width: 8%;">Unit</th>
-                                <th style="width: 12%; background: #fef2f2;">Cost</th>
-                                <th style="width: 12%; background: #fffbeb;">Admin</th>
-                                <th style="width: 12%; background: #f0fdf4;">Retail</th>
-                                <th style="width: 9%;">AP Margin</th>
-                                <th style="width: 9%;">Rep $</th>
-                                <th style="width: 3%;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="pricingTableBody">
-                            <tr><td colspan="9" class="loading">Loading products...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
             <!-- Rep Commissions Tab (Superadmin Only) -->
             <div id="commissionsTab" class="tab-content">
                 <div class="tab-header">
@@ -2168,7 +2073,7 @@
         // Show features based on role
         if (userData.role === 'superadmin') {
             document.getElementById('repAppsNav').style.display = 'block';
-            document.getElementById('pricingNav').style.display = 'block';
+            // Pricing tab removed - functionality merged into Products
             document.getElementById('commissionsNav').style.display = 'block';
             document.getElementById('inventoryNav').style.display = 'block';
             document.getElementById('companySettingsNav').style.display = 'block';
@@ -2185,7 +2090,7 @@
             document.getElementById('adminRole').textContent = 'Distributor';
             document.getElementById('inventoryNav').style.display = 'block';
             // Hide tabs that distributors shouldn't see
-            document.getElementById('pricingNav').style.display = 'none';
+            // Pricing tab removed
             document.getElementById('commissionsNav').style.display = 'none';
             document.getElementById('repAppsNav').style.display = 'none';
         } else {
@@ -4902,31 +4807,18 @@
         document.querySelector('[data-tab="pricing"]')?.addEventListener('click', loadSyncStatus);
 
         // ============ 3-TIER PRICING MANAGEMENT ============
-        let pricingProducts = [];
-        let changedProducts = new Set();
+        // Pricing tab removed - merged into Products tab
+        function loadPricingData() {}
+        function renderPricingTable() {}
+        function markPricingChanged() {}
+        function updateUnsavedIndicator() {}
+        function filterPricingTable() {}
+        function saveAllPricing() {}
+        function savePricing() {}
 
-        async function loadPricingData() {
-            const tbody = document.getElementById('pricingTableBody');
-            try {
-                const res = await fetch(`${API_URL}/api/chemicals`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                pricingProducts = await res.json();
+        /* Old pricing functions removed - pricing is now on Products tab
 
-                if (pricingProducts.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9">No products found</td></tr>';
-                    return;
-                }
-
-                renderPricingTable();
-                changedProducts.clear();
-                updateUnsavedIndicator();
-            } catch (error) {
-                tbody.innerHTML = '<tr><td colspan="9" style="color: #dc2626;">Error loading products</td></tr>';
-            }
-        }
-
-        function renderPricingTable() {
+        function renderPricingTable_OLD() {
             const tbody = document.getElementById('pricingTableBody');
             const searchTerm = (document.getElementById('pricingSearch')?.value || '').toLowerCase();
             const categoryFilter = document.getElementById('pricingCategoryFilter')?.value || '';
@@ -5160,6 +5052,7 @@
                 setTimeout(() => { btn.textContent = 'Save'; }, 2000);
             }
         }
+        End of removed pricing functions */
 
         // ============ REP COMMISSION TRACKING ============
         async function loadCommissionData() {
