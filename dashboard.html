@@ -3,626 +3,359 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Acre Profit - Your Buying Group Dashboard">
-    <title>Dashboard - Acre Profit</title>
+    <meta name="description" content="AcreProfit - Your Customer Dashboard">
+    <title>Dashboard - AcreProfit</title>
 
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#2d5a27">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Acre Profit">
-    <link rel="apple-touch-icon" href="/icon-192.svg">
-    <link rel="manifest" href="/manifest.json">
-
+    <meta name="theme-color" content="#16a34a">
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <!-- Role Switcher Banner (Super Admin only) -->
-    <div id="roleSwitcherBanner" class="role-switcher-banner" style="display: none;">
-        <div class="container" style="display: flex; align-items: center; justify-content: space-between;">
-            <span>Viewing as: <strong id="currentViewRole">Customer</strong></span>
-            <div class="role-switcher-buttons">
-                <button class="role-btn" data-role="customer">Customer</button>
-                <button class="role-btn" data-role="distributor">Distributor</button>
-                <button class="role-btn active" data-role="superadmin">Super Admin</button>
+    <div class="dashboard-layout">
+        <!-- Sidebar -->
+        <aside class="sidebar" id="sidebar">
+            <div class="sidebar-header">
+                <a href="index.html" class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>AcreProfit</span>
+                </a>
             </div>
-        </div>
+
+            <nav class="sidebar-nav">
+                <a href="dashboard.html" class="sidebar-nav-item active">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="7"/>
+                        <rect x="14" y="3" width="7" height="7"/>
+                        <rect x="14" y="14" width="7" height="7"/>
+                        <rect x="3" y="14" width="7" height="7"/>
+                    </svg>
+                    <span>Dashboard</span>
+                </a>
+
+                <a href="shop.html" class="sidebar-nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="9" cy="21" r="1"/>
+                        <circle cx="20" cy="21" r="1"/>
+                        <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                    </svg>
+                    <span>Shop Products</span>
+                </a>
+
+                <a href="calculator.html" class="sidebar-nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="4" y="2" width="16" height="20" rx="2"/>
+                        <line x1="8" y1="6" x2="16" y2="6"/>
+                        <line x1="8" y1="10" x2="10" y2="10"/>
+                        <line x1="14" y1="10" x2="16" y2="10"/>
+                        <line x1="8" y1="14" x2="10" y2="14"/>
+                        <line x1="14" y1="14" x2="16" y2="14"/>
+                        <line x1="8" y1="18" x2="10" y2="18"/>
+                        <line x1="14" y1="18" x2="16" y2="18"/>
+                    </svg>
+                    <span>Calculator</span>
+                </a>
+
+                <a href="cart.html" class="sidebar-nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <path d="M16 10a4 4 0 0 1-8 0"/>
+                    </svg>
+                    <span>Cart</span>
+                </a>
+
+                <a href="my-orders.html" class="sidebar-nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                        <polyline points="14 2 14 8 20 8"/>
+                        <line x1="16" y1="13" x2="8" y2="13"/>
+                        <line x1="16" y1="17" x2="8" y2="17"/>
+                    </svg>
+                    <span>My Orders</span>
+                </a>
+
+                <a href="account.html" class="sidebar-nav-item">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                        <circle cx="12" cy="7" r="4"/>
+                    </svg>
+                    <span>Account</span>
+                </a>
+            </nav>
+
+            <div class="sidebar-footer">
+                <a href="#" class="sidebar-nav-item" id="logout-btn">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/>
+                        <polyline points="16 17 21 12 16 7"/>
+                        <line x1="21" y1="12" x2="9" y2="12"/>
+                    </svg>
+                    <span>Logout</span>
+                </a>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="dashboard-main">
+            <button class="mobile-menu-btn" id="mobile-menu-btn" style="margin-bottom: var(--space-md);">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="3" y1="12" x2="21" y2="12"/>
+                    <line x1="3" y1="6" x2="21" y2="6"/>
+                    <line x1="3" y1="18" x2="21" y2="18"/>
+                </svg>
+            </button>
+
+            <div class="dashboard-header">
+                <div>
+                    <h1>Welcome back, <span id="user-name">Farmer</span></h1>
+                    <p class="text-muted">Here's what's happening with your account</p>
+                </div>
+                <a href="shop.html" class="btn btn-primary">Shop Now</a>
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <div class="stat-card-icon green">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                        </svg>
+                    </div>
+                    <div class="stat-card-value" id="stat-orders">0</div>
+                    <div class="stat-card-label">Total Orders</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-icon blue">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="12" y1="1" x2="12" y2="23"/>
+                            <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                        </svg>
+                    </div>
+                    <div class="stat-card-value" id="stat-spent">$0</div>
+                    <div class="stat-card-label">Total Spent</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-icon amber">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                        </svg>
+                    </div>
+                    <div class="stat-card-value" id="stat-acres">0</div>
+                    <div class="stat-card-label">Farm Acres</div>
+                </div>
+
+                <div class="stat-card">
+                    <div class="stat-card-icon purple">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                            <circle cx="9" cy="7" r="4"/>
+                            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                        </svg>
+                    </div>
+                    <div class="stat-card-value" id="stat-crops">0</div>
+                    <div class="stat-card-label">Crops</div>
+                </div>
+            </div>
+
+            <!-- Quick Actions & Recent Orders -->
+            <div class="grid grid-2" style="margin-top: var(--space-xl);">
+                <!-- Quick Actions -->
+                <div class="card">
+                    <div class="card-header">
+                        <h3>Quick Actions</h3>
+                    </div>
+                    <div class="card-body">
+                        <div class="grid grid-2" style="gap: var(--space-md);">
+                            <a href="shop.html" class="btn btn-secondary btn-block">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                    <circle cx="9" cy="21" r="1"/>
+                                    <circle cx="20" cy="21" r="1"/>
+                                    <path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+                                </svg>
+                                Shop Products
+                            </a>
+                            <a href="calculator.html" class="btn btn-secondary btn-block">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                    <rect x="4" y="2" width="16" height="20" rx="2"/>
+                                    <line x1="8" y1="6" x2="16" y2="6"/>
+                                </svg>
+                                Calculator
+                            </a>
+                            <a href="account.html" class="btn btn-secondary btn-block">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                                    <circle cx="12" cy="7" r="4"/>
+                                </svg>
+                                Edit Profile
+                            </a>
+                            <a href="my-orders.html" class="btn btn-secondary btn-block">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                    <polyline points="14 2 14 8 20 8"/>
+                                </svg>
+                                View Orders
+                            </a>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Orders -->
+                <div class="card">
+                    <div class="card-header flex justify-between items-center">
+                        <h3>Recent Orders</h3>
+                        <a href="my-orders.html" class="btn btn-sm btn-secondary">View All</a>
+                    </div>
+                    <div class="card-body" id="recent-orders">
+                        <div class="empty-state" style="padding: var(--space-xl) 0;">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                                <polyline points="14 2 14 8 20 8"/>
+                            </svg>
+                            <h4>No orders yet</h4>
+                            <p class="text-muted">Start shopping to see your orders here</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Farm Profile Alert -->
+            <div class="card mt-xl" id="profile-alert" style="display: none;">
+                <div class="card-body" style="display: flex; align-items: center; gap: var(--space-lg);">
+                    <div class="stat-card-icon amber">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <circle cx="12" cy="12" r="10"/>
+                            <line x1="12" y1="8" x2="12" y2="12"/>
+                            <line x1="12" y1="16" x2="12.01" y2="16"/>
+                        </svg>
+                    </div>
+                    <div style="flex: 1;">
+                        <h4 style="margin: 0;">Complete Your Farm Profile</h4>
+                        <p class="text-muted" style="margin: 0;">Add your acres and crops to get personalized product recommendations.</p>
+                    </div>
+                    <a href="account.html" class="btn btn-primary">Update Profile</a>
+                </div>
+            </div>
+        </main>
     </div>
 
-    <nav class="navbar dashboard-navbar">
-        <div class="container">
-            <a href="/dashboard.html" class="logo">
-                <img src="logo.svg" alt="Acre Profit">
-            </a>
-            <div class="nav-links" id="navLinks">
-                <a href="/dashboard.html" class="nav-link active">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
-                    Dashboard
-                </a>
-                <a href="/products.html" class="nav-link">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>
-                    Products
-                </a>
-                <a href="/chemicals.html" class="nav-link" id="navShop">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"></path><line x1="3" y1="6" x2="21" y2="6"></line><path d="M16 10a4 4 0 0 1-8 0"></path></svg>
-                    Shop
-                </a>
-                <a href="/order.html" class="nav-link" id="navOrders">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                    Orders
-                </a>
-                <a href="/admin.html" class="nav-link" id="navAdmin" style="display: none;">
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                    Admin
-                </a>
-            </div>
-            <div class="nav-right">
-                <span class="role-badge" id="roleBadge">Customer</span>
-                <span class="user-name" id="navUserName">User</span>
-                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
-            </div>
-            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
-                <span></span>
-                <span></span>
-                <span></span>
-            </button>
-        </div>
-    </nav>
-
-    <main class="dashboard-main">
-        <div class="container">
-            <!-- Welcome Header -->
-            <div class="dashboard-header">
-                <div class="welcome-text">
-                    <h1 id="welcomeHeading">Welcome back</h1>
-                    <p id="welcomeSubtext">What would you like to do today?</p>
-                </div>
-            </div>
-
-            <!-- ============ CUSTOMER VIEW ============ -->
-            <div id="customerView" class="role-view" style="display: none;">
-                <!-- Rep Info Card -->
-                <div class="rep-info-card" id="repInfoCard">
-                    <div class="rep-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path><circle cx="12" cy="10" r="3"></circle></svg></div>
-                    <div class="rep-details">
-                        <span class="rep-label">Your Rep & Pickup Location</span>
-                        <span class="rep-name" id="repName">-</span>
-                        <span class="rep-location" id="repLocation">-</span>
-                    </div>
-                </div>
-
-                <!-- Shop Section -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">Shop</h2>
-                    <div class="card-grid card-grid-2">
-                        <a href="/chemicals.html" class="dashboard-card card-primary">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 12v2M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66l4.24-4.24"></path></svg>
-                            </div>
-                            <h3>Crop Protection</h3>
-                            <p>Herbicides, fungicides, insecticides & adjuvants</p>
-                            <span class="card-cta">Browse Programs →</span>
-                        </a>
-
-                        <a href="/farm-products.html" class="dashboard-card">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"></rect><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"></polygon><circle cx="5.5" cy="18.5" r="2.5"></circle><circle cx="18.5" cy="18.5" r="2.5"></circle></svg>
-                            </div>
-                            <h3>Farm Products</h3>
-                            <p>Multiseal, equipment & supplies</p>
-                            <span class="card-cta">View Products →</span>
-                        </a>
-
-                    </div>
-                </div>
-
-                <!-- Account Section -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">My Account</h2>
-                    <div class="card-grid card-grid-3">
-                        <a href="/my-orders.html" class="dashboard-card card-outline">
-                            <div class="card-icon">
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                            </div>
-                            <h3>My Orders</h3>
-                            <p>View order history & status</p>
-                        </a>
-
-                        <a href="/payment-settings.html" class="dashboard-card card-outline">
-                            <div class="card-icon">
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>
-                            </div>
-                            <h3>Payment Settings</h3>
-                            <p>Manage payment methods</p>
-                        </a>
-
-                        <div class="dashboard-card card-outline" id="licenseCard">
-                            <div class="card-icon">
-                                <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
-                            </div>
-                            <h3>My License</h3>
-                            <p id="licenseStatus">Check applicator status</p>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Quick Info -->
-                <div class="dashboard-section">
-                    <div class="info-cards-row">
-                        <div class="info-card how-it-works-mini">
-                            <h4>How Acre Profit Works</h4>
-                            <div class="steps-row">
-                                <div class="step"><span>1</span> Add your needs</div>
-                                <div class="step"><span>2</span> Orders pool together</div>
-                                <div class="step"><span>3</span> Suppliers bid</div>
-                                <div class="step"><span>4</span> You approve & pay</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ============ DISTRIBUTOR/REP VIEW ============ -->
-            <div id="distributorView" class="role-view" style="display: none;">
-                <!-- Quick Stats -->
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <span class="stat-value" id="distCustomerCount">0</span>
-                        <span class="stat-label">My Customers</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="distOrderCount">0</span>
-                        <span class="stat-label">Active Orders</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="distRevenue">$0</span>
-                        <span class="stat-label">Total Sales</span>
-                    </div>
-                    <div class="stat-card accent">
-                        <span class="stat-value" id="distCommission">$0</span>
-                        <span class="stat-label">My Commission</span>
-                    </div>
-                </div>
-
-                <!-- Main Actions -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">Manage</h2>
-                    <div class="card-grid card-grid-3">
-                        <a href="/admin.html#customers" class="dashboard-card card-primary">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                            </div>
-                            <h3>My Customers</h3>
-                            <p>View & manage customer accounts</p>
-                            <span class="card-cta">Manage Customers →</span>
-                        </a>
-
-                        <a href="/admin.html#orders" class="dashboard-card">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
-                            </div>
-                            <h3>Orders</h3>
-                            <p>Track & manage all orders</p>
-                            <span class="card-cta">View Orders →</span>
-                        </a>
-
-                        <a href="/admin-order.html" class="dashboard-card">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
-                            </div>
-                            <h3>Place Order</h3>
-                            <p>Create order for a customer</p>
-                            <span class="card-cta">New Order →</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Tools Section -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">Tools</h2>
-                    <div class="card-grid card-grid-4">
-                        <a href="/admin.html#ledger" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                            </div>
-                            <h4>Ledger</h4>
-                        </a>
-
-                        <a href="/admin.html#bundles" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-                            </div>
-                            <h4>Bundles</h4>
-                        </a>
-
-                        <a href="/admin.html#compliance" class="dashboard-card card-outline card-sm card-warning">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                            </div>
-                            <h4>Compliance</h4>
-                        </a>
-
-                        <a href="/chemicals.html" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                            </div>
-                            <h4>View as Customer</h4>
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ============ SUPER ADMIN VIEW ============ -->
-            <div id="superadminView" class="role-view" style="display: none;">
-                <!-- Quick Stats -->
-                <div class="stats-row">
-                    <div class="stat-card">
-                        <span class="stat-value" id="adminTotalCustomers">0</span>
-                        <span class="stat-label">Total Customers</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="adminTotalOrders">0</span>
-                        <span class="stat-label">Total Orders</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="adminTotalRevenue">$0</span>
-                        <span class="stat-label">Total Revenue</span>
-                    </div>
-                    <div class="stat-card">
-                        <span class="stat-value" id="adminDistributorCount">0</span>
-                        <span class="stat-label">Distributors</span>
-                    </div>
-                </div>
-
-                <!-- Main Sections -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">Operations</h2>
-                    <div class="card-grid card-grid-3">
-                        <a href="/admin.html#orders" class="dashboard-card card-primary">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
-                            </div>
-                            <h3>All Orders</h3>
-                            <p>View & manage all system orders</p>
-                            <span class="card-cta">Manage Orders →</span>
-                        </a>
-
-                        <a href="/admin.html#customers" class="dashboard-card">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
-                            </div>
-                            <h3>All Customers</h3>
-                            <p>Manage all customer accounts</p>
-                            <span class="card-cta">View Customers →</span>
-                        </a>
-
-                        <a href="/admin.html#bundles" class="dashboard-card">
-                            <div class="card-icon">
-                                <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2" ry="2"></rect><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"></path></svg>
-                            </div>
-                            <h3>Bundles</h3>
-                            <p>Truckload pooling & bundles</p>
-                            <span class="card-cta">Manage Bundles →</span>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Admin Tools -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">Administration</h2>
-                    <div class="card-grid card-grid-4">
-                        <a href="/chemical-pricing.html" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
-                            </div>
-                            <h4>Pricing Tiers</h4>
-                        </a>
-
-                        <a href="/admin.html#products" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                            </div>
-                            <h4>Products</h4>
-                        </a>
-
-                        <a href="/admin.html#inventory" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12.89 1.45l8 4A2 2 0 0 1 22 7.24v9.53a2 2 0 0 1-1.11 1.79l-8 4a2 2 0 0 1-1.79 0l-8-4a2 2 0 0 1-1.1-1.8V7.24a2 2 0 0 1 1.11-1.79l8-4a2 2 0 0 1 1.78 0z"></path><polyline points="2.32 6.16 12 11 21.68 6.16"></polyline><line x1="12" y1="22.76" x2="12" y2="11"></line></svg>
-                            </div>
-                            <h4>Inventory</h4>
-                        </a>
-
-                        <a href="/admin.html#commissions" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M16 8h-6a2 2 0 1 0 0 4h4a2 2 0 1 1 0 4H8"></path><path d="M12 18V6"></path></svg>
-                            </div>
-                            <h4>Commissions</h4>
-                        </a>
-
-                        <a href="/admin.html#compliance" class="dashboard-card card-outline card-sm card-warning">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                            </div>
-                            <h4>Compliance</h4>
-                        </a>
-
-                        <a href="/admin.html#ledger" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path></svg>
-                            </div>
-                            <h4>Ledger</h4>
-                        </a>
-
-                        <a href="/admin.html#applications" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="8.5" cy="7" r="4"></circle><line x1="20" y1="8" x2="20" y2="14"></line><line x1="23" y1="11" x2="17" y2="11"></line></svg>
-                            </div>
-                            <h4>Rep Applications</h4>
-                        </a>
-
-                        <a href="/admin.html" class="dashboard-card card-outline card-sm">
-                            <div class="card-icon-sm">
-                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                            </div>
-                            <h4>Full Admin Panel</h4>
-                        </a>
-                    </div>
-                </div>
-
-                <!-- Quick Actions -->
-                <div class="dashboard-section">
-                    <h2 class="section-title">Quick Actions</h2>
-                    <div class="quick-actions-row">
-                        <button class="btn btn-outline" onclick="viewAsRole('customer')">View as Customer</button>
-                        <button class="btn btn-outline" onclick="viewAsRole('distributor')">View as Distributor</button>
-                        <a href="/chemicals.html" class="btn btn-outline">Preview Shop</a>
-                    </div>
-                </div>
-            </div>
-
-        </div>
-    </main>
-
-    <footer class="footer">
-        <div class="container">
-            <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
-        </div>
-    </footer>
-
     <script>
-        const API_URL = 'https://acreprofit-com.onrender.com';
+        // API Configuration
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : '/api';
 
-        // Check auth
+        // Check authentication
         const token = localStorage.getItem('token');
-        if (!token) {
-            window.location.href = '/login.html';
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+
+        if (!token || !user) {
+            window.location.href = 'login.html';
         }
 
-        // Get user data
-        const user = localStorage.getItem('user');
-        const userData = user ? JSON.parse(user) : {};
-        const userRole = userData.role || 'customer';
-
-        // View state (for super admin switching)
-        let currentViewRole = localStorage.getItem('viewAsRole') || userRole;
-
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            initDashboard();
-        });
-
-        function initDashboard() {
-            // Set user info in nav
-            document.getElementById('navUserName').textContent = userData.name || userData.email || 'User';
-
-            // Show/hide nav links based on role
-            updateNavLinks();
-
-            // Show role switcher for superadmin
-            if (userRole === 'superadmin') {
-                document.getElementById('roleSwitcherBanner').style.display = 'block';
-                initRoleSwitcher();
-            }
-
-            // Show appropriate view
-            showRoleView(currentViewRole);
-
-            // Load data based on view
-            loadDashboardData();
+        // If admin, redirect to admin dashboard
+        if (user && user.role === 'admin') {
+            window.location.href = 'admin.html';
         }
 
-        function showRoleView(role) {
-            // Hide all views
-            document.querySelectorAll('.role-view').forEach(v => v.style.display = 'none');
-
-            // Update role badge
-            const roleBadge = document.getElementById('roleBadge');
-            const welcomeHeading = document.getElementById('welcomeHeading');
-            const welcomeSubtext = document.getElementById('welcomeSubtext');
-
-            switch(role) {
-                case 'superadmin':
-                    document.getElementById('superadminView').style.display = 'block';
-                    roleBadge.textContent = 'Super Admin';
-                    roleBadge.className = 'role-badge role-superadmin';
-                    welcomeHeading.textContent = `Welcome, ${userData.name || 'Admin'}`;
-                    welcomeSubtext.textContent = 'Manage your entire operation from here.';
-                    break;
-                case 'distributor':
-                case 'admin':
-                    document.getElementById('distributorView').style.display = 'block';
-                    roleBadge.textContent = 'Distributor';
-                    roleBadge.className = 'role-badge role-distributor';
-                    welcomeHeading.textContent = `Welcome, ${userData.name || 'Rep'}`;
-                    welcomeSubtext.textContent = 'Manage your customers and track your sales.';
-                    break;
-                default:
-                    document.getElementById('customerView').style.display = 'block';
-                    roleBadge.textContent = 'Customer';
-                    roleBadge.className = 'role-badge role-customer';
-                    welcomeHeading.textContent = `Welcome back, ${userData.name || 'Farmer'}`;
-                    welcomeSubtext.textContent = 'What are you buying today? Pool orders with other farmers for bulk pricing.';
-            }
-
-            // Update current view role indicator
-            document.getElementById('currentViewRole').textContent =
-                role === 'superadmin' ? 'Super Admin' :
-                role === 'distributor' ? 'Distributor' : 'Customer';
-
-            // Update role switcher buttons
-            document.querySelectorAll('.role-btn').forEach(btn => {
-                btn.classList.toggle('active', btn.dataset.role === role);
-            });
-        }
-
-        function initRoleSwitcher() {
-            document.querySelectorAll('.role-btn').forEach(btn => {
-                btn.addEventListener('click', () => {
-                    const role = btn.dataset.role;
-                    localStorage.setItem('viewAsRole', role);
-                    currentViewRole = role;
-                    showRoleView(role);
-                    loadDashboardData();
-                });
-            });
-        }
-
-        function viewAsRole(role) {
-            localStorage.setItem('viewAsRole', role);
-            currentViewRole = role;
-            showRoleView(role);
-            loadDashboardData();
-        }
-
-        async function loadDashboardData() {
-            try {
-                // Load stats based on current view
-                if (currentViewRole === 'superadmin') {
-                    await loadSuperAdminStats();
-                } else if (currentViewRole === 'distributor' || currentViewRole === 'admin') {
-                    await loadDistributorStats();
-                } else {
-                    await loadCustomerData();
-                }
-            } catch (error) {
-                console.error('Error loading dashboard data:', error);
-            }
-        }
-
-        async function loadSuperAdminStats() {
-            try {
-                const [customersRes, ordersRes] = await Promise.all([
-                    fetch(`${API_URL}/api/customers`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${API_URL}/api/orders`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                ]);
-
-                if (customersRes.ok) {
-                    const customers = await customersRes.json();
-                    document.getElementById('adminTotalCustomers').textContent = customers.length;
-                    // Count unique reps
-                    const reps = new Set(customers.map(c => c.rep).filter(Boolean));
-                    document.getElementById('adminDistributorCount').textContent = reps.size || 4;
-                }
-
-                if (ordersRes.ok) {
-                    const orders = await ordersRes.json();
-                    document.getElementById('adminTotalOrders').textContent = orders.length;
-                    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-                    document.getElementById('adminTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
-                }
-            } catch (error) {
-                console.error('Error loading admin stats:', error);
-            }
-        }
-
-        async function loadDistributorStats() {
-            try {
-                const [customersRes, ordersRes, ledgerRes] = await Promise.all([
-                    fetch(`${API_URL}/api/customers`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${API_URL}/api/orders`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    }),
-                    fetch(`${API_URL}/api/ledger`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    })
-                ]);
-
-                if (customersRes.ok) {
-                    const customers = await customersRes.json();
-                    document.getElementById('distCustomerCount').textContent = customers.length;
-                }
-
-                if (ordersRes.ok) {
-                    const orders = await ordersRes.json();
-                    const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
-                    document.getElementById('distOrderCount').textContent = activeOrders.length;
-                    const totalSales = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-                    document.getElementById('distRevenue').textContent = '$' + totalSales.toLocaleString();
-                }
-
-                if (ledgerRes.ok) {
-                    const ledger = await ledgerRes.json();
-                    const balance = ledger.balance || 0;
-                    document.getElementById('distCommission').textContent = '$' + balance.toLocaleString();
-                }
-            } catch (error) {
-                console.error('Error loading distributor stats:', error);
-            }
-        }
-
-        async function loadCustomerData() {
-            // Load rep info
-            if (userData.rep) {
-                document.getElementById('repName').textContent = userData.rep.name || '-';
-                document.getElementById('repLocation').textContent = userData.rep.pickupLocation || '-';
-            }
-        }
-
-        // Update navigation links based on role
-        function updateNavLinks() {
-            const navAdmin = document.getElementById('navAdmin');
-            const navOrders = document.getElementById('navOrders');
-
-            // Show Admin link for distributors and superadmins
-            if (userRole === 'distributor' || userRole === 'admin' || userRole === 'superadmin') {
-                navAdmin.style.display = 'flex';
-            }
-
-            // Update Orders link for admin roles
-            if (userRole === 'distributor' || userRole === 'admin' || userRole === 'superadmin') {
-                navOrders.href = '/admin.html#orders';
-            }
-        }
+        // Set user name
+        document.getElementById('user-name').textContent = user?.name?.split(' ')[0] || 'Farmer';
 
         // Mobile menu toggle
-        const mobileMenuBtn = document.getElementById('mobileMenuBtn');
-        const navLinks = document.getElementById('navLinks');
-
-        if (mobileMenuBtn) {
-            mobileMenuBtn.addEventListener('click', function() {
-                navLinks.classList.toggle('active');
-                mobileMenuBtn.classList.toggle('active');
-            });
-        }
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            document.getElementById('sidebar').classList.toggle('open');
+        });
 
         // Logout
-        document.getElementById('logoutBtn').addEventListener('click', function(e) {
+        document.getElementById('logout-btn').addEventListener('click', (e) => {
             e.preventDefault();
             localStorage.removeItem('token');
             localStorage.removeItem('user');
-            localStorage.removeItem('viewAsRole');
-            window.location.href = '/login.html';
+            window.location.href = 'login.html';
         });
+
+        // Load dashboard data
+        async function loadDashboard() {
+            try {
+                // Load profile
+                const profileRes = await fetch(`${API_URL}/profile`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const profileData = await profileRes.json();
+
+                if (profileData.success) {
+                    const profile = profileData.data.profile;
+                    document.getElementById('stat-acres').textContent = profile.acres || 0;
+                    document.getElementById('stat-crops').textContent = profile.crops?.length || 0;
+
+                    // Show profile alert if not complete
+                    if (!profile.acres || !profile.crops?.length) {
+                        document.getElementById('profile-alert').style.display = 'block';
+                    }
+                }
+
+                // Load orders
+                const ordersRes = await fetch(`${API_URL}/orders/mine`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const ordersData = await ordersRes.json();
+
+                if (ordersData.success) {
+                    const orders = ordersData.data.orders;
+                    document.getElementById('stat-orders').textContent = orders.length;
+
+                    const totalSpent = orders
+                        .filter(o => o.paymentStatus === 'paid')
+                        .reduce((sum, o) => sum + o.total, 0);
+                    document.getElementById('stat-spent').textContent = `$${totalSpent.toFixed(2)}`;
+
+                    // Show recent orders
+                    if (orders.length > 0) {
+                        const recentOrders = orders.slice(0, 5);
+                        document.getElementById('recent-orders').innerHTML = recentOrders.map(order => `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: var(--space-md) 0; border-bottom: 1px solid var(--gray-200);">
+                                <div>
+                                    <strong>${order.orderNumber}</strong>
+                                    <p class="text-sm text-muted" style="margin: 0;">${new Date(order.createdAt).toLocaleDateString()}</p>
+                                </div>
+                                <div style="text-align: right;">
+                                    <span class="badge badge-${getStatusColor(order.status)}">${order.status}</span>
+                                    <p class="text-sm font-medium" style="margin: var(--space-xs) 0 0;">$${order.total.toFixed(2)}</p>
+                                </div>
+                            </div>
+                        `).join('');
+                    }
+                }
+            } catch (error) {
+                console.error('Dashboard error:', error);
+            }
+        }
+
+        function getStatusColor(status) {
+            const colors = {
+                'pending': 'warning',
+                'paid': 'info',
+                'processing': 'info',
+                'shipped': 'info',
+                'delivered': 'success',
+                'cancelled': 'error',
+                'refunded': 'gray'
+            };
+            return colors[status] || 'gray';
+        }
+
+        // Load on page ready
+        loadDashboard();
     </script>
 </body>
 </html>

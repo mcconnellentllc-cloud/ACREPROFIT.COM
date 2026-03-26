@@ -3,999 +3,456 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Calculate your spray program order">
-    <title>Spray Program Calculator - Acre Profit</title>
+    <meta name="description" content="Calculate your spray program - AcreProfit product calculator">
+    <title>Product Calculator - AcreProfit</title>
+
+    <meta name="theme-color" content="#16a34a">
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="logo">
-                <img src="logo.svg" alt="Acre Profit">
-            </a>
-            <ul class="nav-links">
-                <li><a href="/dashboard.html">Dashboard</a></li>
-                <li><a href="/calculator.html" class="active">New Order</a></li>
-                <li><a href="/merch.html">Merch</a></li>
-                <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
-            </ul>
-        </div>
-    </nav>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-inner">
+                <a href="index.html" class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>AcreProfit</span>
+                </a>
 
-    <main class="calculator-page">
-        <div class="container">
-            <div class="calculator-header">
-                <h1>Create Your Order</h1>
-                <p>Select your crop and spray program, then customize your rates.</p>
+                <nav class="nav" id="main-nav">
+                    <a href="shop.html" class="nav-link">Shop Products</a>
+                    <a href="calculator.html" class="nav-link active">Calculator</a>
+                    <a href="cart.html" class="nav-link">Cart (<span id="cart-count">0</span>)</a>
+                </nav>
+
+                <div class="nav-actions">
+                    <a href="dashboard.html" class="btn btn-secondary" id="dashboard-btn">Dashboard</a>
+                </div>
+
+                <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
             </div>
+        </header>
 
-            <div class="calculator-content">
-                <!-- Step 1: Crop Selection -->
-                <div class="calc-section" id="step1">
-                    <div class="step-header">
-                        <span class="step-num">1</span>
-                        <h2>Select Your Crop</h2>
-                    </div>
-
-                    <div class="crop-grid">
-                        <label class="crop-card">
-                            <input type="radio" name="crop" value="corn">
-                            <div class="crop-content">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/></svg>
-                                <span>Corn</span>
-                            </div>
-                        </label>
-                        <label class="crop-card">
-                            <input type="radio" name="crop" value="soybeans">
-                            <div class="crop-content">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22a7 7 0 0 0 7-7c0-2-1-3.9-3-5.5s-3.5-4-4-6.5c-.5 2.5-2 4.9-4 6.5C6 11.1 5 13 5 15a7 7 0 0 0 7 7z"/></svg>
-                                <span>Soybeans</span>
-                            </div>
-                        </label>
-                        <label class="crop-card">
-                            <input type="radio" name="crop" value="wheat">
-                            <div class="crop-content">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><path d="M6 8l6-6 6 6"/><path d="M6 14l6-6 6 6"/></svg>
-                                <span>Wheat</span>
-                            </div>
-                        </label>
-                        <label class="crop-card">
-                            <input type="radio" name="crop" value="sorghum">
-                            <div class="crop-content">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v20"/><circle cx="12" cy="6" r="4"/></svg>
-                                <span>Sorghum</span>
-                            </div>
-                        </label>
-                        <label class="crop-card">
-                            <input type="radio" name="crop" value="dryland-corn">
-                            <div class="crop-content">
-                                <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 20h10"/><path d="M10 20c5.5-2.5.8-6.4 3-10"/><path d="M9.5 9.4c1.1.8 1.8 2.2 2.3 3.7-2 .4-3.5.4-4.8-.3-1.2-.6-2.3-1.9-3-4.2 2.8-.5 4.4 0 5.5.8z"/><path d="M14.1 6a7 7 0 0 0-1.1 4c1.9-.1 3.3-.6 4.3-1.4 1-1 1.6-2.3 1.7-4.6-2.7.1-4 1-4.9 2z"/><line x1="4" y1="22" x2="20" y2="22" stroke-dasharray="2,2"/></svg>
-                                <span>Dryland Corn</span>
-                            </div>
-                        </label>
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <div class="dashboard-header">
+                    <div>
+                        <h1>Product Calculator</h1>
+                        <p class="text-muted">Enter your farm details to get personalized product recommendations</p>
                     </div>
                 </div>
 
-                <!-- Step 2: Acres Input -->
-                <div class="calc-section" id="step2" style="display: none;">
-                    <div class="step-header">
-                        <span class="step-num">2</span>
-                        <h2>How Many Acres?</h2>
-                    </div>
-
-                    <div class="acres-input-wrapper">
-                        <div class="form-group">
-                            <label for="acresInput">Total Acres for This Crop</label>
-                            <div class="input-with-suffix">
-                                <input type="number" id="acresInput" min="1" placeholder="500">
-                                <span class="suffix">acres</span>
+                <div class="grid grid-2" style="gap: var(--space-2xl);">
+                    <!-- Input Form -->
+                    <div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Farm Details</h3>
                             </div>
-                        </div>
-                        <div class="form-group" style="margin-top: 1rem;">
-                            <label for="sprayVolumeInput">Spray Rate (GPA)</label>
-                            <div class="input-with-suffix">
-                                <input type="number" id="sprayVolumeInput" min="5" max="30" value="10" step="1">
-                                <span class="suffix">gal/acre</span>
-                            </div>
-                            <span class="field-note" style="font-size: 0.85rem; color: #666; margin-top: 0.25rem; display: block;">Used to calculate Hydrovant (0.1% of spray volume)</span>
-                        </div>
-                    </div>
-                </div>
+                            <div class="card-body">
+                                <form id="calculator-form">
+                                    <div class="form-group">
+                                        <label class="form-label required" for="total-acres">Total Acres</label>
+                                        <input
+                                            type="number"
+                                            id="total-acres"
+                                            class="form-input"
+                                            placeholder="e.g., 500"
+                                            min="1"
+                                            required
+                                        >
+                                    </div>
 
-                <!-- Step 3: Program Selection -->
-                <div class="calc-section" id="step3" style="display: none;">
-                    <div class="step-header">
-                        <span class="step-num">3</span>
-                        <h2>Select Your Spray Program</h2>
-                    </div>
+                                    <div id="crops-container">
+                                        <div class="form-group">
+                                            <label class="form-label">Crops</label>
+                                            <div class="crop-row" style="display: flex; gap: var(--space-md); margin-bottom: var(--space-sm);">
+                                                <select class="form-select crop-select" style="flex: 1;">
+                                                    <option value="">Select crop</option>
+                                                    <option value="corn">Corn</option>
+                                                    <option value="soybeans">Soybeans</option>
+                                                    <option value="wheat">Wheat</option>
+                                                    <option value="cotton">Cotton</option>
+                                                    <option value="rice">Rice</option>
+                                                    <option value="sorghum">Sorghum</option>
+                                                    <option value="alfalfa">Alfalfa</option>
+                                                    <option value="hay">Hay/Pasture</option>
+                                                    <option value="other">Other</option>
+                                                </select>
+                                                <input
+                                                    type="number"
+                                                    class="form-input crop-acres"
+                                                    placeholder="Acres"
+                                                    min="1"
+                                                    style="width: 120px;"
+                                                >
+                                                <button type="button" class="btn btn-secondary btn-icon remove-crop" style="display: none;">
+                                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                                        <line x1="18" y1="6" x2="6" y2="18"/>
+                                                        <line x1="6" y1="6" x2="18" y2="18"/>
+                                                    </svg>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
 
-                    <div class="program-grid" id="programGrid">
-                        <!-- Programs loaded dynamically -->
-                    </div>
-                </div>
+                                    <button type="button" class="btn btn-secondary mb-lg" id="add-crop-btn">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 18px; height: 18px;">
+                                            <line x1="12" y1="5" x2="12" y2="19"/>
+                                            <line x1="5" y1="12" x2="19" y2="12"/>
+                                        </svg>
+                                        Add Another Crop
+                                    </button>
 
-                <!-- Step 4: Customize Rates -->
-                <div class="calc-section" id="step4" style="display: none;">
-                    <div class="step-header">
-                        <span class="step-num">4</span>
-                        <h2>Customize Your Rates</h2>
-                    </div>
-
-                    <p class="section-note">Adjust rates as needed. Default rates shown are our recommended amounts.</p>
-
-                    <div id="chemicalsContainer" class="chemicals-list">
-                        <!-- Chemicals loaded dynamically -->
-                    </div>
-                </div>
-
-                <!-- Step 5: Additional Products -->
-                <div class="calc-section" id="step5" style="display: none;">
-                    <div class="step-header">
-                        <span class="step-num">5</span>
-                        <h2>Additional Products (Optional)</h2>
-                    </div>
-
-                    <div class="additional-products">
-                        <div class="product-option">
-                            <div class="product-header">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="addHydrovant">
-                                    <span>Hydrovant</span>
-                                </label>
-                                <span class="product-pricing">$125-165/gal (volume pricing)</span>
-                            </div>
-                            <div class="product-qty" id="hydrovantQty" style="display: none;">
-                                <label>Gallons:</label>
-                                <input type="number" id="hydrovantGallons" min="1" value="1">
-                                <span class="price-tier" id="hydrovantPrice">$165/gal</span>
+                                    <button type="submit" class="btn btn-primary btn-block btn-lg">
+                                        Calculate Recommendations
+                                    </button>
+                                </form>
                             </div>
                         </div>
 
-                        <div class="product-option">
-                            <div class="product-header">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="addMultiseal">
-                                    <span>Multi Seal</span>
-                                </label>
-                                <span class="product-pricing">$300/bucket</span>
+                        <!-- Quick Reference -->
+                        <div class="card mt-lg">
+                            <div class="card-header">
+                                <h3>Quick Reference</h3>
                             </div>
-                            <div class="product-qty" id="multisealQty" style="display: none;">
-                                <label>Buckets:</label>
-                                <input type="number" id="multisealBuckets" min="1" value="1">
-                            </div>
-                        </div>
-
-                        <div class="product-option">
-                            <div class="product-header">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="addPump">
-                                    <span>Pump</span>
-                                </label>
-                                <span class="product-pricing">$130/each</span>
-                            </div>
-                            <div class="product-qty" id="pumpQty" style="display: none;">
-                                <label>Quantity:</label>
-                                <input type="number" id="pumpCount" min="1" value="1">
+                            <div class="card-body">
+                                <p class="text-sm text-muted">Common application rates:</p>
+                                <ul style="font-size: 0.875rem; color: var(--gray-600); padding-left: var(--space-lg);">
+                                    <li style="margin-bottom: 0.5rem;">Roundup/Glyphosate: 32-48 oz/acre</li>
+                                    <li style="margin-bottom: 0.5rem;">2,4-D: 16-32 oz/acre</li>
+                                    <li style="margin-bottom: 0.5rem;">Atrazine: 1-2 qt/acre</li>
+                                    <li style="margin-bottom: 0.5rem;">Crop Oil: 1-2% v/v (1-2 gal/100 gal)</li>
+                                </ul>
                             </div>
                         </div>
+                    </div>
 
-                        <div class="product-option pivot-bio">
-                            <div class="product-header">
-                                <label class="checkbox-label">
-                                    <input type="checkbox" id="addPivotBio">
-                                    <span>Pivot Bio</span>
-                                </label>
-                                <a href="https://www.pivotbio.com/" target="_blank" class="product-link">Learn More</a>
+                    <!-- Results -->
+                    <div>
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>Recommended Products</h3>
                             </div>
-                            <div class="product-qty" id="pivotBioQty" style="display: none;">
-                                <div class="form-group">
-                                    <label>Acres:</label>
-                                    <input type="number" id="pivotBioAcres" min="1">
-                                </div>
-                                <div class="form-group">
-                                    <label>Crop:</label>
-                                    <select id="pivotBioCrop">
-                                        <option value="corn">Corn</option>
-                                        <option value="sorghum">Sorghum</option>
-                                    </select>
+                            <div class="card-body" id="results-container">
+                                <div class="empty-state" style="padding: var(--space-xl) 0;">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                        <rect x="4" y="2" width="16" height="20" rx="2"/>
+                                        <line x1="8" y1="6" x2="16" y2="6"/>
+                                        <line x1="8" y1="10" x2="16" y2="10"/>
+                                        <line x1="8" y1="14" x2="12" y2="14"/>
+                                    </svg>
+                                    <h4>Enter your farm details</h4>
+                                    <p class="text-muted">Fill out the form to see product recommendations based on your acres and crops.</p>
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
+            </div>
+        </main>
 
-                <!-- Order Summary -->
-                <div class="calc-section order-summary" id="orderSummary" style="display: none;">
-                    <div class="step-header">
-                        <h2>Order Summary</h2>
-                    </div>
-
-                    <div class="summary-content" id="summaryContent">
-                        <!-- Summary loaded dynamically -->
-                    </div>
-
-                    <div class="summary-totals">
-                        <div class="total-row">
-                            <span>Subtotal</span>
-                            <span id="subtotal">$0.00</span>
-                        </div>
-                        <div class="total-row total-final">
-                            <span>Total</span>
-                            <span id="totalCost">$0.00</span>
-                        </div>
-                        <div class="total-row cost-per-acre">
-                            <span>Cost per Acre</span>
-                            <span id="costPerAcre">$0.00/acre</span>
-                        </div>
-                    </div>
-
-                    <div class="summary-actions">
-                        <button type="button" class="btn btn-outline btn-lg" id="printBtn">
-                            Print Spray Sheet
-                        </button>
-                        <button type="button" class="btn btn-primary btn-lg" id="submitOrderBtn">
-                            Submit Order
-                        </button>
-                    </div>
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+                    <p>&copy; 2024 AcreProfit. All rights reserved.</p>
                 </div>
             </div>
-        </div>
-    </main>
-
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
-                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
-            </div>
-        </div>
-    </footer>
+        </footer>
+    </div>
 
     <script>
-        const API_URL = 'https://acreprofit-com.onrender.com';
+        // API Configuration
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : '/api';
 
-        // Check auth
+        // Check auth status
         const token = localStorage.getItem('token');
-        const user = localStorage.getItem('user');
-
-        if (!token || !user) {
-            window.location.href = '/login.html';
+        if (!token) {
+            document.getElementById('dashboard-btn').textContent = 'Sign In';
+            document.getElementById('dashboard-btn').href = 'login.html';
         }
 
-        const userData = JSON.parse(user);
+        // Cart management
+        let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        updateCartCount();
 
-        // Logout handler
-        document.getElementById('logoutBtn').addEventListener('click', function(e) {
-            e.preventDefault();
-            localStorage.removeItem('token');
-            localStorage.removeItem('user');
-            window.location.href = '/';
+        function updateCartCount() {
+            const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+            document.getElementById('cart-count').textContent = count;
+        }
+
+        // Mobile menu
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            document.getElementById('main-nav').classList.toggle('open');
         });
 
-        // Spray programs data
-        const sprayPrograms = {
-            corn: {
-                '2-pass': {
-                    name: '2-Pass Corn Program',
-                    description: 'Pre-emerge + Post-emerge',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Atrazine', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 12 },
-                        { name: 'Metolachlor', defaultRate: 1.3, unit: 'pt/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 18 },
-                        { name: 'Dicamba', defaultRate: 8, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85 }
-                    ]
-                },
-                '3-pass': {
-                    name: '3-Pass Corn Program',
-                    description: 'Pre-emerge + Early Post + Late Post',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Atrazine', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 12 },
-                        { name: 'Metolachlor', defaultRate: 1.3, unit: 'pt/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 18 },
-                        { name: 'Dicamba', defaultRate: 8, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85 },
-                        { name: 'Status', defaultRate: 5, unit: 'oz/acre', packageSize: 64, packageUnit: 'oz jug', pricePerUnit: 220 },
-                        { name: '2,4-D', defaultRate: 16, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 35 }
-                    ]
-                }
-            },
-            soybeans: {
-                '2-pass': {
-                    name: '2-Pass Soybean Program',
-                    description: 'Pre-emerge + Post-emerge',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Metribuzin', defaultRate: 6, unit: 'oz/acre', packageSize: 5, packageUnit: 'lb jug', pricePerUnit: 125 },
-                        { name: 'Flumioxazin', defaultRate: 3, unit: 'oz/acre', packageSize: 51, packageUnit: 'oz jug', pricePerUnit: 350 },
-                        { name: 'Clethodim', defaultRate: 6, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 65 }
-                    ]
-                },
-                '3-pass': {
-                    name: '3-Pass Soybean Program',
-                    description: 'Burndown + Pre-emerge + Post-emerge',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Metribuzin', defaultRate: 6, unit: 'oz/acre', packageSize: 5, packageUnit: 'lb jug', pricePerUnit: 125 },
-                        { name: 'Flumioxazin', defaultRate: 3, unit: 'oz/acre', packageSize: 51, packageUnit: 'oz jug', pricePerUnit: 350 },
-                        { name: 'Clethodim', defaultRate: 6, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 65 },
-                        { name: '2,4-D Ester', defaultRate: 16, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 38 },
-                        { name: 'Paraquat', defaultRate: 32, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 55 }
-                    ]
-                }
-            },
-            wheat: {
-                '2-pass': {
-                    name: '2-Pass Wheat Program',
-                    description: 'Fall + Spring applications',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 24, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Huskie', defaultRate: 13.5, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 185 },
-                        { name: '2,4-D Amine', defaultRate: 16, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 32 }
-                    ]
-                }
-            },
-            sorghum: {
-                '2-pass': {
-                    name: '2-Pass Sorghum Program',
-                    description: 'Pre-emerge + Post-emerge',
-                    chemicals: [
-                        { name: 'Atrazine', defaultRate: 32, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 12 },
-                        { name: 'Metolachlor', defaultRate: 1.3, unit: 'pt/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 18 },
-                        { name: 'Dicamba', defaultRate: 8, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85 }
-                    ]
-                }
-            },
-            'dryland-corn': {
-                'preplant': {
-                    name: 'Option 1 - Corn Preplant',
-                    description: '30 days pre-plant - wheat stubble with atrazine & valor',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 22, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Valor SX', defaultRate: 3, unit: 'oz/acre', packageSize: 5, packageUnit: 'lb jug', pricePerUnit: 72 },
-                        { name: 'Atrazine', defaultRate: 1, unit: 'lb/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 12 },
-                        { name: 'Hydrovant', defaultRate: 0.1, unit: '% v/v', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 145, isAdjuvant: true }
-                    ]
-                },
-                'post-plant-pre-emerge': {
-                    name: 'Option 2 - Corn Post Plant Pre-Emerge',
-                    description: 'Post plant pre-emerge - fall atrazine already applied',
-                    chemicals: [
-                        { name: 'Glyphosate', defaultRate: 22, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
-                        { name: 'Mesotrione', defaultRate: 6, unit: 'oz/acre', packageSize: 1, packageUnit: 'gal jug', pricePerUnit: 280 },
-                        { name: 'Dicamba', defaultRate: 4, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 85 },
-                        { name: 'Anthem Max', defaultRate: 3, unit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 175 },
-                        { name: 'Hydrovant', defaultRate: 0.1, unit: '% v/v', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 145, isAdjuvant: true }
-                    ]
-                }
-            }
-        };
+        // Add crop row
+        document.getElementById('add-crop-btn').addEventListener('click', () => {
+            const container = document.getElementById('crops-container');
+            const rows = container.querySelectorAll('.crop-row');
 
-        let selectedCrop = null;
-        let selectedProgram = null;
-        let selectedAcres = 0;
-        let sprayVolume = 10; // Default GPA
-        let customRates = {};
+            // Show remove buttons on all rows
+            rows.forEach(row => {
+                row.querySelector('.remove-crop').style.display = 'flex';
+            });
 
-        // Step 1: Crop selection
-        document.querySelectorAll('input[name="crop"]').forEach(input => {
-            input.addEventListener('change', function() {
-                selectedCrop = this.value;
-                document.getElementById('step2').style.display = 'block';
+            const newRow = document.createElement('div');
+            newRow.className = 'crop-row';
+            newRow.style.cssText = 'display: flex; gap: var(--space-md); margin-bottom: var(--space-sm);';
+            newRow.innerHTML = `
+                <select class="form-select crop-select" style="flex: 1;">
+                    <option value="">Select crop</option>
+                    <option value="corn">Corn</option>
+                    <option value="soybeans">Soybeans</option>
+                    <option value="wheat">Wheat</option>
+                    <option value="cotton">Cotton</option>
+                    <option value="rice">Rice</option>
+                    <option value="sorghum">Sorghum</option>
+                    <option value="alfalfa">Alfalfa</option>
+                    <option value="hay">Hay/Pasture</option>
+                    <option value="other">Other</option>
+                </select>
+                <input
+                    type="number"
+                    class="form-input crop-acres"
+                    placeholder="Acres"
+                    min="1"
+                    style="width: 120px;"
+                >
+                <button type="button" class="btn btn-secondary btn-icon remove-crop">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="18" y1="6" x2="6" y2="18"/>
+                        <line x1="6" y1="6" x2="18" y2="18"/>
+                    </svg>
+                </button>
+            `;
 
-                // Pre-fill acres from user data if available
-                if (userData.farm && userData.farm.acres) {
-                    document.getElementById('acresInput').value = userData.farm.acres;
+            container.querySelector('.form-group').appendChild(newRow);
+
+            // Add remove listener
+            newRow.querySelector('.remove-crop').addEventListener('click', () => {
+                newRow.remove();
+                const remaining = container.querySelectorAll('.crop-row');
+                if (remaining.length === 1) {
+                    remaining[0].querySelector('.remove-crop').style.display = 'none';
                 }
-
-                document.getElementById('step2').scrollIntoView({ behavior: 'smooth', block: 'start' });
             });
         });
 
-        // Step 2: Acres input
-        document.getElementById('acresInput').addEventListener('input', function() {
-            selectedAcres = parseInt(this.value) || 0;
-            if (selectedAcres > 0 && selectedCrop) {
-                loadPrograms();
-                document.getElementById('step3').style.display = 'block';
+        // Remove crop listener for first row
+        document.querySelector('.remove-crop').addEventListener('click', function() {
+            const container = document.getElementById('crops-container');
+            const rows = container.querySelectorAll('.crop-row');
+            if (rows.length > 1) {
+                this.closest('.crop-row').remove();
+                const remaining = container.querySelectorAll('.crop-row');
+                if (remaining.length === 1) {
+                    remaining[0].querySelector('.remove-crop').style.display = 'none';
+                }
             }
         });
 
-        // Spray volume (GPA) input
-        document.getElementById('sprayVolumeInput').addEventListener('input', function() {
-            sprayVolume = parseFloat(this.value) || 10;
-        });
+        // Form submission
+        document.getElementById('calculator-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
 
-        // Load programs for selected crop
-        function loadPrograms() {
-            const programs = sprayPrograms[selectedCrop];
-            const grid = document.getElementById('programGrid');
+            const totalAcres = parseInt(document.getElementById('total-acres').value);
+            const cropRows = document.querySelectorAll('.crop-row');
+            const crops = [];
 
-            if (!programs) {
-                grid.innerHTML = '<p>No programs available for this crop.</p>';
+            cropRows.forEach(row => {
+                const cropSelect = row.querySelector('.crop-select');
+                const acresInput = row.querySelector('.crop-acres');
+
+                if (cropSelect.value && acresInput.value) {
+                    crops.push({
+                        name: cropSelect.value,
+                        acres: parseInt(acresInput.value)
+                    });
+                }
+            });
+
+            if (!totalAcres) {
+                alert('Please enter your total acres');
                 return;
             }
 
-            grid.innerHTML = Object.entries(programs).map(([key, program]) => `
-                <label class="program-card">
-                    <input type="radio" name="program" value="${key}">
-                    <div class="program-content">
-                        <h3>${program.name}</h3>
-                        <p>${program.description}</p>
-                        <span class="chemical-count">${program.chemicals.length} chemicals</span>
+            // If logged in, use profile-based calculator
+            if (token) {
+                // Save profile and get recommendations
+                try {
+                    await fetch(`${API_URL}/profile`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify({ acres: totalAcres, crops })
+                    });
+
+                    const response = await fetch(`${API_URL}/calculator`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    const data = await response.json();
+
+                    if (data.success) {
+                        renderRecommendations(data.data.recommendations);
+                    } else {
+                        renderBasicRecommendations(totalAcres, crops);
+                    }
+                } catch (error) {
+                    console.error('Calculator error:', error);
+                    renderBasicRecommendations(totalAcres, crops);
+                }
+            } else {
+                renderBasicRecommendations(totalAcres, crops);
+            }
+        });
+
+        function renderRecommendations(recommendations) {
+            const container = document.getElementById('results-container');
+
+            if (!recommendations || recommendations.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state" style="padding: var(--space-xl) 0;">
+                        <h4>No specific recommendations</h4>
+                        <p class="text-muted">Browse our full product catalog to find what you need.</p>
+                        <a href="shop.html" class="btn btn-primary">Shop All Products</a>
                     </div>
-                </label>
-            `).join('');
+                `;
+                return;
+            }
 
-            // Add event listeners
-            grid.querySelectorAll('input[name="program"]').forEach(input => {
-                input.addEventListener('change', function() {
-                    selectedProgram = this.value;
-                    loadChemicals();
-                    document.getElementById('step4').style.display = 'block';
-                    document.getElementById('step5').style.display = 'block';
-                    document.getElementById('step4').scrollIntoView({ behavior: 'smooth', block: 'start' });
-                });
-            });
-        }
-
-        // Load chemicals for selected program
-        function loadChemicals() {
-            const program = sprayPrograms[selectedCrop][selectedProgram];
-            const container = document.getElementById('chemicalsContainer');
-
-            container.innerHTML = program.chemicals.map((chem, index) => {
-                customRates[index] = chem.defaultRate;
+            let totalCost = 0;
+            const html = recommendations.map(rec => {
+                totalCost += rec.estimatedCost;
                 return `
-                    <div class="chemical-row">
-                        <div class="chemical-info">
-                            <h4>${chem.name}</h4>
-                            <span class="package-info">${chem.packageSize} ${chem.packageUnit}</span>
+                    <div style="padding: var(--space-md); border: 1px solid var(--gray-200); border-radius: var(--radius-md); margin-bottom: var(--space-md);">
+                        <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: var(--space-sm);">
+                            <div>
+                                <span class="badge badge-gray">${rec.crop}</span>
+                                <h4 style="margin: var(--space-xs) 0 0;">${rec.product.name}</h4>
+                            </div>
+                            <span class="font-bold" style="color: var(--primary);">$${rec.estimatedCost.toFixed(2)}</span>
                         </div>
-                        <div class="chemical-rate">
-                            <input type="number" class="rate-input" data-index="${index}"
-                                   value="${chem.defaultRate}" min="0" step="0.1">
-                            <span class="rate-unit">${chem.unit}</span>
-                        </div>
-                        <div class="chemical-calc">
-                            <span class="calc-packages" id="packages-${index}">0</span>
-                            <span class="calc-label">${chem.packageUnit}s needed</span>
-                        </div>
+                        <p class="text-sm text-muted" style="margin: 0 0 var(--space-sm);">
+                            ${rec.unitsNeeded} x ${rec.recommendedPackage.volume} ${rec.recommendedPackage.unit}
+                            @ $${rec.recommendedPackage.price.toFixed(2)} each
+                        </p>
+                        <p class="text-sm" style="margin: 0;">
+                            For ${rec.cropAcres} acres at ${rec.product.applicationRate?.min || 'recommended'} ${rec.product.applicationRate?.unit || 'rate'}
+                        </p>
+                        <a href="product.html?id=${rec.product._id}" class="btn btn-sm btn-outline mt-sm">View Product</a>
                     </div>
                 `;
             }).join('');
 
-            // Add rate change listeners
-            container.querySelectorAll('.rate-input').forEach(input => {
-                input.addEventListener('input', function() {
-                    const index = parseInt(this.dataset.index);
-                    customRates[index] = parseFloat(this.value) || 0;
-                    calculateOrder();
-                });
-            });
-
-            calculateOrder();
+            container.innerHTML = `
+                ${html}
+                <div style="border-top: 2px solid var(--gray-200); padding-top: var(--space-lg); margin-top: var(--space-lg);">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <span class="font-bold">Estimated Total:</span>
+                        <span class="text-xl font-bold" style="color: var(--primary);">$${totalCost.toFixed(2)}</span>
+                    </div>
+                </div>
+            `;
         }
 
-        // Additional products handlers
-        document.getElementById('addHydrovant').addEventListener('change', function() {
-            document.getElementById('hydrovantQty').style.display = this.checked ? 'flex' : 'none';
-            calculateOrder();
-        });
+        function renderBasicRecommendations(totalAcres, crops) {
+            const container = document.getElementById('results-container');
 
-        document.getElementById('hydrovantGallons').addEventListener('input', function() {
-            const gal = parseInt(this.value) || 0;
-            let price = 165;
-            if (gal >= 61) price = 125;
-            else if (gal >= 10) price = 135;
-            document.getElementById('hydrovantPrice').textContent = `$${price}/gal`;
-            calculateOrder();
-        });
-
-        document.getElementById('addMultiseal').addEventListener('change', function() {
-            document.getElementById('multisealQty').style.display = this.checked ? 'flex' : 'none';
-            calculateOrder();
-        });
-
-        document.getElementById('addPump').addEventListener('change', function() {
-            document.getElementById('pumpQty').style.display = this.checked ? 'flex' : 'none';
-            calculateOrder();
-        });
-
-        document.getElementById('addPivotBio').addEventListener('change', function() {
-            document.getElementById('pivotBioQty').style.display = this.checked ? 'block' : 'none';
-            calculateOrder();
-        });
-
-        // Calculate order
-        function calculateOrder() {
-            if (!selectedCrop || !selectedProgram || !selectedAcres) return;
-
-            const program = sprayPrograms[selectedCrop][selectedProgram];
-            let subtotal = 0;
-            let summaryHtml = `<h4>${program.name}</h4><p>${selectedAcres.toLocaleString()} acres</p><table class="summary-table"><thead><tr><th>Product</th><th>Rate</th><th>Packages</th><th>Cost</th></tr></thead><tbody>`;
-
-            program.chemicals.forEach((chem, index) => {
-                const rate = customRates[index] || chem.defaultRate;
-                const totalNeeded = calculateTotalNeeded(rate, chem.unit, selectedAcres);
-                const packages = Math.ceil(totalNeeded / chem.packageSize);
-                const cost = packages * chem.pricePerUnit * chem.packageSize;
-
-                document.getElementById(`packages-${index}`).textContent = packages;
-
-                subtotal += cost;
-                summaryHtml += `<tr><td>${chem.name}</td><td>${rate} ${chem.unit}</td><td>${packages} ${chem.packageUnit}${packages > 1 ? 's' : ''}</td><td>$${cost.toLocaleString()}</td></tr>`;
-            });
-
-            // Additional products
-            if (document.getElementById('addHydrovant').checked) {
-                const gal = parseInt(document.getElementById('hydrovantGallons').value) || 0;
-                let price = 165;
-                if (gal >= 61) price = 125;
-                else if (gal >= 10) price = 135;
-                const cost = gal * price;
-                subtotal += cost;
-                summaryHtml += `<tr><td>Hydrovant</td><td>-</td><td>${gal} gal</td><td>$${cost.toLocaleString()}</td></tr>`;
-            }
-
-            if (document.getElementById('addMultiseal').checked) {
-                const buckets = parseInt(document.getElementById('multisealBuckets').value) || 0;
-                const cost = buckets * 300;
-                subtotal += cost;
-                summaryHtml += `<tr><td>Multi Seal</td><td>-</td><td>${buckets} bucket${buckets > 1 ? 's' : ''}</td><td>$${cost.toLocaleString()}</td></tr>`;
-            }
-
-            if (document.getElementById('addPump').checked) {
-                const pumps = parseInt(document.getElementById('pumpCount').value) || 0;
-                const cost = pumps * 130;
-                subtotal += cost;
-                summaryHtml += `<tr><td>Pump</td><td>-</td><td>${pumps}</td><td>$${cost.toLocaleString()}</td></tr>`;
-            }
-
-            summaryHtml += '</tbody></table>';
-
-            document.getElementById('summaryContent').innerHTML = summaryHtml;
-            document.getElementById('subtotal').textContent = `$${subtotal.toLocaleString()}`;
-            document.getElementById('totalCost').textContent = `$${subtotal.toLocaleString()}`;
-            document.getElementById('costPerAcre').textContent = `$${(subtotal / selectedAcres).toFixed(2)}/acre`;
-
-            document.getElementById('orderSummary').style.display = 'block';
-        }
-
-        function calculateTotalNeeded(rate, unit, acres) {
-            // Convert to gallons for shuttle calculations
-            if (unit.includes('oz/acre')) {
-                return (rate * acres) / 128; // oz to gallons
-            } else if (unit.includes('pt/acre')) {
-                return (rate * acres) / 8; // pints to gallons
-            }
-            return rate * acres;
-        }
-
-        // Print spray sheet
-        document.getElementById('printBtn').addEventListener('click', function() {
-            // Store order data for spray sheet
-            const orderData = {
-                crop: selectedCrop,
-                program: selectedProgram,
-                acres: selectedAcres,
-                chemicals: sprayPrograms[selectedCrop][selectedProgram].chemicals.map((chem, i) => ({
-                    ...chem,
-                    rate: customRates[i]
-                })),
-                additionalProducts: {
-                    hydrovant: document.getElementById('addHydrovant').checked ? parseInt(document.getElementById('hydrovantGallons').value) : 0,
-                    multiseal: document.getElementById('addMultiseal').checked ? parseInt(document.getElementById('multisealBuckets').value) : 0,
-                    pump: document.getElementById('addPump').checked ? parseInt(document.getElementById('pumpCount').value) : 0
-                }
-            };
-            localStorage.setItem('currentOrder', JSON.stringify(orderData));
-            window.open('/spray-sheet.html', '_blank');
-        });
-
-        // Submit order
-        document.getElementById('submitOrderBtn').addEventListener('click', async function() {
-            const btn = this;
-            btn.disabled = true;
-            btn.textContent = 'Submitting...';
-
-            const orderData = {
-                crop: selectedCrop,
-                program: selectedProgram,
-                acres: selectedAcres,
-                chemicals: sprayPrograms[selectedCrop][selectedProgram].chemicals.map((chem, i) => ({
-                    name: chem.name,
-                    rate: customRates[i],
-                    unit: chem.unit,
-                    packageSize: chem.packageSize,
-                    packageUnit: chem.packageUnit
-                })),
-                additionalProducts: {
-                    hydrovant: document.getElementById('addHydrovant').checked ? parseInt(document.getElementById('hydrovantGallons').value) : 0,
-                    multiseal: document.getElementById('addMultiseal').checked ? parseInt(document.getElementById('multisealBuckets').value) : 0,
-                    pump: document.getElementById('addPump').checked ? parseInt(document.getElementById('pumpCount').value) : 0
+            // Calculate basic estimates
+            const estimates = [
+                {
+                    name: 'Glyphosate (Roundup)',
+                    rate: 44, // oz per acre
+                    unit: 'oz',
+                    pricePerGal: 32,
+                    ozPerGal: 128
                 },
-                totalCost: parseFloat(document.getElementById('totalCost').textContent.replace(/[$,]/g, ''))
-            };
-
-            try {
-                const response = await fetch(`${API_URL}/api/orders`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(orderData)
-                });
-
-                const result = await response.json();
-
-                if (!response.ok) {
-                    throw new Error(result.error || 'Failed to submit order');
+                {
+                    name: 'Crop Oil Concentrate',
+                    rate: 1.5, // % of spray solution, roughly 1 gal per 100 gal spray
+                    unit: 'gal per 100 acres',
+                    pricePerGal: 15,
+                    galPer100: 2
+                },
+                {
+                    name: 'Ammonium Sulfate',
+                    rate: 17, // lbs per 100 gal
+                    unit: 'lbs per 100 acres',
+                    pricePer50lb: 25,
+                    lbsPer100: 17
                 }
+            ];
 
-                alert('Order submitted successfully!');
-                window.location.href = '/dashboard.html';
-            } catch (error) {
-                alert('Error: ' + error.message);
-                btn.disabled = false;
-                btn.textContent = 'Submit Order';
-            }
-        });
+            let html = `
+                <div class="alert alert-info mb-lg">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"/>
+                        <line x1="12" y1="16" x2="12" y2="12"/>
+                        <line x1="12" y1="8" x2="12.01" y2="8"/>
+                    </svg>
+                    <span>These are general estimates. <a href="login.html">Sign in</a> for personalized recommendations based on our current inventory.</span>
+                </div>
+
+                <h4 style="margin-bottom: var(--space-md);">For ${totalAcres} acres:</h4>
+            `;
+
+            // Glyphosate estimate
+            const glyphGal = Math.ceil((totalAcres * 44) / 128);
+            html += `
+                <div style="padding: var(--space-md); border: 1px solid var(--gray-200); border-radius: var(--radius-md); margin-bottom: var(--space-md);">
+                    <h4 style="margin: 0 0 var(--space-xs);">Glyphosate (Generic Roundup)</h4>
+                    <p class="text-muted" style="margin: 0;">Est. ${glyphGal} gallons needed @ 44 oz/acre</p>
+                </div>
+            `;
+
+            // Crop oil estimate
+            const cropOilGal = Math.ceil(totalAcres / 50);
+            html += `
+                <div style="padding: var(--space-md); border: 1px solid var(--gray-200); border-radius: var(--radius-md); margin-bottom: var(--space-md);">
+                    <h4 style="margin: 0 0 var(--space-xs);">Crop Oil Concentrate</h4>
+                    <p class="text-muted" style="margin: 0;">Est. ${cropOilGal} gallons needed @ 1% spray solution</p>
+                </div>
+            `;
+
+            // AMS estimate
+            const amsBags = Math.ceil((totalAcres * 17) / 50 / 100);
+            html += `
+                <div style="padding: var(--space-md); border: 1px solid var(--gray-200); border-radius: var(--radius-md); margin-bottom: var(--space-md);">
+                    <h4 style="margin: 0 0 var(--space-xs);">Ammonium Sulfate (AMS)</h4>
+                    <p class="text-muted" style="margin: 0;">Est. ${amsBags} bags (50 lb) needed @ 17 lbs/100 gal</p>
+                </div>
+            `;
+
+            html += `
+                <div style="margin-top: var(--space-xl);">
+                    <a href="shop.html" class="btn btn-primary btn-block btn-lg">Browse All Products</a>
+                </div>
+            `;
+
+            container.innerHTML = html;
+        }
     </script>
-
-    <style>
-        .calculator-page {
-            padding: 100px 0 60px;
-            background: var(--secondary);
-            min-height: 100vh;
-        }
-
-        .calculator-header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .calculator-header h1 {
-            font-size: 2rem;
-            margin-bottom: 12px;
-        }
-
-        .calculator-header p {
-            color: var(--text-light);
-        }
-
-        .calc-section {
-            background: var(--white);
-            border-radius: var(--radius-lg);
-            padding: 32px;
-            margin-bottom: 24px;
-            box-shadow: var(--shadow);
-        }
-
-        .step-header {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            margin-bottom: 24px;
-        }
-
-        .step-num {
-            width: 36px;
-            height: 36px;
-            background: var(--primary);
-            color: var(--white);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-        }
-
-        .step-header h2 {
-            font-size: 1.25rem;
-            margin: 0;
-        }
-
-        .crop-grid, .program-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
-            gap: 16px;
-        }
-
-        .crop-card, .program-card {
-            cursor: pointer;
-        }
-
-        .crop-card input, .program-card input {
-            display: none;
-        }
-
-        .crop-content, .program-content {
-            padding: 24px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-            text-align: center;
-            border: 2px solid transparent;
-            transition: var(--transition);
-        }
-
-        .crop-card:hover .crop-content,
-        .program-card:hover .program-content {
-            background: #e8e8e0;
-        }
-
-        .crop-card input:checked + .crop-content,
-        .program-card input:checked + .program-content {
-            border-color: var(--primary);
-            background: rgba(45, 90, 39, 0.1);
-        }
-
-        .crop-content svg {
-            color: var(--primary);
-            margin-bottom: 12px;
-        }
-
-        .crop-content span {
-            font-weight: 600;
-        }
-
-        .program-content h3 {
-            font-size: 1rem;
-            margin-bottom: 8px;
-        }
-
-        .program-content p {
-            font-size: 0.875rem;
-            color: var(--text-light);
-            margin-bottom: 8px;
-        }
-
-        .chemical-count {
-            font-size: 0.75rem;
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        .acres-input-wrapper {
-            max-width: 300px;
-        }
-
-        .input-with-suffix {
-            position: relative;
-        }
-
-        .input-with-suffix input {
-            width: 100%;
-            padding: 14px 70px 14px 16px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-
-        .input-with-suffix input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .input-with-suffix .suffix {
-            position: absolute;
-            right: 16px;
-            top: 50%;
-            transform: translateY(-50%);
-            color: var(--text-muted);
-        }
-
-        .section-note {
-            color: var(--text-light);
-            font-size: 0.875rem;
-            margin-bottom: 20px;
-        }
-
-        .chemicals-list {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .chemical-row {
-            display: grid;
-            grid-template-columns: 2fr 1fr 1fr;
-            gap: 20px;
-            align-items: center;
-            padding: 16px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-        }
-
-        .chemical-info h4 {
-            margin-bottom: 4px;
-        }
-
-        .package-info {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .chemical-rate {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .rate-input {
-            width: 80px;
-            padding: 8px 12px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 1rem;
-            text-align: center;
-        }
-
-        .rate-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .rate-unit {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-        }
-
-        .chemical-calc {
-            text-align: right;
-        }
-
-        .calc-packages {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-        }
-
-        .calc-label {
-            display: block;
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .additional-products {
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .product-option {
-            padding: 16px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-        }
-
-        .product-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .checkbox-label {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            cursor: pointer;
-            font-weight: 600;
-        }
-
-        .product-pricing {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-        }
-
-        .product-link {
-            font-size: 0.875rem;
-            color: var(--primary);
-        }
-
-        .product-qty {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            margin-top: 12px;
-            padding-top: 12px;
-            border-top: 1px solid var(--border);
-        }
-
-        .product-qty label {
-            font-size: 0.875rem;
-            color: var(--text-light);
-        }
-
-        .product-qty input, .product-qty select {
-            width: 80px;
-            padding: 8px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-        }
-
-        .price-tier {
-            font-size: 0.875rem;
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        .order-summary {
-            background: var(--white);
-            border: 2px solid var(--primary);
-        }
-
-        .summary-table {
-            width: 100%;
-            border-collapse: collapse;
-            margin-bottom: 24px;
-        }
-
-        .summary-table th, .summary-table td {
-            padding: 12px;
-            text-align: left;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .summary-table th {
-            font-size: 0.75rem;
-            text-transform: uppercase;
-            color: var(--text-muted);
-        }
-
-        .summary-totals {
-            padding: 20px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-            margin-bottom: 24px;
-        }
-
-        .total-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 8px 0;
-        }
-
-        .total-final {
-            font-size: 1.5rem;
-            font-weight: 700;
-            color: var(--primary);
-            border-top: 2px solid var(--border);
-            margin-top: 8px;
-            padding-top: 16px;
-        }
-
-        .cost-per-acre {
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
-        .summary-actions {
-            display: flex;
-            gap: 16px;
-        }
-
-        .summary-actions .btn {
-            flex: 1;
-        }
-
-        @media (max-width: 768px) {
-            .chemical-row {
-                grid-template-columns: 1fr;
-                gap: 12px;
-            }
-
-            .chemical-calc {
-                text-align: left;
-            }
-
-            .summary-actions {
-                flex-direction: column;
-            }
-        }
-    </style>
 </body>
 </html>
