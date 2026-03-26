@@ -1587,6 +1587,7 @@
                                 <th>Qty</th>
                                 <th>Unit</th>
                                 <th class="cost-column">Cost</th>
+                                <th class="cost-column">Admin</th>
                                 <th class="cost-column">Margin</th>
                                 <th>Retail</th>
                                 <th>Available</th>
@@ -1595,7 +1596,7 @@
                             </tr>
                         </thead>
                         <tbody id="inventoryTableBody">
-                            <tr><td colspan="10" class="loading">Loading inventory...</td></tr>
+                            <tr><td colspan="11" class="loading">Loading inventory...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -5315,7 +5316,7 @@
                 updateInventoryStats();
             } catch (error) {
                 console.error('Error loading inventory:', error);
-                document.getElementById('inventoryTableBody').innerHTML = '<tr><td colspan="10" class="empty">Error loading inventory. Please try again.</td></tr>';
+                document.getElementById('inventoryTableBody').innerHTML = '<tr><td colspan="11" class="empty">Error loading inventory. Please try again.</td></tr>';
             }
         }
 
@@ -5325,7 +5326,7 @@
             const currentUserId = userData._id || userData.id;
 
             if (!items || items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty">No inventory items. Click "+ Add Inventory" to add products.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="11" class="empty">No inventory items. Click "+ Add Inventory" to add products.</td></tr>';
                 return;
             }
 
@@ -5333,10 +5334,13 @@
                 // Map Inventory model fields
                 const qty = item.quantityOnHand || item.quantity || 0;
                 const cost = item.averageCost || item.costPerUnit || 0;
+                const adminPrice = item.chemicalId?.adminPrice || item.adminPrice || cost * 1.10; // Default 10% admin fee
                 const sellPrice = item.chemicalId?.sellPrice || item.sellPrice || 0;
                 const category = item.chemicalId?.category || item.category || '-';
                 const isLowStock = item.reorderPoint && qty <= item.reorderPoint;
-                const margin = sellPrice > 0 && cost > 0 ? Math.round(((sellPrice - cost) / sellPrice) * 100) : 0;
+
+                // Margin is now distributor's margin (retail - admin / retail)
+                const margin = sellPrice > 0 && adminPrice > 0 ? Math.round(((sellPrice - adminPrice) / sellPrice) * 100) : 0;
 
                 const statusClass = isLowStock ? 'status-pending' : qty > 0 ? 'status-confirmed' : 'status-cancelled';
                 const statusText = qty === 0 ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock';
@@ -5348,6 +5352,7 @@
                         <td><strong>${qty.toLocaleString()}</strong></td>
                         <td>${item.unit || '-'}</td>
                         <td class="cost-column">$${cost.toFixed(2)}</td>
+                        <td class="cost-column">$${adminPrice.toFixed(2)}</td>
                         <td class="cost-column">${margin}%</td>
                         <td><strong style="color: var(--primary);">$${sellPrice.toFixed(2)}</strong></td>
                         <td><span class="order-status status-confirmed">${item.location || 'main'}</span></td>
