@@ -7233,7 +7233,7 @@ app.get('/api/admin/sync-prices/status', authMiddleware, adminMiddleware, async 
                 productsUpdated: lastSync.productsUpdated,
                 productsAdded: lastSync.productsAdded
             } : null,
-            cronSchedule: process.env.PRICE_SYNC_CRON || '0 */6 * * *'
+            cronSchedule: process.env.PRICE_SYNC_CRON || '0 6 */3 * *'
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -7253,7 +7253,7 @@ connectDB().then(() => {
 
         // Set up scheduled price sync if cron is available
         if (cron && process.env.MICROSOFT_CLIENT_ID) {
-            const cronSchedule = process.env.PRICE_SYNC_CRON || '0 */6 * * *';
+            const cronSchedule = process.env.PRICE_SYNC_CRON || '0 6 */3 * *';
             cron.schedule(cronSchedule, async () => {
                 console.log('Running scheduled price sync...');
                 try {
