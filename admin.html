@@ -67,48 +67,95 @@
 
             <!-- Dashboard Tab -->
             <div id="dashboardTab" class="tab-content active">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon green">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <!-- Main Navigation Cards -->
+                <div class="overview-cards">
+                    <div class="overview-card" onclick="switchTab('orders')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #dcfce7; color: #16a34a;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalCustomers">0</span>
-                            <span class="stat-label">Total Customers</span>
+                        <div class="overview-card-content">
+                            <h2>Orders</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalOrdersCount">0</span>
+                                <span class="stat-detail">Total Orders</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="pendingOrders">0</strong> pending</span>
+                                <span><strong id="totalRevenue">$0</strong> revenue</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-icon green">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <div class="overview-card" onclick="switchTab('products')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #dbeafe; color: #2563eb;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalOrdersCount">0</span>
-                            <span class="stat-label">Total Orders</span>
+                        <div class="overview-card-content">
+                            <h2>Products</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalProductsCount">0</span>
+                                <span class="stat-detail">Products</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="lowStockProducts">0</strong> low stock</span>
+                                <span><strong id="inventoryValue">$0</strong> value</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-icon orange">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <div class="overview-card" onclick="switchTab('customers')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #fef3c7; color: #d97706;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="pendingOrders">0</span>
-                            <span class="stat-label">Pending Orders</span>
+                        <div class="overview-card-content">
+                            <h2>Customers</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalCustomers">0</span>
+                                <span class="stat-detail">Customers</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="newCustomersMonth">0</strong> new this month</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-icon purple">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <div class="overview-card" onclick="switchTab('company-settings')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #f3e8ff; color: #7c3aed;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalRevenue">$0</span>
-                            <span class="stat-label">Total Revenue</span>
+                        <div class="overview-card-content">
+                            <h2>AcreProfit Business</h2>
+                            <div class="overview-card-stats">
+                                <span class="stat-detail">LLC & Compliance</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span id="complianceAlerts">Licenses, insurance, documents</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
                 </div>
 
+                <!-- Quick Stats Bar -->
+                <div class="quick-stats-bar">
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">Today's Orders</span>
+                        <span class="quick-stat-value" id="todayOrders">0</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">This Week</span>
+                        <span class="quick-stat-value" id="weekRevenue">$0</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">This Month</span>
+                        <span class="quick-stat-value" id="monthRevenue">$0</span>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
                 <div class="dashboard-grid">
                     <div class="card recent-orders-card">
                         <div class="card-header">
@@ -120,23 +167,12 @@
                         </div>
                     </div>
 
-                    <div class="card bundle-progress-card">
+                    <div class="card reminders-card" id="dashboardRemindersCard">
                         <div class="card-header">
-                            <h3>Bundle Progress</h3>
-                        </div>
-                        <div id="bundleProgress" class="bundle-list">
-                            <p class="loading">Loading bundle data...</p>
-                        </div>
-                    </div>
-
-                    <!-- License & Compliance Reminders (Superadmin Only) -->
-                    <div class="card reminders-card superadmin-only" id="dashboardRemindersCard" style="display: none;">
-                        <div class="card-header">
-                            <h3>Reminders & Compliance</h3>
-                            <a href="#company-settings" class="nav-tab" data-tab="company-settings">View All</a>
+                            <h3>Alerts & Reminders</h3>
                         </div>
                         <div id="dashboardReminders" class="reminders-list">
-                            <p class="loading">Loading reminders...</p>
+                            <p class="loading">Loading...</p>
                         </div>
                     </div>
                 </div>
@@ -5897,6 +5933,96 @@
 
         .tab-content.active {
             display: block;
+        }
+
+        /* Overview Cards */
+        .overview-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .overview-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid transparent;
+        }
+        .overview-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+            border-color: var(--primary);
+        }
+        .overview-card-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .overview-card-content {
+            flex: 1;
+        }
+        .overview-card-content h2 {
+            font-size: 1.25rem;
+            margin: 0 0 8px 0;
+            color: var(--text);
+        }
+        .overview-card-stats {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .overview-card-stats .big-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .overview-card-stats .stat-detail {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .overview-card-sub {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .overview-card-arrow {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+        }
+        .quick-stats-bar {
+            display: flex;
+            gap: 24px;
+            background: var(--white);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow);
+        }
+        .quick-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        .quick-stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .quick-stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .overview-cards { grid-template-columns: 1fr; }
         }
 
         .stats-grid {
