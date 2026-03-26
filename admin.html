@@ -2597,7 +2597,7 @@
         }
 
         // Add Customer Modal
-        function openAddCustomerModal() {
+        async function openAddCustomerModal() {
             document.getElementById('addCustomerModal').style.display = 'flex';
             document.getElementById('addName').value = '';
             document.getElementById('addEmail').value = '';
@@ -2607,6 +2607,19 @@
             document.getElementById('addState').value = '';
             document.getElementById('addAcres').value = '';
             document.getElementById('addCrops').value = '';
+
+            // Load representatives dynamically
+            try {
+                const res = await fetch(`${API_URL}/api/representatives`);
+                const reps = await res.json();
+                const select = document.getElementById('addRepresentative');
+                select.innerHTML = reps.map(rep => {
+                    const shortId = rep.name.split(' ')[0].toLowerCase();
+                    return `<option value="${shortId}">${rep.name}</option>`;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading representatives:', e);
+            }
         }
 
         function closeAddCustomerModal() {
@@ -3183,11 +3196,9 @@
         }
 
         async function loadLedgerReps() {
-            const res = await fetch(`${API_URL}/api/admin/ledger/summary`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const summaries = await res.json();
-            const reps = summaries.map(s => s.rep);
+            // Fetch all representatives for the dropdown
+            const res = await fetch(`${API_URL}/api/representatives`);
+            const reps = await res.json();
 
             const filterSelect = document.getElementById('ledgerRepFilter');
             reps.forEach(rep => {
