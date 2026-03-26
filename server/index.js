@@ -8,6 +8,19 @@ const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
 
+// SharePoint/Excel sync dependencies (optional - only load if configured)
+let Client, ClientSecretCredential, cron, XLSX;
+try {
+    const graphClient = require('@microsoft/microsoft-graph-client');
+    const azureIdentity = require('@azure/identity');
+    Client = graphClient.Client;
+    ClientSecretCredential = azureIdentity.ClientSecretCredential;
+    cron = require('node-cron');
+    XLSX = require('xlsx');
+} catch (e) {
+    console.log('SharePoint sync dependencies not installed. Run npm install to enable.')
+}
+
 const app = express();
 
 // Initialize Stripe (will be configured per-request for Connect)
@@ -1031,6 +1044,326 @@ purchaseOrderSplitSchema.index({ distributorId: 1 });
 purchaseOrderSplitSchema.index({ status: 1 });
 
 const PurchaseOrderSplit = mongoose.model('PurchaseOrderSplit', purchaseOrderSplitSchema);
+
+// ============ INVENTORY MODEL ============
+// Tracks actual stock levels by product and location
+const inventorySchema = new mongoose.Schema({
+    // Product reference
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical', required: true },
+    productName: { type: String, required: true },
+    packSize: String,
+    unit: String, // gal, case, bag, lb, oz
+
+    // Stock levels
+    quantityOnHand: { type: Number, default: 0 }, // Current available stock
+    quantityReserved: { type: Number, default: 0 }, // Reserved for pending orders
+    quantityAvailable: { type: Number, default: 0 }, // onHand - reserved
+
+    // Reorder tracking
+    reorderPoint: { type: Number, default: 0 }, // Alert when stock falls below
+    reorderQuantity: { type: Number, default: 0 }, // Suggested reorder amount
+
+    // Location (for multi-warehouse)
+    location: { type: String, default: 'main' }, // main, haxtun, otis, etc.
+    distributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Which distributor holds this
+
+    // Cost tracking (FIFO/average cost)
+    averageCost: { type: Number, default: 0 }, // Weighted average cost
+    lastCost: { type: Number, default: 0 }, // Most recent purchase cost
+
+    // Timestamps
+    lastReceivedDate: Date,
+    lastSoldDate: Date,
+
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+inventorySchema.index({ chemicalId: 1, location: 1 }, { unique: true });
+inventorySchema.index({ productName: 1 });
+inventorySchema.index({ distributorId: 1 });
+inventorySchema.index({ quantityOnHand: 1 });
+
+const Inventory = mongoose.model('Inventory', inventorySchema);
+
+// ============ INVENTORY TRANSACTION MODEL ============
+// Audit trail for all inventory movements
+const inventoryTransactionSchema = new mongoose.Schema({
+    inventoryId: { type: mongoose.Schema.Types.ObjectId, ref: 'Inventory', required: true },
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+    productName: String,
+
+    // Transaction type
+    type: {
+        type: String,
+        enum: ['receive', 'sale', 'adjustment', 'transfer', 'return', 'damage', 'expired'],
+        required: true
+    },
+
+    // Quantity change (positive for additions, negative for removals)
+    quantityChange: { type: Number, required: true },
+    previousQuantity: Number,
+    newQuantity: Number,
+
+    // Cost info
+    unitCost: Number,
+    totalCost: Number,
+
+    // Reference documents
+    referenceType: { type: String, enum: ['PurchaseOrder', 'ChemicalOrder', 'Manual', 'Transfer'] },
+    referenceId: { type: mongoose.Schema.Types.ObjectId },
+    referenceNumber: String, // PO number, Order number, etc.
+
+    // Location
+    location: String,
+    fromLocation: String, // For transfers
+    toLocation: String, // For transfers
+
+    // Notes
+    notes: String,
+    reason: String, // For adjustments
+
+    // Audit
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now }
+});
+
+inventoryTransactionSchema.index({ inventoryId: 1, createdAt: -1 });
+inventoryTransactionSchema.index({ referenceType: 1, referenceId: 1 });
+inventoryTransactionSchema.index({ type: 1 });
+inventoryTransactionSchema.index({ createdAt: -1 });
+
+const InventoryTransaction = mongoose.model('InventoryTransaction', inventoryTransactionSchema);
+
+// ============ CUSTOMER INVOICE MODEL ============
+// Generated invoices for customer orders
+const invoiceSchema = new mongoose.Schema({
+    // Invoice number: INV-2026-00001
+    invoiceNumber: { type: String, unique: true },
+
+    // Customer info
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    customerName: String,
+    customerEmail: String,
+    customerPhone: String,
+    customerAddress: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
+
+    // Order reference
+    orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChemicalOrder' },
+    orderNumber: String,
+
+    // Representative
+    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    representativeName: String,
+
+    // Line items
+    items: [{
+        productName: String,
+        description: String,
+        packSize: String,
+        unit: String,
+        quantity: Number,
+        unitPrice: Number,
+        totalPrice: Number
+    }],
+
+    // Totals
+    subtotal: Number,
+    discount: { type: Number, default: 0 },
+    discountReason: String,
+    tax: { type: Number, default: 0 },
+    shipping: { type: Number, default: 0 },
+    total: Number,
+
+    // Payment tracking
+    amountPaid: { type: Number, default: 0 },
+    amountDue: Number,
+    paymentStatus: {
+        type: String,
+        enum: ['unpaid', 'partial', 'paid', 'refunded'],
+        default: 'unpaid'
+    },
+    paymentMethod: String,
+    paymentDate: Date,
+    stripePaymentIntentId: String,
+
+    // Dates
+    invoiceDate: { type: Date, default: Date.now },
+    dueDate: Date,
+
+    // Status
+    status: {
+        type: String,
+        enum: ['draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled'],
+        default: 'draft'
+    },
+
+    // Delivery info
+    deliveryStatus: {
+        type: String,
+        enum: ['pending', 'ready', 'shipped', 'delivered', 'signed'],
+        default: 'pending'
+    },
+    deliveryDate: Date,
+    deliveryLocation: String,
+    deliverySignature: String, // Base64 signature image
+    deliverySignedBy: String,
+    deliverySignedAt: Date,
+    deliveryNotes: String,
+
+    // Notes
+    notes: String,
+    internalNotes: String,
+
+    // Audit
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    sentAt: Date,
+    sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+invoiceSchema.index({ invoiceNumber: 1 });
+invoiceSchema.index({ customerId: 1 });
+invoiceSchema.index({ orderId: 1 });
+invoiceSchema.index({ status: 1 });
+invoiceSchema.index({ invoiceDate: -1 });
+
+const Invoice = mongoose.model('Invoice', invoiceSchema);
+
+// Helper: Generate invoice number
+async function generateInvoiceNumber() {
+    const year = new Date().getFullYear();
+    const prefix = `INV-${year}-`;
+
+    const lastInvoice = await Invoice.findOne({ invoiceNumber: { $regex: `^${prefix}` } })
+        .sort({ invoiceNumber: -1 })
+        .lean();
+
+    let nextNum = 1;
+    if (lastInvoice && lastInvoice.invoiceNumber) {
+        const lastNum = parseInt(lastInvoice.invoiceNumber.split('-')[2], 10);
+        if (!isNaN(lastNum)) {
+            nextNum = lastNum + 1;
+        }
+    }
+
+    return `${prefix}${String(nextNum).padStart(5, '0')}`;
+}
+
+// Helper: Update inventory when receiving a PO
+async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, userId }) {
+    // Find or create inventory record
+    let inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+
+    if (!inventory) {
+        inventory = new Inventory({
+            chemicalId,
+            productName,
+            packSize,
+            unit,
+            location: location || 'main',
+            quantityOnHand: 0,
+            quantityReserved: 0,
+            quantityAvailable: 0,
+            averageCost: unitCost,
+            lastCost: unitCost
+        });
+    }
+
+    const previousQuantity = inventory.quantityOnHand;
+    const newQuantity = previousQuantity + quantity;
+
+    // Calculate new weighted average cost
+    if (previousQuantity > 0 && inventory.averageCost > 0) {
+        const totalOldValue = previousQuantity * inventory.averageCost;
+        const totalNewValue = quantity * unitCost;
+        inventory.averageCost = (totalOldValue + totalNewValue) / newQuantity;
+    } else {
+        inventory.averageCost = unitCost;
+    }
+
+    inventory.quantityOnHand = newQuantity;
+    inventory.quantityAvailable = newQuantity - inventory.quantityReserved;
+    inventory.lastCost = unitCost;
+    inventory.lastReceivedDate = new Date();
+    inventory.updatedAt = new Date();
+
+    await inventory.save();
+
+    // Create transaction record
+    const transaction = new InventoryTransaction({
+        inventoryId: inventory._id,
+        chemicalId,
+        productName,
+        type: 'receive',
+        quantityChange: quantity,
+        previousQuantity,
+        newQuantity,
+        unitCost,
+        totalCost: quantity * unitCost,
+        referenceType: 'PurchaseOrder',
+        referenceId: purchaseOrderId,
+        referenceNumber: poNumber,
+        location: location || 'main',
+        createdBy: userId
+    });
+
+    await transaction.save();
+
+    return { inventory, transaction };
+}
+
+// Helper: Deduct inventory when fulfilling an order
+async function deductInventory({ chemicalId, quantity, location, orderId, orderNumber, userId, notes }) {
+    const inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+
+    if (!inventory) {
+        throw new Error(`No inventory found for product at location ${location || 'main'}`);
+    }
+
+    if (inventory.quantityAvailable < quantity) {
+        throw new Error(`Insufficient inventory. Available: ${inventory.quantityAvailable}, Requested: ${quantity}`);
+    }
+
+    const previousQuantity = inventory.quantityOnHand;
+    const newQuantity = previousQuantity - quantity;
+
+    inventory.quantityOnHand = newQuantity;
+    inventory.quantityAvailable = newQuantity - inventory.quantityReserved;
+    inventory.lastSoldDate = new Date();
+    inventory.updatedAt = new Date();
+
+    await inventory.save();
+
+    // Create transaction record
+    const transaction = new InventoryTransaction({
+        inventoryId: inventory._id,
+        chemicalId,
+        productName: inventory.productName,
+        type: 'sale',
+        quantityChange: -quantity,
+        previousQuantity,
+        newQuantity,
+        unitCost: inventory.averageCost,
+        totalCost: quantity * inventory.averageCost,
+        referenceType: 'ChemicalOrder',
+        referenceId: orderId,
+        referenceNumber: orderNumber,
+        location: location || 'main',
+        notes,
+        createdBy: userId
+    });
+
+    await transaction.save();
+
+    return { inventory, transaction };
+}
 
 // Helper: Generate next PO number
 async function generatePONumber() {
@@ -6035,10 +6368,902 @@ app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) =
     }
 });
 
+// ============ INVENTORY API ENDPOINTS ============
+
+// Get all inventory
+app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { location, lowStock } = req.query;
+        let query = {};
+
+        if (location) query.location = location;
+        if (lowStock === 'true') {
+            query.$expr = { $lte: ['$quantityOnHand', '$reorderPoint'] };
+        }
+
+        const inventory = await Inventory.find(query)
+            .populate('chemicalId', 'productName packSize unit sellPrice costPrice category')
+            .populate('distributorId', 'name email')
+            .sort({ productName: 1 });
+
+        res.json(inventory);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get inventory for a specific product
+app.get('/api/admin/inventory/product/:chemicalId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const inventory = await Inventory.find({ chemicalId: req.params.chemicalId })
+            .populate('distributorId', 'name email');
+
+        res.json(inventory);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get inventory transactions (audit trail)
+app.get('/api/admin/inventory/:id/transactions', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const transactions = await InventoryTransaction.find({ inventoryId: req.params.id })
+            .populate('createdBy', 'name email')
+            .sort({ createdAt: -1 })
+            .limit(50);
+
+        res.json(transactions);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Manual inventory adjustment
+app.post('/api/admin/inventory/adjust', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { chemicalId, location, quantityChange, reason, notes } = req.body;
+
+        const inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+        if (!inventory) {
+            return res.status(404).json({ error: 'Inventory record not found' });
+        }
+
+        const previousQuantity = inventory.quantityOnHand;
+        const newQuantity = previousQuantity + quantityChange;
+
+        if (newQuantity < 0) {
+            return res.status(400).json({ error: 'Adjustment would result in negative inventory' });
+        }
+
+        inventory.quantityOnHand = newQuantity;
+        inventory.quantityAvailable = newQuantity - inventory.quantityReserved;
+        inventory.updatedAt = new Date();
+
+        await inventory.save();
+
+        // Create transaction record
+        const transaction = new InventoryTransaction({
+            inventoryId: inventory._id,
+            chemicalId,
+            productName: inventory.productName,
+            type: 'adjustment',
+            quantityChange,
+            previousQuantity,
+            newQuantity,
+            location: location || 'main',
+            reason,
+            notes,
+            createdBy: req.user._id
+        });
+
+        await transaction.save();
+
+        res.json({ inventory, transaction });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Receive Purchase Order - Add items to inventory
+app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { items, location, notes } = req.body;
+        // items: [{ itemIndex: 0, quantityReceived: 10 }, ...]
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        const results = [];
+
+        for (const receiveItem of items) {
+            const poItem = po.items[receiveItem.itemIndex];
+            if (!poItem) {
+                return res.status(400).json({ error: `Invalid item index: ${receiveItem.itemIndex}` });
+            }
+
+            const quantityReceived = receiveItem.quantityReceived || poItem.quantityOrdered;
+
+            // Add to inventory
+            const result = await receiveInventory({
+                chemicalId: poItem.chemicalId,
+                productName: poItem.productName,
+                packSize: poItem.packSize,
+                unit: poItem.unit,
+                quantity: quantityReceived,
+                unitCost: poItem.pricePerUnit,
+                location: location || 'main',
+                purchaseOrderId: po._id,
+                poNumber: po.poNumber,
+                userId: req.user._id
+            });
+
+            results.push({
+                productName: poItem.productName,
+                quantityReceived,
+                inventory: result.inventory
+            });
+        }
+
+        // Update PO status
+        po.status = 'received';
+        po.receivedDate = new Date();
+        po.updatedBy = req.user._id;
+        po.updatedAt = new Date();
+        if (notes) po.internalNotes = (po.internalNotes || '') + '\n' + notes;
+
+        await po.save();
+
+        res.json({
+            message: 'Inventory received successfully',
+            purchaseOrder: po,
+            inventoryUpdates: results
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get products with inventory levels (for Products tab)
+app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const chemicals = await Chemical.find({ isActive: true })
+            .sort({ productName: 1, packSize: 1 });
+
+        // Get inventory for all chemicals
+        const inventoryData = await Inventory.find({}).lean();
+        const inventoryMap = {};
+        for (const inv of inventoryData) {
+            const key = inv.chemicalId.toString();
+            if (!inventoryMap[key]) inventoryMap[key] = [];
+            inventoryMap[key].push(inv);
+        }
+
+        // Get sales data
+        const salesData = await ChemicalOrder.aggregate([
+            { $match: { status: { $nin: ['cancelled', 'draft'] } } },
+            { $unwind: '$items' },
+            { $group: {
+                _id: '$items.chemicalId',
+                unitsSold: { $sum: '$items.quantity' },
+                totalRevenue: { $sum: '$items.totalPrice' }
+            }}
+        ]);
+
+        const salesMap = {};
+        for (const s of salesData) {
+            if (s._id) salesMap[s._id.toString()] = { unitsSold: s.unitsSold, totalRevenue: s.totalRevenue };
+        }
+
+        const products = chemicals.map(c => {
+            const inventoryRecords = inventoryMap[c._id.toString()] || [];
+            const totalOnHand = inventoryRecords.reduce((sum, inv) => sum + (inv.quantityOnHand || 0), 0);
+            const totalAvailable = inventoryRecords.reduce((sum, inv) => sum + (inv.quantityAvailable || 0), 0);
+
+            return {
+                _id: c._id,
+                productName: c.productName,
+                sourceSupplier: c.sourceSupplier,
+                category: c.category,
+                packSize: c.packSize,
+                unit: c.unit,
+                costPrice: c.costPrice,
+                sellPrice: c.sellPrice,
+                margin: c.margin,
+                isActive: c.isActive,
+                // Inventory data
+                quantityOnHand: totalOnHand,
+                quantityAvailable: totalAvailable,
+                inventoryByLocation: inventoryRecords.map(inv => ({
+                    location: inv.location,
+                    onHand: inv.quantityOnHand,
+                    available: inv.quantityAvailable
+                })),
+                // Sales data
+                unitsSold: salesMap[c._id.toString()]?.unitsSold || 0,
+                totalRevenue: salesMap[c._id.toString()]?.totalRevenue || 0
+            };
+        });
+
+        res.json(products);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ INVOICE API ENDPOINTS ============
+
+// Get all invoices
+app.get('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, customerId } = req.query;
+        let query = {};
+
+        if (status) query.status = status;
+        if (customerId) query.customerId = customerId;
+
+        // For non-superadmin, only show their customers' invoices
+        if (req.user.role !== 'superadmin') {
+            const customers = await User.find({ representative: req.user._id }).select('_id');
+            const customerIds = customers.map(c => c._id);
+            query.customerId = { $in: customerIds };
+        }
+
+        const invoices = await Invoice.find(query)
+            .populate('customerId', 'name email phone')
+            .populate('representativeId', 'name email')
+            .sort({ invoiceDate: -1 });
+
+        res.json(invoices);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single invoice
+app.get('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id)
+            .populate('customerId', 'name email phone farm address')
+            .populate('representativeId', 'name email phone')
+            .populate('orderId');
+
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        res.json(invoice);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create invoice from order
+app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await ChemicalOrder.findById(req.params.orderId)
+            .populate('userId', 'name email phone address farm');
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Check if invoice already exists for this order
+        const existing = await Invoice.findOne({ orderId: order._id });
+        if (existing) {
+            return res.status(400).json({ error: 'Invoice already exists for this order', invoiceId: existing._id });
+        }
+
+        const invoiceNumber = await generateInvoiceNumber();
+        const customer = order.userId;
+
+        const invoice = new Invoice({
+            invoiceNumber,
+            customerId: customer._id,
+            customerName: customer.name,
+            customerEmail: customer.email,
+            customerPhone: customer.phone,
+            customerAddress: customer.address,
+            orderId: order._id,
+            orderNumber: order.orderNumber,
+            representativeId: order.representativeId,
+            items: order.items.map(item => ({
+                productName: item.productName,
+                description: `${item.packSize} ${item.unit}`,
+                packSize: item.packSize,
+                unit: item.unit,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice
+            })),
+            subtotal: order.subtotal,
+            discount: order.discount || 0,
+            total: order.total,
+            amountDue: order.total - (order.discount || 0),
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
+            createdBy: req.user._id
+        });
+
+        await invoice.save();
+
+        res.status(201).json(invoice);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create manual invoice
+app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { customerId, items, discount, discountReason, notes, dueDate } = req.body;
+
+        const customer = await User.findById(customerId);
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        const invoiceNumber = await generateInvoiceNumber();
+
+        // Calculate totals
+        const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+        const total = subtotal - (discount || 0);
+
+        const invoice = new Invoice({
+            invoiceNumber,
+            customerId: customer._id,
+            customerName: customer.name,
+            customerEmail: customer.email,
+            customerPhone: customer.phone,
+            customerAddress: customer.address,
+            representativeId: customer.representative || req.user._id,
+            items: items.map(item => ({
+                ...item,
+                totalPrice: item.quantity * item.unitPrice
+            })),
+            subtotal,
+            discount: discount || 0,
+            discountReason,
+            total,
+            amountDue: total,
+            dueDate: dueDate ? new Date(dueDate) : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+            notes,
+            createdBy: req.user._id
+        });
+
+        await invoice.save();
+
+        res.status(201).json(invoice);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update invoice status
+app.put('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, paymentStatus, amountPaid, paymentMethod, paymentDate, notes } = req.body;
+
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        if (status) invoice.status = status;
+        if (paymentStatus) invoice.paymentStatus = paymentStatus;
+        if (amountPaid !== undefined) {
+            invoice.amountPaid = amountPaid;
+            invoice.amountDue = invoice.total - amountPaid;
+            if (amountPaid >= invoice.total) {
+                invoice.paymentStatus = 'paid';
+            } else if (amountPaid > 0) {
+                invoice.paymentStatus = 'partial';
+            }
+        }
+        if (paymentMethod) invoice.paymentMethod = paymentMethod;
+        if (paymentDate) invoice.paymentDate = new Date(paymentDate);
+        if (notes !== undefined) invoice.notes = notes;
+
+        invoice.updatedAt = new Date();
+        await invoice.save();
+
+        res.json(invoice);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Send invoice to customer
+app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id)
+            .populate('customerId', 'name email');
+
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        // TODO: Implement email sending with nodemailer
+        // For now, just update the status
+        invoice.status = 'sent';
+        invoice.sentAt = new Date();
+        invoice.sentBy = req.user._id;
+        await invoice.save();
+
+        res.json({ message: 'Invoice sent successfully', invoice });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Record payment on invoice
+app.post('/api/admin/invoices/:id/payment', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { amount, method, notes } = req.body;
+
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        const newAmountPaid = (invoice.amountPaid || 0) + amount;
+        invoice.amountPaid = newAmountPaid;
+        invoice.amountDue = invoice.total - newAmountPaid;
+        invoice.paymentMethod = method;
+        invoice.paymentDate = new Date();
+
+        if (newAmountPaid >= invoice.total) {
+            invoice.paymentStatus = 'paid';
+            invoice.status = 'paid';
+        } else {
+            invoice.paymentStatus = 'partial';
+        }
+
+        if (notes) {
+            invoice.notes = (invoice.notes || '') + '\n' + `Payment of $${amount} received via ${method}. ${notes}`;
+        }
+
+        invoice.updatedAt = new Date();
+        await invoice.save();
+
+        // Deduct inventory if order exists and status allows
+        if (invoice.orderId) {
+            const order = await ChemicalOrder.findById(invoice.orderId);
+            if (order && order.status !== 'delivered') {
+                // Optionally deduct inventory here when payment is received
+                // This depends on business logic - might want to deduct on delivery instead
+            }
+        }
+
+        res.json({ message: 'Payment recorded', invoice });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ DELIVERY CONFIRMATION ENDPOINTS ============
+
+// Update delivery status with signature
+app.post('/api/admin/invoices/:id/delivery', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { deliveryStatus, deliveryDate, deliveryLocation, deliverySignature, deliverySignedBy, deliveryNotes } = req.body;
+
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        invoice.deliveryStatus = deliveryStatus;
+        if (deliveryDate) invoice.deliveryDate = new Date(deliveryDate);
+        if (deliveryLocation) invoice.deliveryLocation = deliveryLocation;
+        if (deliverySignature) invoice.deliverySignature = deliverySignature;
+        if (deliverySignedBy) invoice.deliverySignedBy = deliverySignedBy;
+        if (deliveryStatus === 'signed') {
+            invoice.deliverySignedAt = new Date();
+        }
+        if (deliveryNotes) invoice.deliveryNotes = deliveryNotes;
+
+        invoice.updatedAt = new Date();
+        await invoice.save();
+
+        // If delivered and signed, deduct inventory
+        if (deliveryStatus === 'signed' && invoice.orderId) {
+            try {
+                const order = await ChemicalOrder.findById(invoice.orderId);
+                if (order) {
+                    for (const item of order.items) {
+                        if (item.chemicalId) {
+                            await deductInventory({
+                                chemicalId: item.chemicalId,
+                                quantity: item.quantity,
+                                location: 'main',
+                                orderId: order._id,
+                                orderNumber: order.orderNumber,
+                                userId: req.user._id,
+                                notes: `Delivered - Invoice ${invoice.invoiceNumber}`
+                            });
+                        }
+                    }
+
+                    // Update order status
+                    order.status = 'delivered';
+                    order.deliveredAt = new Date();
+                    await order.save();
+                }
+            } catch (invError) {
+                // Log but don't fail the delivery confirmation
+                console.error('Inventory deduction error:', invError.message);
+            }
+        }
+
+        res.json({ message: 'Delivery confirmed', invoice });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Customer-facing: Confirm delivery with signature
+app.post('/api/orders/:id/confirm-delivery', authMiddleware, async (req, res) => {
+    try {
+        const { signature, signedBy } = req.body;
+
+        const invoice = await Invoice.findOne({ orderId: req.params.id, customerId: req.user._id });
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        invoice.deliveryStatus = 'signed';
+        invoice.deliverySignature = signature;
+        invoice.deliverySignedBy = signedBy || req.user.name;
+        invoice.deliverySignedAt = new Date();
+        invoice.updatedAt = new Date();
+
+        await invoice.save();
+
+        res.json({ message: 'Delivery confirmed', invoice });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ SHAREPOINT/EXCEL PRICE SYNC ============
+
+// Price Sync Log Model - Track sync history
+const priceSyncLogSchema = new mongoose.Schema({
+    syncDate: { type: Date, default: Date.now },
+    source: { type: String, default: 'sharepoint' },
+    fileName: String,
+    productsUpdated: { type: Number, default: 0 },
+    productsAdded: { type: Number, default: 0 },
+    productsSkipped: { type: Number, default: 0 },
+    errors: [String],
+    status: { type: String, enum: ['success', 'partial', 'failed'], default: 'success' },
+    syncedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    details: mongoose.Schema.Types.Mixed
+});
+
+const PriceSyncLog = mongoose.model('PriceSyncLog', priceSyncLogSchema);
+
+// Initialize Microsoft Graph client
+let graphClient = null;
+
+function initGraphClient() {
+    if (!Client || !ClientSecretCredential) {
+        console.log('Microsoft Graph SDK not available');
+        return null;
+    }
+
+    const clientId = process.env.MICROSOFT_CLIENT_ID;
+    const clientSecret = process.env.MICROSOFT_CLIENT_SECRET;
+    const tenantId = process.env.MICROSOFT_TENANT_ID;
+
+    if (!clientId || !clientSecret || !tenantId) {
+        console.log('Microsoft Graph credentials not configured');
+        return null;
+    }
+
+    try {
+        const credential = new ClientSecretCredential(tenantId, clientId, clientSecret);
+
+        graphClient = Client.initWithMiddleware({
+            authProvider: {
+                getAccessToken: async () => {
+                    const token = await credential.getToken(['https://graph.microsoft.com/.default']);
+                    return token.token;
+                }
+            }
+        });
+
+        console.log('Microsoft Graph client initialized');
+        return graphClient;
+    } catch (error) {
+        console.error('Failed to initialize Graph client:', error.message);
+        return null;
+    }
+}
+
+// Parse Excel data and update prices
+async function syncPricesFromExcel(fileBuffer, userId) {
+    if (!XLSX) {
+        throw new Error('XLSX library not available');
+    }
+
+    const workbook = XLSX.read(fileBuffer, { type: 'buffer' });
+    const sheetName = workbook.SheetNames[0];
+    const sheet = workbook.Sheets[sheetName];
+    const data = XLSX.utils.sheet_to_json(sheet);
+
+    const log = {
+        productsUpdated: 0,
+        productsAdded: 0,
+        productsSkipped: 0,
+        errors: [],
+        details: []
+    };
+
+    for (const row of data) {
+        try {
+            // Expected columns: Product Name, Pack Size, Cost Price, Sell Price
+            // Adjust column names based on actual spreadsheet
+            const productName = row['Product Name'] || row['Product'] || row['Name'];
+            const packSize = row['Pack Size'] || row['Size'] || row['Package'];
+            const costPrice = parseFloat(row['Cost Price'] || row['Cost'] || row['Wholesale'] || 0);
+            const sellPrice = parseFloat(row['Sell Price'] || row['Price'] || row['Retail'] || 0);
+            const supplier = row['Supplier'] || row['Source'] || 'CPD';
+
+            if (!productName) {
+                log.productsSkipped++;
+                continue;
+            }
+
+            // Find existing product
+            let chemical = await Chemical.findOne({
+                productName: { $regex: new RegExp(`^${productName.trim()}$`, 'i') },
+                packSize: packSize ? { $regex: new RegExp(packSize.trim(), 'i') } : undefined
+            });
+
+            if (chemical) {
+                // Update existing
+                const oldCost = chemical.costPrice;
+                const oldSell = chemical.sellPrice;
+
+                if (costPrice > 0) chemical.costPrice = costPrice;
+                if (sellPrice > 0) chemical.sellPrice = sellPrice;
+                chemical.updatedAt = new Date();
+
+                // Record price history
+                if (costPrice !== oldCost || sellPrice !== oldSell) {
+                    const history = new ChemicalPriceHistory({
+                        chemicalId: chemical._id,
+                        productName: chemical.productName,
+                        sourceSupplier: chemical.sourceSupplier,
+                        packSize: chemical.packSize,
+                        costPrice,
+                        sellPrice,
+                        priceVersion: 'sync-' + new Date().toISOString().slice(0, 10),
+                        changedBy: userId
+                    });
+                    await history.save();
+                }
+
+                await chemical.save();
+                log.productsUpdated++;
+                log.details.push({ product: productName, action: 'updated', oldCost, newCost: costPrice, oldSell, newSell: sellPrice });
+            } else if (costPrice > 0 || sellPrice > 0) {
+                // Create new product
+                chemical = new Chemical({
+                    productName: productName.trim(),
+                    sourceSupplier: supplier,
+                    packSize: packSize || 'Unknown',
+                    unit: 'gl',
+                    costPrice: costPrice || 0,
+                    sellPrice: sellPrice || costPrice * 1.15, // 15% default markup
+                    category: 'herbicide',
+                    isActive: true,
+                    availableForOrder: true,
+                    createdBy: userId
+                });
+                await chemical.save();
+                log.productsAdded++;
+                log.details.push({ product: productName, action: 'added', cost: costPrice, sell: sellPrice });
+            } else {
+                log.productsSkipped++;
+            }
+        } catch (error) {
+            log.errors.push(`Row error: ${error.message}`);
+            log.productsSkipped++;
+        }
+    }
+
+    return log;
+}
+
+// Fetch file from SharePoint and sync prices
+async function syncFromSharePoint(userId) {
+    if (!graphClient) {
+        graphClient = initGraphClient();
+    }
+
+    if (!graphClient) {
+        throw new Error('Microsoft Graph client not configured. Check MICROSOFT_CLIENT_ID, MICROSOFT_CLIENT_SECRET, and MICROSOFT_TENANT_ID.');
+    }
+
+    const siteId = process.env.SHAREPOINT_SITE_ID;
+    const filePath = process.env.SHAREPOINT_FILE_PATH;
+
+    if (!siteId || !filePath) {
+        throw new Error('SharePoint site ID or file path not configured');
+    }
+
+    try {
+        // Get the file content
+        // For personal OneDrive: /users/{user-id}/drive/root:/{path}:/content
+        // For SharePoint: /sites/{site-id}/drive/root:/{path}:/content
+
+        let fileBuffer;
+
+        // Try OneDrive personal path first
+        try {
+            const response = await graphClient
+                .api(`/users/jeff@cropprotectdirect.com/drive/root:${filePath}:/content`)
+                .get();
+            fileBuffer = Buffer.from(response);
+        } catch (e) {
+            // Try SharePoint site path
+            const response = await graphClient
+                .api(`/sites/${siteId}/drive/root:${filePath}:/content`)
+                .get();
+            fileBuffer = Buffer.from(response);
+        }
+
+        const result = await syncPricesFromExcel(fileBuffer, userId);
+
+        // Save sync log
+        const syncLog = new PriceSyncLog({
+            source: 'sharepoint',
+            fileName: filePath.split('/').pop(),
+            ...result,
+            status: result.errors.length === 0 ? 'success' : (result.productsUpdated > 0 ? 'partial' : 'failed'),
+            syncedBy: userId
+        });
+        await syncLog.save();
+
+        return { success: true, ...result };
+    } catch (error) {
+        console.error('SharePoint sync error:', error);
+
+        // Save failed sync log
+        const syncLog = new PriceSyncLog({
+            source: 'sharepoint',
+            status: 'failed',
+            errors: [error.message],
+            syncedBy: userId
+        });
+        await syncLog.save();
+
+        throw error;
+    }
+}
+
+// API Endpoints for price sync
+
+// Manual sync trigger (admin only)
+app.post('/api/admin/sync-prices/sharepoint', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can trigger price sync' });
+        }
+
+        const result = await syncFromSharePoint(req.user._id);
+        res.json({
+            message: 'Price sync completed',
+            ...result
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Upload Excel file manually for sync
+app.post('/api/admin/sync-prices/upload', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can upload price files' });
+        }
+
+        // Expect base64 encoded file in request body
+        const { fileData, fileName } = req.body;
+
+        if (!fileData) {
+            return res.status(400).json({ error: 'No file data provided' });
+        }
+
+        const fileBuffer = Buffer.from(fileData, 'base64');
+        const result = await syncPricesFromExcel(fileBuffer, req.user._id);
+
+        // Save sync log
+        const syncLog = new PriceSyncLog({
+            source: 'upload',
+            fileName: fileName || 'uploaded-file.xlsx',
+            ...result,
+            status: result.errors.length === 0 ? 'success' : 'partial',
+            syncedBy: req.user._id
+        });
+        await syncLog.save();
+
+        res.json({
+            message: 'Price sync from upload completed',
+            ...result
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get sync history
+app.get('/api/admin/sync-prices/history', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const logs = await PriceSyncLog.find()
+            .populate('syncedBy', 'name email')
+            .sort({ syncDate: -1 })
+            .limit(50);
+
+        res.json(logs);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get sync status/config
+app.get('/api/admin/sync-prices/status', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const lastSync = await PriceSyncLog.findOne().sort({ syncDate: -1 });
+
+        const configured = !!(
+            process.env.MICROSOFT_CLIENT_ID &&
+            process.env.MICROSOFT_CLIENT_SECRET &&
+            process.env.MICROSOFT_TENANT_ID
+        );
+
+        res.json({
+            configured,
+            lastSync: lastSync ? {
+                date: lastSync.syncDate,
+                status: lastSync.status,
+                productsUpdated: lastSync.productsUpdated,
+                productsAdded: lastSync.productsAdded
+            } : null,
+            cronSchedule: process.env.PRICE_SYNC_CRON || '0 */6 * * *'
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // ============ START SERVER ============
 
 connectDB().then(() => {
     app.listen(PORT, () => {
         console.log(`Acre Profit API running on port ${PORT}`);
+
+        // Initialize Graph client if configured
+        if (process.env.MICROSOFT_CLIENT_ID) {
+            initGraphClient();
+        }
+
+        // Set up scheduled price sync if cron is available
+        if (cron && process.env.MICROSOFT_CLIENT_ID) {
+            const cronSchedule = process.env.PRICE_SYNC_CRON || '0 */6 * * *';
+            cron.schedule(cronSchedule, async () => {
+                console.log('Running scheduled price sync...');
+                try {
+                    const result = await syncFromSharePoint(null);
+                    console.log(`Scheduled sync completed: ${result.productsUpdated} updated, ${result.productsAdded} added`);
+                } catch (error) {
+                    console.error('Scheduled sync failed:', error.message);
+                }
+            });
+            console.log(`Price sync scheduled: ${cronSchedule}`);
+        }
     });
 });

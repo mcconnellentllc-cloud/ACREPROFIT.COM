@@ -982,13 +982,14 @@
                                 <th>Cost Price</th>
                                 <th>Sell Price</th>
                                 <th>Margin %</th>
+                                <th>Inventory</th>
                                 <th>Units Sold</th>
                                 <th>Revenue</th>
                                 <th>Added By</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
-                            <tr><td colspan="9" class="loading">Loading products...</td></tr>
+                            <tr><td colspan="10" class="loading">Loading products...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1287,8 +1288,22 @@
             <!-- Pricing Tiers Tab (Superadmin Only) -->
             <div id="pricingTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>3-Tier Pricing Management</h2>
-                    <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
+                    <div>
+                        <h2>3-Tier Pricing Management</h2>
+                        <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
+                    </div>
+                    <div class="tab-header-actions">
+                        <button class="btn btn-outline" onclick="syncPricesFromSharePoint()" id="syncPricesBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                            Sync Prices
+                        </button>
+                        <label class="btn btn-outline" style="cursor: pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            Upload Excel
+                            <input type="file" id="priceFileUpload" accept=".xlsx,.xls,.csv" style="display: none;" onchange="uploadPriceFile(this)">
+                        </label>
+                        <span id="lastSyncInfo" style="font-size: 12px; color: #666; margin-left: 8px;"></span>
+                    </div>
                 </div>
 
                 <!-- Bulk Edit Controls -->
@@ -2046,6 +2061,10 @@
                     </div>
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closePODetailModal()">Close</button>
+                        <button class="btn btn-primary" id="receivePOBtn" onclick="receivePurchaseOrder()" style="background: #059669;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                            Receive Inventory
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2829,13 +2848,24 @@
 
         async function loadProducts() {
             try {
-                const res = await fetch(`${API_URL}/api/admin/products`, {
+                // Use the endpoint that includes inventory data
+                const res = await fetch(`${API_URL}/api/admin/products-with-inventory`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 allProducts = await res.json();
                 renderProducts(allProducts);
             } catch (error) {
                 console.error('Error loading products:', error);
+                // Fallback to regular products endpoint
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/products`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    allProducts = await res.json();
+                    renderProducts(allProducts);
+                } catch (e) {
+                    console.error('Fallback also failed:', e);
+                }
             }
         }
 
@@ -2860,7 +2890,7 @@
             const tbody = document.getElementById('productsTableBody');
 
             if (!products.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
                 return;
             }
 
@@ -2868,6 +2898,8 @@
                 const margin = p.margin || 0;
                 const marginColor = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
                 const profit = p.sellPrice - p.costPrice;
+                const inventory = p.quantityOnHand || 0;
+                const inventoryColor = inventory === 0 ? '#dc2626' : inventory < 10 ? '#d97706' : '#059669';
 
                 return `
                 <tr>
@@ -2882,6 +2914,10 @@
                     <td>
                         <span style="color: ${marginColor}; font-weight: 700;">${margin.toFixed(1)}%</span>
                         <br><small style="color: ${marginColor}">$${profit.toFixed(2)}/unit</small>
+                    </td>
+                    <td>
+                        <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
+                        ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
                     </td>
                     <td>${p.unitsSold || 0}</td>
                     <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
@@ -3584,6 +3620,58 @@
         function closePODetailModal() {
             document.getElementById('poDetailModal').style.display = 'none';
             currentPO = null;
+        }
+
+        // Receive Purchase Order - Add items to inventory
+        async function receivePurchaseOrder() {
+            if (!currentPO) {
+                alert('No purchase order selected');
+                return;
+            }
+
+            if (currentPO.status === 'received' || currentPO.status === 'closed') {
+                alert('This PO has already been received');
+                return;
+            }
+
+            const confirmed = confirm(`Receive all items from ${currentPO.poNumber}?\n\nThis will add all items to inventory.`);
+            if (!confirmed) return;
+
+            try {
+                // Build items array with all quantities
+                const items = currentPO.items.map((item, index) => ({
+                    itemIndex: index,
+                    quantityReceived: item.quantityOrdered
+                }));
+
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/receive`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        items,
+                        location: 'main',
+                        notes: `Received via admin panel on ${new Date().toLocaleDateString()}`
+                    })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    alert(`✓ Inventory received!\n\n${result.inventoryUpdates.map(u => `${u.productName}: +${u.quantityReceived}`).join('\n')}`);
+                    closePODetailModal();
+                    loadPurchaseOrders();
+                    // Refresh products if that tab is loaded
+                    if (allProducts.length > 0) loadProducts();
+                } else {
+                    const error = await res.json();
+                    alert('Error receiving inventory: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error receiving PO:', error);
+                alert('Error receiving inventory. Please try again.');
+            }
         }
 
         // Admin Fee Calculator Functions
@@ -4465,6 +4553,105 @@
                 alert('Error adding reminder: ' + error.message);
             }
         }
+
+        // ============ PRICE SYNC FUNCTIONS ============
+
+        async function syncPricesFromSharePoint() {
+            const btn = document.getElementById('syncPricesBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg> Syncing...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sync-prices/sharepoint`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    alert(`✓ Price sync completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`);
+                    loadPricingData();
+                    loadProducts();
+                    loadSyncStatus();
+                } else {
+                    alert('Sync error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                alert('Sync failed: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function uploadPriceFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64 = e.target.result.split(',')[1];
+
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/sync-prices/upload`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fileData: base64,
+                            fileName: file.name
+                        })
+                    });
+
+                    const result = await res.json();
+
+                    if (res.ok) {
+                        alert(`✓ Price upload completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`);
+                        loadPricingData();
+                        loadProducts();
+                        loadSyncStatus();
+                    } else {
+                        alert('Upload error: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('Upload failed: ' + error.message);
+                }
+            };
+
+            reader.readAsDataURL(file);
+            input.value = ''; // Reset input
+        }
+
+        async function loadSyncStatus() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sync-prices/status`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const status = await res.json();
+                    const infoEl = document.getElementById('lastSyncInfo');
+                    if (infoEl && status.lastSync) {
+                        const date = new Date(status.lastSync.date);
+                        infoEl.innerHTML = `Last sync: ${date.toLocaleDateString()} ${date.toLocaleTimeString()} (${status.lastSync.productsUpdated} updated)`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading sync status:', error);
+            }
+        }
+
+        // Load sync status when pricing tab is shown
+        document.querySelector('[data-tab="pricing"]')?.addEventListener('click', loadSyncStatus);
 
         // ============ 3-TIER PRICING MANAGEMENT ============
         let pricingProducts = [];
