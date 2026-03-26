@@ -958,6 +958,7 @@
                     <div class="tab-header-actions">
                         <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
                         <button class="btn btn-outline" onclick="importCPDProducts()" id="importCPDBtn">Import CPD Products</button>
+                        <button class="btn btn-outline" onclick="fixProductPricing()" id="fixPricingBtn" style="border-color: #f59e0b; color: #f59e0b;">Fix Pricing</button>
                         <div class="search-box">
                             <input type="text" id="productSearch" placeholder="Search products..." oninput="filterProducts()">
                         </div>
@@ -3089,7 +3090,7 @@
 
         // Bulk import CPD products with their cost prices
         async function importCPDProducts() {
-            if (!confirm('This will import all CPD products with their cost prices. Sell prices will be set equal to cost (add margins after). Continue?')) {
+            if (!confirm('This will import all CPD products with 3-tier pricing:\n\n• Cost = Supplier price\n• Admin = Cost + 10% (Acre Profit margin)\n• Retail = Admin + 15% (Rep commission)\n\nContinue?')) {
                 return;
             }
 
@@ -3123,10 +3124,9 @@
                 { productName: 'AMS x5', packSize: '24', unit: 'lb', costPrice: 1.45, category: 'adjuvant', notes: '24 lb bags' }
             ];
 
-            // Set sellPrice = costPrice initially (margins added later)
+            // Server will calculate adminPrice (cost + 10%) and sellPrice (admin + 15%)
             const productsToImport = cpdProducts.map(p => ({
                 ...p,
-                sellPrice: p.costPrice,
                 sourceSupplier: 'CPD'
             }));
 
@@ -3168,6 +3168,50 @@
 
             btn.disabled = false;
             btn.textContent = 'Import CPD Products';
+        }
+
+        // Fix pricing for existing products where costPrice is wrong
+        async function fixProductPricing() {
+            if (!confirm('This will fix pricing for products where:\n\n• Cost is 0 or missing\n• Admin price is missing\n\nIt will recalculate:\n• Cost = Current sell price (if cost is 0)\n• Admin = Cost + 10%\n• Retail = Admin + 15%\n\nContinue?')) {
+                return;
+            }
+
+            const btn = document.getElementById('fixPricingBtn');
+            btn.disabled = true;
+            btn.textContent = 'Fixing...';
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/fix-pricing`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        adminMargin: 10,
+                        retailMargin: 15
+                    })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    alert(`Pricing fixed!\n\nProducts updated: ${result.fixed}`);
+                    loadProducts();
+                    // Also reload pricing tab if visible
+                    if (document.getElementById('pricingTab')?.classList.contains('active')) {
+                        loadPricingData();
+                    }
+                } else {
+                    const error = await res.json();
+                    alert('Fix failed: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error fixing pricing:', error);
+                alert('Error fixing pricing: ' + error.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Fix Pricing';
         }
 
         // ===== LEDGER TAB =====
