@@ -3584,8 +3584,17 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             });
 
             if (!existing) {
+                // Calculate prices with margins if not set
+                const cost = chem.costPrice || 0;
+                const admin = chem.adminPrice || cost * 1.10; // 10% Acre Profit margin
+                const sell = chem.sellPrice || admin * 1.15; // 15% rep margin on top
+
                 const newChem = await Chemical.create({
                     ...chem,
+                    costPrice: cost,
+                    adminPrice: admin,
+                    sellPrice: sell,
+                    margin: sell > 0 ? Math.round(((sell - cost) / sell) * 100) : 0,
                     sourceSupplier: 'CPD',
                     priceVersion,
                     isActive: true,
@@ -3605,12 +3614,27 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                 });
                 results.created.push(`${chem.productName} (${chem.packSize})`);
             } else {
-                results.existing.push(`${chem.productName} (${chem.packSize})`);
+                // Update existing product if prices are 0
+                if (existing.costPrice === 0 || existing.sellPrice === 0) {
+                    const cost = chem.costPrice || existing.costPrice || 0;
+                    const admin = chem.adminPrice || cost * 1.10;
+                    const sell = chem.sellPrice || admin * 1.15;
+
+                    existing.costPrice = cost;
+                    existing.adminPrice = admin;
+                    existing.sellPrice = sell;
+                    existing.margin = sell > 0 ? Math.round(((sell - cost) / sell) * 100) : 0;
+                    existing.priceVersion = priceVersion;
+                    await existing.save();
+                    results.existing.push(`${chem.productName} (${chem.packSize}) - UPDATED`);
+                } else {
+                    results.existing.push(`${chem.productName} (${chem.packSize})`);
+                }
             }
         }
 
         res.json({
-            message: 'CPD products loaded successfully',
+            message: 'CPD products loaded/updated successfully',
             summary: {
                 created: results.created.length,
                 alreadyExisted: results.existing.length,
@@ -3639,22 +3663,26 @@ app.get('/api/chemicals', async (req, res) => {
         const chemicals = await Chemical.find(query)
             .sort({ productName: 1, packSize: 1 });
 
-        // For public view, show sellPrice not costPrice
-        const publicChemicals = chemicals.map(c => ({
-            _id: c._id,
-            productName: c.productName,
-            category: c.category,
-            crops: c.crops,
-            packSize: c.packSize,
-            unit: c.unit,
-            unitsPerPack: c.unitsPerPack,
-            price: c.sellPrice, // Customer sees sell price
-            defaultRate: c.defaultRate,
-            rateUnit: c.rateUnit,
-            notes: c.notes,
-            isActive: c.isActive,
-            availableForOrder: c.availableForOrder
-        }));
+        // For public view - ONLY show products with valid retail pricing
+        // NEVER expose wholesale/cost pricing to public
+        const publicChemicals = chemicals
+            .filter(c => c.sellPrice > 0) // Only show products with retail price set
+            .map(c => ({
+                _id: c._id,
+                productName: c.productName,
+                category: c.category,
+                crops: c.crops,
+                packSize: c.packSize,
+                unit: c.unit,
+                unitsPerPack: c.unitsPerPack,
+                price: c.sellPrice, // Only the retail price
+                sellPrice: c.sellPrice,
+                defaultRate: c.defaultRate,
+                rateUnit: c.rateUnit,
+                notes: c.notes,
+                isActive: c.isActive,
+                availableForOrder: c.availableForOrder
+            }));
 
         res.json(publicChemicals);
     } catch (error) {
@@ -3691,27 +3719,36 @@ app.get('/api/chemicals/for-customer', authMiddleware, async (req, res) => {
             pricingMap[dp.chemicalId.toString()] = dp.retailPrice;
         });
 
-        // Return products with the correct price for this customer
-        const customerChemicals = chemicals.map(c => {
-            const distributorPrice = pricingMap[c._id.toString()];
-            return {
-                _id: c._id,
-                productName: c.productName,
-                sourceSupplier: c.sourceSupplier,
-                category: c.category,
-                crops: c.crops,
-                packSize: c.packSize,
-                unit: c.unit,
-                unitsPerPack: c.unitsPerPack,
-                // Use distributor's retail price if set, otherwise fall back to base sellPrice
-                sellPrice: distributorPrice || c.sellPrice,
-                price: distributorPrice || c.sellPrice,
-                defaultRate: c.defaultRate,
-                rateUnit: c.rateUnit,
-                equivalentProduct: c.equivalentProduct,
-                notes: c.notes
-            };
-        });
+        // Return ONLY products that have a retail price set by distributor
+        // NEVER expose wholesale/cost pricing to customers
+        const customerChemicals = chemicals
+            .map(c => {
+                const distributorPrice = pricingMap[c._id.toString()];
+                // Must have a valid retail price from distributor
+                const retailPrice = distributorPrice || 0;
+
+                if (retailPrice <= 0) {
+                    return null; // Don't show products without retail pricing
+                }
+
+                return {
+                    _id: c._id,
+                    productName: c.productName,
+                    sourceSupplier: c.sourceSupplier,
+                    category: c.category,
+                    crops: c.crops,
+                    packSize: c.packSize,
+                    unit: c.unit,
+                    unitsPerPack: c.unitsPerPack,
+                    sellPrice: retailPrice,
+                    price: retailPrice,
+                    defaultRate: c.defaultRate,
+                    rateUnit: c.rateUnit,
+                    equivalentProduct: c.equivalentProduct,
+                    notes: c.notes
+                };
+            })
+            .filter(c => c !== null); // Remove products without retail pricing
 
         res.json(customerChemicals);
     } catch (error) {
