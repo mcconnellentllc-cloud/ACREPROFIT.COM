@@ -44,7 +44,6 @@
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
                     <a href="#purchase-orders" class="admin-tab" data-tab="purchase-orders">Purchase Orders</a>
                     <a href="#compliance" class="admin-tab tab-warning" data-tab="compliance">Compliance</a>
-                    <span id="pricingNav" style="display: none;"><a href="#pricing" class="admin-tab" data-tab="pricing">Pricing</a></span>
                     <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
                     <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
                     <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
@@ -68,48 +67,95 @@
 
             <!-- Dashboard Tab -->
             <div id="dashboardTab" class="tab-content active">
-                <div class="stats-grid">
-                    <div class="stat-card">
-                        <div class="stat-icon green">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                <!-- Main Navigation Cards -->
+                <div class="overview-cards">
+                    <div class="overview-card" onclick="switchTab('orders')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #dcfce7; color: #16a34a;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalCustomers">0</span>
-                            <span class="stat-label">Total Customers</span>
+                        <div class="overview-card-content">
+                            <h2>Orders</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalOrdersCount">0</span>
+                                <span class="stat-detail">Total Orders</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="pendingOrders">0</strong> pending</span>
+                                <span><strong id="totalRevenue">$0</strong> revenue</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-icon green">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                    <div class="overview-card" onclick="switchTab('products')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #dbeafe; color: #2563eb;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalOrdersCount">0</span>
-                            <span class="stat-label">Total Orders</span>
+                        <div class="overview-card-content">
+                            <h2>Products</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalProductsCount">0</span>
+                                <span class="stat-detail">Products</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="lowStockProducts">0</strong> low stock</span>
+                                <span><strong id="inventoryValue">$0</strong> value</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-icon orange">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                    <div class="overview-card" onclick="switchTab('customers')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #fef3c7; color: #d97706;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="pendingOrders">0</span>
-                            <span class="stat-label">Pending Orders</span>
+                        <div class="overview-card-content">
+                            <h2>Customers</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalCustomers">0</span>
+                                <span class="stat-detail">Customers</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="newCustomersMonth">0</strong> new this month</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="stat-card">
-                        <div class="stat-icon purple">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                    <div class="overview-card" onclick="switchTab('company-settings')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #f3e8ff; color: #7c3aed;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                         </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalRevenue">$0</span>
-                            <span class="stat-label">Total Revenue</span>
+                        <div class="overview-card-content">
+                            <h2>AcreProfit Business</h2>
+                            <div class="overview-card-stats">
+                                <span class="stat-detail">LLC & Compliance</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span id="complianceAlerts">Licenses, insurance, documents</span>
+                            </div>
                         </div>
+                        <div class="overview-card-arrow">→</div>
                     </div>
                 </div>
 
+                <!-- Quick Stats Bar -->
+                <div class="quick-stats-bar">
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">Today's Orders</span>
+                        <span class="quick-stat-value" id="todayOrders">0</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">This Week</span>
+                        <span class="quick-stat-value" id="weekRevenue">$0</span>
+                    </div>
+                    <div class="quick-stat">
+                        <span class="quick-stat-label">This Month</span>
+                        <span class="quick-stat-value" id="monthRevenue">$0</span>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
                 <div class="dashboard-grid">
                     <div class="card recent-orders-card">
                         <div class="card-header">
@@ -121,23 +167,12 @@
                         </div>
                     </div>
 
-                    <div class="card bundle-progress-card">
+                    <div class="card reminders-card" id="dashboardRemindersCard">
                         <div class="card-header">
-                            <h3>Bundle Progress</h3>
-                        </div>
-                        <div id="bundleProgress" class="bundle-list">
-                            <p class="loading">Loading bundle data...</p>
-                        </div>
-                    </div>
-
-                    <!-- License & Compliance Reminders (Superadmin Only) -->
-                    <div class="card reminders-card superadmin-only" id="dashboardRemindersCard" style="display: none;">
-                        <div class="card-header">
-                            <h3>Reminders & Compliance</h3>
-                            <a href="#company-settings" class="nav-tab" data-tab="company-settings">View All</a>
+                            <h3>Alerts & Reminders</h3>
                         </div>
                         <div id="dashboardReminders" class="reminders-list">
-                            <p class="loading">Loading reminders...</p>
+                            <p class="loading">Loading...</p>
                         </div>
                     </div>
                 </div>
@@ -958,7 +993,6 @@
                     <div class="tab-header-actions">
                         <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
                         <button class="btn btn-outline" onclick="importCPDProducts()" id="importCPDBtn">Import CPD Products</button>
-                        <button class="btn btn-outline" onclick="fixProductPricing()" id="fixPricingBtn" style="border-color: #f59e0b; color: #f59e0b;">Fix Pricing</button>
                         <div class="search-box">
                             <input type="text" id="productSearch" placeholder="Search products..." oninput="filterProducts()">
                         </div>
@@ -1281,100 +1315,6 @@
                         </thead>
                         <tbody id="poTableBody">
                             <tr><td colspan="7" class="loading">Loading purchase orders...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
-            </div>
-
-            <!-- Pricing Tiers Tab (Superadmin Only) -->
-            <div id="pricingTab" class="tab-content">
-                <div class="tab-header">
-                    <div>
-                        <h2>3-Tier Pricing Management</h2>
-                        <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
-                    </div>
-                    <div class="tab-header-actions">
-                        <button class="btn btn-primary" onclick="loadJabcoPrices()" id="loadJabcoBtn">
-                            Load Jabco/CPD Prices
-                        </button>
-                        <button class="btn btn-outline" onclick="syncPricesFromSharePoint()" id="syncPricesBtn">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                            Sync Prices
-                        </button>
-                        <label class="btn btn-outline" style="cursor: pointer;">
-                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
-                            Upload Excel
-                            <input type="file" id="priceFileUpload" accept=".xlsx,.xls,.csv" style="display: none;" onchange="uploadPriceFile(this)">
-                        </label>
-                        <span id="lastSyncInfo" style="font-size: 12px; color: #666; margin-left: 8px;"></span>
-                    </div>
-                </div>
-
-                <!-- Filter Controls -->
-                <div class="pricing-bulk-controls">
-                    <div class="bulk-control-group">
-                        <label>Filter Products:</label>
-                        <div class="search-filter-row">
-                            <input type="text" id="pricingSearch" placeholder="Search by product name..." oninput="filterPricingTable()">
-                            <select id="pricingCategoryFilter" onchange="filterPricingTable()">
-                                <option value="">All Categories</option>
-                                <option value="herbicide">Herbicide</option>
-                                <option value="insecticide">Insecticide</option>
-                                <option value="fungicide">Fungicide</option>
-                                <option value="adjuvant">Adjuvant</option>
-                                <option value="fertilizer">Fertilizer</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Tier Legend -->
-                <div class="pricing-legend">
-                    <div class="legend-item cost">
-                        <span class="legend-dot"></span>
-                        <span>Cost (Supplier)</span>
-                    </div>
-                    <div class="legend-arrow">+</div>
-                    <div class="legend-item admin">
-                        <span class="legend-dot"></span>
-                        <span>Admin (AP Margin)</span>
-                    </div>
-                    <div class="legend-arrow">+</div>
-                    <div class="legend-item retail">
-                        <span class="legend-dot"></span>
-                        <span>Retail (Rep Commission)</span>
-                    </div>
-                </div>
-
-                <!-- Save All Button -->
-                <div class="pricing-actions-bar">
-                    <div class="unsaved-indicator" id="unsavedIndicator" style="display: none;">
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                        <span id="unsavedCount">0</span> unsaved changes
-                    </div>
-                    <button class="btn btn-primary" id="saveAllPricingBtn" onclick="saveAllPricing()" disabled>
-                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                        Save All Changes
-                    </button>
-                </div>
-
-                <div class="orders-table-wrapper pricing-table-wrapper" style="margin-top: 16px;">
-                    <table class="admin-table pricing-table" id="pricingTable">
-                        <thead>
-                            <tr>
-                                <th style="width: 25%;">Product</th>
-                                <th style="width: 10%;">Category</th>
-                                <th style="width: 8%;">Unit</th>
-                                <th style="width: 12%; background: #fef2f2;">Cost</th>
-                                <th style="width: 12%; background: #fffbeb;">Admin</th>
-                                <th style="width: 12%; background: #f0fdf4;">Retail</th>
-                                <th style="width: 9%;">AP Margin</th>
-                                <th style="width: 9%;">Rep $</th>
-                                <th style="width: 3%;"></th>
-                            </tr>
-                        </thead>
-                        <tbody id="pricingTableBody">
-                            <tr><td colspan="9" class="loading">Loading products...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -2169,7 +2109,7 @@
         // Show features based on role
         if (userData.role === 'superadmin') {
             document.getElementById('repAppsNav').style.display = 'block';
-            document.getElementById('pricingNav').style.display = 'block';
+            // Pricing tab removed - functionality merged into Products
             document.getElementById('commissionsNav').style.display = 'block';
             document.getElementById('inventoryNav').style.display = 'block';
             document.getElementById('companySettingsNav').style.display = 'block';
@@ -2186,7 +2126,7 @@
             document.getElementById('adminRole').textContent = 'Distributor';
             document.getElementById('inventoryNav').style.display = 'block';
             // Hide tabs that distributors shouldn't see
-            document.getElementById('pricingNav').style.display = 'none';
+            // Pricing tab removed
             document.getElementById('commissionsNav').style.display = 'none';
             document.getElementById('repAppsNav').style.display = 'none';
         } else {
@@ -3145,50 +3085,6 @@
 
             btn.disabled = false;
             btn.textContent = 'Import CPD Products';
-        }
-
-        // Fix pricing for existing products where costPrice is wrong
-        async function fixProductPricing() {
-            if (!confirm('This will fix pricing for products where:\n\n• Cost is 0 or missing\n• Admin price is missing\n\nIt will recalculate:\n• Cost = Current sell price (if cost is 0)\n• Admin = Cost + 10%\n• Retail = Admin + 15%\n\nContinue?')) {
-                return;
-            }
-
-            const btn = document.getElementById('fixPricingBtn');
-            btn.disabled = true;
-            btn.textContent = 'Fixing...';
-
-            try {
-                const res = await fetch(`${API_URL}/api/chemicals/fix-pricing`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        adminMargin: 10,
-                        retailMargin: 15
-                    })
-                });
-
-                if (res.ok) {
-                    const result = await res.json();
-                    alert(`Pricing fixed!\n\nProducts updated: ${result.fixed}`);
-                    loadProducts();
-                    // Also reload pricing tab if visible
-                    if (document.getElementById('pricingTab')?.classList.contains('active')) {
-                        loadPricingData();
-                    }
-                } else {
-                    const error = await res.json();
-                    alert('Fix failed: ' + (error.error || 'Unknown error'));
-                }
-            } catch (error) {
-                console.error('Error fixing pricing:', error);
-                alert('Error fixing pricing: ' + error.message);
-            }
-
-            btn.disabled = false;
-            btn.textContent = 'Fix Pricing';
         }
 
         // ===== LEDGER TAB =====
@@ -4947,31 +4843,18 @@
         document.querySelector('[data-tab="pricing"]')?.addEventListener('click', loadSyncStatus);
 
         // ============ 3-TIER PRICING MANAGEMENT ============
-        let pricingProducts = [];
-        let changedProducts = new Set();
+        // Pricing tab removed - merged into Products tab
+        function loadPricingData() {}
+        function renderPricingTable() {}
+        function markPricingChanged() {}
+        function updateUnsavedIndicator() {}
+        function filterPricingTable() {}
+        function saveAllPricing() {}
+        function savePricing() {}
 
-        async function loadPricingData() {
-            const tbody = document.getElementById('pricingTableBody');
-            try {
-                const res = await fetch(`${API_URL}/api/chemicals`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                pricingProducts = await res.json();
+        /* Old pricing functions removed - pricing is now on Products tab
 
-                if (pricingProducts.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="9">No products found</td></tr>';
-                    return;
-                }
-
-                renderPricingTable();
-                changedProducts.clear();
-                updateUnsavedIndicator();
-            } catch (error) {
-                tbody.innerHTML = '<tr><td colspan="9" style="color: #dc2626;">Error loading products</td></tr>';
-            }
-        }
-
-        function renderPricingTable() {
+        function renderPricingTable_OLD() {
             const tbody = document.getElementById('pricingTableBody');
             const searchTerm = (document.getElementById('pricingSearch')?.value || '').toLowerCase();
             const categoryFilter = document.getElementById('pricingCategoryFilter')?.value || '';
@@ -5205,6 +5088,7 @@
                 setTimeout(() => { btn.textContent = 'Save'; }, 2000);
             }
         }
+        End of removed pricing functions */
 
         // ============ REP COMMISSION TRACKING ============
         async function loadCommissionData() {
@@ -5469,6 +5353,7 @@
                         <td><span class="order-status status-confirmed">${item.location || 'main'}</span></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
+                            <button class="btn btn-sm btn-outline" onclick="viewInventoryBatches('${item.chemicalId?._id || item.chemicalId}', '${item.productName}')" title="View batches by PO">Batches</button>
                             <button class="btn btn-sm btn-outline" onclick="viewInventoryHistory('${item._id}')">History</button>
                             <button class="btn btn-sm" onclick="adjustInventory('${item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
                         </td>
@@ -5620,6 +5505,174 @@
             } else {
                 alert(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: $${(suggestedOrder * (item.costPerUnit || 0)).toFixed(2)}`);
             }
+        }
+
+        // View inventory batches by PO
+        async function viewInventoryBatches(chemicalId, productName) {
+            if (!chemicalId) {
+                alert('No product ID available');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/batches/product/${chemicalId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load batches');
+
+                const batches = await res.json();
+
+                // Create modal content
+                let content = `
+                    <div class="modal-overlay" id="batchesModal" onclick="if(event.target===this)closeBatchesModal()">
+                        <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+                            <div class="modal-header">
+                                <h3>Inventory Batches - ${productName}</h3>
+                                <button class="close-btn" onclick="closeBatchesModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                `;
+
+                if (batches.length === 0) {
+                    content += '<p style="text-align: center; color: var(--text-muted);">No batches found. Receive a PO to create batches.</p>';
+                } else {
+                    content += `
+                        <table class="admin-table" style="margin: 0;">
+                            <thead>
+                                <tr>
+                                    <th>PO Number</th>
+                                    <th>Lot #</th>
+                                    <th>Received</th>
+                                    <th>Qty Left</th>
+                                    <th>Cost/Unit</th>
+                                    <th>Supplier</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    batches.forEach(batch => {
+                        const statusClass = batch.status === 'active' ? 'status-confirmed' :
+                                           batch.status === 'depleted' ? 'status-cancelled' : 'status-pending';
+                        const receivedDate = new Date(batch.receivedDate).toLocaleDateString();
+
+                        content += `
+                            <tr>
+                                <td><strong>${batch.poNumber}</strong></td>
+                                <td>${batch.lotNumber || '-'}</td>
+                                <td>${receivedDate}<br><small style="color: var(--text-muted);">${batch.quantityReceived} ${batch.unit || ''} received</small></td>
+                                <td><strong style="color: ${batch.quantityRemaining > 0 ? 'var(--success)' : 'var(--text-muted)'};">${batch.quantityRemaining}</strong> ${batch.unit || ''}</td>
+                                <td><strong>$${(batch.costPerUnit || 0).toFixed(2)}</strong></td>
+                                <td>${batch.supplierName || '-'}</td>
+                                <td><span class="order-status ${statusClass}">${batch.status}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    content += '</tbody></table>';
+
+                    // Summary
+                    const totalRemaining = batches.reduce((sum, b) => sum + (b.quantityRemaining || 0), 0);
+                    const avgCost = batches.length > 0 ?
+                        batches.reduce((sum, b) => sum + (b.costPerUnit || 0) * (b.quantityRemaining || 0), 0) / totalRemaining : 0;
+
+                    content += `
+                        <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; display: flex; gap: 24px;">
+                            <div><strong>Total Batches:</strong> ${batches.length}</div>
+                            <div><strong>Total Remaining:</strong> ${totalRemaining.toLocaleString()}</div>
+                            <div><strong>Weighted Avg Cost:</strong> $${avgCost.toFixed(2)}</div>
+                        </div>
+                    `;
+                }
+
+                content += `
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-outline" onclick="closeBatchesModal()">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Remove existing modal if any
+                const existing = document.getElementById('batchesModal');
+                if (existing) existing.remove();
+
+                // Add modal to page
+                document.body.insertAdjacentHTML('beforeend', content);
+
+            } catch (error) {
+                console.error('Error loading batches:', error);
+                alert('Error loading batches: ' + error.message);
+            }
+        }
+
+        function closeBatchesModal() {
+            const modal = document.getElementById('batchesModal');
+            if (modal) modal.remove();
+        }
+
+        // View inventory transaction history
+        async function viewInventoryHistory(inventoryId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/${inventoryId}/transactions`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load history');
+
+                const transactions = await res.json();
+                const item = allInventory.find(i => i._id === inventoryId);
+
+                let content = `
+                    <div class="modal-overlay" id="historyModal" onclick="if(event.target===this)closeHistoryModal()">
+                        <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+                            <div class="modal-header">
+                                <h3>Transaction History - ${item?.productName || 'Product'}</h3>
+                                <button class="close-btn" onclick="closeHistoryModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                `;
+
+                if (transactions.length === 0) {
+                    content += '<p style="text-align: center; color: var(--text-muted);">No transactions found.</p>';
+                } else {
+                    content += `<table class="admin-table" style="margin: 0;"><thead><tr>
+                        <th>Date</th><th>Type</th><th>Change</th><th>Reference</th><th>By</th>
+                    </tr></thead><tbody>`;
+
+                    transactions.forEach(t => {
+                        const date = new Date(t.createdAt).toLocaleDateString();
+                        const changeColor = t.quantityChange >= 0 ? 'var(--success)' : 'var(--danger)';
+                        content += `<tr>
+                            <td>${date}</td>
+                            <td><span class="order-status">${t.type}</span></td>
+                            <td style="color: ${changeColor}; font-weight: 600;">${t.quantityChange >= 0 ? '+' : ''}${t.quantityChange}</td>
+                            <td>${t.referenceNumber || '-'}</td>
+                            <td>${t.createdBy?.name || '-'}</td>
+                        </tr>`;
+                    });
+
+                    content += '</tbody></table>';
+                }
+
+                content += `</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeHistoryModal()">Close</button></div></div></div>`;
+
+                const existing = document.getElementById('historyModal');
+                if (existing) existing.remove();
+                document.body.insertAdjacentHTML('beforeend', content);
+
+            } catch (error) {
+                console.error('Error loading history:', error);
+                alert('Error loading history: ' + error.message);
+            }
+        }
+
+        function closeHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            if (modal) modal.remove();
         }
 
         // Filter inventory
@@ -5880,6 +5933,96 @@
 
         .tab-content.active {
             display: block;
+        }
+
+        /* Overview Cards */
+        .overview-cards {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 24px;
+            margin-bottom: 32px;
+        }
+        .overview-card {
+            background: var(--white);
+            border-radius: 16px;
+            padding: 24px;
+            display: flex;
+            align-items: center;
+            gap: 20px;
+            box-shadow: var(--shadow);
+            transition: transform 0.2s, box-shadow 0.2s;
+            border: 2px solid transparent;
+        }
+        .overview-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 12px 24px rgba(0,0,0,0.15);
+            border-color: var(--primary);
+        }
+        .overview-card-icon {
+            width: 80px;
+            height: 80px;
+            border-radius: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+        .overview-card-content {
+            flex: 1;
+        }
+        .overview-card-content h2 {
+            font-size: 1.25rem;
+            margin: 0 0 8px 0;
+            color: var(--text);
+        }
+        .overview-card-stats {
+            display: flex;
+            align-items: baseline;
+            gap: 8px;
+        }
+        .overview-card-stats .big-number {
+            font-size: 2.5rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .overview-card-stats .stat-detail {
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+        .overview-card-sub {
+            display: flex;
+            gap: 16px;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+        .overview-card-arrow {
+            font-size: 1.5rem;
+            color: var(--text-muted);
+        }
+        .quick-stats-bar {
+            display: flex;
+            gap: 24px;
+            background: var(--white);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 32px;
+            box-shadow: var(--shadow);
+        }
+        .quick-stat {
+            display: flex;
+            flex-direction: column;
+        }
+        .quick-stat-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+        .quick-stat-value {
+            font-size: 1.25rem;
+            font-weight: 600;
+        }
+        @media (max-width: 768px) {
+            .overview-cards { grid-template-columns: 1fr; }
         }
 
         .stats-grid {
