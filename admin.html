@@ -126,36 +126,7 @@
                             <h3>Bundle Progress</h3>
                         </div>
                         <div id="bundleProgress" class="bundle-list">
-                            <div class="bundle-item">
-                                <div class="bundle-info">
-                                    <span class="bundle-name">Glyphosate Shuttle</span>
-                                    <span class="bundle-detail">250 gal shuttles</span>
-                                </div>
-                                <div class="bundle-progress-bar">
-                                    <div class="progress-fill" style="width: 65%"></div>
-                                </div>
-                                <span class="bundle-qty">13/20 ordered</span>
-                            </div>
-                            <div class="bundle-item">
-                                <div class="bundle-info">
-                                    <span class="bundle-name">Atrazine Shuttle</span>
-                                    <span class="bundle-detail">250 gal shuttles</span>
-                                </div>
-                                <div class="bundle-progress-bar">
-                                    <div class="progress-fill" style="width: 40%"></div>
-                                </div>
-                                <span class="bundle-qty">8/20 ordered</span>
-                            </div>
-                            <div class="bundle-item">
-                                <div class="bundle-info">
-                                    <span class="bundle-name">Hydrovant</span>
-                                    <span class="bundle-detail">Gallons</span>
-                                </div>
-                                <div class="bundle-progress-bar">
-                                    <div class="progress-fill" style="width: 25%"></div>
-                                </div>
-                                <span class="bundle-qty">45/180 ordered</span>
-                            </div>
+                            <p class="loading">Loading bundle data...</p>
                         </div>
                     </div>
 
@@ -481,6 +452,24 @@
                                                 <option value="expired">Expired</option>
                                                 <option value="rejected">Rejected</option>
                                             </select>
+                                        </div>
+                                    </div>
+                                    <!-- License Card Photo Upload -->
+                                    <div class="license-photo-section">
+                                        <label>License Card Photo (Front)</label>
+                                        <p class="field-hint">Upload a photo of the license card for record keeping</p>
+                                        <div class="license-photo-upload">
+                                            <div id="licensePhotoPreview" class="license-photo-preview">
+                                                <span class="no-photo">No photo uploaded</span>
+                                            </div>
+                                            <div class="license-photo-actions">
+                                                <input type="file" id="licensePhotoInput" accept="image/*" onchange="previewLicensePhoto(this)" style="display: none;">
+                                                <button type="button" class="btn btn-outline btn-sm" onclick="document.getElementById('licensePhotoInput').click()">
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                                                    Upload Photo
+                                                </button>
+                                                <button type="button" class="btn btn-outline btn-sm" id="removeLicensePhotoBtn" onclick="removeLicensePhoto()" style="display: none;">Remove</button>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
@@ -2287,9 +2276,73 @@
                 document.getElementById('totalCustomers').textContent = customers.length;
                 renderCustomers(customers);
 
+                // Load bundle progress from real order data
+                loadBundleProgress(orders);
+
             } catch (error) {
                 console.error('Error loading dashboard:', error);
             }
+        }
+
+        // Load bundle progress from real order data
+        function loadBundleProgress(orders) {
+            const bundleContainer = document.getElementById('bundleProgress');
+
+            // Aggregate chemicals from all orders
+            const chemicalTotals = {};
+
+            orders.forEach(order => {
+                if (order.chemicals && Array.isArray(order.chemicals)) {
+                    order.chemicals.forEach(chem => {
+                        const name = chem.name || chem.productName || 'Unknown';
+                        const qty = parseFloat(chem.qty || chem.quantity || 0);
+                        const unit = chem.unit || 'units';
+
+                        const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
+                        if (!chemicalTotals[key]) {
+                            chemicalTotals[key] = {
+                                name: name,
+                                unit: unit,
+                                totalQty: 0,
+                                orderCount: 0
+                            };
+                        }
+                        chemicalTotals[key].totalQty += qty;
+                        chemicalTotals[key].orderCount++;
+                    });
+                }
+            });
+
+            // Convert to array and sort by quantity
+            const bundles = Object.values(chemicalTotals)
+                .filter(b => b.totalQty > 0)
+                .sort((a, b) => b.totalQty - a.totalQty)
+                .slice(0, 6); // Show top 6 products
+
+            if (bundles.length === 0) {
+                bundleContainer.innerHTML = '<p class="empty">No chemical orders yet</p>';
+                return;
+            }
+
+            bundleContainer.innerHTML = bundles.map(bundle => {
+                // Calculate progress (assuming shuttle = 250 gal target for bulk ordering)
+                const isShuttle = bundle.unit.toLowerCase().includes('gal') || bundle.unit.toLowerCase().includes('shuttle');
+                const targetQty = isShuttle ? Math.ceil(bundle.totalQty / 250) * 250 + 250 : bundle.totalQty + 50;
+                const progress = Math.min(100, (bundle.totalQty / targetQty) * 100);
+
+                return `
+                    <div class="bundle-item">
+                        <div class="bundle-info">
+                            <span class="bundle-name">${bundle.name}</span>
+                            <span class="bundle-detail">${bundle.orderCount} orders</span>
+                        </div>
+                        <div class="bundle-progress-bar">
+                            <div class="progress-fill" style="width: ${progress}%"></div>
+                        </div>
+                        <span class="bundle-qty">${bundle.totalQty.toLocaleString()} ${bundle.unit}</span>
+                    </div>
+                `;
+            }).join('');
         }
 
         // Load rep applications (superadmin only)
@@ -2613,6 +2666,9 @@
             document.getElementById('editLicenseStatus').value = license.verificationStatus || 'pending';
             toggleLicenseFields();
 
+            // Load license photo if exists
+            loadLicensePhoto(license.licenseDocumentUrl || null);
+
             // Show edit mode, hide view mode
             document.getElementById('viewMode').style.display = 'none';
             document.getElementById('editMode').style.display = 'block';
@@ -2632,6 +2688,54 @@
         function toggleLicenseFields() {
             const hasLicense = document.getElementById('editHasLicense').checked;
             document.getElementById('licenseFields').style.display = hasLicense ? 'block' : 'none';
+        }
+
+        // License photo state
+        let licensePhotoData = null;
+
+        // Preview license photo
+        function previewLicensePhoto(input) {
+            if (input.files && input.files[0]) {
+                const file = input.files[0];
+
+                // Check file size (max 5MB)
+                if (file.size > 5 * 1024 * 1024) {
+                    alert('Photo must be under 5MB');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    licensePhotoData = e.target.result;
+                    const preview = document.getElementById('licensePhotoPreview');
+                    preview.innerHTML = `<img src="${e.target.result}" alt="License Card">`;
+                    document.getElementById('removeLicensePhotoBtn').style.display = 'inline-flex';
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Remove license photo
+        function removeLicensePhoto() {
+            licensePhotoData = null;
+            const preview = document.getElementById('licensePhotoPreview');
+            preview.innerHTML = '<span class="no-photo">No photo uploaded</span>';
+            document.getElementById('licensePhotoInput').value = '';
+            document.getElementById('removeLicensePhotoBtn').style.display = 'none';
+        }
+
+        // Load existing license photo when viewing customer
+        function loadLicensePhoto(photoUrl) {
+            const preview = document.getElementById('licensePhotoPreview');
+            if (photoUrl) {
+                preview.innerHTML = `<img src="${photoUrl}" alt="License Card">`;
+                document.getElementById('removeLicensePhotoBtn').style.display = 'inline-flex';
+                licensePhotoData = photoUrl;
+            } else {
+                preview.innerHTML = '<span class="no-photo">No photo uploaded</span>';
+                document.getElementById('removeLicensePhotoBtn').style.display = 'none';
+                licensePhotoData = null;
+            }
         }
 
         // Save customer
@@ -2654,7 +2758,8 @@
                 licenseNumber: document.getElementById('editLicenseNumber').value.trim(),
                 state: document.getElementById('editLicenseState').value,
                 expirationDate: document.getElementById('editLicenseExpiration').value || null,
-                verificationStatus: document.getElementById('editLicenseStatus').value
+                verificationStatus: document.getElementById('editLicenseStatus').value,
+                licenseDocumentUrl: licensePhotoData || null
             };
 
             if (!name || !email) {
@@ -6053,6 +6158,68 @@
 
         #licenseFields {
             margin-top: 12px;
+        }
+
+        /* License Photo Upload */
+        .license-photo-section {
+            margin-top: 16px;
+            padding-top: 16px;
+            border-top: 1px solid var(--border);
+        }
+
+        .license-photo-section > label {
+            display: block;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+
+        .field-hint {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin: 0 0 12px 0;
+        }
+
+        .license-photo-upload {
+            display: flex;
+            gap: 16px;
+            align-items: flex-start;
+        }
+
+        .license-photo-preview {
+            width: 180px;
+            height: 120px;
+            background: var(--secondary);
+            border: 2px dashed var(--border);
+            border-radius: var(--radius);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            overflow: hidden;
+        }
+
+        .license-photo-preview img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .license-photo-preview .no-photo {
+            color: var(--text-muted);
+            font-size: 0.8rem;
+            text-align: center;
+            padding: 8px;
+        }
+
+        .license-photo-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .license-photo-actions .btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
         }
 
         /* License display in view mode */

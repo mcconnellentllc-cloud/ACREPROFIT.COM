@@ -625,9 +625,9 @@
                             <span>Pickup (FREE)</span>
                         </div>
 
-                        <div class="summary-line" id="achFeeRow" style="display: none;">
-                            <span>Processing Fee (ACH)</span>
-                            <span id="achFee">$0.00</span>
+                        <div class="summary-line" id="processingFeeRow">
+                            <span id="feeLabel">Processing Fee (Card)</span>
+                            <span id="processingFeeAmount">$0.00</span>
                         </div>
 
                         <div class="summary-line total">
@@ -751,14 +751,19 @@
             document.getElementById('itemCount').textContent = items.length;
             document.getElementById('itemsSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
 
-            // Calculate ACH fee if applicable
+            // Calculate processing fee based on payment method
+            const feeRow = document.getElementById('processingFeeRow');
+            const feeLabel = document.getElementById('feeLabel');
+            const feeAmount = document.getElementById('processingFeeAmount');
+
             if (selectedPaymentMethod === 'ach') {
                 processingFee = Math.min(subtotal * 0.008, 5); // 0.8% capped at $5
-                document.getElementById('achFeeRow').style.display = 'flex';
-                document.getElementById('achFee').textContent = '$' + processingFee.toFixed(2);
+                feeRow.style.display = 'flex';
+                feeLabel.textContent = 'Processing Fee (ACH)';
+                feeAmount.textContent = '$' + processingFee.toFixed(2);
             } else {
                 processingFee = 0;
-                document.getElementById('achFeeRow').style.display = 'none';
+                feeRow.style.display = 'none';
             }
 
             const total = subtotal + processingFee;
@@ -785,7 +790,7 @@
             if (method === 'check') {
                 document.getElementById('submitBtn').textContent = 'Place Order (Pay by Check)';
             } else {
-                document.getElementById('submitBtn').textContent = 'Place Order';
+                document.getElementById('submitBtn').textContent = 'Pay with Bank Account';
             }
 
             updateTotals();
@@ -890,7 +895,7 @@
                 };
 
                 if (selectedPaymentMethod === 'ach' && stripe && elements) {
-                    // Submit Stripe payment
+                    // Submit Stripe ACH payment
                     const { error: submitError } = await elements.submit();
                     if (submitError) {
                         throw new Error(submitError.message);

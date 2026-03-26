@@ -108,7 +108,28 @@
                             <!-- Products will be added here dynamically -->
                         </div>
 
-                        <div class="add-product-form">
+                        <!-- Chemical Catalog - Browse Available Products -->
+                        <div class="chemical-catalog">
+                            <div class="catalog-header">
+                                <h4>Available Products</h4>
+                                <div class="catalog-filters">
+                                    <select id="catalogCategory" onchange="filterCatalog()">
+                                        <option value="">All Categories</option>
+                                        <option value="herbicide">Herbicides</option>
+                                        <option value="adjuvant">Adjuvants</option>
+                                        <option value="fungicide">Fungicides</option>
+                                        <option value="insecticide">Insecticides</option>
+                                    </select>
+                                    <input type="text" id="catalogSearch" placeholder="Search products..." oninput="filterCatalog()">
+                                </div>
+                            </div>
+                            <div id="chemicalCatalog" class="catalog-grid">
+                                <p class="loading">Loading products...</p>
+                            </div>
+                        </div>
+
+                        <div class="add-product-form manual-entry">
+                            <h4>Manual Entry</h4>
                             <div class="form-row">
                                 <div class="form-group flex-2">
                                     <label>Product Name</label>
@@ -557,9 +578,71 @@
             }
         }
 
+        // Render chemical catalog
+        function renderCatalog() {
+            const container = document.getElementById('chemicalCatalog');
+            const categoryFilter = document.getElementById('catalogCategory').value.toLowerCase();
+            const searchTerm = document.getElementById('catalogSearch').value.toLowerCase();
+
+            let filtered = allChemicals.filter(c => {
+                const matchCategory = !categoryFilter || (c.category && c.category.toLowerCase() === categoryFilter);
+                const matchSearch = !searchTerm ||
+                    c.productName.toLowerCase().includes(searchTerm) ||
+                    (c.notes && c.notes.toLowerCase().includes(searchTerm));
+                return matchCategory && matchSearch;
+            });
+
+            if (filtered.length === 0) {
+                container.innerHTML = '<p class="empty">No products found</p>';
+                return;
+            }
+
+            container.innerHTML = filtered.map(chem => `
+                <div class="catalog-item" onclick="quickAddFromCatalog('${chem._id}')">
+                    <div class="catalog-item-name">${chem.productName}</div>
+                    <div class="catalog-item-details">
+                        <span class="pack-size">${chem.packSize || '-'} ${chem.unit || ''}</span>
+                        <span class="price">$${(chem.sellPrice || chem.costPrice || 0).toFixed(2)}/${chem.unit || 'unit'}</span>
+                    </div>
+                    ${chem.notes ? `<div class="catalog-item-note">${chem.notes}</div>` : ''}
+                    <button class="btn btn-sm btn-primary catalog-add-btn">+ Add</button>
+                </div>
+            `).join('');
+        }
+
+        function filterCatalog() {
+            renderCatalog();
+        }
+
+        // Quick add from catalog
+        function quickAddFromCatalog(chemicalId) {
+            const chem = allChemicals.find(c => c._id === chemicalId);
+            if (!chem) return;
+
+            // Prompt for quantity
+            const qty = prompt(`Enter quantity for ${chem.productName} (${chem.unit || 'units'}):`, '1');
+            if (!qty || isNaN(parseFloat(qty)) || parseFloat(qty) <= 0) return;
+
+            const product = {
+                name: chem.productName,
+                qty: parseFloat(qty),
+                unit: chem.unit || 'gallons',
+                price: chem.sellPrice || chem.costPrice || 0,
+                total: parseFloat(qty) * (chem.sellPrice || chem.costPrice || 0),
+                chemicalId: chem._id,
+                packSize: chem.packSize,
+                sourceSupplier: chem.sourceSupplier
+            };
+
+            products.push(product);
+            renderProducts();
+            updateSummary();
+        }
+
         // Initialize
         Promise.all([loadCustomers(), loadChemicals()]).then(() => {
             checkUrlCustomer();
+            renderCatalog();
         });
         renderProducts();
     </script>
@@ -960,6 +1043,109 @@
             color: var(--text-muted);
         }
 
+        /* Chemical Catalog */
+        .chemical-catalog {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            margin-bottom: 24px;
+        }
+
+        .catalog-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+            gap: 12px;
+        }
+
+        .catalog-header h4 {
+            margin: 0;
+            font-size: 1rem;
+        }
+
+        .catalog-filters {
+            display: flex;
+            gap: 12px;
+        }
+
+        .catalog-filters select,
+        .catalog-filters input {
+            padding: 8px 12px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 0.875rem;
+        }
+
+        .catalog-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 12px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .catalog-item {
+            background: var(--secondary);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.2s;
+            position: relative;
+        }
+
+        .catalog-item:hover {
+            border-color: var(--primary);
+            box-shadow: 0 2px 8px rgba(45, 90, 39, 0.15);
+        }
+
+        .catalog-item-name {
+            font-weight: 600;
+            margin-bottom: 4px;
+            font-size: 0.9rem;
+        }
+
+        .catalog-item-details {
+            display: flex;
+            justify-content: space-between;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 4px;
+        }
+
+        .catalog-item-details .price {
+            color: var(--primary);
+            font-weight: 600;
+        }
+
+        .catalog-item-note {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            font-style: italic;
+            margin-bottom: 8px;
+        }
+
+        .catalog-add-btn {
+            width: 100%;
+            padding: 6px !important;
+            font-size: 0.8rem !important;
+        }
+
+        .manual-entry {
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+
+        .manual-entry h4 {
+            margin-bottom: 12px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+        }
+
         @media (max-width: 768px) {
             .order-form-grid {
                 grid-template-columns: 1fr 1fr;
@@ -971,6 +1157,19 @@
 
             .flex-2, .flex-1 {
                 flex: 1 1 45%;
+            }
+
+            .catalog-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+
+            .catalog-filters {
+                width: 100%;
+            }
+
+            .catalog-filters select,
+            .catalog-filters input {
+                flex: 1;
             }
         }
     </style>
