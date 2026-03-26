@@ -1039,6 +1039,28 @@ purchaseOrderSchema.index({ orderDate: -1 });
 
 const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
 
+// Supplier Model - Save supplier information for reuse
+const supplierSchema = new mongoose.Schema({
+    name: { type: String, required: true },
+    contact: String,
+    phone: String,
+    email: String,
+    address: {
+        street: String,
+        city: String,
+        state: String,
+        zip: String
+    },
+    notes: String,
+    isActive: { type: Boolean, default: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+supplierSchema.index({ name: 1 });
+const Supplier = mongoose.model('Supplier', supplierSchema);
+
 // Purchase Order Split Model (How a PO is split between distributors)
 const purchaseOrderSplitSchema = new mongoose.Schema({
     // Link to parent purchase order
@@ -5714,6 +5736,84 @@ app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) 
             .populate('createdBy', 'name');
 
         res.status(201).json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ SUPPLIER ENDPOINTS ============
+
+// Get all suppliers
+app.get('/api/admin/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const suppliers = await Supplier.find({ isActive: true }).sort({ name: 1 });
+        res.json(suppliers);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create a new supplier
+app.post('/api/admin/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, contact, phone, email, address, notes } = req.body;
+
+        if (!name) {
+            return res.status(400).json({ error: 'Supplier name is required' });
+        }
+
+        const supplier = new Supplier({
+            name,
+            contact,
+            phone,
+            email,
+            address,
+            notes,
+            createdBy: req.user._id
+        });
+
+        await supplier.save();
+        res.status(201).json(supplier);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update a supplier
+app.put('/api/admin/suppliers/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, contact, phone, email, address, notes } = req.body;
+
+        const supplier = await Supplier.findByIdAndUpdate(
+            req.params.id,
+            { name, contact, phone, email, address, notes, updatedAt: new Date() },
+            { new: true }
+        );
+
+        if (!supplier) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+
+        res.json(supplier);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete (deactivate) a supplier
+app.delete('/api/admin/suppliers/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const supplier = await Supplier.findByIdAndUpdate(
+            req.params.id,
+            { isActive: false, updatedAt: new Date() },
+            { new: true }
+        );
+
+        if (!supplier) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+
+        res.json({ message: 'Supplier deleted' });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

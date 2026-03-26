@@ -1881,6 +1881,12 @@
                     <div class="customer-modal-body">
                         <form id="createPOForm" class="edit-customer-form">
                             <h4 style="margin-bottom: 12px; color: var(--primary);">Supplier Information</h4>
+                            <div class="form-group">
+                                <label>Select Existing Supplier</label>
+                                <select id="poSupplierSelect" onchange="fillSupplierInfo()" style="padding: 10px; border: 2px solid var(--border); border-radius: 8px;">
+                                    <option value="">-- New Supplier --</option>
+                                </select>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Supplier Name *</label>
@@ -1900,6 +1906,12 @@
                                     <label>Email</label>
                                     <input type="email" id="poSupplierEmail" placeholder="sales@supplier.com">
                                 </div>
+                            </div>
+                            <div class="form-group" id="saveSupplierGroup">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="poSaveSupplier" style="width: 18px; height: 18px;">
+                                    Save this supplier for future orders
+                                </label>
                             </div>
 
                             <h4 style="margin: 20px 0 12px; color: var(--primary);">Line Items</h4>
@@ -3435,12 +3447,55 @@
         }
 
         // Create PO Modal Functions
-        function openCreatePOModal() {
+        let allSuppliers = [];
+
+        async function openCreatePOModal() {
             document.getElementById('createPOModal').style.display = 'flex';
             document.getElementById('createPOForm').reset();
             document.getElementById('poItemsContainer').innerHTML = '';
             addPOItemRow(); // Add first row
             updatePOTotal();
+
+            // Load suppliers
+            try {
+                const res = await fetch(`${API_URL}/api/admin/suppliers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                allSuppliers = await res.json();
+
+                const select = document.getElementById('poSupplierSelect');
+                select.innerHTML = '<option value="">-- New Supplier --</option>' +
+                    allSuppliers.map(s => `<option value="${s._id}">${s.name}</option>`).join('');
+
+                // Show save checkbox for new suppliers
+                document.getElementById('saveSupplierGroup').style.display = 'block';
+            } catch (e) {
+                console.error('Error loading suppliers:', e);
+            }
+        }
+
+        function fillSupplierInfo() {
+            const select = document.getElementById('poSupplierSelect');
+            const supplierId = select.value;
+
+            if (supplierId) {
+                const supplier = allSuppliers.find(s => s._id === supplierId);
+                if (supplier) {
+                    document.getElementById('poSupplierName').value = supplier.name || '';
+                    document.getElementById('poSupplierContact').value = supplier.contact || '';
+                    document.getElementById('poSupplierPhone').value = supplier.phone || '';
+                    document.getElementById('poSupplierEmail').value = supplier.email || '';
+                    // Hide save checkbox when using existing supplier
+                    document.getElementById('saveSupplierGroup').style.display = 'none';
+                }
+            } else {
+                // Clear fields for new supplier
+                document.getElementById('poSupplierName').value = '';
+                document.getElementById('poSupplierContact').value = '';
+                document.getElementById('poSupplierPhone').value = '';
+                document.getElementById('poSupplierEmail').value = '';
+                document.getElementById('saveSupplierGroup').style.display = 'block';
+            }
         }
 
         function closeCreatePOModal() {
@@ -3579,6 +3634,26 @@
 
                 if (res.ok) {
                     const newPO = await res.json();
+
+                    // Save supplier if checkbox is checked and it's a new supplier
+                    const saveSupplier = document.getElementById('poSaveSupplier')?.checked;
+                    const existingSupplierId = document.getElementById('poSupplierSelect')?.value;
+
+                    if (saveSupplier && !existingSupplierId) {
+                        await fetch(`${API_URL}/api/admin/suppliers`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                name: supplierName,
+                                contact: document.getElementById('poSupplierContact').value.trim(),
+                                phone: document.getElementById('poSupplierPhone').value.trim(),
+                                email: document.getElementById('poSupplierEmail').value.trim()
+                            })
+                        });
+                    }
 
                     // Upload document if one was selected
                     const fileInput = document.getElementById('poDocument');
