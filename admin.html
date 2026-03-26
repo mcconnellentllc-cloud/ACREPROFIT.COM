@@ -982,13 +982,14 @@
                                 <th>Cost Price</th>
                                 <th>Sell Price</th>
                                 <th>Margin %</th>
+                                <th>Inventory</th>
                                 <th>Units Sold</th>
                                 <th>Revenue</th>
                                 <th>Added By</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
-                            <tr><td colspan="9" class="loading">Loading products...</td></tr>
+                            <tr><td colspan="10" class="loading">Loading products...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1287,8 +1288,25 @@
             <!-- Pricing Tiers Tab (Superadmin Only) -->
             <div id="pricingTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>3-Tier Pricing Management</h2>
-                    <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
+                    <div>
+                        <h2>3-Tier Pricing Management</h2>
+                        <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
+                    </div>
+                    <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="loadJabcoPrices()" id="loadJabcoBtn">
+                            Load Jabco/CPD Prices
+                        </button>
+                        <button class="btn btn-outline" onclick="syncPricesFromSharePoint()" id="syncPricesBtn">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
+                            Sync Prices
+                        </button>
+                        <label class="btn btn-outline" style="cursor: pointer;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                            Upload Excel
+                            <input type="file" id="priceFileUpload" accept=".xlsx,.xls,.csv" style="display: none;" onchange="uploadPriceFile(this)">
+                        </label>
+                        <span id="lastSyncInfo" style="font-size: 12px; color: #666; margin-left: 8px;"></span>
+                    </div>
                 </div>
 
                 <!-- Bulk Edit Controls -->
@@ -1866,6 +1884,12 @@
                     <div class="customer-modal-body">
                         <form id="createPOForm" class="edit-customer-form">
                             <h4 style="margin-bottom: 12px; color: var(--primary);">Supplier Information</h4>
+                            <div class="form-group">
+                                <label>Select Existing Supplier</label>
+                                <select id="poSupplierSelect" onchange="fillSupplierInfo()" style="padding: 10px; border: 2px solid var(--border); border-radius: 8px;">
+                                    <option value="">-- New Supplier --</option>
+                                </select>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Supplier Name *</label>
@@ -1885,6 +1909,12 @@
                                     <label>Email</label>
                                     <input type="email" id="poSupplierEmail" placeholder="sales@supplier.com">
                                 </div>
+                            </div>
+                            <div class="form-group" id="saveSupplierGroup">
+                                <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="poSaveSupplier" style="width: 18px; height: 18px;">
+                                    Save this supplier for future orders
+                                </label>
                             </div>
 
                             <h4 style="margin: 20px 0 12px; color: var(--primary);">Line Items</h4>
@@ -1923,6 +1953,13 @@
                             <div class="form-group">
                                 <label>Notes</label>
                                 <textarea id="poNotes" rows="2" placeholder="Additional notes for this order"></textarea>
+                            </div>
+
+                            <h4 style="margin: 20px 0 12px; color: var(--primary);">Attach Document</h4>
+                            <div class="form-group">
+                                <label>PDF Invoice/Quote (optional)</label>
+                                <input type="file" id="poDocument" accept=".pdf,.png,.jpg,.jpeg" style="padding: 8px; border: 2px dashed var(--border); border-radius: 8px; width: 100%; cursor: pointer;">
+                                <small style="color: #6b7280;">Accepted: PDF, PNG, JPG</small>
                             </div>
 
                             <div style="background: #f0fdf4; border: 2px solid var(--primary); border-radius: 8px; padding: 16px; margin-top: 16px;">
@@ -2035,6 +2072,24 @@
                             </div>
                         </div>
 
+                        <!-- Documents Section -->
+                        <div style="margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="color: var(--primary); margin: 0;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                    Documents
+                                </h4>
+                                <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                    Upload
+                                    <input type="file" id="poDocUpload" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls" style="display: none;" onchange="uploadPODocument(this)">
+                                </label>
+                            </div>
+                            <div id="poDocumentsContainer">
+                                <p style="color: #666; font-style: italic; font-size: 14px;">No documents attached</p>
+                            </div>
+                        </div>
+
                         <!-- Split Section -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <h4 style="color: var(--primary);">Load Splits (Distributor Allocations)</h4>
@@ -2046,6 +2101,10 @@
                     </div>
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closePODetailModal()">Close</button>
+                        <button class="btn btn-primary" id="receivePOBtn" onclick="receivePurchaseOrder()" style="background: #059669;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                            Receive Inventory
+                        </button>
                     </div>
                 </div>
             </div>
@@ -2560,7 +2619,7 @@
         }
 
         // Add Customer Modal
-        function openAddCustomerModal() {
+        async function openAddCustomerModal() {
             document.getElementById('addCustomerModal').style.display = 'flex';
             document.getElementById('addName').value = '';
             document.getElementById('addEmail').value = '';
@@ -2570,6 +2629,19 @@
             document.getElementById('addState').value = '';
             document.getElementById('addAcres').value = '';
             document.getElementById('addCrops').value = '';
+
+            // Load representatives dynamically
+            try {
+                const res = await fetch(`${API_URL}/api/representatives`);
+                const reps = await res.json();
+                const select = document.getElementById('addRepresentative');
+                select.innerHTML = reps.map(rep => {
+                    const shortId = rep.name.split(' ')[0].toLowerCase();
+                    return `<option value="${shortId}">${rep.name}</option>`;
+                }).join('');
+            } catch (e) {
+                console.error('Error loading representatives:', e);
+            }
         }
 
         function closeAddCustomerModal() {
@@ -2829,13 +2901,24 @@
 
         async function loadProducts() {
             try {
-                const res = await fetch(`${API_URL}/api/admin/products`, {
+                // Use the endpoint that includes inventory data
+                const res = await fetch(`${API_URL}/api/admin/products-with-inventory`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 allProducts = await res.json();
                 renderProducts(allProducts);
             } catch (error) {
                 console.error('Error loading products:', error);
+                // Fallback to regular products endpoint
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/products`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    allProducts = await res.json();
+                    renderProducts(allProducts);
+                } catch (e) {
+                    console.error('Fallback also failed:', e);
+                }
             }
         }
 
@@ -2860,7 +2943,7 @@
             const tbody = document.getElementById('productsTableBody');
 
             if (!products.length) {
-                tbody.innerHTML = '<tr><td colspan="9" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="10" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
                 return;
             }
 
@@ -2868,6 +2951,8 @@
                 const margin = p.margin || 0;
                 const marginColor = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
                 const profit = p.sellPrice - p.costPrice;
+                const inventory = p.quantityOnHand || 0;
+                const inventoryColor = inventory === 0 ? '#dc2626' : inventory < 10 ? '#d97706' : '#059669';
 
                 return `
                 <tr>
@@ -2882,6 +2967,10 @@
                     <td>
                         <span style="color: ${marginColor}; font-weight: 700;">${margin.toFixed(1)}%</span>
                         <br><small style="color: ${marginColor}">$${profit.toFixed(2)}/unit</small>
+                    </td>
+                    <td>
+                        <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
+                        ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
                     </td>
                     <td>${p.unitsSold || 0}</td>
                     <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
@@ -3129,11 +3218,9 @@
         }
 
         async function loadLedgerReps() {
-            const res = await fetch(`${API_URL}/api/admin/ledger/summary`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            const summaries = await res.json();
-            const reps = summaries.map(s => s.rep);
+            // Fetch all representatives for the dropdown
+            const res = await fetch(`${API_URL}/api/representatives`);
+            const reps = await res.json();
 
             const filterSelect = document.getElementById('ledgerRepFilter');
             reps.forEach(rep => {
@@ -3363,12 +3450,55 @@
         }
 
         // Create PO Modal Functions
-        function openCreatePOModal() {
+        let allSuppliers = [];
+
+        async function openCreatePOModal() {
             document.getElementById('createPOModal').style.display = 'flex';
             document.getElementById('createPOForm').reset();
             document.getElementById('poItemsContainer').innerHTML = '';
             addPOItemRow(); // Add first row
             updatePOTotal();
+
+            // Load suppliers
+            try {
+                const res = await fetch(`${API_URL}/api/admin/suppliers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                allSuppliers = await res.json();
+
+                const select = document.getElementById('poSupplierSelect');
+                select.innerHTML = '<option value="">-- New Supplier --</option>' +
+                    allSuppliers.map(s => `<option value="${s._id}">${s.name}</option>`).join('');
+
+                // Show save checkbox for new suppliers
+                document.getElementById('saveSupplierGroup').style.display = 'block';
+            } catch (e) {
+                console.error('Error loading suppliers:', e);
+            }
+        }
+
+        function fillSupplierInfo() {
+            const select = document.getElementById('poSupplierSelect');
+            const supplierId = select.value;
+
+            if (supplierId) {
+                const supplier = allSuppliers.find(s => s._id === supplierId);
+                if (supplier) {
+                    document.getElementById('poSupplierName').value = supplier.name || '';
+                    document.getElementById('poSupplierContact').value = supplier.contact || '';
+                    document.getElementById('poSupplierPhone').value = supplier.phone || '';
+                    document.getElementById('poSupplierEmail').value = supplier.email || '';
+                    // Hide save checkbox when using existing supplier
+                    document.getElementById('saveSupplierGroup').style.display = 'none';
+                }
+            } else {
+                // Clear fields for new supplier
+                document.getElementById('poSupplierName').value = '';
+                document.getElementById('poSupplierContact').value = '';
+                document.getElementById('poSupplierPhone').value = '';
+                document.getElementById('poSupplierEmail').value = '';
+                document.getElementById('saveSupplierGroup').style.display = 'block';
+            }
         }
 
         function closeCreatePOModal() {
@@ -3506,6 +3636,43 @@
                 });
 
                 if (res.ok) {
+                    const newPO = await res.json();
+
+                    // Save supplier if checkbox is checked and it's a new supplier
+                    const saveSupplier = document.getElementById('poSaveSupplier')?.checked;
+                    const existingSupplierId = document.getElementById('poSupplierSelect')?.value;
+
+                    if (saveSupplier && !existingSupplierId) {
+                        await fetch(`${API_URL}/api/admin/suppliers`, {
+                            method: 'POST',
+                            headers: {
+                                'Content-Type': 'application/json',
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: JSON.stringify({
+                                name: supplierName,
+                                contact: document.getElementById('poSupplierContact').value.trim(),
+                                phone: document.getElementById('poSupplierPhone').value.trim(),
+                                email: document.getElementById('poSupplierEmail').value.trim()
+                            })
+                        });
+                    }
+
+                    // Upload document if one was selected
+                    const fileInput = document.getElementById('poDocument');
+                    if (fileInput.files.length > 0) {
+                        const formData = new FormData();
+                        formData.append('document', fileInput.files[0]);
+
+                        await fetch(`${API_URL}/api/admin/purchase-orders/${newPO._id}/documents`, {
+                            method: 'POST',
+                            headers: {
+                                'Authorization': `Bearer ${token}`
+                            },
+                            body: formData
+                        });
+                    }
+
                     closeCreatePOModal();
                     loadPurchaseOrders();
                     alert('Purchase order created!');
@@ -3572,6 +3739,9 @@
                 // Populate splits
                 renderSplits(splits);
 
+                // Render attached documents
+                renderPODocuments();
+
                 // Load distributors for split modal
                 await loadDistributors();
 
@@ -3584,6 +3754,162 @@
         function closePODetailModal() {
             document.getElementById('poDetailModal').style.display = 'none';
             currentPO = null;
+        }
+
+        // Receive Purchase Order - Add items to inventory
+        async function receivePurchaseOrder() {
+            if (!currentPO) {
+                alert('No purchase order selected');
+                return;
+            }
+
+            if (currentPO.status === 'received' || currentPO.status === 'closed') {
+                alert('This PO has already been received');
+                return;
+            }
+
+            const confirmed = confirm(`Receive all items from ${currentPO.poNumber}?\n\nThis will add all items to inventory.`);
+            if (!confirmed) return;
+
+            try {
+                // Build items array with all quantities
+                const items = currentPO.items.map((item, index) => ({
+                    itemIndex: index,
+                    quantityReceived: item.quantityOrdered
+                }));
+
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/receive`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        items,
+                        location: 'main',
+                        notes: `Received via admin panel on ${new Date().toLocaleDateString()}`
+                    })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    alert(`✓ Inventory received!\n\n${result.inventoryUpdates.map(u => `${u.productName}: +${u.quantityReceived}`).join('\n')}`);
+                    closePODetailModal();
+                    loadPurchaseOrders();
+                    // Refresh products if that tab is loaded
+                    if (allProducts.length > 0) loadProducts();
+                } else {
+                    const error = await res.json();
+                    alert('Error receiving inventory: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Error receiving PO:', error);
+                alert('Error receiving inventory. Please try again.');
+            }
+        }
+
+        // ============ PO DOCUMENT FUNCTIONS ============
+
+        function renderPODocuments() {
+            const container = document.getElementById('poDocumentsContainer');
+            if (!currentPO || !currentPO.documents || currentPO.documents.length === 0) {
+                container.innerHTML = '<p style="color: #666; font-style: italic; font-size: 14px;">No documents attached</p>';
+                return;
+            }
+
+            container.innerHTML = currentPO.documents.map(doc => {
+                const icon = doc.fileType.includes('pdf') ? '📄' :
+                             doc.fileType.includes('image') ? '🖼️' :
+                             doc.fileType.includes('sheet') || doc.fileType.includes('excel') ? '📊' : '📎';
+                const size = (doc.fileSize / 1024).toFixed(1) + ' KB';
+                const date = new Date(doc.uploadedAt).toLocaleDateString();
+
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: white; border-radius: 6px; margin-bottom: 6px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.25rem;">${icon}</span>
+                            <div>
+                                <div style="font-weight: 500; font-size: 14px;">${doc.fileName}</div>
+                                <div style="font-size: 12px; color: #666;">${doc.documentType} • ${size} • ${date}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${doc._id}"
+                               target="_blank" class="btn btn-outline btn-sm" style="padding: 4px 8px;">View</a>
+                            <a href="${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${doc._id}/download"
+                               class="btn btn-outline btn-sm" style="padding: 4px 8px;">Download</a>
+                            ${userData.role === 'superadmin' ? `
+                                <button onclick="deletePODocument('${doc._id}')" class="btn btn-outline btn-sm"
+                                        style="padding: 4px 8px; color: #dc2626; border-color: #dc2626;">Delete</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function uploadPODocument(input) {
+            if (!currentPO) {
+                alert('No purchase order selected');
+                return;
+            }
+
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('document', file);
+            formData.append('documentType', 'invoice'); // Default to invoice
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    currentPO = result.purchaseOrder;
+                    renderPODocuments();
+                    alert('✓ Document uploaded successfully');
+                } else {
+                    const error = await res.json();
+                    alert('Upload failed: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed. Please try again.');
+            }
+
+            input.value = ''; // Reset input
+        }
+
+        async function deletePODocument(docId) {
+            if (!confirm('Delete this document?')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${docId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    currentPO = result.purchaseOrder;
+                    renderPODocuments();
+                } else {
+                    const error = await res.json();
+                    alert('Delete failed: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Delete failed. Please try again.');
+            }
         }
 
         // Admin Fee Calculator Functions
@@ -4466,6 +4792,139 @@
             }
         }
 
+        // ============ PRICE SYNC FUNCTIONS ============
+
+        // Load Jabco/CPD prices from seed data
+        async function loadJabcoPrices() {
+            const btn = document.getElementById('loadJabcoBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Loading...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/seed`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ secretKey: 'acreprofit2026seed' })
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    alert(`✓ Jabco/CPD Prices Loaded!\n\nNew products: ${result.summary?.created || 0}\nUpdated: ${result.summary?.alreadyExisted || 0}`);
+                    loadPricingData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                alert('Load failed: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function syncPricesFromSharePoint() {
+            const btn = document.getElementById('syncPricesBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="spin"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg> Syncing...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sync-prices/sharepoint`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    alert(`✓ Price sync completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`);
+                    loadPricingData();
+                    loadProducts();
+                    loadSyncStatus();
+                } else {
+                    alert('Sync error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Sync error:', error);
+                alert('Sync failed: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
+
+        async function uploadPriceFile(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async function(e) {
+                const base64 = e.target.result.split(',')[1];
+
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/sync-prices/upload`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            fileData: base64,
+                            fileName: file.name
+                        })
+                    });
+
+                    const result = await res.json();
+
+                    if (res.ok) {
+                        alert(`✓ Price upload completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`);
+                        loadPricingData();
+                        loadProducts();
+                        loadSyncStatus();
+                    } else {
+                        alert('Upload error: ' + (result.error || 'Unknown error'));
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('Upload failed: ' + error.message);
+                }
+            };
+
+            reader.readAsDataURL(file);
+            input.value = ''; // Reset input
+        }
+
+        async function loadSyncStatus() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sync-prices/status`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const status = await res.json();
+                    const infoEl = document.getElementById('lastSyncInfo');
+                    if (infoEl && status.lastSync) {
+                        const date = new Date(status.lastSync.date);
+                        infoEl.innerHTML = `Last sync: ${date.toLocaleDateString()} ${date.toLocaleTimeString()} (${status.lastSync.productsUpdated} updated)`;
+                    }
+                }
+            } catch (error) {
+                console.error('Error loading sync status:', error);
+            }
+        }
+
+        // Load sync status when pricing tab is shown
+        document.querySelector('[data-tab="pricing"]')?.addEventListener('click', loadSyncStatus);
+
         // ============ 3-TIER PRICING MANAGEMENT ============
         let pricingProducts = [];
         let changedProducts = new Set();
@@ -4969,22 +5428,18 @@
         // Load inventory data
         async function loadInventory() {
             try {
-                const res = await fetch(`${API_URL}/api/inventory`, {
+                const res = await fetch(`${API_URL}/api/admin/inventory`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) {
-                    // If no inventory endpoint exists, use localStorage as fallback
-                    allInventory = JSON.parse(localStorage.getItem('inventory') || '[]');
-                } else {
-                    allInventory = await res.json();
+                    throw new Error('Failed to load inventory');
                 }
+                allInventory = await res.json();
                 renderInventory(allInventory);
                 updateInventoryStats();
             } catch (error) {
-                console.log('Using local inventory storage');
-                allInventory = JSON.parse(localStorage.getItem('inventory') || '[]');
-                renderInventory(allInventory);
-                updateInventoryStats();
+                console.error('Error loading inventory:', error);
+                document.getElementById('inventoryTableBody').innerHTML = '<tr><td colspan="10" class="empty">Error loading inventory. Please try again.</td></tr>';
             }
         }
 
@@ -4999,30 +5454,31 @@
             }
 
             tbody.innerHTML = items.map(item => {
-                const isOwner = item.addedById === currentUserId || userData.role === 'superadmin';
-                const isLowStock = item.lowStockThreshold && item.quantity <= item.lowStockThreshold;
-                const statusClass = isLowStock ? 'status-pending' : 'status-confirmed';
-                const statusText = isLowStock ? 'Low Stock' : 'In Stock';
-                const availableClass = item.availableToSell ? 'status-confirmed' : 'status-pending';
-                const availableText = item.availableToSell ? 'Listed' : 'Not Listed';
+                // Map Inventory model fields
+                const qty = item.quantityOnHand || item.quantity || 0;
+                const cost = item.averageCost || item.costPerUnit || 0;
+                const sellPrice = item.chemicalId?.sellPrice || item.sellPrice || 0;
+                const category = item.chemicalId?.category || item.category || '-';
+                const isLowStock = item.reorderPoint && qty <= item.reorderPoint;
+                const margin = sellPrice > 0 && cost > 0 ? Math.round(((sellPrice - cost) / sellPrice) * 100) : 0;
+
+                const statusClass = isLowStock ? 'status-pending' : qty > 0 ? 'status-confirmed' : 'status-cancelled';
+                const statusText = qty === 0 ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock';
 
                 return `
                     <tr>
-                        <td><strong>${item.productName}</strong>${item.manufacturer ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.manufacturer}</span>` : ''}</td>
-                        <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${item.category || '-'}</span></td>
-                        <td><strong>${item.quantity?.toLocaleString() || 0}</strong></td>
+                        <td><strong>${item.productName}</strong>${item.packSize ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.packSize}</span>` : ''}</td>
+                        <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${category}</span></td>
+                        <td><strong>${qty.toLocaleString()}</strong></td>
                         <td>${item.unit || '-'}</td>
-                        <td class="cost-column">${isOwner ? '$' + (item.costPerUnit?.toFixed(2) || '0.00') : '<span style="color:#999;">Hidden</span>'}</td>
-                        <td class="cost-column">${isOwner ? (item.margin || 0) + '%' : '<span style="color:#999;">-</span>'}</td>
-                        <td><strong style="color: var(--primary);">$${item.sellPrice?.toFixed(2) || '0.00'}</strong></td>
-                        <td><span class="order-status ${availableClass}">${availableText}</span></td>
+                        <td class="cost-column">$${cost.toFixed(2)}</td>
+                        <td class="cost-column">${margin}%</td>
+                        <td><strong style="color: var(--primary);">$${sellPrice.toFixed(2)}</strong></td>
+                        <td><span class="order-status status-confirmed">${item.location || 'main'}</span></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
-                            ${isOwner ? `
-                                <button class="btn btn-sm btn-outline" onclick="editInventory('${item.id || item._id}')">Edit</button>
-                                <button class="btn btn-sm" onclick="adjustInventory('${item.id || item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
-                                <button class="btn btn-sm" onclick="deleteInventory('${item.id || item._id}')" style="background: #dc2626; color: white;">Delete</button>
-                            ` : '<span style="color:#999; font-size: 0.8rem;">View Only</span>'}
+                            <button class="btn btn-sm btn-outline" onclick="viewInventoryHistory('${item._id}')">History</button>
+                            <button class="btn btn-sm" onclick="adjustInventory('${item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
                         </td>
                     </tr>
                 `;
@@ -5032,14 +5488,21 @@
         // Update inventory stats
         function updateInventoryStats() {
             const totalItems = allInventory.length;
-            const totalValue = allInventory.reduce((sum, item) => sum + ((item.quantity || 0) * (item.costPerUnit || 0)), 0);
-            const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold);
-            const categories = [...new Set(allInventory.map(item => item.category).filter(Boolean))].length;
+            const totalValue = allInventory.reduce((sum, item) => {
+                const qty = item.quantityOnHand || item.quantity || 0;
+                const cost = item.averageCost || item.costPerUnit || 0;
+                return sum + (qty * cost);
+            }, 0);
+            const lowStockItems = allInventory.filter(item => {
+                const qty = item.quantityOnHand || item.quantity || 0;
+                return item.reorderPoint && qty <= item.reorderPoint;
+            });
+            const locations = [...new Set(allInventory.map(item => item.location).filter(Boolean))].length;
 
             document.getElementById('totalInventoryItems').textContent = totalItems;
             document.getElementById('totalInventoryValue').textContent = '$' + totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
             document.getElementById('lowStockCount').textContent = lowStockItems.length;
-            document.getElementById('inventoryCategories').textContent = categories;
+            document.getElementById('inventoryCategories').textContent = locations || 1;
 
             // Update low inventory alert
             updateLowInventoryAlert(lowStockItems);

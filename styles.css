@@ -2300,3 +2300,13 @@ h4 {
 .admin-page {
     padding-top: 24px;
 }
+
+/* Spin animation for sync buttons */
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    animation: spin 1s linear infinite;
+}

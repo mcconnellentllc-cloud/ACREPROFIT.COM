@@ -486,7 +486,21 @@
         // ============ LOAD DATA FROM API ============
         async function loadChemicals() {
             try {
-                const response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                const token = localStorage.getItem('token');
+                let response;
+
+                // Use authenticated endpoint with distributor pricing if logged in
+                if (token) {
+                    response = await fetch(`${API_URL}/api/chemicals/for-customer`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                }
+
+                // Fall back to public endpoint
+                if (!response || !response.ok) {
+                    response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
+                }
+
                 if (response.ok) {
                     chemicals = await response.json();
                 } else {
