@@ -2050,6 +2050,24 @@
                             </div>
                         </div>
 
+                        <!-- Documents Section -->
+                        <div style="margin-bottom: 20px; padding: 16px; background: #f8fafc; border-radius: 8px; border: 1px solid #e2e8f0;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h4 style="color: var(--primary); margin: 0;">
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align: middle; margin-right: 6px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                                    Documents
+                                </h4>
+                                <label class="btn btn-outline btn-sm" style="cursor: pointer;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+                                    Upload
+                                    <input type="file" id="poDocUpload" accept=".pdf,.jpg,.jpeg,.png,.xlsx,.xls" style="display: none;" onchange="uploadPODocument(this)">
+                                </label>
+                            </div>
+                            <div id="poDocumentsContainer">
+                                <p style="color: #666; font-style: italic; font-size: 14px;">No documents attached</p>
+                            </div>
+                        </div>
+
                         <!-- Split Section -->
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
                             <h4 style="color: var(--primary);">Load Splits (Distributor Allocations)</h4>
@@ -3608,6 +3626,9 @@
                 // Populate splits
                 renderSplits(splits);
 
+                // Render attached documents
+                renderPODocuments();
+
                 // Load distributors for split modal
                 await loadDistributors();
 
@@ -3671,6 +3692,110 @@
             } catch (error) {
                 console.error('Error receiving PO:', error);
                 alert('Error receiving inventory. Please try again.');
+            }
+        }
+
+        // ============ PO DOCUMENT FUNCTIONS ============
+
+        function renderPODocuments() {
+            const container = document.getElementById('poDocumentsContainer');
+            if (!currentPO || !currentPO.documents || currentPO.documents.length === 0) {
+                container.innerHTML = '<p style="color: #666; font-style: italic; font-size: 14px;">No documents attached</p>';
+                return;
+            }
+
+            container.innerHTML = currentPO.documents.map(doc => {
+                const icon = doc.fileType.includes('pdf') ? '📄' :
+                             doc.fileType.includes('image') ? '🖼️' :
+                             doc.fileType.includes('sheet') || doc.fileType.includes('excel') ? '📊' : '📎';
+                const size = (doc.fileSize / 1024).toFixed(1) + ' KB';
+                const date = new Date(doc.uploadedAt).toLocaleDateString();
+
+                return `
+                    <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: white; border-radius: 6px; margin-bottom: 6px; border: 1px solid #e2e8f0;">
+                        <div style="display: flex; align-items: center; gap: 10px;">
+                            <span style="font-size: 1.25rem;">${icon}</span>
+                            <div>
+                                <div style="font-weight: 500; font-size: 14px;">${doc.fileName}</div>
+                                <div style="font-size: 12px; color: #666;">${doc.documentType} • ${size} • ${date}</div>
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 6px;">
+                            <a href="${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${doc._id}"
+                               target="_blank" class="btn btn-outline btn-sm" style="padding: 4px 8px;">View</a>
+                            <a href="${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${doc._id}/download"
+                               class="btn btn-outline btn-sm" style="padding: 4px 8px;">Download</a>
+                            ${userData.role === 'superadmin' ? `
+                                <button onclick="deletePODocument('${doc._id}')" class="btn btn-outline btn-sm"
+                                        style="padding: 4px 8px; color: #dc2626; border-color: #dc2626;">Delete</button>
+                            ` : ''}
+                        </div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function uploadPODocument(input) {
+            if (!currentPO) {
+                alert('No purchase order selected');
+                return;
+            }
+
+            const file = input.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('document', file);
+            formData.append('documentType', 'invoice'); // Default to invoice
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    currentPO = result.purchaseOrder;
+                    renderPODocuments();
+                    alert('✓ Document uploaded successfully');
+                } else {
+                    const error = await res.json();
+                    alert('Upload failed: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Upload error:', error);
+                alert('Upload failed. Please try again.');
+            }
+
+            input.value = ''; // Reset input
+        }
+
+        async function deletePODocument(docId) {
+            if (!confirm('Delete this document?')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${docId}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    currentPO = result.purchaseOrder;
+                    renderPODocuments();
+                } else {
+                    const error = await res.json();
+                    alert('Delete failed: ' + (error.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Delete error:', error);
+                alert('Delete failed. Please try again.');
             }
         }
 

@@ -7,6 +7,16 @@ const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
 const crypto = require('crypto');
+const path = require('path');
+const fs = require('fs');
+
+// File upload handling
+let multer;
+try {
+    multer = require('multer');
+} catch (e) {
+    console.log('Multer not installed. File uploads disabled.');
+}
 
 // SharePoint/Excel sync dependencies (optional - only load if configured)
 let Client, ClientSecretCredential, cron, XLSX;
@@ -513,6 +523,35 @@ const chemicalPriceHistorySchema = new mongoose.Schema({
 
 const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
 
+// ============ DISTRIBUTOR PRICING MODEL ============
+// Allows each distributor to set their own retail prices
+// Distributors cannot see wholesale/cost prices - only their retail price
+const distributorPricingSchema = new mongoose.Schema({
+    distributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical', required: true },
+
+    // The retail price this distributor charges their customers
+    retailPrice: { type: Number, required: true },
+
+    // Optional markup percentage (for reference)
+    markupPercent: { type: Number },
+
+    // Whether this product is available from this distributor
+    isAvailable: { type: Boolean, default: true },
+
+    // Notes
+    notes: String,
+
+    updatedAt: { type: Date, default: Date.now },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+});
+
+distributorPricingSchema.index({ distributorId: 1, chemicalId: 1 }, { unique: true });
+distributorPricingSchema.index({ distributorId: 1 });
+distributorPricingSchema.index({ chemicalId: 1 });
+
+const DistributorPricing = mongoose.model('DistributorPricing', distributorPricingSchema);
+
 // ============ RUP SALE RECORD MODEL ============
 // Required by EPA/state law to maintain records of all Restricted Use Pesticide sales
 // Must be kept for minimum 2 years (recommend 3 years)
@@ -969,6 +1008,22 @@ const purchaseOrderSchema = new mongoose.Schema({
     // Notes
     notes: String,
     internalNotes: String,
+
+    // Attached documents (invoices, receipts, BOLs)
+    documents: [{
+        fileName: String,           // Original filename
+        storedName: String,         // Filename in storage (PO-2026-00001-invoice.pdf)
+        fileType: String,           // MIME type
+        fileSize: Number,           // Size in bytes
+        documentType: {             // Type of document
+            type: String,
+            enum: ['invoice', 'receipt', 'bol', 'packing_slip', 'other'],
+            default: 'invoice'
+        },
+        uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        uploadedAt: { type: Date, default: Date.now },
+        notes: String
+    }],
 
     // Audit trail
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -7235,6 +7290,377 @@ app.get('/api/admin/sync-prices/status', authMiddleware, adminMiddleware, async 
             } : null,
             cronSchedule: process.env.PRICE_SYNC_CRON || '0 6 */3 * *'
         });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ PURCHASE ORDER DOCUMENT UPLOADS ============
+
+// Configure multer for file uploads
+const poDocumentsPath = path.join(__dirname, '..', 'purchase-orders');
+
+// Ensure upload directory exists
+if (!fs.existsSync(poDocumentsPath)) {
+    fs.mkdirSync(poDocumentsPath, { recursive: true });
+}
+
+let uploadPO;
+if (multer) {
+    const poStorage = multer.diskStorage({
+        destination: (req, file, cb) => {
+            cb(null, poDocumentsPath);
+        },
+        filename: (req, file, cb) => {
+            // Generate filename: PO-2026-00001-invoice-timestamp.pdf
+            const ext = path.extname(file.originalname);
+            const poNumber = req.params.poNumber || 'unknown';
+            const docType = req.body.documentType || 'document';
+            const timestamp = Date.now();
+            cb(null, `${poNumber}-${docType}-${timestamp}${ext}`);
+        }
+    });
+
+    uploadPO = multer({
+        storage: poStorage,
+        limits: { fileSize: 10 * 1024 * 1024 }, // 10MB max
+        fileFilter: (req, file, cb) => {
+            const allowedTypes = [
+                'application/pdf',
+                'image/jpeg',
+                'image/png',
+                'image/gif',
+                'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // xlsx
+                'application/vnd.ms-excel' // xls
+            ];
+            if (allowedTypes.includes(file.mimetype)) {
+                cb(null, true);
+            } else {
+                cb(new Error('Invalid file type. Allowed: PDF, JPEG, PNG, GIF, Excel'));
+            }
+        }
+    });
+}
+
+// Upload document to a purchase order
+app.post('/api/admin/purchase-orders/:id/documents', authMiddleware, adminMiddleware, (req, res, next) => {
+    if (!uploadPO) {
+        return res.status(500).json({ error: 'File upload not configured' });
+    }
+    next();
+}, async (req, res) => {
+    try {
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        // Set poNumber for filename generation
+        req.params.poNumber = po.poNumber;
+
+        // Handle file upload
+        uploadPO.single('document')(req, res, async (err) => {
+            if (err) {
+                return res.status(400).json({ error: err.message });
+            }
+
+            if (!req.file) {
+                return res.status(400).json({ error: 'No file uploaded' });
+            }
+
+            // Add document to PO
+            const doc = {
+                fileName: req.file.originalname,
+                storedName: req.file.filename,
+                fileType: req.file.mimetype,
+                fileSize: req.file.size,
+                documentType: req.body.documentType || 'invoice',
+                uploadedBy: req.user._id,
+                uploadedAt: new Date(),
+                notes: req.body.notes || ''
+            };
+
+            po.documents.push(doc);
+            po.updatedAt = new Date();
+            po.updatedBy = req.user._id;
+            await po.save();
+
+            res.json({
+                message: 'Document uploaded successfully',
+                document: doc,
+                purchaseOrder: po
+            });
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get/download document from purchase order
+app.get('/api/admin/purchase-orders/:id/documents/:docId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        const doc = po.documents.id(req.params.docId);
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        const filePath = path.join(poDocumentsPath, doc.storedName);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'File not found on server' });
+        }
+
+        res.setHeader('Content-Type', doc.fileType);
+        res.setHeader('Content-Disposition', `inline; filename="${doc.fileName}"`);
+        res.sendFile(filePath);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Download document (force download)
+app.get('/api/admin/purchase-orders/:id/documents/:docId/download', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        const doc = po.documents.id(req.params.docId);
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        const filePath = path.join(poDocumentsPath, doc.storedName);
+
+        if (!fs.existsSync(filePath)) {
+            return res.status(404).json({ error: 'File not found on server' });
+        }
+
+        res.download(filePath, doc.fileName);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete document from purchase order
+app.delete('/api/admin/purchase-orders/:id/documents/:docId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // Only superadmin can delete documents
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can delete documents' });
+        }
+
+        const po = await PurchaseOrder.findById(req.params.id);
+        if (!po) {
+            return res.status(404).json({ error: 'Purchase order not found' });
+        }
+
+        const doc = po.documents.id(req.params.docId);
+        if (!doc) {
+            return res.status(404).json({ error: 'Document not found' });
+        }
+
+        // Delete file from disk
+        const filePath = path.join(poDocumentsPath, doc.storedName);
+        if (fs.existsSync(filePath)) {
+            fs.unlinkSync(filePath);
+        }
+
+        // Remove from PO
+        po.documents.pull(req.params.docId);
+        po.updatedAt = new Date();
+        po.updatedBy = req.user._id;
+        await po.save();
+
+        res.json({ message: 'Document deleted', purchaseOrder: po });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// List all PO documents (superadmin only - for browsing the folder)
+app.get('/api/admin/purchase-order-documents', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can view all documents' });
+        }
+
+        // Get all POs with documents
+        const pos = await PurchaseOrder.find({ 'documents.0': { $exists: true } })
+            .select('poNumber supplier.name documents status orderDate')
+            .sort({ orderDate: -1 });
+
+        const result = pos.map(po => ({
+            poId: po._id,
+            poNumber: po.poNumber,
+            supplier: po.supplier.name,
+            status: po.status,
+            orderDate: po.orderDate,
+            documents: po.documents.map(d => ({
+                _id: d._id,
+                fileName: d.fileName,
+                documentType: d.documentType,
+                fileSize: d.fileSize,
+                uploadedAt: d.uploadedAt
+            }))
+        }));
+
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Serve static files from purchase-orders folder (authenticated)
+app.use('/purchase-orders', authMiddleware, adminMiddleware, express.static(poDocumentsPath));
+
+// ============ DISTRIBUTOR PRICING ENDPOINTS ============
+
+// Get products for distributor pricing (hides wholesale prices)
+app.get('/api/distributor/products', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // Only distributors and admins can access
+        if (!['distributor', 'admin', 'superadmin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const chemicals = await Chemical.find({ isActive: true })
+            .select('productName sourceSupplier category packSize unit sellPrice') // NO costPrice for distributors
+            .sort({ productName: 1 });
+
+        // Get this distributor's custom pricing
+        const distributorPricing = await DistributorPricing.find({ distributorId: req.user._id });
+        const pricingMap = {};
+        distributorPricing.forEach(p => {
+            pricingMap[p.chemicalId.toString()] = p;
+        });
+
+        // Build response
+        const products = chemicals.map(c => {
+            const customPrice = pricingMap[c._id.toString()];
+            return {
+                _id: c._id,
+                productName: c.productName,
+                sourceSupplier: c.sourceSupplier,
+                category: c.category,
+                packSize: c.packSize,
+                unit: c.unit,
+                // Base retail price (set by super admin)
+                baseRetailPrice: c.sellPrice,
+                // Distributor's custom retail price (if set)
+                myRetailPrice: customPrice?.retailPrice || null,
+                // Effective price (custom or base)
+                effectivePrice: customPrice?.retailPrice || c.sellPrice,
+                isAvailable: customPrice?.isAvailable !== false,
+                notes: customPrice?.notes || ''
+            };
+        });
+
+        res.json(products);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Set distributor's retail price for a product
+app.put('/api/distributor/products/:chemicalId/price', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (!['distributor', 'admin', 'superadmin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const { retailPrice, isAvailable, notes } = req.body;
+
+        if (retailPrice === undefined || retailPrice < 0) {
+            return res.status(400).json({ error: 'Valid retail price required' });
+        }
+
+        // Find or create distributor pricing
+        let pricing = await DistributorPricing.findOne({
+            distributorId: req.user._id,
+            chemicalId: req.params.chemicalId
+        });
+
+        if (pricing) {
+            pricing.retailPrice = retailPrice;
+            if (isAvailable !== undefined) pricing.isAvailable = isAvailable;
+            if (notes !== undefined) pricing.notes = notes;
+            pricing.updatedAt = new Date();
+            pricing.updatedBy = req.user._id;
+        } else {
+            pricing = new DistributorPricing({
+                distributorId: req.user._id,
+                chemicalId: req.params.chemicalId,
+                retailPrice,
+                isAvailable: isAvailable !== false,
+                notes: notes || '',
+                updatedBy: req.user._id
+            });
+        }
+
+        await pricing.save();
+
+        res.json({ message: 'Price updated', pricing });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Bulk update distributor prices
+app.put('/api/distributor/products/bulk-price', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (!['distributor', 'admin', 'superadmin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        const { prices } = req.body;
+        // prices: [{ chemicalId, retailPrice }, ...]
+
+        if (!Array.isArray(prices)) {
+            return res.status(400).json({ error: 'prices array required' });
+        }
+
+        let updated = 0;
+        for (const item of prices) {
+            if (!item.chemicalId || item.retailPrice === undefined) continue;
+
+            await DistributorPricing.findOneAndUpdate(
+                { distributorId: req.user._id, chemicalId: item.chemicalId },
+                {
+                    retailPrice: item.retailPrice,
+                    updatedAt: new Date(),
+                    updatedBy: req.user._id
+                },
+                { upsert: true }
+            );
+            updated++;
+        }
+
+        res.json({ message: `${updated} prices updated` });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all distributor pricing (superadmin only - to view all distributors' prices)
+app.get('/api/admin/distributor-pricing', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can view all distributor pricing' });
+        }
+
+        const pricing = await DistributorPricing.find()
+            .populate('distributorId', 'name email')
+            .populate('chemicalId', 'productName packSize sellPrice costPrice')
+            .sort({ 'distributorId': 1 });
+
+        res.json(pricing);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
