@@ -1212,6 +1212,59 @@ inventoryTransactionSchema.index({ createdAt: -1 });
 
 const InventoryTransaction = mongoose.model('InventoryTransaction', inventoryTransactionSchema);
 
+// ============ INVENTORY BATCH/LOT MODEL ============
+// Tracks inventory by PO - each batch has its own cost and quantity
+const inventoryBatchSchema = new mongoose.Schema({
+    // Product reference
+    chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical', required: true },
+    productName: { type: String, required: true },
+    packSize: String,
+    unit: String,
+
+    // Batch identification - PO is the primary identifier
+    poNumber: { type: String, required: true }, // e.g., "JABCO-2026-001"
+    poId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+    lotNumber: String, // Supplier's lot number from label (e.g., "05826M254M")
+
+    // Quantities (in base units - gallons, lbs, etc.)
+    quantityReceived: { type: Number, required: true }, // Original amount from this PO
+    quantityRemaining: { type: Number, required: true }, // What's left to sell
+    quantitySold: { type: Number, default: 0 }, // Sold from this batch
+    quantityAdjusted: { type: Number, default: 0 }, // Manual adjustments (+/-)
+
+    // Cost for THIS specific batch
+    costPerUnit: { type: Number, required: true }, // What we paid per unit for this PO
+    totalCost: { type: Number }, // Total cost for this batch
+
+    // Location
+    location: { type: String, default: 'main' },
+
+    // Status
+    status: {
+        type: String,
+        enum: ['active', 'depleted', 'expired', 'damaged', 'returned'],
+        default: 'active'
+    },
+
+    // Dates
+    receivedDate: { type: Date, default: Date.now },
+    expirationDate: Date,
+
+    // Supplier info
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+    supplierName: String,
+
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+inventoryBatchSchema.index({ chemicalId: 1, status: 1 });
+inventoryBatchSchema.index({ poNumber: 1 });
+inventoryBatchSchema.index({ productName: 1 });
+inventoryBatchSchema.index({ status: 1, quantityRemaining: 1 });
+
+const InventoryBatch = mongoose.model('InventoryBatch', inventoryBatchSchema);
+
 // ============ CUSTOMER INVOICE MODEL ============
 // Generated invoices for customer orders
 const invoiceSchema = new mongoose.Schema({
@@ -1334,8 +1387,8 @@ async function generateInvoiceNumber() {
 }
 
 // Helper: Update inventory when receiving a PO
-async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, userId }) {
-    // Find or create inventory record
+async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, lotNumber, supplierName, userId }) {
+    // Find or create inventory record (aggregate tracking)
     let inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
 
     if (!inventory) {
@@ -1373,6 +1426,27 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
 
     await inventory.save();
 
+    // Create batch record for PO-based tracking
+    const batch = new InventoryBatch({
+        chemicalId,
+        productName,
+        packSize,
+        unit,
+        poNumber: poNumber || 'UNTRACKED',
+        poId: purchaseOrderId,
+        lotNumber: lotNumber || '',
+        quantityReceived: quantity,
+        quantityRemaining: quantity,
+        costPerUnit: unitCost,
+        totalCost: quantity * unitCost,
+        location: location || 'main',
+        supplierName: supplierName || '',
+        status: 'active',
+        receivedDate: new Date()
+    });
+
+    await batch.save();
+
     // Create transaction record
     const transaction = new InventoryTransaction({
         inventoryId: inventory._id,
@@ -1393,7 +1467,7 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
 
     await transaction.save();
 
-    return { inventory, transaction };
+    return { inventory, transaction, batch };
 }
 
 // Helper: Deduct inventory when fulfilling an order
@@ -3540,6 +3614,11 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
 
             // Glyphosate 5.4 lb - from JABCO/CPD
             { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 250, costPrice: 13.25, adminPrice: 13.32, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
+
+            // XSATE Glyphosate 53.8% - Xingfa USA via Jabco (EPA 89343-5)
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 0, adminPrice: 0, sellPrice: 0, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 0, adminPrice: 0, sellPrice: 0, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 0, adminPrice: 0, sellPrice: 0, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
 
             // Atrazine
             { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
@@ -6729,13 +6808,72 @@ app.post('/api/admin/inventory/adjust', authMiddleware, adminMiddleware, async (
     }
 });
 
+// ============ INVENTORY BATCH ENDPOINTS ============
+
+// Get all active batches (with optional filters)
+app.get('/api/admin/inventory/batches', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { chemicalId, poNumber, status = 'active', location } = req.query;
+        let query = {};
+
+        if (chemicalId) query.chemicalId = chemicalId;
+        if (poNumber) query.poNumber = { $regex: poNumber, $options: 'i' };
+        if (status && status !== 'all') query.status = status;
+        if (location) query.location = location;
+
+        const batches = await InventoryBatch.find(query)
+            .populate('chemicalId', 'productName packSize unit category')
+            .sort({ receivedDate: -1 });
+
+        res.json(batches);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get batches for a specific product
+app.get('/api/admin/inventory/batches/product/:chemicalId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const batches = await InventoryBatch.find({
+            chemicalId: req.params.chemicalId,
+            status: { $in: ['active', 'depleted'] }
+        }).sort({ receivedDate: -1 });
+
+        res.json(batches);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update batch info (lot number, notes, etc.)
+app.patch('/api/admin/inventory/batches/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { lotNumber, status, notes } = req.body;
+        const batch = await InventoryBatch.findById(req.params.id);
+
+        if (!batch) {
+            return res.status(404).json({ error: 'Batch not found' });
+        }
+
+        if (lotNumber !== undefined) batch.lotNumber = lotNumber;
+        if (status) batch.status = status;
+        if (notes !== undefined) batch.notes = notes;
+        batch.updatedAt = new Date();
+
+        await batch.save();
+        res.json(batch);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Receive Purchase Order - Add items to inventory
 app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { items, location, notes } = req.body;
-        // items: [{ itemIndex: 0, quantityReceived: 10 }, ...]
+        // items: [{ itemIndex: 0, quantityReceived: 10, lotNumber: 'ABC123' }, ...]
 
-        const po = await PurchaseOrder.findById(req.params.id);
+        const po = await PurchaseOrder.findById(req.params.id).populate('supplierId', 'name');
         if (!po) {
             return res.status(404).json({ error: 'Purchase order not found' });
         }
@@ -6750,7 +6888,7 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
 
             const quantityReceived = receiveItem.quantityReceived || poItem.quantityOrdered;
 
-            // Add to inventory
+            // Add to inventory with batch tracking
             const result = await receiveInventory({
                 chemicalId: poItem.chemicalId,
                 productName: poItem.productName,
@@ -6761,13 +6899,16 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
                 location: location || 'main',
                 purchaseOrderId: po._id,
                 poNumber: po.poNumber,
+                lotNumber: receiveItem.lotNumber || '',
+                supplierName: po.supplierId?.name || po.supplierName || '',
                 userId: req.user._id
             });
 
             results.push({
                 productName: poItem.productName,
                 quantityReceived,
-                inventory: result.inventory
+                inventory: result.inventory,
+                batch: result.batch
             });
         }
 

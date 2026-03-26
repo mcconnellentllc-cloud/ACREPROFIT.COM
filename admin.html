@@ -5424,6 +5424,7 @@
                         <td><span class="order-status status-confirmed">${item.location || 'main'}</span></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
+                            <button class="btn btn-sm btn-outline" onclick="viewInventoryBatches('${item.chemicalId?._id || item.chemicalId}', '${item.productName}')" title="View batches by PO">Batches</button>
                             <button class="btn btn-sm btn-outline" onclick="viewInventoryHistory('${item._id}')">History</button>
                             <button class="btn btn-sm" onclick="adjustInventory('${item._id}')" style="background: #f59e0b; color: white;">Adjust</button>
                         </td>
@@ -5575,6 +5576,174 @@
             } else {
                 alert(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: $${(suggestedOrder * (item.costPerUnit || 0)).toFixed(2)}`);
             }
+        }
+
+        // View inventory batches by PO
+        async function viewInventoryBatches(chemicalId, productName) {
+            if (!chemicalId) {
+                alert('No product ID available');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/batches/product/${chemicalId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load batches');
+
+                const batches = await res.json();
+
+                // Create modal content
+                let content = `
+                    <div class="modal-overlay" id="batchesModal" onclick="if(event.target===this)closeBatchesModal()">
+                        <div class="modal-content" style="max-width: 800px; max-height: 80vh; overflow-y: auto;">
+                            <div class="modal-header">
+                                <h3>Inventory Batches - ${productName}</h3>
+                                <button class="close-btn" onclick="closeBatchesModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                `;
+
+                if (batches.length === 0) {
+                    content += '<p style="text-align: center; color: var(--text-muted);">No batches found. Receive a PO to create batches.</p>';
+                } else {
+                    content += `
+                        <table class="admin-table" style="margin: 0;">
+                            <thead>
+                                <tr>
+                                    <th>PO Number</th>
+                                    <th>Lot #</th>
+                                    <th>Received</th>
+                                    <th>Qty Left</th>
+                                    <th>Cost/Unit</th>
+                                    <th>Supplier</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                    `;
+
+                    batches.forEach(batch => {
+                        const statusClass = batch.status === 'active' ? 'status-confirmed' :
+                                           batch.status === 'depleted' ? 'status-cancelled' : 'status-pending';
+                        const receivedDate = new Date(batch.receivedDate).toLocaleDateString();
+
+                        content += `
+                            <tr>
+                                <td><strong>${batch.poNumber}</strong></td>
+                                <td>${batch.lotNumber || '-'}</td>
+                                <td>${receivedDate}<br><small style="color: var(--text-muted);">${batch.quantityReceived} ${batch.unit || ''} received</small></td>
+                                <td><strong style="color: ${batch.quantityRemaining > 0 ? 'var(--success)' : 'var(--text-muted)'};">${batch.quantityRemaining}</strong> ${batch.unit || ''}</td>
+                                <td><strong>$${(batch.costPerUnit || 0).toFixed(2)}</strong></td>
+                                <td>${batch.supplierName || '-'}</td>
+                                <td><span class="order-status ${statusClass}">${batch.status}</span></td>
+                            </tr>
+                        `;
+                    });
+
+                    content += '</tbody></table>';
+
+                    // Summary
+                    const totalRemaining = batches.reduce((sum, b) => sum + (b.quantityRemaining || 0), 0);
+                    const avgCost = batches.length > 0 ?
+                        batches.reduce((sum, b) => sum + (b.costPerUnit || 0) * (b.quantityRemaining || 0), 0) / totalRemaining : 0;
+
+                    content += `
+                        <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; display: flex; gap: 24px;">
+                            <div><strong>Total Batches:</strong> ${batches.length}</div>
+                            <div><strong>Total Remaining:</strong> ${totalRemaining.toLocaleString()}</div>
+                            <div><strong>Weighted Avg Cost:</strong> $${avgCost.toFixed(2)}</div>
+                        </div>
+                    `;
+                }
+
+                content += `
+                            </div>
+                            <div class="modal-footer">
+                                <button class="btn btn-outline" onclick="closeBatchesModal()">Close</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+
+                // Remove existing modal if any
+                const existing = document.getElementById('batchesModal');
+                if (existing) existing.remove();
+
+                // Add modal to page
+                document.body.insertAdjacentHTML('beforeend', content);
+
+            } catch (error) {
+                console.error('Error loading batches:', error);
+                alert('Error loading batches: ' + error.message);
+            }
+        }
+
+        function closeBatchesModal() {
+            const modal = document.getElementById('batchesModal');
+            if (modal) modal.remove();
+        }
+
+        // View inventory transaction history
+        async function viewInventoryHistory(inventoryId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/${inventoryId}/transactions`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load history');
+
+                const transactions = await res.json();
+                const item = allInventory.find(i => i._id === inventoryId);
+
+                let content = `
+                    <div class="modal-overlay" id="historyModal" onclick="if(event.target===this)closeHistoryModal()">
+                        <div class="modal-content" style="max-width: 700px; max-height: 80vh; overflow-y: auto;">
+                            <div class="modal-header">
+                                <h3>Transaction History - ${item?.productName || 'Product'}</h3>
+                                <button class="close-btn" onclick="closeHistoryModal()">&times;</button>
+                            </div>
+                            <div class="modal-body">
+                `;
+
+                if (transactions.length === 0) {
+                    content += '<p style="text-align: center; color: var(--text-muted);">No transactions found.</p>';
+                } else {
+                    content += `<table class="admin-table" style="margin: 0;"><thead><tr>
+                        <th>Date</th><th>Type</th><th>Change</th><th>Reference</th><th>By</th>
+                    </tr></thead><tbody>`;
+
+                    transactions.forEach(t => {
+                        const date = new Date(t.createdAt).toLocaleDateString();
+                        const changeColor = t.quantityChange >= 0 ? 'var(--success)' : 'var(--danger)';
+                        content += `<tr>
+                            <td>${date}</td>
+                            <td><span class="order-status">${t.type}</span></td>
+                            <td style="color: ${changeColor}; font-weight: 600;">${t.quantityChange >= 0 ? '+' : ''}${t.quantityChange}</td>
+                            <td>${t.referenceNumber || '-'}</td>
+                            <td>${t.createdBy?.name || '-'}</td>
+                        </tr>`;
+                    });
+
+                    content += '</tbody></table>';
+                }
+
+                content += `</div><div class="modal-footer"><button class="btn btn-outline" onclick="closeHistoryModal()">Close</button></div></div></div>`;
+
+                const existing = document.getElementById('historyModal');
+                if (existing) existing.remove();
+                document.body.insertAdjacentHTML('beforeend', content);
+
+            } catch (error) {
+                console.error('Error loading history:', error);
+                alert('Error loading history: ' + error.message);
+            }
+        }
+
+        function closeHistoryModal() {
+            const modal = document.getElementById('historyModal');
+            if (modal) modal.remove();
         }
 
         // Filter inventory
