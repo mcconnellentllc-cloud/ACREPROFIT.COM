@@ -348,9 +348,9 @@
                 }
             },
             'dryland-corn': {
-                'wheat-stubble-fall': {
-                    name: 'Option 1 - Wheat Stubble Fall',
-                    description: 'Wheat stubble with atrazine & valor applied in fall - 30 days pre-plant',
+                'preplant': {
+                    name: 'Option 1 - Corn Preplant',
+                    description: '30 days pre-plant - wheat stubble with atrazine & valor',
                     chemicals: [
                         { name: 'Glyphosate', defaultRate: 22, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
                         { name: 'Valor SX', defaultRate: 3, unit: 'oz/acre', packageSize: 5, packageUnit: 'lb jug', pricePerUnit: 72 },
@@ -358,9 +358,9 @@
                         { name: 'Hydrovant', defaultRate: 0.1, unit: '% v/v', packageSize: 2.5, packageUnit: 'gal jug', pricePerUnit: 125, isAdjuvant: true }
                     ]
                 },
-                'wheat-stubble-post-fall': {
-                    name: 'Option 2 - Wheat Stubble (Fall Atrazine Applied)',
-                    description: 'Wheat stubble that has had fall application of atrazine - post-emerge',
+                'post-plant-pre-emerge': {
+                    name: 'Option 2 - Corn Post Plant Pre-Emerge',
+                    description: 'Post plant pre-emerge - fall atrazine already applied',
                     chemicals: [
                         { name: 'Glyphosate', defaultRate: 22, unit: 'oz/acre', packageSize: 250, packageUnit: 'gal shuttle', pricePerUnit: 15 },
                         { name: 'Mesotrione', defaultRate: 6, unit: 'oz/acre', packageSize: 1, packageUnit: 'gal jug', pricePerUnit: 280 },
