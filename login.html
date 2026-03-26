@@ -3,204 +3,359 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Login to your AcreProfit account - Bulk agricultural chemicals for farmers">
-    <title>Login - AcreProfit</title>
+    <meta name="description" content="Login to your Acre Profit account">
+    <title>Login - Acre Profit</title>
 
-    <meta name="theme-color" content="#16a34a">
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#2d5a27">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Acre Profit">
+    <link rel="apple-touch-icon" href="/icon-192.svg">
+    <link rel="manifest" href="/manifest.json">
+
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 </head>
-<body>
-    <div class="auth-page">
-        <div class="auth-card">
-            <div class="auth-logo">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
-                    <path d="M2 17l10 5 10-5"/>
-                    <path d="M2 12l10 5 10-5"/>
-                </svg>
-                <h1>AcreProfit</h1>
+<body class="auth-body">
+    <div class="auth-split">
+        <!-- Left side - Farm image -->
+        <div class="auth-image">
+            <div class="auth-image-content">
+                <a href="/" class="auth-logo">
+                    <img src="logo.svg" alt="Acre Profit">
+                </a>
+                <div class="auth-tagline">
+                    <h2>Farmers Helping Farmers</h2>
+                    <p>Join our bulk buying co-op and save on the products you need most.</p>
+                </div>
             </div>
+        </div>
 
-            <div class="auth-title">
-                <h2>Welcome Back</h2>
-                <p>Sign in to access your account</p>
-            </div>
-
-            <div id="alert-container"></div>
-
-            <form id="login-form">
-                <div class="form-group">
-                    <label class="form-label required" for="email">Email Address</label>
-                    <input
-                        type="email"
-                        id="email"
-                        name="email"
-                        class="form-input"
-                        placeholder="you@example.com"
-                        required
-                        autocomplete="email"
-                    >
+        <!-- Right side - Login form -->
+        <div class="auth-form-side">
+            <div class="auth-form-wrapper">
+                <div class="auth-header">
+                    <h1>Welcome Back</h1>
+                    <p>Sign in to access your orders and account.</p>
                 </div>
 
-                <div class="form-group">
-                    <label class="form-label required" for="password">Password</label>
-                    <input
-                        type="password"
-                        id="password"
-                        name="password"
-                        class="form-input"
-                        placeholder="Enter your password"
-                        required
-                        autocomplete="current-password"
-                        minlength="8"
-                    >
+                <form id="loginForm" class="auth-form">
+                    <div class="form-group">
+                        <label for="email">Email Address</label>
+                        <input type="email" id="email" name="email" required placeholder="you@yourfarm.com">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <input type="password" id="password" name="password" required placeholder="Enter your password">
+                    </div>
+
+                    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+                    <div class="forgot-password-link">
+                        <a href="/forgot-password.html">Forgot your password?</a>
+                    </div>
+
+                    <button type="submit" class="btn btn-accent btn-lg btn-block" id="submitBtn">
+                        Sign In
+                    </button>
+
+                    <p class="auth-switch">
+                        Don't have an account? <a href="/signup.html">Create one</a>
+                    </p>
+                </form>
+
+                <div class="auth-footer">
+                    <a href="/">Back to Home</a>
                 </div>
-
-                <div class="form-group" style="display: flex; justify-content: space-between; align-items: center;">
-                    <label class="form-checkbox">
-                        <input type="checkbox" id="remember" name="remember">
-                        <span>Remember me</span>
-                    </label>
-                    <a href="forgot-password.html">Forgot password?</a>
-                </div>
-
-                <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
-                    <span class="btn-text">Sign In</span>
-                    <span class="btn-loading hidden">
-                        <span class="spinner spinner-sm"></span>
-                    </span>
-                </button>
-            </form>
-
-            <div class="auth-footer">
-                Don't have an account? <a href="signup.html">Create one</a>
             </div>
         </div>
     </div>
 
     <script>
-        // API Configuration
-        const API_URL = window.location.hostname === 'localhost'
-            ? 'http://localhost:3001/api'
-            : '/api';
+        const API_URL = 'https://acreprofit-com.onrender.com';
+        const MAX_RETRIES = 3;
+        const RETRY_DELAY_MS = 5000;
 
-        // DOM Elements
-        const form = document.getElementById('login-form');
-        const submitBtn = document.getElementById('submit-btn');
-        const alertContainer = document.getElementById('alert-container');
+        function redirectByRole(role) {
+            if (role === 'supplier') {
+                window.location.href = '/supplier-dashboard.html';
+            } else if (role === 'superadmin' || role === 'admin' || role === 'distributor') {
+                window.location.href = '/admin.html';
+            } else {
+                window.location.href = '/dashboard.html';
+            }
+        }
 
         // Check if already logged in
         const token = localStorage.getItem('token');
-        if (token) {
-            // Verify token and redirect
-            checkAuthAndRedirect();
+        const user = localStorage.getItem('user');
+        if (token && user) {
+            redirectByRole(JSON.parse(user).role);
         }
 
-        async function checkAuthAndRedirect() {
-            try {
-                const response = await fetch(`${API_URL}/auth/me`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const data = await response.json();
-
-                if (data.success) {
-                    const user = data.data.user;
-                    if (user.role === 'admin') {
-                        window.location.href = 'admin.html';
-                    } else {
-                        window.location.href = 'dashboard.html';
-                    }
-                }
-            } catch (error) {
-                // Token invalid, clear and stay on login
-                localStorage.removeItem('token');
-                localStorage.removeItem('user');
+        async function attemptLogin(data, attempt) {
+            const response = await fetch(`${API_URL}/api/auth/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(data)
+            });
+            const result = await response.json();
+            if (!response.ok) {
+                throw new Error(result.error || 'Login failed');
             }
+            return result;
         }
 
-        // Show alert message
-        function showAlert(message, type = 'error') {
-            alertContainer.innerHTML = `
-                <div class="alert alert-${type}">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                        ${type === 'error'
-                            ? '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
-                            : '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'}
-                    </svg>
-                    <span>${message}</span>
-                </div>
-            `;
-        }
-
-        // Set loading state
-        function setLoading(loading) {
-            submitBtn.disabled = loading;
-            submitBtn.querySelector('.btn-text').classList.toggle('hidden', loading);
-            submitBtn.querySelector('.btn-loading').classList.toggle('hidden', !loading);
-        }
-
-        // Handle form submission
-        form.addEventListener('submit', async (e) => {
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
             e.preventDefault();
 
-            const email = document.getElementById('email').value.trim();
-            const password = document.getElementById('password').value;
+            const submitBtn = document.getElementById('submitBtn');
+            const errorDiv = document.getElementById('errorMessage');
 
-            if (!email || !password) {
-                showAlert('Please enter your email and password');
-                return;
-            }
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Signing in...';
+            errorDiv.style.display = 'none';
 
-            setLoading(true);
-            alertContainer.innerHTML = '';
+            const data = {
+                email: document.getElementById('email').value,
+                password: document.getElementById('password').value
+            };
 
-            try {
-                const response = await fetch(`${API_URL}/auth/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email, password })
-                });
+            let lastError = null;
 
-                const data = await response.json();
+            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+                try {
+                    const result = await attemptLogin(data, attempt);
 
-                if (data.success) {
-                    // Store auth data
-                    localStorage.setItem('token', data.data.token);
-                    localStorage.setItem('user', JSON.stringify(data.data.user));
+                    // Store token and user data
+                    localStorage.setItem('token', result.token);
+                    localStorage.setItem('user', JSON.stringify(result.user));
 
-                    // Remember me - extend token storage
-                    if (document.getElementById('remember').checked) {
-                        localStorage.setItem('rememberMe', 'true');
+                    redirectByRole(result.user.role);
+                    return;
+                } catch (error) {
+                    lastError = error;
+                    const isNetworkError = error.message === 'Failed to fetch' || error.message.includes('Load failed');
+
+                    if (!isNetworkError) {
+                        // Auth error (wrong password, etc.) — don't retry
+                        break;
                     }
 
-                    // Redirect based on role
-                    const user = data.data.user;
-                    if (user.role === 'admin') {
-                        window.location.href = 'admin.html';
-                    } else {
-                        window.location.href = 'dashboard.html';
+                    if (attempt < MAX_RETRIES) {
+                        submitBtn.textContent = `Server waking up... retry ${attempt}/${MAX_RETRIES - 1}`;
+                        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
                     }
-                } else {
-                    showAlert(data.message || 'Invalid email or password');
                 }
-            } catch (error) {
-                console.error('Login error:', error);
-                showAlert('Unable to connect to server. Please try again.');
-            } finally {
-                setLoading(false);
             }
-        });
 
-        // Enter key to submit
-        document.getElementById('password').addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                form.dispatchEvent(new Event('submit'));
+            // All retries exhausted or non-network error
+            const isNetworkError = lastError.message === 'Failed to fetch' || lastError.message.includes('Load failed');
+            if (isNetworkError) {
+                errorDiv.textContent = 'Server is currently unavailable. It may be starting up — please wait a moment and try again.';
+            } else {
+                errorDiv.textContent = lastError.message;
             }
+            errorDiv.style.display = 'block';
+            submitBtn.disabled = false;
+            submitBtn.textContent = 'Sign In';
         });
     </script>
+
+    <style>
+        .auth-body {
+            min-height: 100vh;
+            margin: 0;
+            padding: 0;
+        }
+
+        .auth-split {
+            display: flex;
+            min-height: 100vh;
+        }
+
+        .auth-image {
+            flex: 1;
+            background-image: url('https://images.unsplash.com/photo-1574323347407-f5e1ad6d020b?w=1200&q=80');
+            background-size: cover;
+            background-position: center;
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            padding: 48px;
+        }
+
+        .auth-image::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(180deg, rgba(30, 61, 26, 0.4) 0%, rgba(30, 61, 26, 0.85) 100%);
+        }
+
+        .auth-image-content {
+            position: relative;
+            z-index: 2;
+            color: white;
+        }
+
+        .auth-logo img {
+            height: 48px;
+            filter: brightness(0) invert(1);
+            margin-bottom: 32px;
+        }
+
+        .auth-tagline h2 {
+            font-size: 2rem;
+            margin-bottom: 12px;
+            color: white;
+        }
+
+        .auth-tagline p {
+            font-size: 1.125rem;
+            color: rgba(255, 255, 255, 0.9);
+            max-width: 400px;
+        }
+
+        .auth-form-side {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 48px;
+            background: var(--white);
+        }
+
+        .auth-form-wrapper {
+            width: 100%;
+            max-width: 400px;
+        }
+
+        .auth-header {
+            margin-bottom: 32px;
+        }
+
+        .auth-header h1 {
+            font-size: 2rem;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .auth-header p {
+            color: var(--text-light);
+        }
+
+        .auth-form .form-group {
+            margin-bottom: 20px;
+        }
+
+        .auth-form label {
+            display: block;
+            font-weight: 600;
+            font-size: 0.875rem;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .auth-form input {
+            width: 100%;
+            padding: 14px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: var(--transition);
+            background: var(--white);
+        }
+
+        .auth-form input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
+        }
+
+        .error-message {
+            background: #FEE2E2;
+            color: #DC2626;
+            padding: 12px 16px;
+            border-radius: var(--radius);
+            margin-bottom: 20px;
+            font-size: 0.875rem;
+        }
+
+        .forgot-password-link {
+            text-align: right;
+            margin-bottom: 20px;
+        }
+
+        .forgot-password-link a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            text-decoration: none;
+        }
+
+        .forgot-password-link a:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+
+        .auth-switch {
+            text-align: center;
+            margin-top: 24px;
+            color: var(--text-light);
+        }
+
+        .auth-switch a {
+            color: var(--accent);
+            font-weight: 600;
+        }
+
+        .auth-switch a:hover {
+            text-decoration: underline;
+        }
+
+        .auth-footer {
+            margin-top: 32px;
+            padding-top: 24px;
+            border-top: 1px solid var(--border);
+            text-align: center;
+        }
+
+        .auth-footer a {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+        }
+
+        .auth-footer a:hover {
+            color: var(--primary);
+        }
+
+        @media (max-width: 1024px) {
+            .auth-image {
+                display: none;
+            }
+
+            .auth-form-side {
+                padding: 24px;
+            }
+        }
+
+        @media (max-width: 480px) {
+            .auth-form-wrapper {
+                padding: 0;
+            }
+
+            .auth-header h1 {
+                font-size: 1.75rem;
+            }
+        }
+    </style>
 </body>
 </html>
