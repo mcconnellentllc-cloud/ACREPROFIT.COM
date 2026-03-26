@@ -1293,6 +1293,9 @@
                         <p class="tab-subtitle">Set cost, admin, and retail prices for all products</p>
                     </div>
                     <div class="tab-header-actions">
+                        <button class="btn btn-primary" onclick="loadJabcoPrices()" id="loadJabcoBtn">
+                            Load Jabco/CPD Prices
+                        </button>
                         <button class="btn btn-outline" onclick="syncPricesFromSharePoint()" id="syncPricesBtn">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
                             Sync Prices
@@ -4790,6 +4793,40 @@
         }
 
         // ============ PRICE SYNC FUNCTIONS ============
+
+        // Load Jabco/CPD prices from seed data
+        async function loadJabcoPrices() {
+            const btn = document.getElementById('loadJabcoBtn');
+            const originalText = btn.innerHTML;
+            btn.innerHTML = 'Loading...';
+            btn.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/seed`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ secretKey: 'acreprofit2026seed' })
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    alert(`✓ Jabco/CPD Prices Loaded!\n\nNew products: ${result.summary?.created || 0}\nUpdated: ${result.summary?.alreadyExisted || 0}`);
+                    loadPricingData();
+                } else {
+                    alert('Error: ' + (result.error || 'Unknown error'));
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                alert('Load failed: ' + error.message);
+            } finally {
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+            }
+        }
 
         async function syncPricesFromSharePoint() {
             const btn = document.getElementById('syncPricesBtn');
