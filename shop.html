@@ -3,395 +3,324 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Shop - Acre Profit</title>
+    <meta name="description" content="Shop bulk agricultural chemicals - herbicides, insecticides, fungicides, and more at wholesale prices">
+    <title>Shop Products - AcreProfit</title>
+
+    <meta name="theme-color" content="#16a34a">
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
-    <style>
-        .shop-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
-        .shop-layout { display: grid; grid-template-columns: 1fr 350px; gap: 2rem; }
-        @media (max-width: 900px) { .shop-layout { grid-template-columns: 1fr; } }
-
-        .shop-header { margin-bottom: 2rem; }
-        .shop-header h1 { margin: 0 0 0.5rem; }
-        .shop-header p { color: #666; margin: 0; }
-
-        .products-section { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); }
-        .filter-row { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
-        .filter-row input { flex: 1; min-width: 200px; padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; }
-        .filter-row select { padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; }
-
-        .products-list { display: flex; flex-direction: column; gap: 1rem; max-height: 600px; overflow-y: auto; }
-        .product-item { display: flex; justify-content: space-between; align-items: center; padding: 1rem; border: 1px solid #eee; border-radius: 8px; transition: all 0.2s; }
-        .product-item:hover { border-color: #2d5a27; background: #f9f9f9; }
-        .product-info h4 { margin: 0 0 0.25rem; font-size: 1rem; }
-        .product-info p { margin: 0; font-size: 0.85rem; color: #666; }
-        .product-price { font-size: 1.25rem; font-weight: 700; color: #2d5a27; white-space: nowrap; }
-        .product-price small { font-weight: 400; font-size: 0.8rem; color: #666; }
-        .product-actions { display: flex; align-items: center; gap: 0.5rem; }
-        .qty-input { width: 60px; padding: 0.5rem; border: 1px solid #ddd; border-radius: 6px; text-align: center; }
-        .rup-tag { background: #dc3545; color: white; font-size: 0.65rem; padding: 0.15rem 0.4rem; border-radius: 3px; margin-left: 0.5rem; }
-
-        .cart-section { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.08); position: sticky; top: 1rem; }
-        .cart-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
-        .cart-header h3 { margin: 0; }
-        .cart-count { background: #2d5a27; color: white; padding: 0.25rem 0.75rem; border-radius: 20px; font-size: 0.85rem; }
-
-        .cart-items { max-height: 300px; overflow-y: auto; margin-bottom: 1rem; }
-        .cart-item { display: flex; justify-content: space-between; align-items: center; padding: 0.75rem 0; border-bottom: 1px solid #f0f0f0; }
-        .cart-item:last-child { border-bottom: none; }
-        .cart-item-info { flex: 1; }
-        .cart-item-info h5 { margin: 0 0 0.25rem; font-size: 0.9rem; }
-        .cart-item-info p { margin: 0; font-size: 0.8rem; color: #666; }
-        .cart-item-total { font-weight: 600; color: #2d5a27; }
-        .remove-btn { background: none; border: none; color: #dc3545; cursor: pointer; font-size: 1.2rem; padding: 0.25rem; }
-
-        .cart-empty { text-align: center; padding: 2rem; color: #666; }
-
-        .cart-summary { border-top: 2px solid #eee; padding-top: 1rem; margin-top: 1rem; }
-        .summary-row { display: flex; justify-content: space-between; padding: 0.5rem 0; }
-        .summary-row.total { font-size: 1.25rem; font-weight: 700; border-top: 1px solid #eee; margin-top: 0.5rem; padding-top: 1rem; }
-
-        .btn { padding: 0.75rem 1.5rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; width: 100%; }
-        .btn-primary { background: #2d5a27; color: white; }
-        .btn-primary:hover { background: #1e3d1a; }
-        .btn-primary:disabled { background: #ccc; cursor: not-allowed; }
-        .btn-secondary { background: #6c757d; color: white; margin-top: 0.5rem; }
-        .btn-add { background: #2d5a27; color: white; padding: 0.5rem 1rem; font-size: 0.9rem; }
-
-        .checkout-form { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #eee; }
-        .checkout-form .form-group { margin-bottom: 1rem; }
-        .checkout-form label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
-        .checkout-form textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 8px; resize: vertical; min-height: 80px; }
-
-        .loading { text-align: center; padding: 2rem; color: #666; }
-        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
-        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 8px; margin-bottom: 1rem; }
-
-        .order-confirmation { text-align: center; padding: 2rem; }
-        .order-confirmation h2 { color: #2d5a27; margin-bottom: 1rem; }
-        .order-number { font-size: 1.5rem; font-weight: 700; background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar dashboard-navbar">
-        <div class="container">
-            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
-            <div class="nav-links">
-                <a href="/dashboard.html" class="nav-link">Dashboard</a>
-                <a href="/products.html" class="nav-link">Products</a>
-                <a href="/shop.html" class="nav-link active">Shop</a>
-                <a href="/my-orders.html" class="nav-link">My Orders</a>
-            </div>
-            <div class="nav-right">
-                <span class="user-name" id="userName">User</span>
-                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
-            </div>
-        </div>
-    </nav>
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-inner">
+                <a href="index.html" class="logo">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                        <path d="M2 17l10 5 10-5"/>
+                        <path d="M2 12l10 5 10-5"/>
+                    </svg>
+                    <span>AcreProfit</span>
+                </a>
 
-    <main class="shop-page">
-        <div class="container">
-            <div class="shop-header">
-                <h1>Shop Chemicals</h1>
-                <p>Add products to your cart and submit your order</p>
+                <nav class="nav" id="main-nav">
+                    <a href="shop.html" class="nav-link active">Shop Products</a>
+                    <a href="calculator.html" class="nav-link">Calculator</a>
+                    <a href="cart.html" class="nav-link">Cart (<span id="cart-count">0</span>)</a>
+                </nav>
+
+                <div class="nav-actions">
+                    <a href="dashboard.html" class="btn btn-secondary" id="dashboard-btn">Dashboard</a>
+                </div>
+
+                <button class="mobile-menu-btn" id="mobile-menu-btn" aria-label="Toggle menu">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <line x1="3" y1="12" x2="21" y2="12"/>
+                        <line x1="3" y1="6" x2="21" y2="6"/>
+                        <line x1="3" y1="18" x2="21" y2="18"/>
+                    </svg>
+                </button>
             </div>
+        </header>
 
-            <div id="messageArea"></div>
-
-            <div class="shop-layout">
-                <div class="products-section">
-                    <div class="filter-row">
-                        <input type="text" id="searchInput" placeholder="Search products...">
-                        <select id="categoryFilter">
-                            <option value="">All Categories</option>
-                            <option value="herbicide">Herbicides</option>
-                            <option value="adjuvant">Adjuvants</option>
-                            <option value="fertilizer">Fertilizers</option>
-                        </select>
-                    </div>
-                    <div class="products-list" id="productsList">
-                        <div class="loading">Loading products...</div>
+        <!-- Main Content -->
+        <main class="main-content">
+            <div class="container">
+                <div class="dashboard-header">
+                    <div>
+                        <h1>Shop Products</h1>
+                        <p class="text-muted">Browse our selection of bulk agricultural chemicals</p>
                     </div>
                 </div>
 
-                <div class="cart-section">
-                    <div class="cart-header">
-                        <h3>Your Cart</h3>
-                        <span class="cart-count" id="cartCount">0</span>
-                    </div>
-
-                    <div class="cart-items" id="cartItems">
-                        <div class="cart-empty">Your cart is empty</div>
-                    </div>
-
-                    <div class="cart-summary" id="cartSummary" style="display: none;">
-                        <div class="summary-row total">
-                            <span>Total:</span>
-                            <span id="cartTotal">$0.00</span>
+                <!-- Search & Filters -->
+                <div class="card mb-xl">
+                    <div class="card-body">
+                        <div class="flex gap-md flex-wrap">
+                            <div class="form-group" style="flex: 1; min-width: 200px; margin: 0;">
+                                <input
+                                    type="text"
+                                    id="search"
+                                    class="form-input"
+                                    placeholder="Search products..."
+                                >
+                            </div>
+                            <div class="form-group" style="min-width: 150px; margin: 0;">
+                                <select id="category-filter" class="form-select">
+                                    <option value="">All Categories</option>
+                                    <option value="herbicide">Herbicides</option>
+                                    <option value="insecticide">Insecticides</option>
+                                    <option value="fungicide">Fungicides</option>
+                                    <option value="adjuvant">Adjuvants</option>
+                                    <option value="fertilizer">Fertilizers</option>
+                                    <option value="seed-treatment">Seed Treatments</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="min-width: 150px; margin: 0;">
+                                <select id="sort-filter" class="form-select">
+                                    <option value="name">Sort by Name</option>
+                                    <option value="price-low">Price: Low to High</option>
+                                    <option value="price-high">Price: High to Low</option>
+                                </select>
+                            </div>
                         </div>
-                    </div>
-
-                    <div class="checkout-form" id="checkoutForm" style="display: none;">
-                        <div class="form-group">
-                            <label>Delivery Notes (optional)</label>
-                            <textarea id="orderNotes" placeholder="Special instructions, delivery preferences, etc."></textarea>
-                        </div>
-                        <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder()">Submit Order</button>
-                        <button class="btn btn-secondary" onclick="clearCart()">Clear Cart</button>
                     </div>
                 </div>
+
+                <!-- Category Filters -->
+                <div class="filters" id="category-buttons">
+                    <button class="filter-btn active" data-category="">All Products</button>
+                    <button class="filter-btn" data-category="herbicide">Herbicides</button>
+                    <button class="filter-btn" data-category="insecticide">Insecticides</button>
+                    <button class="filter-btn" data-category="fungicide">Fungicides</button>
+                    <button class="filter-btn" data-category="adjuvant">Adjuvants</button>
+                    <button class="filter-btn" data-category="fertilizer">Fertilizers</button>
+                </div>
+
+                <!-- Products Grid -->
+                <div class="products-grid" id="products-grid">
+                    <div class="product-card skeleton" style="height: 350px;"></div>
+                    <div class="product-card skeleton" style="height: 350px;"></div>
+                    <div class="product-card skeleton" style="height: 350px;"></div>
+                    <div class="product-card skeleton" style="height: 350px;"></div>
+                </div>
+
+                <!-- Empty State -->
+                <div class="empty-state hidden" id="empty-state">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                        <circle cx="11" cy="11" r="8"/>
+                        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                    <h3>No products found</h3>
+                    <p>Try adjusting your search or filter criteria</p>
+                    <button class="btn btn-primary" onclick="resetFilters()">Clear Filters</button>
+                </div>
             </div>
-        </div>
-    </main>
+        </main>
+
+        <!-- Footer -->
+        <footer class="footer">
+            <div class="container">
+                <div class="footer-bottom" style="border-top: none; padding-top: 0;">
+                    <p>&copy; 2024 AcreProfit. All rights reserved.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
 
     <script>
-        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
-        let products = [];
-        let cart = JSON.parse(localStorage.getItem('acreprofit_cart') || '[]');
-        let token = localStorage.getItem('acreprofit_token');
-        let currentUser = null;
+        // API Configuration
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : '/api';
 
-        // Auth check
-        function checkAuth() {
-            const userStr = localStorage.getItem('acreprofit_user');
-            if (!token || !userStr) {
-                window.location.href = '/login.html';
-                return false;
-            }
-            currentUser = JSON.parse(userStr);
-            document.getElementById('userName').textContent = currentUser.name || currentUser.email;
-            return true;
+        // Check auth status
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || 'null');
+
+        if (!token) {
+            document.getElementById('dashboard-btn').textContent = 'Sign In';
+            document.getElementById('dashboard-btn').href = 'login.html';
         }
 
-        // Load products with user's distributor pricing if logged in
+        // Cart management
+        let cart = JSON.parse(localStorage.getItem('cart') || '[]');
+        updateCartCount();
+
+        function updateCartCount() {
+            const count = cart.reduce((sum, item) => sum + item.quantity, 0);
+            document.getElementById('cart-count').textContent = count;
+        }
+
+        // Mobile menu
+        document.getElementById('mobile-menu-btn').addEventListener('click', () => {
+            document.getElementById('main-nav').classList.toggle('open');
+        });
+
+        // Products state
+        let allProducts = [];
+        let filteredProducts = [];
+
+        // Load products
         async function loadProducts() {
             try {
-                const token = localStorage.getItem('token');
-                let response;
+                const response = await fetch(`${API_URL}/products`);
+                const data = await response.json();
 
-                if (token) {
-                    // Use authenticated endpoint with distributor pricing
-                    response = await fetch(`${API_URL}/api/chemicals/for-customer`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
+                if (data.success) {
+                    allProducts = data.data.products;
+                    applyFilters();
+                } else {
+                    showEmpty();
                 }
-
-                // Fall back to public endpoint if not logged in or auth failed
-                if (!response || !response.ok) {
-                    response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
-                }
-
-                if (!response.ok) throw new Error('Failed to load');
-                products = await response.json();
-                renderProducts();
             } catch (error) {
-                document.getElementById('productsList').innerHTML = '<div class="error-msg">Unable to load products. Please refresh.</div>';
+                console.error('Error loading products:', error);
+                showEmpty();
             }
+        }
+
+        // Apply filters
+        function applyFilters() {
+            const search = document.getElementById('search').value.toLowerCase();
+            const category = document.getElementById('category-filter').value;
+            const sort = document.getElementById('sort-filter').value;
+
+            filteredProducts = allProducts.filter(product => {
+                const matchesSearch = !search ||
+                    product.name.toLowerCase().includes(search) ||
+                    product.description?.toLowerCase().includes(search) ||
+                    product.activeIngredient?.toLowerCase().includes(search);
+
+                const matchesCategory = !category || product.category === category;
+
+                return matchesSearch && matchesCategory;
+            });
+
+            // Sort
+            filteredProducts.sort((a, b) => {
+                switch (sort) {
+                    case 'price-low':
+                        return (a.packageSizes[0]?.price || 0) - (b.packageSizes[0]?.price || 0);
+                    case 'price-high':
+                        return (b.packageSizes[0]?.price || 0) - (a.packageSizes[0]?.price || 0);
+                    default:
+                        return a.name.localeCompare(b.name);
+                }
+            });
+
+            renderProducts();
         }
 
         // Render products
         function renderProducts() {
-            const search = document.getElementById('searchInput').value.toLowerCase();
-            const category = document.getElementById('categoryFilter').value;
+            const grid = document.getElementById('products-grid');
+            const empty = document.getElementById('empty-state');
 
-            let filtered = products.filter(p => {
-                const matchSearch = p.productName.toLowerCase().includes(search) || (p.notes || '').toLowerCase().includes(search);
-                const matchCategory = !category || p.category === category;
-                const available = p.availableForOrder !== false;
-                return matchSearch && matchCategory && available;
-            });
-
-            if (filtered.length === 0) {
-                document.getElementById('productsList').innerHTML = '<div class="cart-empty">No products found</div>';
+            if (filteredProducts.length === 0) {
+                grid.classList.add('hidden');
+                empty.classList.remove('hidden');
                 return;
             }
 
-            document.getElementById('productsList').innerHTML = filtered.map(p => `
-                <div class="product-item" data-id="${p._id}">
-                    <div class="product-info">
-                        <h4>${p.productName}${p.isRestrictedUse ? '<span class="rup-tag">RUP</span>' : ''}</h4>
-                        <p>${p.packSize || ''} ${p.unitsPerPack ? '(' + p.unitsPerPack + ' ' + p.unit + ')' : ''}</p>
-                        <p style="color: #888; font-size: 0.8rem;">${p.notes || ''}</p>
-                    </div>
-                    <div class="product-price">
-                        $${(p.sellPrice || 0).toFixed(2)}<small>/${p.unit}</small>
-                    </div>
-                    <div class="product-actions">
-                        <input type="number" class="qty-input" id="qty-${p._id}" min="1" value="1" step="1">
-                        <button class="btn btn-add" onclick="addToCart('${p._id}')">Add</button>
-                    </div>
-                </div>
-            `).join('');
-        }
+            grid.classList.remove('hidden');
+            empty.classList.add('hidden');
 
-        // Add to cart
-        function addToCart(productId) {
-            const product = products.find(p => p._id === productId);
-            if (!product) return;
+            grid.innerHTML = filteredProducts.map(product => {
+                const lowestPrice = product.packageSizes.length > 0
+                    ? Math.min(...product.packageSizes.map(ps => ps.price))
+                    : null;
 
-            const qty = parseFloat(document.getElementById(`qty-${productId}`).value) || 1;
-            const existingIndex = cart.findIndex(item => item.productId === productId);
+                const inStock = product.packageSizes.some(ps => ps.inventory > 0);
 
-            if (existingIndex >= 0) {
-                cart[existingIndex].quantity += qty;
-            } else {
-                cart.push({
-                    productId: product._id,
-                    productName: product.productName,
-                    packSize: product.packSize,
-                    unit: product.unit,
-                    unitsPerPack: product.unitsPerPack,
-                    price: product.sellPrice,
-                    quantity: qty
-                });
-            }
-
-            saveCart();
-            renderCart();
-            showMessage('Added to cart!', 'success');
-        }
-
-        // Remove from cart
-        function removeFromCart(index) {
-            cart.splice(index, 1);
-            saveCart();
-            renderCart();
-        }
-
-        // Clear cart
-        function clearCart() {
-            cart = [];
-            saveCart();
-            renderCart();
-        }
-
-        // Save cart to localStorage
-        function saveCart() {
-            localStorage.setItem('acreprofit_cart', JSON.stringify(cart));
-        }
-
-        // Render cart
-        function renderCart() {
-            const cartItems = document.getElementById('cartItems');
-            const cartCount = document.getElementById('cartCount');
-            const cartSummary = document.getElementById('cartSummary');
-            const checkoutForm = document.getElementById('checkoutForm');
-
-            cartCount.textContent = cart.length;
-
-            if (cart.length === 0) {
-                cartItems.innerHTML = '<div class="cart-empty">Your cart is empty</div>';
-                cartSummary.style.display = 'none';
-                checkoutForm.style.display = 'none';
-                return;
-            }
-
-            let total = 0;
-            cartItems.innerHTML = cart.map((item, index) => {
-                const itemTotal = item.price * item.quantity;
-                total += itemTotal;
                 return `
-                    <div class="cart-item">
-                        <div class="cart-item-info">
-                            <h5>${item.productName}</h5>
-                            <p>${item.quantity} ${item.unit} @ $${item.price.toFixed(2)}/${item.unit}</p>
+                    <a href="product.html?id=${product._id}" class="product-card">
+                        <div class="product-card-image">
+                            ${product.imageUrl
+                                ? `<img src="${product.imageUrl}" alt="${product.name}">`
+                                : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                    <rect x="3" y="3" width="18" height="18" rx="2"/>
+                                    <circle cx="8.5" cy="8.5" r="1.5"/>
+                                    <path d="M21 15l-5-5L5 21"/>
+                                </svg>`
+                            }
                         </div>
-                        <div class="cart-item-total">$${itemTotal.toFixed(2)}</div>
-                        <button class="remove-btn" onclick="removeFromCart(${index})">&times;</button>
-                    </div>
+                        <div class="product-card-body">
+                            <span class="product-card-category">${product.category}</span>
+                            <h3 class="product-card-title">${product.name}</h3>
+                            ${product.activeIngredient ? `<p class="text-sm text-muted" style="margin: 0 0 var(--space-sm);">${product.activeIngredient}</p>` : ''}
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <span class="product-card-price">
+                                    ${lowestPrice
+                                        ? `From $${lowestPrice.toFixed(2)}`
+                                        : 'Contact for pricing'
+                                    }
+                                </span>
+                                ${inStock
+                                    ? '<span class="badge badge-success">In Stock</span>'
+                                    : '<span class="badge badge-error">Out of Stock</span>'
+                                }
+                            </div>
+                        </div>
+                    </a>
                 `;
             }).join('');
-
-            document.getElementById('cartTotal').textContent = '$' + total.toFixed(2);
-            cartSummary.style.display = 'block';
-            checkoutForm.style.display = 'block';
         }
 
-        // Submit order
-        async function submitOrder() {
-            if (cart.length === 0) return;
-
-            const btn = document.getElementById('submitOrderBtn');
-            btn.disabled = true;
-            btn.textContent = 'Submitting...';
-
-            try {
-                const orderData = {
-                    items: cart.map(item => ({
-                        chemicalId: item.productId,
-                        productName: item.productName,
-                        quantity: item.quantity,
-                        unit: item.unit,
-                        pricePerUnit: item.price,
-                        totalPrice: item.price * item.quantity
-                    })),
-                    notes: document.getElementById('orderNotes').value,
-                    totalAmount: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
-                };
-
-                const response = await fetch(`${API_URL}/api/chemical-orders`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(orderData)
-                });
-
-                if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.message || 'Failed to submit order');
-                }
-
-                const order = await response.json();
-
-                // Clear cart
-                cart = [];
-                saveCart();
-
-                // Show confirmation
-                document.querySelector('.shop-layout').innerHTML = `
-                    <div class="order-confirmation" style="grid-column: 1 / -1;">
-                        <h2>Order Submitted!</h2>
-                        <p>Thank you for your order. We'll process it shortly.</p>
-                        <div class="order-number">Order #${order._id ? order._id.slice(-8).toUpperCase() : 'PENDING'}</div>
-                        <p>Total: <strong>$${orderData.totalAmount.toFixed(2)}</strong></p>
-                        <p style="color: #666; margin-top: 1rem;">You'll receive an invoice via email.</p>
-                        <div style="margin-top: 2rem;">
-                            <a href="/my-orders.html" class="btn btn-primary" style="display: inline-block; width: auto; margin-right: 1rem;">View My Orders</a>
-                            <a href="/shop.html" class="btn btn-secondary" style="display: inline-block; width: auto;">Continue Shopping</a>
-                        </div>
-                    </div>
-                `;
-
-            } catch (error) {
-                showMessage(error.message, 'error');
-                btn.disabled = false;
-                btn.textContent = 'Submit Order';
-            }
+        function showEmpty() {
+            document.getElementById('products-grid').classList.add('hidden');
+            document.getElementById('empty-state').classList.remove('hidden');
         }
 
-        function showMessage(msg, type) {
-            const area = document.getElementById('messageArea');
-            area.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${msg}</div>`;
-            setTimeout(() => area.innerHTML = '', 3000);
+        function resetFilters() {
+            document.getElementById('search').value = '';
+            document.getElementById('category-filter').value = '';
+            document.getElementById('sort-filter').value = 'name';
+
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === '');
+            });
+
+            applyFilters();
         }
 
         // Event listeners
-        document.getElementById('searchInput').addEventListener('input', renderProducts);
-        document.getElementById('categoryFilter').addEventListener('change', renderProducts);
-        document.getElementById('logoutBtn').addEventListener('click', e => {
-            e.preventDefault();
-            localStorage.removeItem('acreprofit_token');
-            localStorage.removeItem('acreprofit_user');
-            window.location.href = '/';
+        document.getElementById('search').addEventListener('input', applyFilters);
+        document.getElementById('category-filter').addEventListener('change', (e) => {
+            // Sync with buttons
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === e.target.value);
+            });
+            applyFilters();
+        });
+        document.getElementById('sort-filter').addEventListener('change', applyFilters);
+
+        // Category buttons
+        document.getElementById('category-buttons').addEventListener('click', (e) => {
+            if (e.target.classList.contains('filter-btn')) {
+                document.querySelectorAll('.filter-btn').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+                document.getElementById('category-filter').value = e.target.dataset.category;
+                applyFilters();
+            }
         });
 
-        // Initialize
-        if (checkAuth()) {
-            loadProducts();
-            renderCart();
+        // Check for category in URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const categoryParam = urlParams.get('category');
+        if (categoryParam) {
+            document.getElementById('category-filter').value = categoryParam;
+            document.querySelectorAll('.filter-btn').forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.category === categoryParam);
+            });
         }
+
+        // Load products on page load
+        loadProducts();
     </script>
 </body>
 </html>

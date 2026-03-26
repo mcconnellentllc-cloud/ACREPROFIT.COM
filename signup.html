@@ -3,462 +3,238 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <meta name="description" content="Create your Acre Profit account">
-    <title>Sign Up - Acre Profit</title>
+    <meta name="description" content="Create your AcreProfit account - Bulk agricultural chemicals for farmers">
+    <title>Sign Up - AcreProfit</title>
 
-    <!-- PWA Meta Tags -->
-    <meta name="theme-color" content="#2d5a27">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Acre Profit">
-    <link rel="apple-touch-icon" href="/icon-192.svg">
-    <link rel="manifest" href="/manifest.json">
-
+    <meta name="theme-color" content="#16a34a">
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
 <body>
-    <nav class="navbar">
-        <div class="container">
-            <a href="/" class="logo">
-                <img src="logo.svg" alt="Acre Profit">
-            </a>
-            <ul class="nav-links">
-                <li><a href="/#how-it-works">How It Works</a></li>
-                <li><a href="/#products">Products</a></li>
-                <li><a href="/login.html" class="btn btn-outline">Login</a></li>
-            </ul>
-        </div>
-    </nav>
+    <div class="auth-page">
+        <div class="auth-card">
+            <div class="auth-logo">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+                    <path d="M2 17l10 5 10-5"/>
+                    <path d="M2 12l10 5 10-5"/>
+                </svg>
+                <h1>AcreProfit</h1>
+            </div>
 
-    <main class="auth-page">
-        <div class="container">
-            <div class="auth-wrapper">
-                <!-- Step 1: Basic Info -->
-                <div id="step1" class="signup-step">
-                    <div class="auth-header">
-                        <h1>Create Your Account</h1>
-                        <p>Join the co-op and start saving on bulk orders.</p>
-                    </div>
+            <div class="auth-title">
+                <h2>Create Account</h2>
+                <p>Start saving on bulk ag chemicals</p>
+            </div>
 
-                    <form id="step1Form" class="auth-form">
-                        <div class="form-section">
-                            <div class="form-group">
-                                <label for="name">Your Name *</label>
-                                <input type="text" id="name" name="name" required placeholder="John Smith">
-                            </div>
+            <div id="alert-container"></div>
 
-                            <div class="form-group">
-                                <label for="email">Email *</label>
-                                <input type="email" id="email" name="email" required placeholder="john@farm.com">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="phone">Phone *</label>
-                                <input type="tel" id="phone" name="phone" required placeholder="(555) 123-4567">
-                            </div>
-                        </div>
-
-                        <div class="form-section">
-                            <h3>Create Password</h3>
-
-                            <div class="form-group">
-                                <label for="password">Password *</label>
-                                <input type="password" id="password" name="password" required placeholder="At least 8 characters" minlength="8">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="confirmPassword">Confirm Password *</label>
-                                <input type="password" id="confirmPassword" name="confirmPassword" required placeholder="Re-enter your password">
-                            </div>
-                        </div>
-
-                        <div class="form-section">
-                            <h3>Your Address</h3>
-
-                            <div class="form-group">
-                                <label for="address">Street Address *</label>
-                                <input type="text" id="address" name="address" required placeholder="123 Farm Road">
-                            </div>
-
-                            <div class="form-group">
-                                <label for="city">City *</label>
-                                <input type="text" id="city" name="city" required placeholder="Haxtun">
-                            </div>
-
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label for="state">State *</label>
-                                    <select id="state" name="state" required>
-                                        <option value="">Select State</option>
-                                        <option value="CO">Colorado</option>
-                                        <option value="KS">Kansas</option>
-                                        <option value="NE">Nebraska</option>
-                                    </select>
-                                </div>
-                                <div class="form-group">
-                                    <label for="zip">ZIP Code *</label>
-                                    <input type="text" id="zip" name="zip" required placeholder="80759" pattern="[0-9]{5}">
-                                </div>
-                            </div>
-                        </div>
-
-                        <div id="errorMessage" class="error-message" style="display: none;"></div>
-
-                        <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn">
-                            Continue
-                        </button>
-
-                        <p class="auth-switch">
-                            Already have an account? <a href="/login.html">Login</a>
-                        </p>
-                    </form>
+            <form id="signup-form">
+                <div class="form-group">
+                    <label class="form-label required" for="name">Full Name</label>
+                    <input
+                        type="text"
+                        id="name"
+                        name="name"
+                        class="form-input"
+                        placeholder="John Smith"
+                        required
+                        autocomplete="name"
+                    >
                 </div>
 
-                <!-- Step 2: Pick Representative -->
-                <div id="step2" class="signup-step" style="display: none;">
-                    <div class="auth-header">
-                        <h1>Pick Your Representative</h1>
-                        <p>Your rep is your point of contact and pickup location for orders.</p>
-                    </div>
-
-                    <form id="step2Form" class="auth-form">
-                        <div class="rep-grid" id="repGrid">
-                            <label class="rep-card">
-                                <input type="radio" name="representative" value="kyle" required>
-                                <div class="rep-info">
-                                    <span class="rep-name">Kyle McConnell</span>
-                                    <span class="rep-phone">(970) 571-1015</span>
-                                    <span class="rep-location">Pickup: Haxtun, CO</span>
-                                </div>
-                            </label>
-                            <label class="rep-card">
-                                <input type="radio" name="representative" value="ty">
-                                <div class="rep-info">
-                                    <span class="rep-name">Ty Mollohan</span>
-                                    <span class="rep-phone">(970) 520-2340</span>
-                                    <span class="rep-location">Pickup: Otis, CO</span>
-                                </div>
-                            </label>
-                            <label class="rep-card">
-                                <input type="radio" name="representative" value="chad">
-                                <div class="rep-info">
-                                    <span class="rep-name">Chad Bamford</span>
-                                    <span class="rep-phone">(970) 520-3716</span>
-                                    <span class="rep-location">Pickup: Haxtun, CO</span>
-                                </div>
-                            </label>
-                            <label class="rep-card">
-                                <input type="radio" name="representative" value="seth">
-                                <div class="rep-info">
-                                    <span class="rep-name">Seth Rolfs</span>
-                                    <span class="rep-phone">(785) 531-0680</span>
-                                    <span class="rep-location">Pickup: Kansas</span>
-                                </div>
-                            </label>
-                        </div>
-
-                        <div id="errorMessage2" class="error-message" style="display: none;"></div>
-
-                        <button type="submit" class="btn btn-primary btn-lg btn-block" id="submitBtn2">
-                            Complete Signup
-                        </button>
-                    </form>
+                <div class="form-group">
+                    <label class="form-label required" for="email">Email Address</label>
+                    <input
+                        type="email"
+                        id="email"
+                        name="email"
+                        class="form-input"
+                        placeholder="you@example.com"
+                        required
+                        autocomplete="email"
+                    >
                 </div>
-            </div>
-        </div>
-    </main>
 
-    <footer class="footer">
-        <div class="container">
-            <div class="footer-bottom" style="border-top: none; padding-top: 0;">
-                <p>&copy; 2026 AcreProfit.com. All rights reserved.</p>
+                <div class="form-group">
+                    <label class="form-label" for="phone">Phone Number</label>
+                    <input
+                        type="tel"
+                        id="phone"
+                        name="phone"
+                        class="form-input"
+                        placeholder="(555) 123-4567"
+                        autocomplete="tel"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required" for="password">Password</label>
+                    <input
+                        type="password"
+                        id="password"
+                        name="password"
+                        class="form-input"
+                        placeholder="Min. 8 characters"
+                        required
+                        autocomplete="new-password"
+                        minlength="8"
+                    >
+                    <p class="form-hint">Must be at least 8 characters</p>
+                </div>
+
+                <div class="form-group">
+                    <label class="form-label required" for="confirm-password">Confirm Password</label>
+                    <input
+                        type="password"
+                        id="confirm-password"
+                        name="confirm-password"
+                        class="form-input"
+                        placeholder="Confirm your password"
+                        required
+                        autocomplete="new-password"
+                        minlength="8"
+                    >
+                </div>
+
+                <div class="form-group">
+                    <label class="form-checkbox">
+                        <input type="checkbox" id="terms" name="terms" required>
+                        <span>I agree to the <a href="#" target="_blank">Terms of Service</a> and <a href="#" target="_blank">Privacy Policy</a></span>
+                    </label>
+                </div>
+
+                <button type="submit" class="btn btn-primary btn-block btn-lg" id="submit-btn">
+                    <span class="btn-text">Create Account</span>
+                    <span class="btn-loading hidden">
+                        <span class="spinner spinner-sm"></span>
+                    </span>
+                </button>
+            </form>
+
+            <div class="auth-footer">
+                Already have an account? <a href="login.html">Sign in</a>
             </div>
         </div>
-    </footer>
+    </div>
 
     <script>
-        const API_URL = 'https://acreprofit-com.onrender.com';
-        const MAX_RETRIES = 3;
-        const RETRY_DELAY_MS = 5000;
-        let userData = {};
+        // API Configuration
+        const API_URL = window.location.hostname === 'localhost'
+            ? 'http://localhost:3001/api'
+            : '/api';
 
-        // Step 1: Collect basic info
-        document.getElementById('step1Form').addEventListener('submit', function(e) {
+        // DOM Elements
+        const form = document.getElementById('signup-form');
+        const submitBtn = document.getElementById('submit-btn');
+        const alertContainer = document.getElementById('alert-container');
+
+        // Check if already logged in
+        const token = localStorage.getItem('token');
+        if (token) {
+            window.location.href = 'dashboard.html';
+        }
+
+        // Show alert message
+        function showAlert(message, type = 'error') {
+            alertContainer.innerHTML = `
+                <div class="alert alert-${type}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        ${type === 'error'
+                            ? '<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'
+                            : '<path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>'}
+                    </svg>
+                    <span>${message}</span>
+                </div>
+            `;
+        }
+
+        // Set loading state
+        function setLoading(loading) {
+            submitBtn.disabled = loading;
+            submitBtn.querySelector('.btn-text').classList.toggle('hidden', loading);
+            submitBtn.querySelector('.btn-loading').classList.toggle('hidden', !loading);
+        }
+
+        // Format phone number
+        document.getElementById('phone').addEventListener('input', (e) => {
+            let value = e.target.value.replace(/\D/g, '');
+            if (value.length > 0) {
+                if (value.length <= 3) {
+                    value = `(${value}`;
+                } else if (value.length <= 6) {
+                    value = `(${value.slice(0, 3)}) ${value.slice(3)}`;
+                } else {
+                    value = `(${value.slice(0, 3)}) ${value.slice(3, 6)}-${value.slice(6, 10)}`;
+                }
+            }
+            e.target.value = value;
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
             e.preventDefault();
 
-            const formData = new FormData(this);
-            const password = formData.get('password');
-            const confirmPassword = formData.get('confirmPassword');
-            const errorDiv = document.getElementById('errorMessage');
+            const name = document.getElementById('name').value.trim();
+            const email = document.getElementById('email').value.trim();
+            const phone = document.getElementById('phone').value.trim();
+            const password = document.getElementById('password').value;
+            const confirmPassword = document.getElementById('confirm-password').value;
+            const terms = document.getElementById('terms').checked;
 
-            // Validate passwords match
+            // Validation
+            if (!name || !email || !password) {
+                showAlert('Please fill in all required fields');
+                return;
+            }
+
             if (password !== confirmPassword) {
-                errorDiv.textContent = 'Passwords do not match';
-                errorDiv.style.display = 'block';
+                showAlert('Passwords do not match');
                 return;
             }
 
             if (password.length < 8) {
-                errorDiv.textContent = 'Password must be at least 8 characters';
-                errorDiv.style.display = 'block';
+                showAlert('Password must be at least 8 characters');
                 return;
             }
 
-            errorDiv.style.display = 'none';
-
-            userData = {
-                name: formData.get('name'),
-                email: formData.get('email'),
-                phone: formData.get('phone'),
-                password: password,
-                address: {
-                    street: formData.get('address'),
-                    city: formData.get('city'),
-                    state: formData.get('state'),
-                    zip: formData.get('zip')
-                }
-            };
-
-            // Move to step 2
-            document.getElementById('step1').style.display = 'none';
-            document.getElementById('step2').style.display = 'block';
-        });
-
-        // Step 2: Pick representative and complete signup
-        document.getElementById('step2Form').addEventListener('submit', async function(e) {
-            e.preventDefault();
-
-            const submitBtn = document.getElementById('submitBtn2');
-            const errorDiv = document.getElementById('errorMessage2');
-
-            submitBtn.disabled = true;
-            submitBtn.textContent = 'Creating Account...';
-            errorDiv.style.display = 'none';
-
-            const formData = new FormData(this);
-            userData.representativeId = formData.get('representative');
-
-            let lastError = null;
-
-            for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
-                try {
-                    const response = await fetch(`${API_URL}/api/auth/signup`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify(userData)
-                    });
-
-                    const result = await response.json();
-
-                    if (!response.ok) {
-                        throw new Error(result.error || 'Signup failed');
-                    }
-
-                    // Store token and redirect to producer portal
-                    localStorage.setItem('token', result.token);
-                    localStorage.setItem('user', JSON.stringify(result.user));
-                    window.location.href = '/dashboard.html';
-                    return;
-                } catch (error) {
-                    lastError = error;
-                    const isNetworkError = error.message === 'Failed to fetch' || error.message.includes('Load failed');
-
-                    if (!isNetworkError) break;
-
-                    if (attempt < MAX_RETRIES) {
-                        submitBtn.textContent = `Server waking up... retry ${attempt}/${MAX_RETRIES - 1}`;
-                        await new Promise(r => setTimeout(r, RETRY_DELAY_MS));
-                    }
-                }
+            if (!terms) {
+                showAlert('Please agree to the Terms of Service');
+                return;
             }
 
-            // All retries exhausted or non-network error
-            const isNetworkError = lastError.message === 'Failed to fetch' || lastError.message.includes('Load failed');
-            if (isNetworkError) {
-                errorDiv.textContent = 'Server is currently unavailable. It may be starting up — please wait a moment and try again.';
-            } else {
-                errorDiv.textContent = lastError.message;
+            setLoading(true);
+            alertContainer.innerHTML = '';
+
+            try {
+                const response = await fetch(`${API_URL}/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, phone, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    // Store auth data
+                    localStorage.setItem('token', data.data.token);
+                    localStorage.setItem('user', JSON.stringify(data.data.user));
+
+                    // Redirect to dashboard
+                    window.location.href = 'dashboard.html';
+                } else {
+                    showAlert(data.message || 'Error creating account');
+                }
+            } catch (error) {
+                console.error('Signup error:', error);
+                showAlert('Unable to connect to server. Please try again.');
+            } finally {
+                setLoading(false);
             }
-            errorDiv.style.display = 'block';
-            submitBtn.disabled = false;
-            submitBtn.textContent = 'Complete Signup';
         });
     </script>
-
-    <style>
-        .auth-page {
-            padding: 120px 0 80px;
-            background: var(--secondary);
-            min-height: 100vh;
-        }
-
-        .auth-wrapper {
-            max-width: 500px;
-            margin: 0 auto;
-            background: var(--white);
-            border-radius: var(--radius-lg);
-            box-shadow: var(--shadow-xl);
-            padding: 48px;
-        }
-
-        .auth-header {
-            text-align: center;
-            margin-bottom: 40px;
-        }
-
-        .auth-header h1 {
-            font-size: 2rem;
-            margin-bottom: 12px;
-        }
-
-        .auth-header p {
-            color: var(--text-light);
-        }
-
-        .form-section {
-            margin-bottom: 32px;
-            padding-bottom: 32px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .form-section:last-of-type {
-            border-bottom: none;
-            padding-bottom: 0;
-        }
-
-        .form-section h3 {
-            font-size: 1.125rem;
-            margin-bottom: 16px;
-            color: var(--primary);
-        }
-
-        .auth-form .form-group {
-            margin-bottom: 20px;
-        }
-
-        .auth-form label {
-            display: block;
-            font-weight: 600;
-            font-size: 0.875rem;
-            margin-bottom: 8px;
-            color: var(--text);
-        }
-
-        .auth-form input,
-        .auth-form select {
-            width: 100%;
-            padding: 14px 16px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 1rem;
-            font-family: inherit;
-            transition: var(--transition);
-        }
-
-        .auth-form input:focus,
-        .auth-form select:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
-        }
-
-        .form-row {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 20px;
-        }
-
-        .rep-grid {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 12px;
-            margin-bottom: 24px;
-        }
-
-        .rep-card {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-            padding: 20px 24px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-            cursor: pointer;
-            transition: var(--transition);
-            border: 3px solid transparent;
-        }
-
-        .rep-card:hover {
-            background: #e8e8e0;
-        }
-
-        .rep-card:has(input:checked) {
-            background: rgba(45, 90, 39, 0.1);
-            border-color: var(--primary);
-        }
-
-        .rep-card input {
-            width: auto;
-            accent-color: var(--primary);
-            transform: scale(1.3);
-        }
-
-        .rep-info {
-            display: flex;
-            flex-direction: column;
-        }
-
-        .rep-name {
-            font-weight: 700;
-            font-size: 1.125rem;
-            color: var(--text);
-        }
-
-        .rep-phone {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .rep-location {
-            font-size: 0.9rem;
-            color: var(--primary);
-            font-weight: 600;
-            margin-top: 6px;
-        }
-
-        .error-message {
-            background: #fee2e2;
-            color: #dc2626;
-            padding: 12px 16px;
-            border-radius: var(--radius);
-            margin-bottom: 20px;
-            font-size: 0.875rem;
-        }
-
-        .auth-switch {
-            text-align: center;
-            margin-top: 24px;
-            color: var(--text-light);
-        }
-
-        .auth-switch a {
-            color: var(--primary);
-            font-weight: 600;
-        }
-
-        @media (max-width: 768px) {
-            .auth-wrapper {
-                padding: 32px 24px;
-            }
-
-            .form-row {
-                grid-template-columns: 1fr;
-            }
-        }
-    </style>
 </body>
 </html>
