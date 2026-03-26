@@ -1014,13 +1014,13 @@
                                 <th>Product</th>
                                 <th>Supplier</th>
                                 <th>Pack Size</th>
-                                <th>Cost Price</th>
+                                <th>Cost</th>
+                                <th>Admin Margin</th>
+                                <th>Margin $</th>
                                 <th>Sell Price</th>
-                                <th>Margin %</th>
                                 <th>Inventory</th>
                                 <th>Units Sold</th>
                                 <th>Revenue</th>
-                                <th>Added By</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
@@ -2867,9 +2867,18 @@
             }
 
             tbody.innerHTML = products.map(p => {
-                const margin = p.margin || 0;
-                const marginColor = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
-                const profit = p.sellPrice - p.costPrice;
+                const costPrice = p.costPrice || 0;
+                const adminPrice = p.adminPrice || costPrice;
+                const sellPrice = p.sellPrice || adminPrice;
+
+                // Admin margin: the % markup from cost to admin price
+                const adminMarginPct = p.adminMargin || (costPrice > 0 ? ((adminPrice - costPrice) / costPrice * 100) : 0);
+                const adminMarginColor = adminMarginPct >= 10 ? '#059669' : adminMarginPct >= 5 ? '#d97706' : '#dc2626';
+
+                // Margin $: the profit per unit (sell - cost)
+                const marginDollars = sellPrice - costPrice;
+                const marginDollarColor = marginDollars >= 3 ? '#059669' : marginDollars >= 1 ? '#d97706' : '#dc2626';
+
                 const inventory = p.quantityOnHand || 0;
                 const inventoryColor = inventory === 0 ? '#dc2626' : inventory < 10 ? '#d97706' : '#059669';
 
@@ -2881,19 +2890,22 @@
                     </td>
                     <td>${p.sourceSupplier}</td>
                     <td>${p.packSize} <small>(${p.unit})</small></td>
-                    <td>$${p.costPrice.toFixed(2)}</td>
-                    <td>$${p.sellPrice.toFixed(2)}</td>
+                    <td>$${costPrice.toFixed(2)}</td>
                     <td>
-                        <span style="color: ${marginColor}; font-weight: 700;">${margin.toFixed(1)}%</span>
-                        <br><small style="color: ${marginColor}">$${profit.toFixed(2)}/unit</small>
+                        <span style="color: ${adminMarginColor}; font-weight: 700;">${adminMarginPct.toFixed(1)}%</span>
+                        <br><small style="color: var(--text-muted);">$${adminPrice.toFixed(2)}</small>
                     </td>
+                    <td>
+                        <span style="color: ${marginDollarColor}; font-weight: 700;">$${marginDollars.toFixed(2)}</span>
+                        <br><small style="color: var(--text-muted);">/unit</small>
+                    </td>
+                    <td>$${sellPrice.toFixed(2)}</td>
                     <td>
                         <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
                         ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
                     </td>
                     <td>${p.unitsSold || 0}</td>
                     <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td style="font-size:0.8rem;">${p.createdBy?.name || '-'}</td>
                 </tr>
                 `;
             }).join('');
