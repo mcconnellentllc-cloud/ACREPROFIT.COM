@@ -3899,7 +3899,7 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
 // Update chemical price (admin only)
 app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { costPrice, sellPrice, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
+        const { costPrice, adminPrice, sellPrice, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
                 category, crops, defaultRate, rateUnit, unitsPerPack } = req.body;
 
         const chemical = await Chemical.findById(req.params.id);
@@ -3909,6 +3909,7 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
 
         // If price changed, save to history
         if ((costPrice !== undefined && costPrice !== chemical.costPrice) ||
+            (adminPrice !== undefined && adminPrice !== chemical.adminPrice) ||
             (sellPrice !== undefined && sellPrice !== chemical.sellPrice)) {
             await ChemicalPriceHistory.create({
                 chemicalId: chemical._id,
@@ -3923,6 +3924,7 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
             });
 
             if (costPrice !== undefined) chemical.costPrice = costPrice;
+            if (adminPrice !== undefined) chemical.adminPrice = adminPrice;
             if (sellPrice !== undefined) chemical.sellPrice = sellPrice;
             chemical.priceDate = new Date();
         }

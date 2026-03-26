@@ -1310,31 +1310,8 @@
                     </div>
                 </div>
 
-                <!-- Bulk Edit Controls -->
+                <!-- Filter Controls -->
                 <div class="pricing-bulk-controls">
-                    <div class="bulk-control-group">
-                        <label>Apply Markup to All:</label>
-                        <div class="bulk-input-row">
-                            <div class="bulk-field">
-                                <span class="field-label">Admin Markup</span>
-                                <div class="input-with-suffix">
-                                    <input type="number" id="bulkAdminMarkup" value="10" min="0" max="100" step="0.5">
-                                    <span class="suffix">%</span>
-                                </div>
-                            </div>
-                            <div class="bulk-field">
-                                <span class="field-label">Retail Markup</span>
-                                <div class="input-with-suffix">
-                                    <input type="number" id="bulkRetailMarkup" value="15" min="0" max="100" step="0.5">
-                                    <span class="suffix">%</span>
-                                </div>
-                            </div>
-                            <button class="btn btn-outline btn-sm" onclick="applyBulkMarkup()">
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="1 4 1 10 7 10"></polyline><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"></path></svg>
-                                Apply to All
-                            </button>
-                        </div>
-                    </div>
                     <div class="bulk-control-group">
                         <label>Filter Products:</label>
                         <div class="search-filter-row">
@@ -5104,35 +5081,6 @@
 
         function filterPricingTable() {
             renderPricingTable();
-        }
-
-        function applyBulkMarkup() {
-            const adminMarkup = parseFloat(document.getElementById('bulkAdminMarkup').value) || 0;
-            const retailMarkup = parseFloat(document.getElementById('bulkRetailMarkup').value) || 0;
-
-            if (!confirm(`Apply ${adminMarkup}% admin markup and ${retailMarkup}% retail markup to all visible products?`)) {
-                return;
-            }
-
-            document.querySelectorAll('#pricingTableBody tr[data-id]').forEach(row => {
-                const costInput = row.querySelector('.cost-input');
-                const adminInput = row.querySelector('.admin-input');
-                const retailInput = row.querySelector('.retail-input');
-
-                const cost = parseFloat(costInput.value) || 0;
-                const newAdmin = cost * (1 + adminMarkup / 100);
-                const newRetail = newAdmin * (1 + retailMarkup / 100);
-
-                adminInput.value = newAdmin.toFixed(2);
-                retailInput.value = newRetail.toFixed(2);
-
-                // Update margins display
-                row.querySelector('.ap-margin').textContent = '$' + (newAdmin - cost).toFixed(2);
-                row.querySelector('.rep-commission').textContent = '$' + (newRetail - newAdmin).toFixed(2);
-
-                // Mark as changed
-                markPricingChanged(adminInput);
-            });
         }
 
         async function saveAllPricing() {
