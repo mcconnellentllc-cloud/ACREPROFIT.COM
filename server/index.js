@@ -7406,8 +7406,17 @@ app.get('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, 
 // Create invoice from order
 app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const order = await ChemicalOrder.findById(req.params.orderId)
+        // Try ChemicalOrder first, then Order
+        let order = await ChemicalOrder.findById(req.params.orderId)
             .populate('userId', 'name email phone address farm');
+
+        let isChemicalOrder = !!order;
+
+        if (!order) {
+            // Try regular Order model
+            order = await Order.findById(req.params.orderId)
+                .populate('userId', 'name email phone farm');
+        }
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
@@ -7422,6 +7431,74 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
         const invoiceNumber = await generateInvoiceNumber();
         const customer = order.userId;
 
+        let invoiceItems = [];
+        let subtotal = 0;
+        let total = 0;
+        let orderNumber = '';
+
+        if (isChemicalOrder) {
+            // ChemicalOrder has items array
+            invoiceItems = order.items.map(item => ({
+                productName: item.productName,
+                description: `${item.packSize} ${item.unit}`,
+                packSize: item.packSize,
+                unit: item.unit,
+                quantity: item.quantity,
+                unitPrice: item.unitPrice,
+                totalPrice: item.totalPrice
+            }));
+            subtotal = order.subtotal;
+            total = order.total;
+            orderNumber = order.orderNumber;
+        } else {
+            // Regular Order has chemicals, seeds, pivotBio arrays
+            // Convert chemicals to invoice items
+            if (order.chemicals && order.chemicals.length > 0) {
+                order.chemicals.forEach(chem => {
+                    invoiceItems.push({
+                        productName: chem.name,
+                        description: `${chem.packageSize} ${chem.packageUnit}`,
+                        packSize: `${chem.packageSize}`,
+                        unit: chem.packageUnit,
+                        quantity: chem.packagesNeeded,
+                        unitPrice: chem.pricePerPackage,
+                        totalPrice: chem.totalPrice
+                    });
+                });
+            }
+            // Convert seeds to invoice items
+            if (order.seeds && order.seeds.length > 0) {
+                order.seeds.forEach(seed => {
+                    invoiceItems.push({
+                        productName: seed.name,
+                        description: `${seed.crop} seed`,
+                        packSize: 'bag',
+                        unit: 'bags',
+                        quantity: seed.bagsNeeded,
+                        unitPrice: seed.pricePerBag,
+                        totalPrice: seed.totalPrice
+                    });
+                });
+            }
+            // Convert pivotBio to invoice items
+            if (order.pivotBio && order.pivotBio.length > 0) {
+                order.pivotBio.forEach(pb => {
+                    invoiceItems.push({
+                        productName: pb.product,
+                        description: 'PivotBio',
+                        packSize: 'unit',
+                        unit: 'units',
+                        quantity: Math.ceil(pb.totalAmount),
+                        unitPrice: pb.pricePerUnit,
+                        totalPrice: pb.totalPrice
+                    });
+                });
+            }
+            subtotal = order.totalCost || invoiceItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+            total = subtotal;
+            orderNumber = `ORD-${order._id.toString().slice(-8).toUpperCase()}`;
+        }
+
         const invoice = new Invoice({
             invoiceNumber,
             customerId: customer._id,
@@ -7430,21 +7507,13 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
             customerPhone: customer.phone,
             customerAddress: customer.address,
             orderId: order._id,
-            orderNumber: order.orderNumber,
+            orderNumber: orderNumber,
             representativeId: order.representativeId,
-            items: order.items.map(item => ({
-                productName: item.productName,
-                description: `${item.packSize} ${item.unit}`,
-                packSize: item.packSize,
-                unit: item.unit,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice
-            })),
-            subtotal: order.subtotal,
+            items: invoiceItems,
+            subtotal: subtotal,
             discount: order.discount || 0,
-            total: order.total,
-            amountDue: order.total - (order.discount || 0),
+            total: total,
+            amountDue: total - (order.discount || 0),
             dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
             createdBy: req.user._id
         });
