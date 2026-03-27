@@ -3319,8 +3319,8 @@
                     <div class="customer-avatar">${c.name.split(' ').map(n => n[0]).join('')}</div>
                     <div class="customer-info">
                         <h4>${c.name}</h4>
-                        <p>${c.farm || 'No farm name'}</p>
-                        <p class="customer-detail">${c.crops?.join(', ') || 'No crops'} • ${c.state || 'N/A'}</p>
+                        <p>${c.farm?.name || 'No farm name'}</p>
+                        <p class="customer-detail">${c.crops?.join(', ') || 'No crops'} • ${c.farm?.state || 'N/A'}</p>
                         <div class="customer-contact">
                             <a href="mailto:${c.email}">${c.email}</a>
                             ${c.phone ? `<a href="tel:${c.phone}">${c.phone}</a>` : ''}
