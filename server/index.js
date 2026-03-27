@@ -206,15 +206,51 @@ const User = mongoose.model('User', userSchema);
 // Order Model
 const orderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     crop: { type: String, required: true },
     program: { type: String },
     acres: { type: Number, required: true },
-    gpa: { type: Number }, // Gallons per acre
+    gpa: { type: Number, default: 10 }, // Gallons per acre
+    totalWaterVolume: { type: Number }, // acres * gpa
     year: { type: Number, default: () => new Date().getFullYear() },
     notes: { type: String },
+
+    // Order lines from calculator (enhanced structure)
+    orderLines: [{
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        productName: String,
+        category: String,
+        rate: Number,
+        rateUnit: String,
+        totalNeeded: Number,
+        packageSize: Number,
+        packSize: String,
+        packageUnit: String,
+        packagesNeeded: Number,
+        onHandQuantity: Number,
+        pricePerPackage: Number,
+        lineTotal: Number,
+        status: { type: String, enum: ['confirmed', 'needs_quote', 'error'], default: 'confirmed' },
+        supplier: String,
+        isAutoAdded: { type: Boolean, default: false }
+    }],
+
+    // Hydrovant auto-calculation
+    hydrovant: {
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        productName: String,
+        gallonsNeeded: Number,
+        packageSize: Number,
+        packagesNeeded: Number,
+        pricePerPackage: Number,
+        lineTotal: Number,
+        status: String
+    },
+
+    // Legacy chemicals array (backward compatibility)
     chemicals: [{
         name: String,
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
         rate: Number,
         rateUnit: String,
         totalAmount: Number,
@@ -223,7 +259,9 @@ const orderSchema = new mongoose.Schema({
         packageUnit: String,
         packagesNeeded: Number,
         pricePerPackage: Number,
-        totalPrice: Number
+        totalPrice: Number,
+        status: String,
+        isAutoAdded: Boolean
     }],
     seeds: [{
         name: String,
@@ -271,11 +309,29 @@ const orderSchema = new mongoose.Schema({
     checkNumber: String,
     checkReceivedDate: Date,
     paidAt: Date,
+
+    // Order status
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered', 'archived', 'cancelled'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered', 'archived', 'cancelled', 'quote_pending', 'quote_sent'],
         default: 'draft'
     },
+    orderStatus: {
+        type: String,
+        enum: ['pending_quote', 'ready_for_checkout', 'confirmed', 'paid'],
+        default: 'pending_quote'
+    },
+
+    // Calculator-specific fields
+    valorWarning: { type: Boolean, default: false },
+    totalConfirmedPrice: { type: Number, default: 0 },
+
+    // Timestamps
+    submittedAt: Date,
+    quotedAt: Date, // When admin responded to quote request
+    quotedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    quoteResponse: String, // Admin's quote notes
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
@@ -4813,6 +4869,73 @@ app.get('/api/chemicals/admin', authMiddleware, adminMiddleware, async (req, res
             .sort({ productName: 1, packSize: 1 });
 
         res.json(chemicals);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Search chemicals with inventory status (for calculator)
+// Auth: all logged-in roles
+app.get('/api/chemicals/search', authMiddleware, async (req, res) => {
+    try {
+        const { q, category, crop, limit = 20 } = req.query;
+
+        // Build query
+        let query = { isActive: true, availableForOrder: true };
+        if (q) {
+            query.productName = new RegExp(q, 'i');
+        }
+        if (category) {
+            query.category = category;
+        }
+        if (crop) {
+            query.crops = crop;
+        }
+
+        // Get chemicals
+        const chemicals = await Chemical.find(query)
+            .select('productName category crops packSize unit unitsPerPack sellPrice defaultRate rateUnit sourceSupplier')
+            .limit(parseInt(limit))
+            .lean();
+
+        // Get inventory for all chemicals
+        const chemicalIds = chemicals.map(c => c._id);
+        const inventories = await Inventory.find({
+            chemicalId: { $in: chemicalIds },
+            location: 'main'
+        }).lean();
+
+        // Create inventory map
+        const inventoryMap = {};
+        inventories.forEach(inv => {
+            inventoryMap[inv.chemicalId.toString()] = inv.quantityAvailable || 0;
+        });
+
+        // Map chemicals with inventory status
+        const results = chemicals.map(c => ({
+            _id: c._id,
+            productName: c.productName,
+            category: c.category,
+            crops: c.crops,
+            packSize: c.packSize,
+            unit: c.unit,
+            unitsPerPack: c.unitsPerPack,
+            sellPrice: c.sellPrice,
+            defaultRate: c.defaultRate,
+            rateUnit: c.rateUnit,
+            supplier: c.sourceSupplier,
+            onHandQuantity: inventoryMap[c._id.toString()] || 0,
+            inStock: (inventoryMap[c._id.toString()] || 0) > 0
+        }));
+
+        // Sort by in-stock first, then by name
+        results.sort((a, b) => {
+            if (a.inStock && !b.inStock) return -1;
+            if (!a.inStock && b.inStock) return 1;
+            return a.productName.localeCompare(b.productName);
+        });
+
+        res.json(results);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
