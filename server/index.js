@@ -6654,7 +6654,6 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
             productName: c.productName,
             sourceSupplier: c.sourceSupplier,
             category: c.category,
-            crops: c.crops,
             packSize: c.packSize,
             unit: c.unit,
             unitsPerPack: c.unitsPerPack,
@@ -6663,6 +6662,7 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
             adminMargin: c.adminMargin,
             sellPrice: c.sellPrice,
             margin: c.margin,
+            activeIngredients: c.activeIngredients,
             isActive: c.isActive,
             availableForOrder: c.availableForOrder,
             notes: c.notes,
@@ -7110,6 +7110,7 @@ app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, a
                 adminMargin: c.adminMargin,
                 sellPrice: c.sellPrice,
                 margin: c.margin,
+                activeIngredients: c.activeIngredients,
                 isActive: c.isActive,
                 // Inventory data
                 quantityOnHand: totalOnHand,
