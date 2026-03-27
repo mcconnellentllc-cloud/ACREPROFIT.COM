@@ -7468,6 +7468,30 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
             .populate('distributorId', 'name email')
             .sort({ productName: 1 });
 
+        // Get "On Order" quantities from pending POs (not yet received)
+        const pendingPOs = await PurchaseOrder.find({
+            status: { $in: ['pending', 'submitted', 'approved', 'ordered'] }
+        }).select('items');
+
+        // Build map of chemicalId -> quantity on order
+        const onOrderMap = {};
+        for (const po of pendingPOs) {
+            for (const item of po.items || []) {
+                if (item.chemicalId) {
+                    const key = item.chemicalId.toString();
+                    onOrderMap[key] = (onOrderMap[key] || 0) + (item.quantityOrdered || 0);
+                }
+            }
+        }
+
+        // Add onOrder quantity to each inventory item
+        const enrichedInventory = inventory.map(inv => {
+            const invObj = inv.toObject();
+            const chemId = inv.chemicalId?._id?.toString() || inv.chemicalId?.toString();
+            invObj.quantityOnOrder = chemId ? (onOrderMap[chemId] || 0) : 0;
+            return invObj;
+        });
+
         // If includeAll is true, also include chemicals without inventory records
         if (includeAll === 'true') {
             const existingChemicalIds = inventory.map(i => i.chemicalId?._id?.toString()).filter(Boolean);
@@ -7485,16 +7509,17 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
                 quantityOnHand: 0,
                 quantityReserved: 0,
                 quantityAvailable: 0,
+                quantityOnOrder: onOrderMap[chem._id.toString()] || 0,
                 averageCost: chem.costPrice || 0,
                 location: 'main',
                 needsInventoryRecord: true
             }));
 
-            res.json([...inventory, ...placeholders]);
+            res.json([...enrichedInventory, ...placeholders]);
             return;
         }
 
-        res.json(inventory);
+        res.json(enrichedInventory);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -7778,11 +7803,36 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
                 return res.status(400).json({ error: `Invalid item index: ${receiveItem.itemIndex}` });
             }
 
+            // Get chemicalId - use from PO item, or look up by product name
+            let chemicalId = poItem.chemicalId;
+            if (!chemicalId && poItem.productName) {
+                // Try to find chemical by product name (fallback for old POs without chemicalId)
+                const chemical = await Chemical.findOne({
+                    productName: { $regex: new RegExp(`^${poItem.productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                });
+                if (chemical) {
+                    chemicalId = chemical._id;
+                    // Update the PO item with the found chemicalId for future reference
+                    poItem.chemicalId = chemicalId;
+                } else {
+                    console.warn(`Could not find chemical for product: ${poItem.productName}`);
+                    return res.status(400).json({
+                        error: `Product "${poItem.productName}" not found in catalog. Please add it to Products first.`
+                    });
+                }
+            }
+
+            if (!chemicalId) {
+                return res.status(400).json({
+                    error: `Missing product reference for item: ${poItem.productName || 'Unknown'}`
+                });
+            }
+
             const quantityReceived = receiveItem.quantityReceived || poItem.quantityOrdered;
 
             // Add to inventory with batch tracking
             const result = await receiveInventory({
-                chemicalId: poItem.chemicalId,
+                chemicalId: chemicalId,
                 productName: poItem.productName,
                 packSize: poItem.packSize,
                 unit: poItem.unit,

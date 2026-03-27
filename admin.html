@@ -1839,13 +1839,13 @@
                             <tr>
                                 <th>Product Name</th>
                                 <th>Category</th>
-                                <th>Qty</th>
+                                <th style="text-align: center;" title="Physical stock in warehouse">On Hand</th>
+                                <th style="text-align: center;" title="Allocated to customer orders">Reserved</th>
+                                <th style="text-align: center;" title="Can be sold (On Hand - Reserved)">Available</th>
+                                <th style="text-align: center;" title="Ordered from suppliers, not yet received">On Order</th>
                                 <th>Unit</th>
                                 <th class="cost-column">Cost</th>
-                                <th class="cost-column">Admin</th>
-                                <th class="cost-column">Margin</th>
                                 <th>Retail</th>
-                                <th>Available</th>
                                 <th>Status</th>
                                 <th>Actions</th>
                             </tr>
@@ -4422,6 +4422,10 @@
             document.getElementById('createPOModal').style.display = 'flex';
             document.getElementById('createPOForm').reset();
             document.getElementById('poItemsContainer').innerHTML = '';
+
+            // Load products first for dropdown
+            await loadPOProducts();
+
             addPOItemRow(); // Add first row
             updatePOTotal();
 
@@ -4472,9 +4476,31 @@
         }
 
         let poItemCount = 0;
+        let poProductList = []; // Loaded chemicals for PO product selection
+
+        // Load products for PO dropdown
+        async function loadPOProducts() {
+            if (poProductList.length > 0) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    poProductList = await res.json();
+                }
+            } catch (e) {
+                console.warn('Could not load products for PO:', e);
+            }
+        }
+
         function addPOItemRow() {
             const container = document.getElementById('poItemsContainer');
             const rowId = poItemCount++;
+
+            // Build product options from loaded chemicals
+            const productOptions = poProductList.length > 0
+                ? poProductList.map(p => `<option value="${p._id}" data-name="${p.productName}" data-pack="${p.packSize || ''}" data-unit="${p.unit || ''}" data-cost="${p.costPrice || 0}">${p.productName} (${p.packSize || 'N/A'})</option>`).join('')
+                : '';
 
             const row = document.createElement('div');
             row.className = 'po-item-row';
@@ -4482,19 +4508,24 @@
             row.style.cssText = 'display: grid; grid-template-columns: 2fr 1fr 80px 100px 100px 40px; gap: 8px; margin-bottom: 8px; align-items: end;';
             row.innerHTML = `
                 <div>
-                    <label style="font-size: 11px; color: #666;">Product Name *</label>
-                    <input type="text" class="po-item-name" placeholder="Product name" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <label style="font-size: 11px; color: #666;">Product * (select from catalog)</label>
+                    <select class="po-item-select" onchange="onPOProductSelect(this, ${rowId})" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                        <option value="">-- Select Product --</option>
+                        ${productOptions}
+                    </select>
+                    <input type="hidden" class="po-item-id">
+                    <input type="hidden" class="po-item-name">
                 </div>
                 <div>
                     <label style="font-size: 11px; color: #666;">Pack Size</label>
-                    <input type="text" class="po-item-pack" placeholder="e.g., 2.5 gal" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                    <input type="text" class="po-item-pack" readonly placeholder="Auto-filled" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px; background: #f9f9f9;">
                 </div>
                 <div>
                     <label style="font-size: 11px; color: #666;">Qty *</label>
                     <input type="number" class="po-item-qty" min="1" value="1" onchange="updatePOTotal()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
-                    <label style="font-size: 11px; color: #666;">Price/Unit *</label>
+                    <label style="font-size: 11px; color: #666;">Cost/Unit *</label>
                     <input type="number" class="po-item-price" step="0.01" min="0" placeholder="0.00" onchange="updatePOTotal()" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
                 </div>
                 <div>
@@ -4506,6 +4537,21 @@
                 </div>
             `;
             container.appendChild(row);
+        }
+
+        // Handle product selection in PO item row
+        function onPOProductSelect(select, rowId) {
+            const row = document.getElementById(`poItemRow${rowId}`);
+            if (!row) return;
+
+            const option = select.options[select.selectedIndex];
+            if (!option.value) return;
+
+            row.querySelector('.po-item-id').value = option.value;
+            row.querySelector('.po-item-name').value = option.dataset.name || '';
+            row.querySelector('.po-item-pack').value = option.dataset.pack || '';
+            row.querySelector('.po-item-price').value = option.dataset.cost || '';
+            updatePOTotal();
         }
 
         function removePOItemRow(rowId) {
@@ -4555,13 +4601,20 @@
             const items = [];
 
             for (const row of rows) {
+                const chemicalId = row.querySelector('.po-item-id')?.value;
                 const productName = row.querySelector('.po-item-name')?.value.trim();
                 const packSize = row.querySelector('.po-item-pack')?.value.trim();
                 const qty = parseFloat(row.querySelector('.po-item-qty')?.value) || 0;
                 const price = parseFloat(row.querySelector('.po-item-price')?.value) || 0;
 
-                if (productName && qty > 0) {
+                if (!chemicalId) {
+                    alert('Please select a product from the catalog for all items');
+                    return;
+                }
+
+                if (qty > 0) {
                     items.push({
+                        chemicalId,
                         productName,
                         packSize,
                         quantityOrdered: qty,
@@ -6377,31 +6430,44 @@
             }
 
             tbody.innerHTML = items.map(item => {
-                // Map Inventory model fields
-                const qty = item.quantityOnHand || item.quantity || 0;
+                // Map Inventory model fields - Clear naming convention
+                const onHand = item.quantityOnHand || item.quantity || 0;        // Physical stock
+                const reserved = item.quantityReserved || 0;                      // Allocated to orders
+                const available = item.quantityAvailable || (onHand - reserved); // Can be sold
+                const onOrder = item.quantityOnOrder || 0;                        // Ordered from suppliers
+
                 const cost = item.averageCost || item.costPerUnit || 0;
-                const adminPrice = item.chemicalId?.adminPrice || item.adminPrice || cost * 1.10; // Default 10% admin fee
                 const sellPrice = item.chemicalId?.sellPrice || item.sellPrice || 0;
                 const category = item.chemicalId?.category || item.category || '-';
-                const isLowStock = item.reorderPoint && qty <= item.reorderPoint;
+                const isLowStock = item.reorderPoint && onHand <= item.reorderPoint;
 
-                // Margin is now distributor's margin (retail - admin / retail)
-                const margin = sellPrice > 0 && adminPrice > 0 ? Math.round(((sellPrice - adminPrice) / sellPrice) * 100) : 0;
-
-                const statusClass = isLowStock ? 'status-pending' : qty > 0 ? 'status-confirmed' : 'status-cancelled';
-                const statusText = qty === 0 ? 'Out of Stock' : isLowStock ? 'Low Stock' : 'In Stock';
+                // Status logic: Out of Stock, Low Stock, Needs Order, In Stock
+                let statusClass, statusText;
+                if (onHand === 0 && onOrder === 0) {
+                    statusClass = 'status-cancelled';
+                    statusText = 'Out of Stock';
+                } else if (onHand === 0 && onOrder > 0) {
+                    statusClass = 'status-pending';
+                    statusText = 'On Order';
+                } else if (isLowStock) {
+                    statusClass = 'status-pending';
+                    statusText = 'Low Stock';
+                } else {
+                    statusClass = 'status-confirmed';
+                    statusText = 'In Stock';
+                }
 
                 return `
                     <tr>
                         <td><strong>${item.productName}</strong>${item.packSize ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.packSize}</span>` : ''}</td>
                         <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${category}</span></td>
-                        <td><strong>${qty.toLocaleString()}</strong></td>
+                        <td style="text-align: center;"><strong>${onHand.toLocaleString()}</strong></td>
+                        <td style="text-align: center; color: ${reserved > 0 ? '#dc2626' : '#666'};">${reserved.toLocaleString()}</td>
+                        <td style="text-align: center; color: ${available > 0 ? '#059669' : '#dc2626'};"><strong>${available.toLocaleString()}</strong></td>
+                        <td style="text-align: center; color: ${onOrder > 0 ? '#2563eb' : '#666'};">${onOrder > 0 ? onOrder.toLocaleString() : '-'}</td>
                         <td>${item.unit || '-'}</td>
                         <td class="cost-column">$${cost.toFixed(2)}</td>
-                        <td class="cost-column">$${adminPrice.toFixed(2)}</td>
-                        <td class="cost-column">${margin}%</td>
                         <td><strong style="color: var(--primary);">$${sellPrice.toFixed(2)}</strong></td>
-                        <td><span class="order-status status-confirmed">${item.location || 'main'}</span></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
                             <button class="btn btn-sm btn-outline" onclick="viewInventoryBatches('${item.chemicalId?._id || item.chemicalId}', '${item.productName}')" title="View batches by PO">Batches</button>
