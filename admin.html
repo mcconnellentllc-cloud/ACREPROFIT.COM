@@ -2208,6 +2208,14 @@
         let allCustomers = [];
         let selectedCustomer = null;
 
+        // Function to switch tabs programmatically (used by overview cards)
+        window.switchTab = function(tabName) {
+            const tabEl = document.querySelector(`.admin-tab[data-tab="${tabName}"]`);
+            if (tabEl) {
+                tabEl.click();
+            }
+        };
+
         // Tab navigation
         document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.addEventListener('click', function(e) {
