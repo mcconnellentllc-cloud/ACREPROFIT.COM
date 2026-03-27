@@ -2728,12 +2728,18 @@
         }
 
         // Show features based on role
+        // Helper to safely set element display
+        const setDisplay = (id, value) => {
+            const el = document.getElementById(id);
+            if (el) el.style.display = value;
+        };
+
         if (userData.role === 'superadmin') {
-            document.getElementById('repAppsNav').style.display = 'block';
+            setDisplay('repAppsNav', 'block');
             // Pricing tab removed - functionality merged into Products
-            document.getElementById('commissionsNav').style.display = 'block';
-            document.getElementById('inventoryNav').style.display = 'block';
-            document.getElementById('companySettingsNav').style.display = 'block';
+            setDisplay('commissionsNav', 'block');
+            setDisplay('inventoryNav', 'block');
+            setDisplay('companySettingsNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
@@ -2745,16 +2751,16 @@
             loadDashboardReminders();
         } else if (userData.role === 'distributor') {
             document.getElementById('adminRole').textContent = 'Distributor';
-            document.getElementById('inventoryNav').style.display = 'block';
+            setDisplay('inventoryNav', 'block');
             // Hide tabs that distributors shouldn't see
             // Pricing tab removed
-            document.getElementById('commissionsNav').style.display = 'none';
-            document.getElementById('repAppsNav').style.display = 'none';
+            setDisplay('commissionsNav', 'none');
+            setDisplay('repAppsNav', 'none');
         } else {
             document.getElementById('adminRole').textContent = 'Representative';
-            document.getElementById('inventoryNav').style.display = 'block';
+            setDisplay('inventoryNav', 'block');
             // Show rep's own commission view
-            document.getElementById('commissionsNav').style.display = 'block';
+            setDisplay('commissionsNav', 'block');
             loadRepOwnCommission(userData);
         }
 
@@ -3100,11 +3106,38 @@
             });
         });
 
+        // Dropdown toggle functionality
+        document.querySelectorAll('.dropdown-trigger').forEach(trigger => {
+            trigger.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const dropdown = this.closest('.admin-tab-dropdown');
+                const isOpen = dropdown.classList.contains('open');
+
+                // Close all other dropdowns
+                document.querySelectorAll('.admin-tab-dropdown').forEach(d => d.classList.remove('open'));
+
+                // Toggle this dropdown
+                if (!isOpen) {
+                    dropdown.classList.add('open');
+                }
+            });
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.admin-tab-dropdown')) {
+                document.querySelectorAll('.admin-tab-dropdown').forEach(d => d.classList.remove('open'));
+            }
+        });
+
         // Tab navigation - dropdown items
         document.querySelectorAll('.dropdown-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 e.preventDefault();
                 const tabName = this.dataset.tab;
+                // Close the dropdown after selecting
+                document.querySelectorAll('.admin-tab-dropdown').forEach(d => d.classList.remove('open'));
                 navigateToTab(tabName);
             });
         });
