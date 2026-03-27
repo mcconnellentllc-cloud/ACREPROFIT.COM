@@ -1836,12 +1836,13 @@ const additionalProducts = {
     hydrovant: {
         id: 'hydrovant',
         name: 'Hydrovant',
-        description: 'Water conditioning agent',
+        description: 'Drift reduction/deposition aid adjuvant',
         unit: 'gal',
+        costPerUnit: 95,
         pricing: [
-            { minQty: 1, maxQty: 9, pricePerUnit: 165 },
-            { minQty: 10, maxQty: 60, pricePerUnit: 135 },
-            { minQty: 61, maxQty: 180, pricePerUnit: 125 }
+            { minQty: 1, maxQty: 9, pricePerUnit: 145 },
+            { minQty: 10, maxQty: 60, pricePerUnit: 145 },
+            { minQty: 61, maxQty: 180, pricePerUnit: 145 }
         ]
     },
     multiseal: {
@@ -3821,8 +3822,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'AMS x5', packSize: '24', unit: 'lb', unitsPerPack: 120, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - 5 bag bundle' },
 
             // Hydrovant
-            { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 15.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
-            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 14.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
+            { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 145.00, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
+            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 95.00, sellPrice: 145.00, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
         ];
 
         const results = { created: [], existing: [] };
