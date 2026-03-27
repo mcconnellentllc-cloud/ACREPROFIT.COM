@@ -86,6 +86,16 @@
                             </select>
                         </div>
                         <div class="form-group">
+                            <label>Program</label>
+                            <select id="orderProgram">
+                                <option value="">Select program...</option>
+                                <option value="standard">Standard</option>
+                                <option value="premium">Premium</option>
+                                <option value="basic">Basic</option>
+                                <option value="custom">Custom</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
                             <label>Acres</label>
                             <input type="number" id="orderAcres" placeholder="Enter acres" min="0">
                         </div>
@@ -212,6 +222,10 @@
                                 <option value="soybeans">Soybeans</option>
                             </select>
                             <button class="btn-edit" onclick="toggleSummaryEdit('Crop')" title="Edit">Edit</button>
+                        </div>
+                        <div class="summary-row">
+                            <span>Program:</span>
+                            <strong id="summaryProgram">-</strong>
                         </div>
                         <div class="summary-row editable-row">
                             <span>Acres:</span>
@@ -543,6 +557,7 @@
         function updateSummary() {
             document.getElementById('summaryCustomer').textContent = selectedCustomer ? selectedCustomer.name : '-';
             document.getElementById('summaryCrop').textContent = document.getElementById('orderCrop').value || '-';
+            document.getElementById('summaryProgram').textContent = document.getElementById('orderProgram').value || '-';
             document.getElementById('summaryAcres').textContent = document.getElementById('orderAcres').value || '-';
             document.getElementById('summaryGPA').textContent = document.getElementById('orderGPA').value || '-';
             document.getElementById('summaryProducts').textContent = `${products.length} items`;
@@ -562,6 +577,7 @@
 
         // Listen for form changes
         document.getElementById('orderCrop').addEventListener('change', updateSummary);
+        document.getElementById('orderProgram').addEventListener('change', updateSummary);
         document.getElementById('orderAcres').addEventListener('input', updateSummary);
         document.getElementById('orderGPA').addEventListener('input', updateSummary);
 
@@ -685,6 +701,7 @@
             }
 
             const crop = document.getElementById('orderCrop').value;
+            const program = document.getElementById('orderProgram').value;
             const acres = parseInt(document.getElementById('orderAcres').value) || 0;
             const gpa = parseFloat(document.getElementById('orderGPA').value) || 0;
             const year = document.getElementById('orderYear').value;
@@ -697,6 +714,12 @@
                 return;
             }
 
+            // Warn if no products added
+            if (products.length === 0 || totalPrice === 0) {
+                const proceed = confirm('Warning: No products have been added to this order (total is $0).\n\nDo you want to create this order anyway?');
+                if (!proceed) return;
+            }
+
             try {
                 const response = await fetch(`${API_URL}/api/admin/orders/for-customer`, {
                     method: 'POST',
@@ -707,6 +730,7 @@
                     body: JSON.stringify({
                         customerId: selectedCustomer._id,
                         crop,
+                        programId: program,
                         acres,
                         gpa,
                         year,

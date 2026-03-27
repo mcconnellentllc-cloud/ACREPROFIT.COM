@@ -2691,7 +2691,7 @@
                     <tr>
                         <td>${new Date(order.createdAt).toLocaleDateString()}</td>
                         <td>${order.userId?.name || 'Unknown'}</td>
-                        <td>${order.crop} / ${order.program}</td>
+                        <td>${order.crop}${order.program ? ' / ' + order.program : ''}</td>
                         <td>${order.acres?.toLocaleString()}</td>
                         <td>$${order.totalCost?.toLocaleString() || '0'}</td>
                         <td><span class="order-status status-${order.status}">${order.status}</span></td>
