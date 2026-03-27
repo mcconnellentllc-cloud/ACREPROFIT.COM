@@ -566,6 +566,72 @@ distributorPricingSchema.index({ chemicalId: 1 });
 
 const DistributorPricing = mongoose.model('DistributorPricing', distributorPricingSchema);
 
+// ============ CHEMICAL QUOTE MODEL ============
+// For comparing prices from different suppliers for the same product
+// Allows tracking quotes over time to find best deals
+const chemicalQuoteSchema = new mongoose.Schema({
+    // Product identification (normalized name for comparison)
+    productName: { type: String, required: true }, // Generic/common name: "Dicamba DMA", "Atrazine 4-L"
+    brandName: String, // Brand-specific name if different
+
+    // Supplier info
+    supplier: { type: String, required: true }, // "Sims", "CPD", "Agri-Star", etc.
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+
+    // Packaging
+    packSize: { type: String, required: true }, // "265 gal", "2.5 gal", "16 oz"
+    unit: { type: String, required: true }, // "gal", "oz", "lb"
+    unitsPerPack: Number, // Total units in the pack
+
+    // Pricing
+    pricePerUnit: { type: Number, required: true }, // Price per gallon/oz/lb
+    packPrice: Number, // Full pack price (calculated)
+
+    // Volume discounts / special pricing
+    volumeDiscount: {
+        minQuantity: Number, // e.g., "10 totes"
+        discountedPrice: Number, // e.g., "$12.75/gal for 10+ totes"
+        notes: String // "for only 10 totes and no other product"
+    },
+
+    // Quote metadata
+    quoteDate: { type: Date, default: Date.now },
+    expirationDate: Date, // When quote expires
+    quoteReference: String, // Quote number or reference from supplier
+
+    // Status
+    isActive: { type: Boolean, default: true },
+    isPurchased: { type: Boolean, default: false }, // Did we buy at this price?
+    purchaseDate: Date,
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+
+    // Notes
+    notes: String, // "same as Anthem Maxx - no longer making the Maxx"
+
+    // Audit
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Indexes for quick lookups and comparisons
+chemicalQuoteSchema.index({ productName: 1 });
+chemicalQuoteSchema.index({ supplier: 1 });
+chemicalQuoteSchema.index({ productName: 1, supplier: 1 });
+chemicalQuoteSchema.index({ quoteDate: -1 });
+chemicalQuoteSchema.index({ pricePerUnit: 1 });
+chemicalQuoteSchema.index({ isActive: 1, productName: 1, pricePerUnit: 1 }); // For finding best active price
+
+// Virtual to calculate savings vs other quotes
+chemicalQuoteSchema.virtual('packPriceCalculated').get(function() {
+    if (this.pricePerUnit && this.unitsPerPack) {
+        return Math.round(this.pricePerUnit * this.unitsPerPack * 100) / 100;
+    }
+    return this.packPrice;
+});
+
+const ChemicalQuote = mongoose.model('ChemicalQuote', chemicalQuoteSchema);
+
 // ============ RUP SALE RECORD MODEL ============
 // Required by EPA/state law to maintain records of all Restricted Use Pesticide sales
 // Must be kept for minimum 2 years (recommend 3 years)
@@ -4725,6 +4791,278 @@ app.delete('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, re
         res.json({ message: 'Chemical deleted', chemical });
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ CHEMICAL QUOTE / PRICE COMPARISON API ROUTES ============
+
+// Get all quotes with optional filters
+app.get('/api/quotes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { productName, supplier, isActive, sortBy } = req.query;
+        const filter = {};
+
+        if (productName) {
+            filter.productName = { $regex: productName, $options: 'i' };
+        }
+        if (supplier) {
+            filter.supplier = { $regex: supplier, $options: 'i' };
+        }
+        if (isActive !== undefined) {
+            filter.isActive = isActive === 'true';
+        }
+
+        let sort = { quoteDate: -1 }; // Default: newest first
+        if (sortBy === 'price') sort = { pricePerUnit: 1 };
+        if (sortBy === 'product') sort = { productName: 1 };
+        if (sortBy === 'supplier') sort = { supplier: 1 };
+
+        const quotes = await ChemicalQuote.find(filter).sort(sort);
+        res.json(quotes);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get unique product names for dropdown
+app.get('/api/quotes/products', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const products = await ChemicalQuote.distinct('productName');
+        res.json(products.sort());
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get unique suppliers for dropdown
+app.get('/api/quotes/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const suppliers = await ChemicalQuote.distinct('supplier');
+        res.json(suppliers.sort());
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Compare prices for a specific product across all suppliers
+app.get('/api/quotes/compare/:productName', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const productName = decodeURIComponent(req.params.productName);
+
+        // Get all active quotes for this product
+        const quotes = await ChemicalQuote.find({
+            productName: { $regex: `^${productName}$`, $options: 'i' },
+            isActive: true
+        }).sort({ pricePerUnit: 1 });
+
+        if (quotes.length === 0) {
+            return res.json({
+                productName,
+                quotes: [],
+                bestDeal: null,
+                comparison: null
+            });
+        }
+
+        const bestDeal = quotes[0]; // Lowest price
+        const highestPrice = quotes[quotes.length - 1];
+
+        const comparison = {
+            lowestPrice: bestDeal.pricePerUnit,
+            highestPrice: highestPrice.pricePerUnit,
+            priceDifference: Math.round((highestPrice.pricePerUnit - bestDeal.pricePerUnit) * 100) / 100,
+            savingsPercent: Math.round(((highestPrice.pricePerUnit - bestDeal.pricePerUnit) / highestPrice.pricePerUnit) * 100 * 10) / 10,
+            totalQuotes: quotes.length
+        };
+
+        res.json({
+            productName,
+            quotes,
+            bestDeal,
+            comparison
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get best deals across all products (lowest price per product)
+app.get('/api/quotes/best-deals', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // Aggregate to find best price for each product
+        const bestDeals = await ChemicalQuote.aggregate([
+            { $match: { isActive: true } },
+            { $sort: { pricePerUnit: 1 } },
+            {
+                $group: {
+                    _id: '$productName',
+                    bestQuote: { $first: '$$ROOT' },
+                    allPrices: { $push: { supplier: '$supplier', price: '$pricePerUnit', packSize: '$packSize' } },
+                    count: { $sum: 1 }
+                }
+            },
+            { $sort: { '_id': 1 } }
+        ]);
+
+        // Format results
+        const results = bestDeals.map(item => ({
+            productName: item._id,
+            bestPrice: item.bestQuote.pricePerUnit,
+            bestSupplier: item.bestQuote.supplier,
+            packSize: item.bestQuote.packSize,
+            unit: item.bestQuote.unit,
+            quoteDate: item.bestQuote.quoteDate,
+            notes: item.bestQuote.notes,
+            alternativeCount: item.count - 1,
+            alternatives: item.allPrices.slice(1) // Other options
+        }));
+
+        res.json(results);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create a new quote
+app.post('/api/quotes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const quote = new ChemicalQuote({
+            ...req.body,
+            createdBy: req.user._id
+        });
+
+        // Calculate pack price if units provided
+        if (quote.pricePerUnit && quote.unitsPerPack) {
+            quote.packPrice = Math.round(quote.pricePerUnit * quote.unitsPerPack * 100) / 100;
+        }
+
+        await quote.save();
+        res.status(201).json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Bulk import quotes (for entering multiple quotes at once)
+app.post('/api/quotes/bulk', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { quotes } = req.body;
+        if (!Array.isArray(quotes) || quotes.length === 0) {
+            return res.status(400).json({ error: 'Quotes array is required' });
+        }
+
+        const results = {
+            created: [],
+            errors: []
+        };
+
+        for (const quoteData of quotes) {
+            try {
+                const quote = new ChemicalQuote({
+                    ...quoteData,
+                    createdBy: req.user._id
+                });
+
+                // Calculate pack price if units provided
+                if (quote.pricePerUnit && quote.unitsPerPack) {
+                    quote.packPrice = Math.round(quote.pricePerUnit * quote.unitsPerPack * 100) / 100;
+                }
+
+                await quote.save();
+                results.created.push(quote);
+            } catch (err) {
+                results.errors.push({
+                    data: quoteData,
+                    error: err.message
+                });
+            }
+        }
+
+        res.status(201).json({
+            message: `Created ${results.created.length} quotes, ${results.errors.length} errors`,
+            ...results
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update a quote
+app.put('/api/quotes/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const quote = await ChemicalQuote.findByIdAndUpdate(
+            req.params.id,
+            { ...req.body, updatedAt: new Date() },
+            { new: true, runValidators: true }
+        );
+
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote not found' });
+        }
+
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete a quote
+app.delete('/api/quotes/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const quote = await ChemicalQuote.findByIdAndDelete(req.params.id);
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote not found' });
+        }
+        res.json({ message: 'Quote deleted', quote });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Mark quote as purchased
+app.put('/api/quotes/:id/purchased', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { purchaseOrderId } = req.body;
+        const quote = await ChemicalQuote.findByIdAndUpdate(
+            req.params.id,
+            {
+                isPurchased: true,
+                purchaseDate: new Date(),
+                purchaseOrderId,
+                updatedAt: new Date()
+            },
+            { new: true }
+        );
+
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote not found' });
+        }
+
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Deactivate old quotes (utility endpoint)
+app.put('/api/quotes/deactivate-expired', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const result = await ChemicalQuote.updateMany(
+            {
+                expirationDate: { $lt: new Date() },
+                isActive: true
+            },
+            {
+                isActive: false,
+                updatedAt: new Date()
+            }
+        );
+
+        res.json({
+            message: `Deactivated ${result.modifiedCount} expired quotes`
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
