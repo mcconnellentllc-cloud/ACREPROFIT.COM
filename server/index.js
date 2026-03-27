@@ -7951,27 +7951,97 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
-// ---- SPRAY PROGRAM ROUTES ----
+// ---- SPRAY PROGRAM CALCULATOR ROUTES ----
 
-// Get all public/recommended programs
-app.get('/api/spray-programs', async (req, res) => {
+// Helper: Convert hardcoded sprayPrograms to program format
+const convertHardcodedToPrograms = () => {
+    const programs = [];
+    for (const [cropKey, cropPrograms] of Object.entries(sprayPrograms)) {
+        for (const [programKey, programData] of Object.entries(cropPrograms)) {
+            programs.push({
+                _id: `template-${cropKey}-${programKey}`,
+                name: programData.name,
+                description: programData.description,
+                crop: cropKey,
+                type: 'template',
+                isPublic: true,
+                isTemplate: true,
+                applications: [{
+                    name: programData.name,
+                    chemicals: programData.chemicals.map(chem => ({
+                        productName: chem.name,
+                        suggestedRate: chem.defaultRate,
+                        rateUnit: chem.rateUnit,
+                        packSize: chem.packageSize,
+                        unit: chem.packageUnit,
+                        isAdjuvant: chem.isAdjuvant || false
+                    }))
+                }]
+            });
+        }
+    }
+    return programs;
+};
+
+// GET all programs — merge hardcoded templates + MongoDB custom/suggestion programs
+// Auth: all logged-in roles
+app.get('/api/spray-programs', authMiddleware, async (req, res) => {
     try {
         const { crop, type } = req.query;
-        let query = { isPublic: true };
+        const userId = req.user._id;
+        const userRole = req.user.role;
 
-        if (crop) query.crop = crop;
-        if (type) query.type = type;
+        // 1. Get hardcoded templates
+        let templatePrograms = convertHardcodedToPrograms();
+        if (crop) {
+            templatePrograms = templatePrograms.filter(p => p.crop === crop);
+        }
 
-        const programs = await SprayProgram.find(query)
+        // 2. Build MongoDB query
+        let dbQuery = {};
+
+        if (isAdminLevel(req.user)) {
+            // Admins see all MongoDB programs
+            if (crop) dbQuery.crop = crop;
+            if (type && type !== 'template') dbQuery.type = type;
+        } else {
+            // Regular users see: public programs OR their own programs
+            dbQuery.$or = [
+                { isPublic: true },
+                { createdBy: userId }
+            ];
+            if (crop) dbQuery.crop = crop;
+            if (type && type !== 'template') dbQuery.type = type;
+        }
+
+        const dbPrograms = await SprayProgram.find(dbQuery)
+            .populate('createdBy', 'name email')
             .sort({ crop: 1, name: 1 });
 
-        res.json(programs);
+        // 3. Merge and return
+        // Filter templates if specific type requested
+        let allPrograms = [];
+        if (!type || type === 'template') {
+            allPrograms = [...templatePrograms];
+        }
+        if (!type || type !== 'template') {
+            allPrograms = [...allPrograms, ...dbPrograms.map(p => p.toObject())];
+        }
+
+        res.json({
+            programs: allPrograms,
+            counts: {
+                templates: templatePrograms.length,
+                database: dbPrograms.length,
+                total: allPrograms.length
+            }
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
 
-// Get user's custom programs
+// Get user's custom programs only
 app.get('/api/spray-programs/my', authMiddleware, async (req, res) => {
     try {
         const programs = await SprayProgram.find({
@@ -7985,49 +8055,83 @@ app.get('/api/spray-programs/my', authMiddleware, async (req, res) => {
 });
 
 // Get single program with chemical details
-app.get('/api/spray-programs/:id', async (req, res) => {
+app.get('/api/spray-programs/:id', authMiddleware, async (req, res) => {
     try {
-        const program = await SprayProgram.findById(req.params.id);
+        const programId = req.params.id;
+
+        // Check if it's a hardcoded template
+        if (programId.startsWith('template-')) {
+            const templates = convertHardcodedToPrograms();
+            const template = templates.find(t => t._id === programId);
+            if (template) {
+                return res.json(template);
+            }
+            return res.status(404).json({ error: 'Template not found' });
+        }
+
+        const program = await SprayProgram.findById(programId)
+            .populate('createdBy', 'name email');
+
         if (!program) {
             return res.status(404).json({ error: 'Program not found' });
         }
+
+        // Check access: public, owner, or admin
+        if (!program.isPublic &&
+            program.createdBy._id.toString() !== req.user._id.toString() &&
+            !isAdminLevel(req.user)) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
         res.json(program);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
 });
 
-// Create spray program (admin for recommended, customer for custom)
+// POST save custom program
+// Auth: all logged-in roles
 app.post('/api/spray-programs', authMiddleware, async (req, res) => {
     try {
-        const { name, description, crop, applications, type } = req.body;
+        const { name, description, crop, applications, isPublic } = req.body;
 
-        // Only admins/distributors can create recommended programs
-        const programType = isAdminLevel(req.user) ? (type || 'template') : 'custom';
-        const isPublic = programType === 'recommended';
+        // Validate required fields
+        if (!name || !crop) {
+            return res.status(400).json({ error: 'Name and crop are required' });
+        }
+
+        // Determine program type and visibility
+        const isAdmin = isAdminLevel(req.user);
+        const programType = isAdmin ? 'suggestion' : 'custom';
+        // Only admins can create public programs
+        const publicFlag = isAdmin ? (isPublic || false) : false;
 
         const program = new SprayProgram({
             name,
             description,
             crop,
-            applications,
+            applications: applications || [],
             type: programType,
-            isPublic,
+            isPublic: publicFlag,
             createdBy: req.user._id
         });
 
-        // Calculate estimated cost per acre
-        let totalCost = 0;
-        for (const app of applications) {
-            for (const chem of app.chemicals) {
-                const chemical = await Chemical.findById(chem.chemicalId);
-                if (chemical && chemical.sellPrice && chem.rate) {
-                    // Convert rate to gallons and multiply by price
-                    totalCost += (chem.rate / 128) * chemical.sellPrice; // Assuming oz to gal
+        // Calculate estimated cost per acre if applications provided
+        if (applications && applications.length > 0) {
+            let totalCost = 0;
+            for (const app of applications) {
+                for (const chem of app.chemicals || []) {
+                    if (chem.chemicalId) {
+                        const chemical = await Chemical.findById(chem.chemicalId);
+                        if (chemical && chemical.sellPrice && chem.suggestedRate) {
+                            // Convert rate to gallons and multiply by price
+                            totalCost += (chem.suggestedRate / 128) * chemical.sellPrice;
+                        }
+                    }
                 }
             }
+            program.estimatedCostPerAcre = Math.round(totalCost * 100) / 100;
         }
-        program.estimatedCostPerAcre = Math.round(totalCost * 100) / 100;
 
         await program.save();
         res.status(201).json(program);
@@ -8036,85 +8140,598 @@ app.post('/api/spray-programs', authMiddleware, async (req, res) => {
     }
 });
 
-// Calculate order from program (preview before ordering)
-app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) => {
+// POST calculate order from program or custom product list
+// Auth: all logged-in roles
+app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
     try {
-        const { acres } = req.body;
-        const program = await SprayProgram.findById(req.params.id);
+        const { acres, gpa = 10, products } = req.body;
 
-        if (!program) {
-            return res.status(404).json({ error: 'Program not found' });
+        // Validate inputs
+        if (!acres || acres <= 0) {
+            return res.status(400).json({ error: 'Acres is required and must be greater than 0' });
+        }
+        if (!products || !Array.isArray(products) || products.length === 0) {
+            return res.status(400).json({ error: 'Products array is required' });
         }
 
-        const orderItems = [];
-        let totalCost = 0;
+        const orderLines = [];
+        let totalConfirmedPrice = 0;
+        let hasNeedsQuote = false;
+        let valorWarning = false;
+        const totalWaterVolume = acres * gpa;
 
-        for (const app of program.applications) {
-            for (const chemItem of app.chemicals) {
-                const chemical = await Chemical.findById(chemItem.chemicalId);
-                if (!chemical) continue;
+        // STEP 1 & 2: Process each product
+        for (const prod of products) {
+            const { chemicalId, rate, unit } = prod;
 
-                // Calculate amount needed
-                let amountNeeded = 0;
-                const rate = chemItem.rate;
+            if (!chemicalId || !rate) {
+                continue; // Skip invalid entries
+            }
 
-                // Convert based on rate unit
-                switch (chemItem.rateUnit) {
-                    case 'oz/acre':
-                        amountNeeded = (rate * acres) / 128; // oz to gallons
-                        break;
-                    case 'pt/acre':
-                        amountNeeded = (rate * acres) / 8; // pints to gallons
-                        break;
-                    case 'qt/acre':
-                        amountNeeded = (rate * acres) / 4; // quarts to gallons
-                        break;
-                    case 'gal/acre':
-                        amountNeeded = rate * acres;
-                        break;
-                    case 'lb/acre':
-                        amountNeeded = rate * acres;
-                        break;
-                    default:
-                        amountNeeded = rate * acres;
+            // Fetch chemical from database
+            const chemical = await Chemical.findById(chemicalId);
+            if (!chemical) {
+                orderLines.push({
+                    chemicalId,
+                    productName: 'Unknown Product',
+                    error: 'Product not found in database',
+                    status: 'error'
+                });
+                continue;
+            }
+
+            // Check for Valor warning
+            if (chemical.productName && chemical.productName.toLowerCase().includes('valor')) {
+                valorWarning = true;
+            }
+
+            // Calculate total needed based on rate unit
+            let totalNeeded = 0;
+            const rateUnit = unit || chemical.rateUnit || 'oz/acre';
+
+            switch (rateUnit) {
+                case 'oz/acre':
+                    totalNeeded = (rate * acres) / 128; // oz to gallons
+                    break;
+                case 'pt/acre':
+                    totalNeeded = (rate * acres) / 8; // pints to gallons
+                    break;
+                case 'qt/acre':
+                    totalNeeded = (rate * acres) / 4; // quarts to gallons
+                    break;
+                case 'gal/acre':
+                    totalNeeded = rate * acres;
+                    break;
+                case 'lb/acre':
+                    totalNeeded = rate * acres; // lbs
+                    break;
+                case '% v/v':
+                    // Percentage of total water volume
+                    totalNeeded = totalWaterVolume * (rate / 100);
+                    break;
+                default:
+                    totalNeeded = rate * acres;
+            }
+
+            // Get package size (unitsPerPack is gallons/units per package)
+            const packageSize = chemical.unitsPerPack || 1;
+
+            // ALWAYS round UP to nearest package
+            const packagesNeeded = Math.ceil(totalNeeded / packageSize);
+
+            // Check inventory
+            const inventory = await Inventory.findOne({
+                chemicalId: chemical._id,
+                location: 'main' // Default location
+            });
+            const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
+
+            // Determine status
+            let status, pricePerPackage, lineTotal;
+            if (onHandQuantity >= packagesNeeded) {
+                status = 'confirmed';
+                pricePerPackage = chemical.sellPrice * packageSize;
+                lineTotal = packagesNeeded * pricePerPackage;
+                totalConfirmedPrice += lineTotal;
+            } else {
+                status = 'needs_quote';
+                pricePerPackage = null;
+                lineTotal = null;
+                hasNeedsQuote = true;
+            }
+
+            orderLines.push({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                category: chemical.category,
+                rate,
+                unit: rateUnit,
+                totalNeeded: Math.round(totalNeeded * 1000) / 1000,
+                packageSize,
+                packSize: chemical.packSize,
+                packageUnit: chemical.unit,
+                packagesNeeded,
+                onHandQuantity,
+                pricePerPackage: pricePerPackage ? Math.round(pricePerPackage * 100) / 100 : null,
+                lineTotal: lineTotal ? Math.round(lineTotal * 100) / 100 : null,
+                status,
+                supplier: chemical.sourceSupplier
+            });
+        }
+
+        // STEP 3: Hydrovant auto-calculation (LOCKED — cannot be passed in by client)
+        let hydrovantLine = null;
+        const hydrovantGallonsNeeded = totalWaterVolume * 0.001; // 0.1% of total water volume
+
+        if (hydrovantGallonsNeeded > 0) {
+            const hydrovant = await Chemical.findOne({
+                productName: { $regex: /hydrovant/i }
+            });
+
+            if (hydrovant) {
+                const hvPackageSize = hydrovant.unitsPerPack || 2.5; // Default 2.5 gal
+                const hvPackagesNeeded = Math.ceil(hydrovantGallonsNeeded / hvPackageSize);
+
+                const hvInventory = await Inventory.findOne({
+                    chemicalId: hydrovant._id,
+                    location: 'main'
+                });
+                const hvOnHand = hvInventory ? hvInventory.quantityAvailable : 0;
+
+                const hvStatus = hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote';
+                const hvPricePerPack = hvStatus === 'confirmed' ? (hydrovant.sellPrice * hvPackageSize) : null;
+                const hvLineTotal = hvStatus === 'confirmed' ? (hvPackagesNeeded * hvPricePerPack) : null;
+
+                if (hvStatus === 'confirmed' && hvLineTotal) {
+                    totalConfirmedPrice += hvLineTotal;
+                } else {
+                    hasNeedsQuote = true;
                 }
 
-                // Round up to nearest package
-                const unitsPerPack = chemical.unitsPerPack || 1;
-                const packsNeeded = Math.ceil(amountNeeded / unitsPerPack);
-                const totalPrice = packsNeeded * chemical.sellPrice * unitsPerPack;
-
-                orderItems.push({
-                    chemicalId: chemical._id,
-                    productName: chemical.productName,
-                    packSize: chemical.packSize,
-                    unit: chemical.unit,
-                    rate,
-                    rateUnit: chemItem.rateUnit,
-                    acres,
-                    calculatedAmount: Math.round(amountNeeded * 100) / 100,
-                    quantity: packsNeeded,
-                    unitPrice: chemical.sellPrice,
-                    totalPrice: Math.round(totalPrice * 100) / 100,
-                    applicationName: app.name
-                });
-
-                totalCost += totalPrice;
+                hydrovantLine = {
+                    chemicalId: hydrovant._id,
+                    productName: 'Hydrovant (Auto-Added)',
+                    category: 'adjuvant',
+                    gallonsNeeded: Math.round(hydrovantGallonsNeeded * 1000) / 1000,
+                    packageSize: hvPackageSize,
+                    packSize: hydrovant.packSize,
+                    packageUnit: hydrovant.unit,
+                    packagesNeeded: hvPackagesNeeded,
+                    onHandQuantity: hvOnHand,
+                    pricePerPackage: hvPricePerPack ? Math.round(hvPricePerPack * 100) / 100 : null,
+                    lineTotal: hvLineTotal ? Math.round(hvLineTotal * 100) / 100 : null,
+                    status: hvStatus,
+                    isAutoAdded: true,
+                    note: '0.1% of total spray volume'
+                };
             }
         }
+
+        // STEP 5: Build response
+        const orderStatus = hasNeedsQuote ? 'pending_quote' : 'ready_for_checkout';
+
+        res.json({
+            acres,
+            gpa,
+            totalWaterVolume,
+            orderLines,
+            hydrovant: hydrovantLine,
+            valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
+            orderStatus,
+            totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
+            costPerAcre: acres > 0 ? Math.round((totalConfirmedPrice / acres) * 100) / 100 : 0
+        });
+    } catch (error) {
+        console.error('Calculate error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// POST submit order or quote request
+// Auth: all logged-in roles
+app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) => {
+    try {
+        const {
+            acres, gpa, orderLines, hydrovant, orderStatus,
+            totalConfirmedPrice, crop, programName
+        } = req.body;
+
+        if (!acres || !orderLines || orderLines.length === 0) {
+            return res.status(400).json({ error: 'Invalid order data' });
+        }
+
+        // Build chemicals array for order
+        const chemicals = orderLines.map(line => ({
+            name: line.productName,
+            chemicalId: line.chemicalId,
+            rate: line.rate,
+            rateUnit: line.unit,
+            totalAmount: line.totalNeeded,
+            totalUnit: 'gal',
+            packageSize: line.packageSize,
+            packageUnit: line.packageUnit,
+            packagesNeeded: line.packagesNeeded,
+            pricePerPackage: line.pricePerPackage,
+            totalPrice: line.lineTotal,
+            status: line.status
+        }));
+
+        // Add Hydrovant if present
+        if (hydrovant) {
+            chemicals.push({
+                name: hydrovant.productName,
+                chemicalId: hydrovant.chemicalId,
+                rate: 0.1,
+                rateUnit: '% v/v',
+                totalAmount: hydrovant.gallonsNeeded,
+                totalUnit: 'gal',
+                packageSize: hydrovant.packageSize,
+                packageUnit: hydrovant.packageUnit,
+                packagesNeeded: hydrovant.packagesNeeded,
+                pricePerPackage: hydrovant.pricePerPackage,
+                totalPrice: hydrovant.lineTotal,
+                status: hydrovant.status,
+                isAutoAdded: true
+            });
+        }
+
+        if (orderStatus === 'ready_for_checkout') {
+            // All items confirmed — proceed to Stripe checkout
+            if (!stripe) {
+                return res.status(500).json({ error: 'Payment processing not configured' });
+            }
+
+            // Create or get Stripe customer
+            let customerId = req.user.stripeCustomerId;
+            if (!customerId) {
+                const customer = await stripe.customers.create({
+                    email: req.user.email,
+                    name: req.user.name,
+                    metadata: { userId: req.user._id.toString() }
+                });
+                customerId = customer.id;
+                await User.findByIdAndUpdate(req.user._id, { stripeCustomerId: customerId });
+            }
+
+            // Create line items for Stripe
+            const lineItems = chemicals
+                .filter(c => c.status === 'confirmed' && c.totalPrice)
+                .map(c => ({
+                    price_data: {
+                        currency: 'usd',
+                        product_data: {
+                            name: c.name,
+                            description: `${c.packagesNeeded} x ${c.packageSize} ${c.packageUnit}`
+                        },
+                        unit_amount: Math.round(c.totalPrice * 100) // Stripe uses cents
+                    },
+                    quantity: 1
+                }));
+
+            // Create Stripe checkout session
+            const session = await stripe.checkout.sessions.create({
+                customer: customerId,
+                payment_method_types: ['card'],
+                line_items: lineItems,
+                mode: 'payment',
+                success_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/order-success?session_id={CHECKOUT_SESSION_ID}`,
+                cancel_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/calculator`,
+                metadata: {
+                    userId: req.user._id.toString(),
+                    acres: acres.toString(),
+                    crop: crop || 'unknown'
+                }
+            });
+
+            // Save order as draft with Stripe session
+            const order = new Order({
+                userId: req.user._id,
+                representativeId: req.user.representative || req.user._id,
+                crop: crop || 'unknown',
+                program: programName || 'Custom Order',
+                acres,
+                gpa,
+                chemicals,
+                totalCost: totalConfirmedPrice,
+                costPerAcre: acres > 0 ? totalConfirmedPrice / acres : 0,
+                status: 'draft',
+                paymentStatus: 'pending',
+                stripePaymentIntentId: session.payment_intent
+            });
+            await order.save();
+
+            return res.json({
+                success: true,
+                orderStatus: 'checkout',
+                checkoutUrl: session.url,
+                orderId: order._id
+            });
+
+        } else {
+            // Has items needing quotes — save and notify admin
+            const order = new Order({
+                userId: req.user._id,
+                representativeId: req.user.representative || req.user._id,
+                crop: crop || 'unknown',
+                program: programName || 'Custom Order',
+                acres,
+                gpa,
+                chemicals,
+                totalCost: totalConfirmedPrice,
+                costPerAcre: acres > 0 ? totalConfirmedPrice / acres : 0,
+                status: 'draft',
+                paymentStatus: 'pending',
+                notes: 'Quote requested - some items need pricing'
+            });
+            await order.save();
+
+            // Send email notification to admin
+            const transporter = createEmailTransporter();
+            if (transporter) {
+                const needsQuoteItems = chemicals.filter(c => c.status === 'needs_quote');
+                const confirmedItems = chemicals.filter(c => c.status === 'confirmed');
+
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    to: 'contact@acreprofit.com',
+                    subject: `New Quote Request — ${req.user.name} — ${acres} acres`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+                            <div style="background-color: #2d5a27; padding: 20px; text-align: center;">
+                                <h1 style="color: white; margin: 0;">Quote Request</h1>
+                            </div>
+                            <div style="padding: 30px; background-color: #f9f9f9;">
+                                <h2 style="color: #333;">Customer Information</h2>
+                                <p><strong>Name:</strong> ${req.user.name}</p>
+                                <p><strong>Email:</strong> ${req.user.email}</p>
+                                <p><strong>Phone:</strong> ${req.user.phone || 'Not provided'}</p>
+
+                                <h2 style="color: #333; margin-top: 20px;">Order Details</h2>
+                                <p><strong>Crop:</strong> ${crop || 'Not specified'}</p>
+                                <p><strong>Acres:</strong> ${acres}</p>
+                                <p><strong>GPA:</strong> ${gpa}</p>
+
+                                <h3 style="color: #c00; margin-top: 20px;">Items Needing Quote (${needsQuoteItems.length})</h3>
+                                <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                                    <tr style="background-color: #fdd;">
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Product</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd;">Packages Needed</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd;">Size</th>
+                                    </tr>
+                                    ${needsQuoteItems.map(item => `
+                                        <tr>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packageSize} ${item.packageUnit}</td>
+                                        </tr>
+                                    `).join('')}
+                                </table>
+
+                                ${confirmedItems.length > 0 ? `
+                                <h3 style="color: #2d5a27; margin-top: 20px;">Confirmed Items (${confirmedItems.length})</h3>
+                                <table style="width: 100%; border-collapse: collapse;">
+                                    <tr style="background-color: #dfd;">
+                                        <th style="padding: 8px; border: 1px solid #ddd; text-align: left;">Product</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd;">Qty</th>
+                                        <th style="padding: 8px; border: 1px solid #ddd;">Price</th>
+                                    </tr>
+                                    ${confirmedItems.map(item => `
+                                        <tr>
+                                            <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
+                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${item.totalPrice?.toFixed(2) || 'N/A'}</td>
+                                        </tr>
+                                    `).join('')}
+                                </table>
+                                <p style="text-align: right; font-weight: bold; margin-top: 10px;">
+                                    Confirmed Total: $${totalConfirmedPrice.toFixed(2)}
+                                </p>
+                                ` : ''}
+
+                                <p style="margin-top: 30px; padding: 15px; background-color: #fff3cd; border-radius: 4px;">
+                                    <strong>Action Required:</strong> Please provide quotes for the items listed above and contact the customer.
+                                </p>
+                            </div>
+                        </div>
+                    `
+                });
+            }
+
+            return res.json({
+                success: true,
+                orderStatus: 'quote_pending',
+                orderId: order._id,
+                message: 'Quote request submitted. You will be contacted within 24 hours.'
+            });
+        }
+    } catch (error) {
+        console.error('Submit order error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Calculate order from existing program by ID (legacy support)
+app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) => {
+    try {
+        const { acres, gpa = 10 } = req.body;
+        const programId = req.params.id;
+
+        if (!acres || acres <= 0) {
+            return res.status(400).json({ error: 'Acres is required' });
+        }
+
+        let program;
+        let chemicals = [];
+
+        // Check if it's a hardcoded template
+        if (programId.startsWith('template-')) {
+            const templates = convertHardcodedToPrograms();
+            program = templates.find(t => t._id === programId);
+            if (!program) {
+                return res.status(404).json({ error: 'Template not found' });
+            }
+            // For templates, we need to match chemicals by name
+            for (const app of program.applications) {
+                for (const chem of app.chemicals) {
+                    const dbChem = await Chemical.findOne({
+                        productName: { $regex: new RegExp(chem.productName, 'i') }
+                    });
+                    if (dbChem) {
+                        chemicals.push({
+                            chemicalId: dbChem._id,
+                            rate: chem.suggestedRate,
+                            unit: chem.rateUnit
+                        });
+                    }
+                }
+            }
+        } else {
+            program = await SprayProgram.findById(programId);
+            if (!program) {
+                return res.status(404).json({ error: 'Program not found' });
+            }
+            // Extract chemicals from program applications
+            for (const app of program.applications) {
+                for (const chem of app.chemicals) {
+                    chemicals.push({
+                        chemicalId: chem.chemicalId,
+                        rate: chem.suggestedRate,
+                        unit: chem.rateUnit
+                    });
+                }
+            }
+        }
+
+        // Use the main calculate endpoint logic
+        // Forward to calculate endpoint
+        req.body = { acres, gpa, products: chemicals };
+
+        // Call calculate logic directly (could also use next() pattern)
+        const result = await calculateOrder(acres, gpa, chemicals);
 
         res.json({
             program: program.name,
             crop: program.crop,
-            acres,
-            items: orderItems,
-            totalCost: Math.round(totalCost * 100) / 100,
-            costPerAcre: Math.round((totalCost / acres) * 100) / 100
+            ...result
         });
     } catch (error) {
+        console.error('Program calculate error:', error);
         res.status(400).json({ error: error.message });
     }
 });
+
+// Helper function for order calculation (reusable)
+async function calculateOrder(acres, gpa, products) {
+    const orderLines = [];
+    let totalConfirmedPrice = 0;
+    let hasNeedsQuote = false;
+    let valorWarning = false;
+    const totalWaterVolume = acres * gpa;
+
+    for (const prod of products) {
+        const { chemicalId, rate, unit } = prod;
+        if (!chemicalId || !rate) continue;
+
+        const chemical = await Chemical.findById(chemicalId);
+        if (!chemical) continue;
+
+        if (chemical.productName?.toLowerCase().includes('valor')) {
+            valorWarning = true;
+        }
+
+        let totalNeeded = 0;
+        const rateUnit = unit || chemical.rateUnit || 'oz/acre';
+
+        switch (rateUnit) {
+            case 'oz/acre': totalNeeded = (rate * acres) / 128; break;
+            case 'pt/acre': totalNeeded = (rate * acres) / 8; break;
+            case 'qt/acre': totalNeeded = (rate * acres) / 4; break;
+            case 'gal/acre': totalNeeded = rate * acres; break;
+            case 'lb/acre': totalNeeded = rate * acres; break;
+            case '% v/v': totalNeeded = totalWaterVolume * (rate / 100); break;
+            default: totalNeeded = rate * acres;
+        }
+
+        const packageSize = chemical.unitsPerPack || 1;
+        const packagesNeeded = Math.ceil(totalNeeded / packageSize);
+
+        const inventory = await Inventory.findOne({ chemicalId: chemical._id, location: 'main' });
+        const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
+
+        let status, pricePerPackage, lineTotal;
+        if (onHandQuantity >= packagesNeeded) {
+            status = 'confirmed';
+            pricePerPackage = chemical.sellPrice * packageSize;
+            lineTotal = packagesNeeded * pricePerPackage;
+            totalConfirmedPrice += lineTotal;
+        } else {
+            status = 'needs_quote';
+            pricePerPackage = null;
+            lineTotal = null;
+            hasNeedsQuote = true;
+        }
+
+        orderLines.push({
+            chemicalId: chemical._id,
+            productName: chemical.productName,
+            category: chemical.category,
+            rate,
+            unit: rateUnit,
+            totalNeeded: Math.round(totalNeeded * 1000) / 1000,
+            packageSize,
+            packSize: chemical.packSize,
+            packageUnit: chemical.unit,
+            packagesNeeded,
+            onHandQuantity,
+            pricePerPackage: pricePerPackage ? Math.round(pricePerPackage * 100) / 100 : null,
+            lineTotal: lineTotal ? Math.round(lineTotal * 100) / 100 : null,
+            status,
+            supplier: chemical.sourceSupplier
+        });
+    }
+
+    // Hydrovant auto-calculation
+    let hydrovant = null;
+    const hvGallons = totalWaterVolume * 0.001;
+    if (hvGallons > 0) {
+        const hvChem = await Chemical.findOne({ productName: { $regex: /hydrovant/i } });
+        if (hvChem) {
+            const hvPkgSize = hvChem.unitsPerPack || 2.5;
+            const hvPkgs = Math.ceil(hvGallons / hvPkgSize);
+            const hvInv = await Inventory.findOne({ chemicalId: hvChem._id, location: 'main' });
+            const hvOnHand = hvInv ? hvInv.quantityAvailable : 0;
+            const hvStatus = hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote';
+            const hvPrice = hvStatus === 'confirmed' ? hvChem.sellPrice * hvPkgSize : null;
+            const hvTotal = hvStatus === 'confirmed' ? hvPkgs * hvPrice : null;
+
+            if (hvStatus === 'confirmed' && hvTotal) totalConfirmedPrice += hvTotal;
+            else hasNeedsQuote = true;
+
+            hydrovant = {
+                chemicalId: hvChem._id,
+                productName: 'Hydrovant (Auto-Added)',
+                gallonsNeeded: Math.round(hvGallons * 1000) / 1000,
+                packageSize: hvPkgSize,
+                packagesNeeded: hvPkgs,
+                status: hvStatus,
+                pricePerPackage: hvPrice ? Math.round(hvPrice * 100) / 100 : null,
+                lineTotal: hvTotal ? Math.round(hvTotal * 100) / 100 : null
+            };
+        }
+    }
+
+    return {
+        acres,
+        gpa,
+        totalWaterVolume,
+        orderLines,
+        hydrovant,
+        valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
+        orderStatus: hasNeedsQuote ? 'pending_quote' : 'ready_for_checkout',
+        totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
+        costPerAcre: acres > 0 ? Math.round((totalConfirmedPrice / acres) * 100) / 100 : 0
+    };
+}
 
 // ============ INVENTORY API ENDPOINTS ============
 
