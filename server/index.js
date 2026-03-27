@@ -2767,7 +2767,7 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
         // Update private applicator license if provided
         if (privateApplicatorLicense !== undefined) {
             customer.privateApplicatorLicense = {
-                ...customer.privateApplicatorLicense,
+                ...(customer.privateApplicatorLicense?.toObject?.() || customer.privateApplicatorLicense || {}),
                 ...privateApplicatorLicense,
                 verifiedBy: privateApplicatorLicense.hasLicense ? req.user._id : undefined,
                 verifiedAt: privateApplicatorLicense.hasLicense ? new Date() : undefined
