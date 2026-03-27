@@ -2158,8 +2158,8 @@
                     name: c.name || c.productName,
                     qty: c.qty || c.quantity || c.totalAmount || 0,
                     unit: c.unit || c.totalUnit || 'gal',
-                    pricePerUnit: c.pricePerUnit || c.pricePerPackage || 0,
-                    total: c.total || c.totalPrice || 0,
+                    pricePerUnit: c.pricePerUnit || c.pricePerPackage || c.price || 0,
+                    total: c.total || c.totalPrice || (c.qty * (c.pricePerUnit || c.pricePerPackage || c.price || 0)) || 0,
                     chemicalId: c.chemicalId || c._id
                 }));
             }

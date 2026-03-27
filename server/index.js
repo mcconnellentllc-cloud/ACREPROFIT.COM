@@ -2811,6 +2811,18 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
         const costPerAcre = acres > 0 ? Math.round((totalPrice / acres) * 100) / 100 : 0;
 
+        // Normalize chemicals array to use consistent field names
+        const normalizedChemicals = (chemicals || []).map(c => ({
+            name: c.name || c.productName,
+            qty: c.qty || c.quantity || 0,
+            unit: c.unit || 'gal',
+            pricePerUnit: c.pricePerUnit || c.price || 0,
+            totalPrice: c.totalPrice || c.total || (c.qty || c.quantity || 0) * (c.pricePerUnit || c.price || 0),
+            chemicalId: c.chemicalId,
+            packSize: c.packSize,
+            sourceSupplier: c.sourceSupplier
+        }));
+
         const order = new Order({
             userId: customerId,
             representativeId: req.user._id,
@@ -2819,7 +2831,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             acres,
             gpa,
             year: year || new Date().getFullYear(),
-            chemicals,
+            chemicals: normalizedChemicals,
             seeds,
             pivotBio,
             totalCost: totalPrice,
