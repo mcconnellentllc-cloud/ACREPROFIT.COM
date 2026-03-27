@@ -40,7 +40,8 @@ const JWT_SECRET = process.env.JWT_SECRET || 'acreprofit-secret-key-change-in-pr
 
 // Middleware
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
 // MongoDB Connection
 const connectDB = async () => {
