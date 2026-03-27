@@ -563,12 +563,23 @@
                     <!-- Payment Methods -->
                     <div class="payment-section">
                         <h3 class="section-title">Payment Method</h3>
+
+                        <!-- Important Notice -->
+                        <div style="background: #e8f4e8; border: 1px solid #2D5A27; border-radius: 8px; padding: 16px; margin-bottom: 20px;">
+                            <p style="margin: 0; color: #1a5a27; font-weight: 500;">
+                                <strong>Important:</strong> Your order will not be placed until payment is received. Choose your preferred payment method below.
+                            </p>
+                        </div>
+
                         <div class="payment-options">
-                            <label class="payment-option selected" onclick="selectPayment('ach')">
+                            <label class="payment-option selected" onclick="selectPayment('ach')" style="position: relative;">
                                 <input type="radio" name="paymentMethod" value="ach" checked>
                                 <div class="payment-option-info">
-                                    <div class="payment-option-title">Bank Transfer (ACH)</div>
-                                    <div class="payment-option-desc">Pay directly from your bank account</div>
+                                    <div class="payment-option-title">
+                                        Bank Transfer (ACH)
+                                        <span style="background: #2D5A27; color: white; font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; margin-left: 8px; vertical-align: middle;">RECOMMENDED</span>
+                                    </div>
+                                    <div class="payment-option-desc">Pay securely from your bank account - fastest processing!</div>
                                 </div>
                                 <div class="payment-option-fee">0.8% fee (max $5)</div>
                             </label>
@@ -576,8 +587,8 @@
                             <label class="payment-option" onclick="selectPayment('check')">
                                 <input type="radio" name="paymentMethod" value="check">
                                 <div class="payment-option-info">
-                                    <div class="payment-option-title">Pay by Check</div>
-                                    <div class="payment-option-desc">Mail a check to your representative</div>
+                                    <div class="payment-option-title">Pay Later with Check</div>
+                                    <div class="payment-option-desc">Mail a check - order placed after payment received</div>
                                 </div>
                                 <div class="payment-option-fee">No fee</div>
                             </label>
@@ -585,6 +596,11 @@
 
                         <!-- ACH Payment Form (Stripe Elements) -->
                         <div class="ach-form active" id="achForm">
+                            <div style="background: #d4edda; border-radius: 6px; padding: 12px; margin-bottom: 16px;">
+                                <p style="margin: 0; color: #155724; font-size: 0.9rem;">
+                                    <strong>Why ACH?</strong> Secure bank transfers are processed quickly, and your order is placed immediately upon payment confirmation.
+                                </p>
+                            </div>
                             <p style="margin-bottom: 16px; color: #666;">Enter your bank details below. Your information is securely processed by Stripe.</p>
                             <div id="payment-element"></div>
                             <div id="payment-message" style="color: #dc3545; font-size: 0.9rem; margin-top: 8px;"></div>
@@ -592,14 +608,15 @@
 
                         <!-- Check Payment Instructions -->
                         <div class="check-instructions" id="checkInstructions">
-                            <h4>Check Payment Instructions</h4>
-                            <p>Your order will be placed immediately. Please mail your check within 7 days to:</p>
+                            <h4>Pay Later with Check</h4>
+                            <p><strong>Your order will NOT be placed until payment is received.</strong></p>
+                            <p style="margin-top: 8px;">Please mail your check to:</p>
                             <div class="check-address" id="checkAddress">
-                                <strong>Acre Profit</strong><br>
-                                c/o Kyle McConnell<br>
-                                <span id="repAddress">Address provided after order submission</span>
+                                <strong>AcreProfit</strong><br>
+                                3454 HWY 59<br>
+                                Haxtun, CO 80731
                             </div>
-                            <p style="margin-top: 12px;"><strong>Note:</strong> Write your Order ID (provided after checkout) on the check memo line.</p>
+                            <p style="margin-top: 12px;"><strong>Important:</strong> Write your Order ID (provided after checkout) on the check memo line. Your order will be placed once we receive and process your payment.</p>
                         </div>
                     </div>
 

@@ -279,8 +279,8 @@
                     </svg>
                 </div>
 
-                <h1 class="confirmation-title">Order Confirmed!</h1>
-                <p class="confirmation-subtitle">Thank you for your order. We've received it and will begin processing.</p>
+                <h1 class="confirmation-title" id="confirmationTitle">Order Confirmed!</h1>
+                <p class="confirmation-subtitle" id="confirmationSubtitle">Thank you for your order. We've received it and will begin processing.</p>
 
                 <div class="order-number">
                     <div class="order-number-label">Order Number</div>
@@ -315,12 +315,15 @@
                 <div class="check-instructions" id="checkInstructions" style="display: none;">
                     <h4>Mail Your Check To:</h4>
                     <div class="check-address" id="checkAddress">
-                        <strong>Acre Profit</strong><br>
-                        c/o Kyle McConnell<br>
-                        Please contact your rep for mailing address
+                        <strong>AcreProfit</strong><br>
+                        3454 HWY 59<br>
+                        Haxtun, CO 80731
                     </div>
                     <p style="margin-top: 12px; color: #856404; font-size: 0.9rem;">
                         Write "<span id="orderNumberCheck">-</span>" on the memo line.
+                    </p>
+                    <p style="margin-top: 8px; color: #856404; font-size: 0.9rem; font-weight: 600;">
+                        Your order will be placed once payment is received.
                     </p>
                 </div>
 
@@ -426,8 +429,11 @@
             // Payment status badge
             const statusEl = document.getElementById('paymentStatus');
             if (order.paymentMethod === 'check' || order.paymentStatus === 'pending') {
-                statusEl.innerHTML = '<span class="payment-status pending">Pending</span>';
+                statusEl.innerHTML = '<span class="payment-status pending">Awaiting Payment</span>';
                 document.getElementById('checkInstructions').style.display = 'block';
+                // Update title and subtitle for check payments
+                document.getElementById('confirmationTitle').textContent = 'Order Submitted!';
+                document.getElementById('confirmationSubtitle').textContent = 'Your order will be placed once we receive your check payment.';
             } else {
                 statusEl.innerHTML = '<span class="payment-status paid">Paid</span>';
             }
