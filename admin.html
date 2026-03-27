@@ -2946,7 +2946,7 @@
 
         async function openOrderDetail(orderId) {
             try {
-                const res = await fetch(`${API_URL}/api/chemical-orders/${orderId}`, {
+                const res = await fetch(`${API_URL}/api/admin/orders/${orderId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
@@ -2963,7 +2963,7 @@
 
         function displayOrderDetail(order) {
             // Header info
-            document.getElementById('orderDetailNumber').textContent = `Order #${order.orderNumber || 'N/A'}`;
+            document.getElementById('orderDetailNumber').textContent = `Order #${order.orderNumber || order._id?.slice(-6)?.toUpperCase() || 'N/A'}`;
             document.getElementById('orderDetailDate').textContent = new Date(order.createdAt).toLocaleDateString('en-US', {
                 year: 'numeric', month: 'long', day: 'numeric'
             });
@@ -2978,22 +2978,34 @@
             document.getElementById('orderCustomerEmail').textContent = order.contactInfo?.email || order.userId?.email || '-';
             document.getElementById('orderCustomerPhone').textContent = order.contactInfo?.phone || order.userId?.phone || '-';
 
-            // Order details
-            document.getElementById('orderCrop').textContent = order.programName || order.items?.[0]?.timing || 'General';
-            document.getElementById('orderAcres').textContent = order.totalAcres?.toLocaleString() || '-';
+            // Order details - handle both Order and ChemicalOrder models
+            document.getElementById('orderCrop').textContent = order.crop || order.programName || order.items?.[0]?.timing || 'General';
+            document.getElementById('orderAcres').textContent = (order.acres || order.totalAcres)?.toLocaleString() || '-';
             document.getElementById('orderYear').textContent = order.year || new Date().getFullYear();
             document.getElementById('orderPickup').textContent = order.pickupLocation || '-';
 
-            // Items
-            orderItems = [...(order.items || [])];
+            // Items - convert Order.chemicals to items format if needed
+            if (order.items) {
+                orderItems = [...order.items];
+            } else if (order.chemicals) {
+                orderItems = order.chemicals.map(c => ({
+                    productName: c.name,
+                    quantity: c.packagesNeeded || c.totalAmount || 0,
+                    unit: c.packageUnit || c.totalUnit || 'units',
+                    pricePerUnit: c.pricePerPackage || 0,
+                    totalPrice: c.totalPrice || 0
+                }));
+            } else {
+                orderItems = [];
+            }
             renderOrderItems();
 
             // Totals
             document.getElementById('orderDiscount').value = order.discount || 0;
             updateOrderTotals();
 
-            // Notes
-            document.getElementById('orderNotes').value = order.internalNotes || '';
+            // Notes - handle both field names
+            document.getElementById('orderNotes').value = order.notes || order.internalNotes || '';
         }
 
         function renderOrderItems() {

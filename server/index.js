@@ -2976,6 +2976,30 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
     }
 });
 
+// Get single order by ID (admin only)
+app.get('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        let query = { _id: req.params.orderId };
+
+        // If not superadmin, can only view their own customers' orders
+        if (isDistributor(req.user)) {
+            query.representativeId = req.user._id;
+        }
+
+        const order = await Order.findOne(query)
+            .populate('userId', 'name email phone farm')
+            .populate('representativeId', 'name email');
+
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found or access denied' });
+        }
+
+        res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Get all orders (admin only)
 app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
