@@ -4118,7 +4118,7 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
 // Update chemical price (admin only)
 app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { costPrice, adminPrice, sellPrice, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
+        const { costPrice, adminPrice, sellPrice, adminMarginDollars, marginDollars, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
                 category, crops, defaultRate, rateUnit, unitsPerPack } = req.body;
 
         const chemical = await Chemical.findById(req.params.id);
@@ -4146,6 +4146,18 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
             if (adminPrice !== undefined) chemical.adminPrice = adminPrice;
             if (sellPrice !== undefined) chemical.sellPrice = sellPrice;
             chemical.priceDate = new Date();
+        }
+
+        // Handle margin dollar amounts (these recalculate prices)
+        if (adminMarginDollars !== undefined) {
+            chemical.adminMarginDollars = adminMarginDollars;
+            // Recalculate admin price from cost + admin margin
+            chemical.adminPrice = Math.round((chemical.costPrice + adminMarginDollars) * 100) / 100;
+        }
+        if (marginDollars !== undefined) {
+            chemical.marginDollars = marginDollars;
+            // Recalculate sell price from admin price + margin
+            chemical.sellPrice = Math.round((chemical.adminPrice + marginDollars) * 100) / 100;
         }
 
         if (priceVersion !== undefined) chemical.priceVersion = priceVersion;
