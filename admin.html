@@ -3106,11 +3106,38 @@
             });
         });
 
+        // Dropdown toggle functionality
+        document.querySelectorAll('.dropdown-trigger').forEach(trigger => {
+            trigger.addEventListener('click', function(e) {
+                e.preventDefault();
+                e.stopPropagation();
+                const dropdown = this.closest('.admin-tab-dropdown');
+                const isOpen = dropdown.classList.contains('open');
+
+                // Close all other dropdowns
+                document.querySelectorAll('.admin-tab-dropdown').forEach(d => d.classList.remove('open'));
+
+                // Toggle this dropdown
+                if (!isOpen) {
+                    dropdown.classList.add('open');
+                }
+            });
+        });
+
+        // Close dropdowns when clicking outside
+        document.addEventListener('click', function(e) {
+            if (!e.target.closest('.admin-tab-dropdown')) {
+                document.querySelectorAll('.admin-tab-dropdown').forEach(d => d.classList.remove('open'));
+            }
+        });
+
         // Tab navigation - dropdown items
         document.querySelectorAll('.dropdown-item').forEach(item => {
             item.addEventListener('click', function(e) {
                 e.preventDefault();
                 const tabName = this.dataset.tab;
+                // Close the dropdown after selecting
+                document.querySelectorAll('.admin-tab-dropdown').forEach(d => d.classList.remove('open'));
                 navigateToTab(tabName);
             });
         });
