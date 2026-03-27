@@ -39,7 +39,6 @@
                     <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
                     <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
                     <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
-                    <a href="#bundles" class="admin-tab" data-tab="bundles">Bundles</a>
                     <a href="#products" class="admin-tab" data-tab="products">Products</a>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
                     <a href="#purchase-orders" class="admin-tab" data-tab="purchase-orders">Purchase Orders</a>
@@ -587,147 +586,6 @@
                     <div class="customer-modal-actions" id="editActions" style="display: none;">
                         <button class="btn btn-outline" onclick="cancelEdit()">Cancel</button>
                         <button class="btn btn-primary" onclick="saveCustomer()">Save Changes</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Bundles Tab -->
-            <div id="bundlesTab" class="tab-content">
-                <div class="tab-header">
-                    <h2>Order Bundles</h2>
-                    <p class="tab-desc">Track product quantities for bulk ordering - fills automatically from customer orders</p>
-                </div>
-                <div class="bundles-grid" id="bundlesGrid">
-                    <div class="bundle-card">
-                        <div class="bundle-card-header">
-                            <h3>Glyphosate</h3>
-                            <span class="bundle-type">250 Gal Shuttle</span>
-                        </div>
-                        <div class="bundle-card-body">
-                            <div class="bundle-gauge">
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2D5A27" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <span class="gauge-value">0%</span>
-                            </div>
-                            <div class="bundle-stats">
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Gallons Ordered</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Shuttles</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">20</span>
-                                    <span class="stat-lbl">To Fill Truck</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bundle-card-footer">
-                            <span class="bundle-status empty">No orders yet</span>
-                        </div>
-                    </div>
-
-                    <div class="bundle-card">
-                        <div class="bundle-card-header">
-                            <h3>Atrazine</h3>
-                            <span class="bundle-type">250 Gal Shuttle</span>
-                        </div>
-                        <div class="bundle-card-body">
-                            <div class="bundle-gauge">
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#4a7c44" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <span class="gauge-value">0%</span>
-                            </div>
-                            <div class="bundle-stats">
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Gallons Ordered</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Shuttles</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">20</span>
-                                    <span class="stat-lbl">To Fill Truck</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bundle-card-footer">
-                            <span class="bundle-status empty">No orders yet</span>
-                        </div>
-                    </div>
-
-                    <div class="bundle-card">
-                        <div class="bundle-card-header">
-                            <h3>Dicamba</h3>
-                            <span class="bundle-type">250 Gal Shuttle</span>
-                        </div>
-                        <div class="bundle-card-body">
-                            <div class="bundle-gauge">
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#2D5A27" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <span class="gauge-value">0%</span>
-                            </div>
-                            <div class="bundle-stats">
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Gallons Ordered</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Shuttles</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">20</span>
-                                    <span class="stat-lbl">To Fill Truck</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bundle-card-footer">
-                            <span class="bundle-status empty">No orders yet</span>
-                        </div>
-                    </div>
-
-                    <div class="bundle-card">
-                        <div class="bundle-card-header">
-                            <h3>2,4-D LV6</h3>
-                            <span class="bundle-type">250 Gal Shuttle</span>
-                        </div>
-                        <div class="bundle-card-body">
-                            <div class="bundle-gauge">
-                                <svg viewBox="0 0 100 100">
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#e0e0d8" stroke-width="8"/>
-                                    <circle cx="50" cy="50" r="45" fill="none" stroke="#10b981" stroke-width="8" stroke-dasharray="283" stroke-dashoffset="283" transform="rotate(-90 50 50)"/>
-                                </svg>
-                                <span class="gauge-value">0%</span>
-                            </div>
-                            <div class="bundle-stats">
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Gallons Ordered</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">0</span>
-                                    <span class="stat-lbl">Shuttles</span>
-                                </div>
-                                <div class="bundle-stat">
-                                    <span class="stat-num">20</span>
-                                    <span class="stat-lbl">To Fill Truck</span>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="bundle-card-footer">
-                            <span class="bundle-status empty">No orders yet</span>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -2300,8 +2158,8 @@
                     name: c.name || c.productName,
                     qty: c.qty || c.quantity || c.totalAmount || 0,
                     unit: c.unit || c.totalUnit || 'gal',
-                    pricePerUnit: c.pricePerUnit || c.pricePerPackage || 0,
-                    total: c.total || c.totalPrice || 0,
+                    pricePerUnit: c.pricePerUnit || c.pricePerPackage || c.price || 0,
+                    total: c.total || c.totalPrice || (c.qty * (c.pricePerUnit || c.pricePerPackage || c.price || 0)) || 0,
                     chemicalId: c.chemicalId || c._id
                 }));
             }
@@ -2593,73 +2451,9 @@
                 document.getElementById('totalCustomers').textContent = customers.length;
                 renderCustomers(customers);
 
-                // Load bundle progress from real order data
-                loadBundleProgress(orders);
-
             } catch (error) {
                 console.error('Error loading dashboard:', error);
             }
-        }
-
-        // Load bundle progress from real order data
-        function loadBundleProgress(orders) {
-            const bundleContainer = document.getElementById('bundleProgress');
-
-            // Aggregate chemicals from all orders
-            const chemicalTotals = {};
-
-            orders.forEach(order => {
-                if (order.chemicals && Array.isArray(order.chemicals)) {
-                    order.chemicals.forEach(chem => {
-                        const name = chem.name || chem.productName || 'Unknown';
-                        const qty = parseFloat(chem.qty || chem.quantity || 0);
-                        const unit = chem.unit || 'units';
-
-                        const key = name.toLowerCase().replace(/[^a-z0-9]/g, '');
-                        if (!chemicalTotals[key]) {
-                            chemicalTotals[key] = {
-                                name: name,
-                                unit: unit,
-                                totalQty: 0,
-                                orderCount: 0
-                            };
-                        }
-                        chemicalTotals[key].totalQty += qty;
-                        chemicalTotals[key].orderCount++;
-                    });
-                }
-            });
-
-            // Convert to array and sort by quantity
-            const bundles = Object.values(chemicalTotals)
-                .filter(b => b.totalQty > 0)
-                .sort((a, b) => b.totalQty - a.totalQty)
-                .slice(0, 6); // Show top 6 products
-
-            if (bundles.length === 0) {
-                bundleContainer.innerHTML = '<p class="empty">No chemical orders yet</p>';
-                return;
-            }
-
-            bundleContainer.innerHTML = bundles.map(bundle => {
-                // Calculate progress (assuming shuttle = 250 gal target for bulk ordering)
-                const isShuttle = bundle.unit.toLowerCase().includes('gal') || bundle.unit.toLowerCase().includes('shuttle');
-                const targetQty = isShuttle ? Math.ceil(bundle.totalQty / 250) * 250 + 250 : bundle.totalQty + 50;
-                const progress = Math.min(100, (bundle.totalQty / targetQty) * 100);
-
-                return `
-                    <div class="bundle-item">
-                        <div class="bundle-info">
-                            <span class="bundle-name">${bundle.name}</span>
-                            <span class="bundle-detail">${bundle.orderCount} orders</span>
-                        </div>
-                        <div class="bundle-progress-bar">
-                            <div class="progress-fill" style="width: ${progress}%"></div>
-                        </div>
-                        <span class="bundle-qty">${bundle.totalQty.toLocaleString()} ${bundle.unit}</span>
-                    </div>
-                `;
-            }).join('');
         }
 
         // Load rep applications (superadmin only)

@@ -273,31 +273,14 @@ const orderSchema = new mongoose.Schema({
     paidAt: Date,
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'bundled', 'ordered', 'shipped', 'delivered'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered'],
         default: 'draft'
     },
-    bundleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bundle' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
 const Order = mongoose.model('Order', orderSchema);
-
-// Bundle Model (for truckload bundling)
-const bundleSchema = new mongoose.Schema({
-    product: String,
-    targetQuantity: Number, // e.g., 250 gal for a shuttle
-    currentQuantity: { type: Number, default: 0 },
-    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
-    status: {
-        type: String,
-        enum: ['collecting', 'ready', 'ordered', 'shipped', 'delivered'],
-        default: 'collecting'
-    },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const Bundle = mongoose.model('Bundle', bundleSchema);
 
 // Rep Application Model
 const repApplicationSchema = new mongoose.Schema({
@@ -1853,12 +1836,13 @@ const additionalProducts = {
     hydrovant: {
         id: 'hydrovant',
         name: 'Hydrovant',
-        description: 'Water conditioning agent',
+        description: 'Drift reduction/deposition aid adjuvant',
         unit: 'gal',
+        costPerUnit: 95,
         pricing: [
-            { minQty: 1, maxQty: 9, pricePerUnit: 165 },
-            { minQty: 10, maxQty: 60, pricePerUnit: 135 },
-            { minQty: 61, maxQty: 180, pricePerUnit: 125 }
+            { minQty: 1, maxQty: 9, pricePerUnit: 145 },
+            { minQty: 10, maxQty: 60, pricePerUnit: 145 },
+            { minQty: 61, maxQty: 180, pricePerUnit: 145 }
         ]
     },
     multiseal: {
@@ -2828,6 +2812,18 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
         const costPerAcre = acres > 0 ? Math.round((totalPrice / acres) * 100) / 100 : 0;
 
+        // Normalize chemicals array to use consistent field names
+        const normalizedChemicals = (chemicals || []).map(c => ({
+            name: c.name || c.productName,
+            qty: c.qty || c.quantity || 0,
+            unit: c.unit || 'gal',
+            pricePerUnit: c.pricePerUnit || c.price || 0,
+            totalPrice: c.totalPrice || c.total || (c.qty || c.quantity || 0) * (c.pricePerUnit || c.price || 0),
+            chemicalId: c.chemicalId,
+            packSize: c.packSize,
+            sourceSupplier: c.sourceSupplier
+        }));
+
         const order = new Order({
             userId: customerId,
             representativeId: req.user._id,
@@ -2836,7 +2832,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             acres,
             gpa,
             year: year || new Date().getFullYear(),
-            chemicals,
+            chemicals: normalizedChemicals,
             seeds,
             pivotBio,
             totalCost: totalPrice,
@@ -3077,62 +3073,6 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
             totalAcres: totalAcres[0]?.total || 0,
             totalCustomers
         });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Bundle orders for truckload (superadmin only)
-app.post('/api/admin/bundles', authMiddleware, superAdminMiddleware, async (req, res) => {
-    try {
-        const { product, orderIds, targetQuantity } = req.body;
-
-        const bundle = new Bundle({
-            product,
-            targetQuantity,
-            orders: orderIds
-        });
-
-        // Calculate current quantity from orders
-        const orders = await Order.find({ _id: { $in: orderIds } });
-        let currentQuantity = 0;
-        orders.forEach(order => {
-            order.chemicals.forEach(chem => {
-                if (chem.name === product) {
-                    currentQuantity += chem.totalAmount;
-                }
-            });
-        });
-
-        bundle.currentQuantity = currentQuantity;
-        if (currentQuantity >= targetQuantity) {
-            bundle.status = 'ready';
-        }
-
-        await bundle.save();
-
-        // Update orders with bundle ID
-        await Order.updateMany(
-            { _id: { $in: orderIds } },
-            { bundleId: bundle._id, status: 'bundled' }
-        );
-
-        res.status(201).json(bundle);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Get bundles (superadmin only)
-app.get('/api/admin/bundles', authMiddleware, superAdminMiddleware, async (req, res) => {
-    try {
-        const bundles = await Bundle.find()
-            .populate({
-                path: 'orders',
-                populate: { path: 'userId', select: 'name email farm' }
-            })
-            .sort({ createdAt: -1 });
-        res.json(bundles);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -3878,7 +3818,12 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'Clethodim', packSize: '135', unit: 'gal', unitsPerPack: 135, costPrice: 33.00, sellPrice: 0, category: 'herbicide' },
 
             // AMS (Ammonium Sulfate)
-            { productName: 'AMS', packSize: '24 lb', unit: 'lb', unitsPerPack: 24, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - water conditioner/adjuvant' }
+            { productName: 'AMS', packSize: '24 lb', unit: 'lb', unitsPerPack: 24, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - water conditioner/adjuvant' },
+            { productName: 'AMS x5', packSize: '24', unit: 'lb', unitsPerPack: 120, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - 5 bag bundle' },
+
+            // Hydrovant
+            { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 145.00, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
+            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 95.00, sellPrice: 145.00, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
         ];
 
         const results = { created: [], existing: [] };
