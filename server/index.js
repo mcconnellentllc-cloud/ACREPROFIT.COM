@@ -5487,14 +5487,25 @@ app.get('/api/chemical-orders', authMiddleware, async (req, res) => {
 // Get single chemical order
 app.get('/api/chemical-orders/:id', authMiddleware, async (req, res) => {
     try {
-        const order = await ChemicalOrder.findOne({
-            _id: req.params.id,
-            userId: req.user._id
-        }).populate('items.chemicalId');
+        const order = await ChemicalOrder.findById(req.params.id)
+            .populate('items.chemicalId')
+            .populate('userId', 'name email phone farm');
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
         }
+
+        // Check access: owner, admin, or assigned distributor
+        const isOwner = order.userId?._id?.toString() === req.user._id.toString() ||
+                        order.userId?.toString() === req.user._id.toString();
+        const isAdmin = req.user.role === 'admin' || req.user.role === 'superadmin';
+        const isAssignedDistributor = isDistributor(req.user) &&
+                                      order.representativeId?.toString() === req.user._id.toString();
+
+        if (!isOwner && !isAdmin && !isAssignedDistributor) {
+            return res.status(403).json({ error: 'Not authorized to view this order' });
+        }
+
         res.json(order);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -5515,6 +5526,38 @@ app.put('/api/chemical-orders/:id/submit', authMiddleware, async (req, res) => {
 
         order.status = 'submitted';
         order.submittedAt = new Date();
+        order.updatedAt = new Date();
+        await order.save();
+
+        res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update chemical order (admin/distributor)
+app.put('/api/chemical-orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await ChemicalOrder.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        // Check distributor access
+        if (isDistributor(req.user) && order.representativeId?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized to edit this order' });
+        }
+
+        const { items, subtotal, discount, total, internalNotes, status } = req.body;
+
+        // Update fields if provided
+        if (items !== undefined) order.items = items;
+        if (subtotal !== undefined) order.subtotal = subtotal;
+        if (discount !== undefined) order.discount = discount;
+        if (total !== undefined) order.total = total;
+        if (internalNotes !== undefined) order.internalNotes = internalNotes;
+        if (status !== undefined) order.status = status;
+
         order.updatedAt = new Date();
         await order.save();
 
@@ -7374,21 +7417,223 @@ app.put('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, 
 app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id)
-            .populate('customerId', 'name email');
+            .populate('customerId', 'name email phone')
+            .populate('orderId');
 
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
 
-        // TODO: Implement email sending with nodemailer
-        // For now, just update the status
-        invoice.status = 'sent';
-        invoice.sentAt = new Date();
-        invoice.sentBy = req.user._id;
-        await invoice.save();
+        // Get customer email
+        const customerEmail = invoice.customerEmail || invoice.customerId?.email;
+        if (!customerEmail) {
+            return res.status(400).json({ error: 'No customer email found' });
+        }
 
-        res.json({ message: 'Invoice sent successfully', invoice });
+        // Format dates
+        const invoiceDate = new Date(invoice.invoiceDate || invoice.createdAt).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+        const dueDate = new Date(invoice.dueDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)).toLocaleDateString('en-US', {
+            year: 'numeric', month: 'long', day: 'numeric'
+        });
+
+        // Build items table HTML
+        const itemsHtml = (invoice.items || []).map(item => `
+            <tr>
+                <td style="padding: 14px 16px; border-bottom: 1px solid #e0e0e0;">${item.productName || item.description || 'Product'}</td>
+                <td style="padding: 14px 16px; border-bottom: 1px solid #e0e0e0; text-align: center;">${item.quantity || 0}</td>
+                <td style="padding: 14px 16px; border-bottom: 1px solid #e0e0e0; text-align: right;">$${(item.unitPrice || 0).toFixed(2)}</td>
+                <td style="padding: 14px 16px; border-bottom: 1px solid #e0e0e0; text-align: right; font-weight: 600;">$${(item.total || (item.quantity * item.unitPrice) || 0).toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        // Calculate totals
+        const subtotal = invoice.subtotal || invoice.items?.reduce((sum, i) => sum + (i.total || i.quantity * i.unitPrice || 0), 0) || 0;
+        const discount = invoice.discount || 0;
+        const total = invoice.total || (subtotal - discount);
+
+        // Get order details if available
+        const order = invoice.orderId;
+        const crop = order?.programName || 'General';
+        const acres = order?.totalAcres || 0;
+        const year = order?.year || new Date().getFullYear();
+
+        // Build professional invoice email HTML
+        const emailHtml = `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="margin: 0; padding: 0; font-family: 'Segoe UI', Arial, sans-serif; background-color: #f5f5f0;">
+    <div style="max-width: 700px; margin: 0 auto; background-color: #ffffff;">
+        <!-- Header -->
+        <div style="background: linear-gradient(135deg, #2d5a27 0%, #1e3d1a 100%); padding: 32px; text-align: center;">
+            <h1 style="color: #ffffff; margin: 0; font-size: 28px; letter-spacing: 2px;">ACRE PROFIT</h1>
+            <p style="color: rgba(255,255,255,0.9); margin: 8px 0 0 0; font-size: 14px;">Agricultural Chemical Solutions</p>
+        </div>
+
+        <!-- Invoice Title Bar -->
+        <div style="background-color: #e8b923; padding: 16px 32px; display: flex; justify-content: space-between;">
+            <div>
+                <h2 style="margin: 0; color: #1a1a1a; font-size: 24px;">INVOICE</h2>
+            </div>
+            <div style="text-align: right;">
+                <p style="margin: 0; font-size: 18px; font-weight: 700; color: #1a1a1a;">${invoice.invoiceNumber}</p>
+            </div>
+        </div>
+
+        <!-- Content -->
+        <div style="padding: 32px;">
+            <!-- Info Bar -->
+            <div style="background-color: #f5f5f0; border-radius: 12px; padding: 20px; margin-bottom: 28px;">
+                <table width="100%" cellpadding="0" cellspacing="0">
+                    <tr>
+                        <td style="text-align: center; padding: 8px;">
+                            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Invoice Date</p>
+                            <p style="margin: 4px 0 0 0; font-weight: 600;">${invoiceDate}</p>
+                        </td>
+                        <td style="text-align: center; padding: 8px;">
+                            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Due Date</p>
+                            <p style="margin: 4px 0 0 0; font-weight: 600;">${dueDate}</p>
+                        </td>
+                        <td style="text-align: center; padding: 8px;">
+                            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Order #</p>
+                            <p style="margin: 4px 0 0 0; font-weight: 600;">${invoice.orderNumber || 'N/A'}</p>
+                        </td>
+                        <td style="text-align: center; padding: 8px;">
+                            <p style="margin: 0; font-size: 12px; color: #666; text-transform: uppercase;">Status</p>
+                            <p style="margin: 4px 0 0 0;">
+                                <span style="background: ${invoice.paymentStatus === 'paid' ? '#d1fae5' : '#fee2e2'}; color: ${invoice.paymentStatus === 'paid' ? '#065f46' : '#991b1b'}; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700;">
+                                    ${invoice.paymentStatus === 'paid' ? 'PAID' : 'UNPAID'}
+                                </span>
+                            </p>
+                        </td>
+                    </tr>
+                </table>
+            </div>
+
+            <!-- Addresses -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 28px;">
+                <tr>
+                    <td style="width: 48%; vertical-align: top;">
+                        <p style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; color: #2d5a27; font-weight: 700; border-bottom: 2px solid #e8b923; padding-bottom: 8px;">Bill To</p>
+                        <p style="margin: 0; font-weight: 700; font-size: 18px;">${invoice.customerName || invoice.customerId?.name || 'Customer'}</p>
+                        <p style="margin: 4px 0; color: #666;">${invoice.customerFarm || ''}</p>
+                        <p style="margin: 4px 0; color: #666;">${customerEmail}</p>
+                        <p style="margin: 4px 0; color: #666;">${invoice.customerPhone || invoice.customerId?.phone || ''}</p>
+                    </td>
+                    <td style="width: 4%;"></td>
+                    <td style="width: 48%; vertical-align: top;">
+                        <p style="margin: 0 0 12px 0; font-size: 12px; text-transform: uppercase; color: #2d5a27; font-weight: 700; border-bottom: 2px solid #e8b923; padding-bottom: 8px;">From</p>
+                        <p style="margin: 0; font-weight: 700; font-size: 18px;">Acre Profit LLC</p>
+                        <p style="margin: 4px 0; color: #666;">Agricultural Chemical Distribution</p>
+                        <p style="margin: 4px 0; color: #666;">Haxtun, CO</p>
+                        <p style="margin: 4px 0; color: #666;">info@acreprofit.com</p>
+                    </td>
+                </tr>
+            </table>
+
+            <!-- Order Details -->
+            <div style="margin-bottom: 28px;">
+                <span style="display: inline-block; background: #e8f5e9; color: #2d5a27; padding: 8px 16px; border-radius: 20px; font-weight: 600; margin-right: 8px;">${crop}</span>
+                <span style="display: inline-block; background: #e8f5e9; color: #2d5a27; padding: 8px 16px; border-radius: 20px; font-weight: 600; margin-right: 8px;">${acres.toLocaleString()} Acres</span>
+                <span style="display: inline-block; background: #e8f5e9; color: #2d5a27; padding: 8px 16px; border-radius: 20px; font-weight: 600;">${year}</span>
+            </div>
+
+            <!-- Items Table -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="border: 1px solid #e0e0e0; border-radius: 8px; overflow: hidden; margin-bottom: 28px;">
+                <thead>
+                    <tr style="background-color: #2d5a27;">
+                        <th style="padding: 14px 16px; text-align: left; color: white; font-size: 13px; text-transform: uppercase;">Product</th>
+                        <th style="padding: 14px 16px; text-align: center; color: white; font-size: 13px; text-transform: uppercase;">Qty</th>
+                        <th style="padding: 14px 16px; text-align: right; color: white; font-size: 13px; text-transform: uppercase;">Unit Price</th>
+                        <th style="padding: 14px 16px; text-align: right; color: white; font-size: 13px; text-transform: uppercase;">Total</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${itemsHtml || '<tr><td colspan="4" style="padding: 20px; text-align: center; color: #666;">No items</td></tr>'}
+                </tbody>
+            </table>
+
+            <!-- Totals -->
+            <div style="display: flex; justify-content: flex-end;">
+                <div style="width: 280px; background: #f5f5f0; border-radius: 12px; padding: 20px;">
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0;">
+                        <span>Subtotal</span>
+                        <span>$${subtotal.toFixed(2)}</span>
+                    </div>
+                    ${discount > 0 ? `
+                    <div style="display: flex; justify-content: space-between; padding: 8px 0; color: #059669;">
+                        <span>Discount</span>
+                        <span>-$${discount.toFixed(2)}</span>
+                    </div>
+                    ` : ''}
+                    <div style="display: flex; justify-content: space-between; padding: 12px 0; margin-top: 8px; border-top: 2px solid #2d5a27; font-size: 20px; font-weight: 700; color: #2d5a27;">
+                        <span>Total Due</span>
+                        <span>$${total.toFixed(2)}</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Payment Info -->
+            <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 20px; margin: 28px 0;">
+                <h4 style="margin: 0 0 8px 0; color: #92400e;">Payment Information</h4>
+                <p style="margin: 4px 0; color: #78350f; font-size: 14px;">Please make payment via check or ACH transfer:</p>
+                <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
+                    <p style="margin: 0; font-weight: 700;">Acre Profit LLC</p>
+                    <p style="margin: 4px 0; font-size: 14px; color: #666;">Contact your representative for ACH details or mail check to your pickup location.</p>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <div style="text-align: center; padding-top: 20px; border-top: 2px solid #e0e0e0;">
+                <p style="margin: 4px 0; color: #2d5a27; font-weight: 600;">Thank you for your business!</p>
+                <p style="margin: 4px 0; color: #666; font-size: 14px;">Questions? Contact us at info@acreprofit.com</p>
+            </div>
+        </div>
+
+        <!-- Bottom Bar -->
+        <div style="background-color: #2d5a27; padding: 16px; text-align: center;">
+            <p style="margin: 0; color: rgba(255,255,255,0.8); font-size: 12px;">&copy; ${new Date().getFullYear()} Acre Profit LLC. All rights reserved.</p>
+        </div>
+    </div>
+</body>
+</html>`;
+
+        // Send email
+        const transporter = createEmailTransporter();
+        if (transporter) {
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: customerEmail,
+                subject: `Invoice ${invoice.invoiceNumber} from Acre Profit - $${total.toFixed(2)} Due`,
+                html: emailHtml
+            });
+
+            invoice.status = 'sent';
+            invoice.sentAt = new Date();
+            invoice.sentBy = req.user._id;
+            await invoice.save();
+
+            res.json({ message: 'Invoice sent successfully', invoice });
+        } else {
+            // No email transporter configured, just update status
+            invoice.status = 'sent';
+            invoice.sentAt = new Date();
+            invoice.sentBy = req.user._id;
+            await invoice.save();
+
+            res.json({
+                message: 'Invoice marked as sent (email not configured)',
+                invoice,
+                warning: 'Email transporter not configured. Please set up SMTP or Gmail credentials.'
+            });
+        }
     } catch (error) {
+        console.error('Error sending invoice:', error);
         res.status(400).json({ error: error.message });
     }
 });

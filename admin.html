@@ -590,6 +590,276 @@
                 </div>
             </div>
 
+            <!-- Order Detail Modal -->
+            <div class="modal-overlay" id="orderDetailModal" style="display: none;">
+                <div class="modal-content order-detail-modal-content">
+                    <button class="modal-close" onclick="closeOrderDetailModal()">&times;</button>
+                    <div class="order-detail-header">
+                        <div class="order-detail-icon">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+                        </div>
+                        <div class="order-detail-title">
+                            <h2 id="orderDetailNumber">Order #CO-2026-00001</h2>
+                            <p id="orderDetailDate">March 26, 2026</p>
+                        </div>
+                        <span class="order-detail-status" id="orderDetailStatus">DRAFT</span>
+                    </div>
+
+                    <div class="order-detail-body">
+                        <!-- Customer Info Section -->
+                        <div class="order-section">
+                            <h4>Customer Information</h4>
+                            <div class="order-customer-info">
+                                <div class="info-row">
+                                    <span class="info-label">Name</span>
+                                    <span class="info-value" id="orderCustomerName">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Farm</span>
+                                    <span class="info-value" id="orderCustomerFarm">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Email</span>
+                                    <span class="info-value" id="orderCustomerEmail">-</span>
+                                </div>
+                                <div class="info-row">
+                                    <span class="info-label">Phone</span>
+                                    <span class="info-value" id="orderCustomerPhone">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Order Details Section -->
+                        <div class="order-section">
+                            <h4>Order Details</h4>
+                            <div class="order-details-grid">
+                                <div class="detail-item">
+                                    <span class="detail-label">Crop</span>
+                                    <span class="detail-value" id="orderCrop">-</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Acres</span>
+                                    <span class="detail-value" id="orderAcres">-</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Year</span>
+                                    <span class="detail-value" id="orderYear">-</span>
+                                </div>
+                                <div class="detail-item">
+                                    <span class="detail-label">Pickup Location</span>
+                                    <span class="detail-value" id="orderPickup">-</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Items Section -->
+                        <div class="order-section">
+                            <h4>Order Items</h4>
+                            <div class="order-items-table-container">
+                                <table class="order-items-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Product</th>
+                                            <th>Qty</th>
+                                            <th>Unit Price</th>
+                                            <th>Total</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="orderItemsBody">
+                                    </tbody>
+                                </table>
+                            </div>
+                            <button class="btn btn-outline btn-sm" id="addItemBtn" onclick="addOrderItem()" style="margin-top: 12px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                Add Item
+                            </button>
+                        </div>
+
+                        <!-- Totals Section -->
+                        <div class="order-section order-totals-section">
+                            <div class="order-totals">
+                                <div class="total-row">
+                                    <span>Subtotal</span>
+                                    <span id="orderSubtotal">$0.00</span>
+                                </div>
+                                <div class="total-row discount-row">
+                                    <span>Discount</span>
+                                    <div class="discount-input-group">
+                                        <span>-$</span>
+                                        <input type="number" id="orderDiscount" value="0" min="0" step="0.01" onchange="updateOrderTotals()">
+                                    </div>
+                                </div>
+                                <div class="total-row grand-total">
+                                    <span>Total</span>
+                                    <span id="orderTotal">$0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Notes Section -->
+                        <div class="order-section">
+                            <h4>Notes</h4>
+                            <textarea id="orderNotes" class="order-notes-input" placeholder="Add internal notes about this order..."></textarea>
+                        </div>
+                    </div>
+
+                    <div class="order-detail-actions">
+                        <button class="btn btn-outline" onclick="closeOrderDetailModal()">Close</button>
+                        <button class="btn btn-outline" onclick="saveOrderChanges()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                            Save Changes
+                        </button>
+                        <button class="btn btn-primary" onclick="openInvoiceModal()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            Send Invoice
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Invoice Modal -->
+            <div class="modal-overlay" id="invoiceModal" style="display: none;">
+                <div class="modal-content invoice-modal-content">
+                    <button class="modal-close" onclick="closeInvoiceModal()">&times;</button>
+
+                    <div class="invoice-preview" id="invoicePreview">
+                        <!-- Invoice Header -->
+                        <div class="invoice-header">
+                            <div class="invoice-logo">
+                                <div class="logo-icon">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                </div>
+                                <div class="logo-text">
+                                    <h1>ACRE PROFIT</h1>
+                                    <p>Agricultural Chemical Solutions</p>
+                                </div>
+                            </div>
+                            <div class="invoice-title-block">
+                                <h2>INVOICE</h2>
+                                <div class="invoice-number" id="invoiceNumber">INV-2026-00001</div>
+                            </div>
+                        </div>
+
+                        <!-- Invoice Info Bar -->
+                        <div class="invoice-info-bar">
+                            <div class="invoice-info-item">
+                                <span class="label">Invoice Date</span>
+                                <span class="value" id="invoiceDate">March 27, 2026</span>
+                            </div>
+                            <div class="invoice-info-item">
+                                <span class="label">Due Date</span>
+                                <span class="value" id="invoiceDueDate">April 26, 2026</span>
+                            </div>
+                            <div class="invoice-info-item">
+                                <span class="label">Order #</span>
+                                <span class="value" id="invoiceOrderNumber">CO-2026-00001</span>
+                            </div>
+                            <div class="invoice-info-item status">
+                                <span class="label">Status</span>
+                                <span class="value invoice-status-badge" id="invoiceStatusBadge">UNPAID</span>
+                            </div>
+                        </div>
+
+                        <!-- Bill To / Ship To -->
+                        <div class="invoice-addresses">
+                            <div class="address-block">
+                                <h4>Bill To</h4>
+                                <p class="customer-name" id="invoiceBillToName">Customer Name</p>
+                                <p id="invoiceBillToFarm">Farm Name</p>
+                                <p id="invoiceBillToEmail">email@example.com</p>
+                                <p id="invoiceBillToPhone">(555) 123-4567</p>
+                            </div>
+                            <div class="address-block">
+                                <h4>From</h4>
+                                <p class="customer-name">Acre Profit LLC</p>
+                                <p>Agricultural Chemical Distribution</p>
+                                <p>Haxtun, CO</p>
+                                <p>info@acreprofit.com</p>
+                            </div>
+                        </div>
+
+                        <!-- Order Details Banner -->
+                        <div class="invoice-order-details">
+                            <div class="order-detail-chip">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
+                                <span id="invoiceCrop">Corn</span>
+                            </div>
+                            <div class="order-detail-chip">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                                <span id="invoiceAcres">978 Acres</span>
+                            </div>
+                            <div class="order-detail-chip">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                                <span id="invoiceYear">2026</span>
+                            </div>
+                        </div>
+
+                        <!-- Items Table -->
+                        <div class="invoice-items-section">
+                            <table class="invoice-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Quantity</th>
+                                        <th>Unit Price</th>
+                                        <th>Total</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="invoiceItemsBody">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Totals -->
+                        <div class="invoice-totals">
+                            <div class="totals-box">
+                                <div class="total-line">
+                                    <span>Subtotal</span>
+                                    <span id="invoiceSubtotal">$0.00</span>
+                                </div>
+                                <div class="total-line discount" id="invoiceDiscountLine" style="display: none;">
+                                    <span>Discount</span>
+                                    <span id="invoiceDiscountAmount">-$0.00</span>
+                                </div>
+                                <div class="total-line grand">
+                                    <span>Total Due</span>
+                                    <span id="invoiceTotalDue">$0.00</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Payment Instructions -->
+                        <div class="invoice-payment-info">
+                            <h4>Payment Information</h4>
+                            <p>Please make payment via check or ACH transfer:</p>
+                            <div class="payment-details">
+                                <p><strong>Acre Profit LLC</strong></p>
+                                <p>Contact your representative for ACH details or mail check to your pickup location.</p>
+                            </div>
+                        </div>
+
+                        <!-- Footer -->
+                        <div class="invoice-footer">
+                            <p>Thank you for your business!</p>
+                            <p class="small">Questions? Contact us at info@acreprofit.com</p>
+                        </div>
+                    </div>
+
+                    <div class="invoice-modal-actions">
+                        <button class="btn btn-outline" onclick="closeInvoiceModal()">Close</button>
+                        <button class="btn btn-outline" onclick="printInvoice()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+                            Print
+                        </button>
+                        <button class="btn btn-primary" onclick="sendInvoiceEmail()">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
+                            Send to Customer
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Compliance Tab -->
             <div id="complianceTab" class="tab-content">
                 <div class="tab-header">
@@ -2643,9 +2913,9 @@
                 }
             }
 
-            // Render orders
+            // Render orders (now clickable)
             const ordersHtml = customer.orders && customer.orders.length ? customer.orders.map(order => `
-                <div class="customer-order-item">
+                <div class="customer-order-item" onclick="openOrderDetail('${order._id}')" title="Click to view/edit order">
                     <div class="order-item-info">
                         <span class="order-crop">${order.crop || 'General'}</span>
                         <span class="order-date">${new Date(order.createdAt).toLocaleDateString()}</span>
@@ -2653,7 +2923,7 @@
                     <div class="order-item-details">
                         <span class="order-acres">${order.acres?.toLocaleString() || 0} acres</span>
                         <span class="order-total">$${order.totalPrice?.toLocaleString() || 0}</span>
-                        <span class="order-status status-${order.status}">${order.status}</span>
+                        <span class="order-status status-${order.status}">${order.status.toUpperCase()}</span>
                     </div>
                 </div>
             `).join('') : '<p class="empty">No orders yet</p>';
@@ -2668,6 +2938,302 @@
             selectedCustomer = null;
             // Reset to view mode
             cancelEdit();
+        }
+
+        // ============ ORDER DETAIL MODAL ============
+        let currentOrder = null;
+        let orderItems = [];
+
+        async function openOrderDetail(orderId) {
+            try {
+                const res = await fetch(`${API_URL}/api/chemical-orders/${orderId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!res.ok) throw new Error('Failed to load order');
+
+                currentOrder = await res.json();
+                displayOrderDetail(currentOrder);
+                document.getElementById('orderDetailModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Error loading order:', error);
+                alert('Error loading order details');
+            }
+        }
+
+        function displayOrderDetail(order) {
+            // Header info
+            document.getElementById('orderDetailNumber').textContent = `Order #${order.orderNumber || 'N/A'}`;
+            document.getElementById('orderDetailDate').textContent = new Date(order.createdAt).toLocaleDateString('en-US', {
+                year: 'numeric', month: 'long', day: 'numeric'
+            });
+
+            const statusEl = document.getElementById('orderDetailStatus');
+            statusEl.textContent = order.status?.toUpperCase() || 'DRAFT';
+            statusEl.className = `order-detail-status status-${order.status || 'draft'}`;
+
+            // Customer info
+            document.getElementById('orderCustomerName').textContent = order.contactInfo?.name || order.userId?.name || '-';
+            document.getElementById('orderCustomerFarm').textContent = order.contactInfo?.farm || order.userId?.farm?.name || '-';
+            document.getElementById('orderCustomerEmail').textContent = order.contactInfo?.email || order.userId?.email || '-';
+            document.getElementById('orderCustomerPhone').textContent = order.contactInfo?.phone || order.userId?.phone || '-';
+
+            // Order details
+            document.getElementById('orderCrop').textContent = order.programName || order.items?.[0]?.timing || 'General';
+            document.getElementById('orderAcres').textContent = order.totalAcres?.toLocaleString() || '-';
+            document.getElementById('orderYear').textContent = order.year || new Date().getFullYear();
+            document.getElementById('orderPickup').textContent = order.pickupLocation || '-';
+
+            // Items
+            orderItems = [...(order.items || [])];
+            renderOrderItems();
+
+            // Totals
+            document.getElementById('orderDiscount').value = order.discount || 0;
+            updateOrderTotals();
+
+            // Notes
+            document.getElementById('orderNotes').value = order.internalNotes || '';
+        }
+
+        function renderOrderItems() {
+            const tbody = document.getElementById('orderItemsBody');
+            tbody.innerHTML = orderItems.map((item, index) => `
+                <tr>
+                    <td>
+                        <input type="text" value="${item.productName || ''}"
+                               onchange="updateItem(${index}, 'productName', this.value)"
+                               style="width: 200px;">
+                    </td>
+                    <td>
+                        <input type="number" value="${item.quantity || 0}" min="0"
+                               onchange="updateItem(${index}, 'quantity', parseFloat(this.value))"
+                               style="width: 80px;">
+                    </td>
+                    <td>
+                        <input type="number" value="${item.unitPrice || 0}" min="0" step="0.01"
+                               onchange="updateItem(${index}, 'unitPrice', parseFloat(this.value))"
+                               style="width: 100px;">
+                    </td>
+                    <td>$${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}</td>
+                    <td>
+                        <button class="btn-remove" onclick="removeOrderItem(${index})" title="Remove item">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        </button>
+                    </td>
+                </tr>
+            `).join('') || '<tr><td colspan="5" style="text-align: center; color: var(--text-light);">No items</td></tr>';
+        }
+
+        function updateItem(index, field, value) {
+            orderItems[index][field] = value;
+            if (field === 'quantity' || field === 'unitPrice') {
+                orderItems[index].totalPrice = (orderItems[index].quantity || 0) * (orderItems[index].unitPrice || 0);
+            }
+            renderOrderItems();
+            updateOrderTotals();
+        }
+
+        function addOrderItem() {
+            orderItems.push({
+                productName: '',
+                quantity: 1,
+                unitPrice: 0,
+                totalPrice: 0,
+                isCustom: true
+            });
+            renderOrderItems();
+        }
+
+        function removeOrderItem(index) {
+            orderItems.splice(index, 1);
+            renderOrderItems();
+            updateOrderTotals();
+        }
+
+        function updateOrderTotals() {
+            const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+            const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
+            const total = subtotal - discount;
+
+            document.getElementById('orderSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('orderTotal').textContent = '$' + total.toFixed(2);
+        }
+
+        async function saveOrderChanges() {
+            if (!currentOrder) return;
+
+            const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
+            const notes = document.getElementById('orderNotes').value;
+            const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemical-orders/${currentOrder._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        items: orderItems,
+                        subtotal: subtotal,
+                        discount: discount,
+                        total: subtotal - discount,
+                        internalNotes: notes
+                    })
+                });
+
+                if (!res.ok) throw new Error('Failed to save order');
+
+                alert('Order saved successfully!');
+                // Refresh customer data if modal is open
+                if (selectedCustomer) {
+                    viewCustomer(selectedCustomer._id);
+                }
+            } catch (error) {
+                console.error('Error saving order:', error);
+                alert('Error saving order changes');
+            }
+        }
+
+        function closeOrderDetailModal() {
+            document.getElementById('orderDetailModal').style.display = 'none';
+            currentOrder = null;
+            orderItems = [];
+        }
+
+        // ============ INVOICE MODAL ============
+        let currentInvoice = null;
+
+        function openInvoiceModal() {
+            if (!currentOrder) return;
+
+            // Generate invoice data from current order
+            const now = new Date();
+            const dueDate = new Date(now);
+            dueDate.setDate(dueDate.getDate() + 30);
+
+            const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+            const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
+            const total = subtotal - discount;
+
+            // Populate invoice
+            document.getElementById('invoiceNumber').textContent = `INV-${currentOrder.orderNumber?.replace('CO-', '') || now.getFullYear() + '-00001'}`;
+            document.getElementById('invoiceDate').textContent = now.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('invoiceDueDate').textContent = dueDate.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+            document.getElementById('invoiceOrderNumber').textContent = currentOrder.orderNumber || 'N/A';
+
+            // Status
+            const statusBadge = document.getElementById('invoiceStatusBadge');
+            const paymentStatus = currentOrder.paymentStatus || 'pending';
+            statusBadge.textContent = paymentStatus === 'paid' ? 'PAID' : paymentStatus === 'partial' ? 'PARTIAL' : 'UNPAID';
+            statusBadge.className = 'value invoice-status-badge ' + (paymentStatus === 'paid' ? 'paid' : paymentStatus === 'partial' ? 'partial' : 'unpaid');
+
+            // Bill To
+            document.getElementById('invoiceBillToName').textContent = currentOrder.contactInfo?.name || currentOrder.userId?.name || 'Customer';
+            document.getElementById('invoiceBillToFarm').textContent = currentOrder.contactInfo?.farm || currentOrder.userId?.farm?.name || '';
+            document.getElementById('invoiceBillToEmail').textContent = currentOrder.contactInfo?.email || currentOrder.userId?.email || '';
+            document.getElementById('invoiceBillToPhone').textContent = currentOrder.contactInfo?.phone || currentOrder.userId?.phone || '';
+
+            // Order details chips
+            document.getElementById('invoiceCrop').textContent = currentOrder.programName || 'General';
+            document.getElementById('invoiceAcres').textContent = (currentOrder.totalAcres?.toLocaleString() || '0') + ' Acres';
+            document.getElementById('invoiceYear').textContent = currentOrder.year || new Date().getFullYear();
+
+            // Items table
+            const itemsBody = document.getElementById('invoiceItemsBody');
+            itemsBody.innerHTML = orderItems.map(item => `
+                <tr>
+                    <td>${item.productName || 'Product'}</td>
+                    <td>${item.quantity || 0}</td>
+                    <td>$${(item.unitPrice || 0).toFixed(2)}</td>
+                    <td>$${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}</td>
+                </tr>
+            `).join('') || '<tr><td colspan="4" style="text-align: center;">No items</td></tr>';
+
+            // Totals
+            document.getElementById('invoiceSubtotal').textContent = '$' + subtotal.toFixed(2);
+
+            const discountLine = document.getElementById('invoiceDiscountLine');
+            if (discount > 0) {
+                discountLine.style.display = 'flex';
+                document.getElementById('invoiceDiscountAmount').textContent = '-$' + discount.toFixed(2);
+            } else {
+                discountLine.style.display = 'none';
+            }
+
+            document.getElementById('invoiceTotalDue').textContent = '$' + total.toFixed(2);
+
+            document.getElementById('invoiceModal').style.display = 'flex';
+        }
+
+        function closeInvoiceModal() {
+            document.getElementById('invoiceModal').style.display = 'none';
+        }
+
+        function printInvoice() {
+            window.print();
+        }
+
+        async function sendInvoiceEmail() {
+            if (!currentOrder) {
+                alert('No order selected');
+                return;
+            }
+
+            const customerEmail = currentOrder.contactInfo?.email || currentOrder.userId?.email;
+            if (!customerEmail) {
+                alert('No customer email found. Please update customer information.');
+                return;
+            }
+
+            if (!confirm(`Send invoice to ${customerEmail}?`)) {
+                return;
+            }
+
+            try {
+                // First generate/get invoice
+                let invoiceId = currentOrder.invoiceId;
+
+                if (!invoiceId) {
+                    // Generate invoice from order
+                    const genRes = await fetch(`${API_URL}/api/admin/invoices/from-order/${currentOrder._id}`, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        }
+                    });
+
+                    if (!genRes.ok) {
+                        const err = await genRes.json();
+                        throw new Error(err.error || 'Failed to generate invoice');
+                    }
+
+                    const invoice = await genRes.json();
+                    invoiceId = invoice._id;
+                }
+
+                // Send the invoice
+                const sendRes = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}/send`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!sendRes.ok) {
+                    const err = await sendRes.json();
+                    throw new Error(err.error || 'Failed to send invoice');
+                }
+
+                alert('Invoice sent successfully to ' + customerEmail);
+                closeInvoiceModal();
+            } catch (error) {
+                console.error('Error sending invoice:', error);
+                alert('Error sending invoice: ' + error.message);
+            }
         }
 
         // Add Customer Modal
@@ -7853,6 +8419,579 @@
         .status-badge.status-pending {
             background: #fff3cd;
             color: #856404;
+        }
+
+        /* ===== Clickable Order Items ===== */
+        .customer-order-item {
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .customer-order-item:hover {
+            background: #e8f5e9;
+            transform: translateX(4px);
+        }
+
+        /* ===== Order Detail Modal ===== */
+        .order-detail-modal-content {
+            max-width: 800px;
+            width: 100%;
+            max-height: 90vh;
+            overflow-y: auto;
+        }
+
+        .order-detail-header {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+            padding: 24px 32px;
+            background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
+            color: var(--white);
+        }
+
+        .order-detail-icon {
+            width: 56px;
+            height: 56px;
+            background: rgba(255,255,255,0.15);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .order-detail-title {
+            flex: 1;
+        }
+
+        .order-detail-title h2 {
+            font-size: 1.5rem;
+            margin-bottom: 4px;
+        }
+
+        .order-detail-title p {
+            opacity: 0.85;
+            font-size: 0.9rem;
+        }
+
+        .order-detail-status {
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .order-detail-status.status-draft { background: #fef3c7; color: #92400e; }
+        .order-detail-status.status-submitted { background: #dbeafe; color: #1e40af; }
+        .order-detail-status.status-confirmed { background: #d1fae5; color: #065f46; }
+        .order-detail-status.status-delivered { background: #d1fae5; color: #065f46; }
+        .order-detail-status.status-cancelled { background: #fee2e2; color: #991b1b; }
+
+        .order-detail-body {
+            padding: 24px 32px;
+        }
+
+        .order-section {
+            margin-bottom: 24px;
+        }
+
+        .order-section h4 {
+            font-size: 0.9rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-light);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--border);
+        }
+
+        .order-customer-info {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+        }
+
+        .info-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 12px;
+            background: var(--secondary);
+            border-radius: 6px;
+        }
+
+        .info-row .info-label {
+            color: var(--text-light);
+            font-size: 0.85rem;
+        }
+
+        .info-row .info-value {
+            font-weight: 600;
+        }
+
+        .order-details-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 12px;
+        }
+
+        .detail-item {
+            background: var(--secondary);
+            padding: 12px;
+            border-radius: 8px;
+            text-align: center;
+        }
+
+        .detail-item .detail-label {
+            display: block;
+            font-size: 0.75rem;
+            color: var(--text-light);
+            text-transform: uppercase;
+            margin-bottom: 4px;
+        }
+
+        .detail-item .detail-value {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .order-items-table-container {
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .order-items-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .order-items-table th {
+            background: var(--secondary);
+            padding: 12px;
+            text-align: left;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: var(--text-light);
+        }
+
+        .order-items-table td {
+            padding: 12px;
+            border-top: 1px solid var(--border);
+        }
+
+        .order-items-table input {
+            width: 80px;
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 0.9rem;
+        }
+
+        .order-items-table .btn-remove {
+            background: none;
+            border: none;
+            color: #dc2626;
+            cursor: pointer;
+            padding: 4px;
+        }
+
+        .order-items-table .btn-remove:hover {
+            background: #fee2e2;
+            border-radius: 4px;
+        }
+
+        .order-totals-section {
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        .order-totals {
+            width: 300px;
+            background: var(--secondary);
+            border-radius: 8px;
+            padding: 16px;
+        }
+
+        .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .total-row.grand-total {
+            border-top: 2px solid var(--primary);
+            margin-top: 8px;
+            padding-top: 12px;
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .discount-input-group {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .discount-input-group input {
+            width: 80px;
+            padding: 4px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+        }
+
+        .order-notes-input {
+            width: 100%;
+            min-height: 80px;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-family: inherit;
+            font-size: 0.9rem;
+            resize: vertical;
+        }
+
+        .order-detail-actions {
+            display: flex;
+            gap: 12px;
+            padding: 20px 32px;
+            border-top: 1px solid var(--border);
+            justify-content: flex-end;
+            background: var(--secondary);
+        }
+
+        /* ===== Invoice Modal ===== */
+        .invoice-modal-content {
+            max-width: 850px;
+            width: 100%;
+            max-height: 95vh;
+            overflow-y: auto;
+            padding: 0;
+        }
+
+        .invoice-preview {
+            background: var(--white);
+            padding: 40px;
+        }
+
+        .invoice-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 32px;
+            padding-bottom: 24px;
+            border-bottom: 3px solid var(--primary);
+        }
+
+        .invoice-logo {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: var(--primary);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--white);
+        }
+
+        .logo-text h1 {
+            font-size: 1.75rem;
+            color: var(--primary);
+            margin: 0;
+            letter-spacing: 1px;
+        }
+
+        .logo-text p {
+            font-size: 0.85rem;
+            color: var(--text-light);
+            margin: 0;
+        }
+
+        .invoice-title-block {
+            text-align: right;
+        }
+
+        .invoice-title-block h2 {
+            font-size: 2rem;
+            color: var(--primary);
+            margin: 0 0 8px 0;
+            letter-spacing: 2px;
+        }
+
+        .invoice-number {
+            font-size: 1.1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .invoice-info-bar {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            background: var(--secondary);
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 28px;
+        }
+
+        .invoice-info-item {
+            text-align: center;
+        }
+
+        .invoice-info-item .label {
+            display: block;
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--text-light);
+            margin-bottom: 4px;
+        }
+
+        .invoice-info-item .value {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text);
+        }
+
+        .invoice-status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.8rem !important;
+            font-weight: 700;
+        }
+
+        .invoice-status-badge.unpaid {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+
+        .invoice-status-badge.paid {
+            background: #d1fae5;
+            color: #065f46;
+        }
+
+        .invoice-status-badge.partial {
+            background: #fef3c7;
+            color: #92400e;
+        }
+
+        .invoice-addresses {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 32px;
+            margin-bottom: 28px;
+        }
+
+        .address-block h4 {
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            color: var(--primary);
+            margin-bottom: 12px;
+            padding-bottom: 8px;
+            border-bottom: 2px solid var(--accent);
+        }
+
+        .address-block p {
+            margin: 4px 0;
+            color: var(--text);
+            font-size: 0.95rem;
+        }
+
+        .address-block .customer-name {
+            font-weight: 700;
+            font-size: 1.1rem;
+            color: var(--text);
+        }
+
+        .invoice-order-details {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 28px;
+        }
+
+        .order-detail-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #e8f5e9;
+            border-radius: 20px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--primary);
+        }
+
+        .invoice-items-section {
+            margin-bottom: 28px;
+        }
+
+        .invoice-table {
+            width: 100%;
+            border-collapse: collapse;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .invoice-table th {
+            background: var(--primary);
+            color: var(--white);
+            padding: 14px 16px;
+            text-align: left;
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .invoice-table th:last-child {
+            text-align: right;
+        }
+
+        .invoice-table td {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .invoice-table td:last-child {
+            text-align: right;
+            font-weight: 600;
+        }
+
+        .invoice-table tbody tr:nth-child(even) {
+            background: var(--secondary);
+        }
+
+        .invoice-table tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        .invoice-totals {
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 28px;
+        }
+
+        .totals-box {
+            width: 300px;
+            background: var(--secondary);
+            border-radius: 12px;
+            padding: 20px;
+        }
+
+        .total-line {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+            font-size: 0.95rem;
+        }
+
+        .total-line.discount {
+            color: #059669;
+        }
+
+        .total-line.grand {
+            border-top: 2px solid var(--primary);
+            margin-top: 8px;
+            padding-top: 12px;
+            font-size: 1.3rem;
+            font-weight: 700;
+            color: var(--primary);
+        }
+
+        .invoice-payment-info {
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 12px;
+            padding: 20px;
+            margin-bottom: 28px;
+        }
+
+        .invoice-payment-info h4 {
+            color: #92400e;
+            margin-bottom: 8px;
+            font-size: 1rem;
+        }
+
+        .invoice-payment-info p {
+            color: #78350f;
+            margin: 4px 0;
+            font-size: 0.9rem;
+        }
+
+        .payment-details {
+            margin-top: 12px;
+            padding: 12px;
+            background: rgba(255,255,255,0.7);
+            border-radius: 8px;
+        }
+
+        .invoice-footer {
+            text-align: center;
+            padding-top: 20px;
+            border-top: 2px solid var(--border);
+        }
+
+        .invoice-footer p {
+            margin: 4px 0;
+            color: var(--text-light);
+        }
+
+        .invoice-footer .small {
+            font-size: 0.85rem;
+        }
+
+        .invoice-modal-actions {
+            display: flex;
+            gap: 12px;
+            padding: 20px 32px;
+            border-top: 1px solid var(--border);
+            justify-content: flex-end;
+            background: var(--secondary);
+        }
+
+        /* Print Styles for Invoice */
+        @media print {
+            body * {
+                visibility: hidden;
+            }
+            .invoice-preview, .invoice-preview * {
+                visibility: visible;
+            }
+            .invoice-preview {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+                padding: 20px;
+            }
+            .invoice-modal-actions, .modal-close {
+                display: none !important;
+            }
+        }
+
+        @media (max-width: 768px) {
+            .order-details-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .order-customer-info {
+                grid-template-columns: 1fr;
+            }
+            .invoice-info-bar {
+                grid-template-columns: repeat(2, 1fr);
+            }
+            .invoice-addresses {
+                grid-template-columns: 1fr;
+            }
         }
     </style>
 </body>
