@@ -56,7 +56,8 @@
                     <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
                     <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
-                    <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Quote Requests</a>
+                    <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
+                    <a href="#price-mining" class="admin-tab" data-tab="price-mining" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">⛏️ Price Mining</a>
 
                     <!-- AcreProfit Business Dropdown -->
                     <div class="admin-tab-dropdown">
@@ -2135,14 +2136,14 @@
                 </div>
             </div>
 
-            <!-- Quote Requests Tab -->
+            <!-- Quote Requests / Preorders Tab -->
             <div id="quote-requestsTab" class="tab-content">
                 <div class="tab-header">
                     <div>
-                        <h2>Quote Requests</h2>
-                        <p class="tab-subtitle">Customers submit quantities needed - you provide pricing</p>
+                        <h2>Preorders</h2>
+                        <p class="tab-subtitle">Customers lock in their quantities - you mine for the best price</p>
                     </div>
-                    <button class="btn btn-primary" onclick="openCreateQuoteModal()">+ Create Quote Request</button>
+                    <button class="btn btn-primary" onclick="openCreateQuoteModal()">+ Add Preorder</button>
                 </div>
 
                 <!-- Volume Needs Summary -->
@@ -2210,6 +2211,98 @@
                         <tbody id="volumeNeedsTableBody">
                         </tbody>
                     </table>
+                    <div style="margin-top: 20px; text-align: right;">
+                        <button class="btn btn-primary" onclick="createBidSheetFromVolume()" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                            ⛏️ Start Price Mining
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Price Mining / Bid Sheets Tab -->
+            <div id="price-miningTab" class="tab-content">
+                <div class="tab-header">
+                    <div>
+                        <h2>⛏️ Price Mining</h2>
+                        <p class="tab-subtitle">Send volume needs to suppliers, compare bids, find the cheapest prices</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="createBidSheetFromVolume()" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                        + New Bid Sheet
+                    </button>
+                </div>
+
+                <!-- Mining Stats -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-bottom: 24px;">
+                    <div style="background: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%); border-radius: 12px; padding: 20px; color: #78350f;">
+                        <div style="font-size: 2rem; font-weight: 800;" id="activeBidCount">0</div>
+                        <div>Active Bids</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #34d399 0%, #10b981 100%); border-radius: 12px; padding: 20px; color: #065f46;">
+                        <div style="font-size: 2rem; font-weight: 800;" id="awardedBidCount">0</div>
+                        <div>Awarded</div>
+                    </div>
+                    <div style="background: linear-gradient(135deg, #a78bfa 0%, #8b5cf6 100%); border-radius: 12px; padding: 20px; color: #4c1d95;">
+                        <div style="font-size: 2rem; font-weight: 800;" id="totalSavings">$0</div>
+                        <div>Est. Savings</div>
+                    </div>
+                </div>
+
+                <!-- How It Works -->
+                <div style="background: #fffbeb; border: 2px solid #fbbf24; border-radius: 12px; padding: 20px; margin-bottom: 24px;">
+                    <h3 style="color: #92400e; margin: 0 0 12px 0;">How Price Mining Works</h3>
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; text-align: center;">
+                        <div>
+                            <div style="font-size: 1.5rem;">1️⃣</div>
+                            <div style="font-weight: 600; color: #92400e;">Collect Volume</div>
+                            <div style="font-size: 0.85rem; color: #78350f;">Customer preorders & quote requests</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5rem;">2️⃣</div>
+                            <div style="font-weight: 600; color: #92400e;">Send to Suppliers</div>
+                            <div style="font-size: 0.85rem; color: #78350f;">CPD, Sims, Jabco, etc.</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5rem;">3️⃣</div>
+                            <div style="font-weight: 600; color: #92400e;">Compare Bids</div>
+                            <div style="font-size: 0.85rem; color: #78350f;">Find the cheapest price</div>
+                        </div>
+                        <div>
+                            <div style="font-size: 1.5rem;">4️⃣</div>
+                            <div style="font-weight: 600; color: #92400e;">Create PO</div>
+                            <div style="font-size: 0.85rem; color: #78350f;">Order from winner</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Bid Sheets Table -->
+                <div class="orders-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Bid #</th>
+                                <th>Title</th>
+                                <th>Items</th>
+                                <th>Suppliers</th>
+                                <th>Responses</th>
+                                <th>Lowest Bid</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="bidSheetsTableBody">
+                            <tr><td colspan="8" class="loading">Loading bid sheets...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Bid Sheet Detail Modal -->
+            <div class="modal-overlay" id="bidSheetModal" style="display: none;">
+                <div class="modal-content" style="max-width: 1000px; max-height: 90vh; overflow-y: auto;">
+                    <button class="modal-close" onclick="closeBidSheetModal()">&times;</button>
+                    <div id="bidSheetModalContent">
+                        <!-- Filled dynamically -->
+                    </div>
                 </div>
             </div>
 
@@ -3199,6 +3292,7 @@
             if (tabName === 'distributors') loadDistributors();
             if (tabName === 'suppliers') loadSuppliers();
             if (tabName === 'quote-requests') loadQuoteRequests();
+            if (tabName === 'price-mining') loadBidSheets();
         }
 
         // Tab navigation - regular tabs
@@ -5144,6 +5238,407 @@
                 console.error('Error:', err);
                 alert('Error creating quote request');
             });
+        }
+
+        // ===== PRICE MINING / BID SHEETS =====
+        let bidSheets = [];
+
+        async function loadBidSheets() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                bidSheets = await res.json();
+                renderBidSheets(bidSheets);
+                updateBidStats(bidSheets);
+            } catch (error) {
+                console.error('Error loading bid sheets:', error);
+            }
+        }
+
+        function updateBidStats(sheets) {
+            const active = sheets.filter(s => ['draft', 'sent', 'responses_received', 'evaluating'].includes(s.status)).length;
+            const awarded = sheets.filter(s => ['awarded', 'po_created'].includes(s.status)).length;
+
+            document.getElementById('activeBidCount').textContent = active;
+            document.getElementById('awardedBidCount').textContent = awarded;
+
+            // Calculate estimated savings (mock for now)
+            const savings = awarded * 500; // Placeholder
+            document.getElementById('totalSavings').textContent = '$' + savings.toLocaleString();
+        }
+
+        function renderBidSheets(sheets) {
+            const tbody = document.getElementById('bidSheetsTableBody');
+
+            if (!sheets.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty">No bid sheets yet. Click "+ New Bid Sheet" to start mining for prices!</td></tr>';
+                return;
+            }
+
+            const statusColors = {
+                draft: '#6b7280',
+                sent: '#3b82f6',
+                responses_received: '#f59e0b',
+                evaluating: '#8b5cf6',
+                awarded: '#10b981',
+                po_created: '#059669',
+                cancelled: '#ef4444',
+                expired: '#9ca3af'
+            };
+
+            const statusLabels = {
+                draft: 'Draft',
+                sent: 'Sent to Suppliers',
+                responses_received: 'Bids Received',
+                evaluating: 'Evaluating',
+                awarded: 'Awarded',
+                po_created: 'PO Created',
+                cancelled: 'Cancelled',
+                expired: 'Expired'
+            };
+
+            tbody.innerHTML = sheets.map(s => {
+                const lowestBid = s.supplierBids.length > 0
+                    ? Math.min(...s.supplierBids.map(b => b.totalBid))
+                    : null;
+
+                return `
+                <tr>
+                    <td><strong>${s.bidNumber}</strong></td>
+                    <td>${s.title}</td>
+                    <td>${s.items.length} items</td>
+                    <td>${s.invitedSuppliers.length} invited</td>
+                    <td>${s.supplierBids.length} bids</td>
+                    <td style="font-weight: 700; color: ${lowestBid ? '#10b981' : 'inherit'};">
+                        ${lowestBid ? '$' + lowestBid.toLocaleString() : '-'}
+                    </td>
+                    <td><span class="order-status" style="background: ${statusColors[s.status]}20; color: ${statusColors[s.status]};">${statusLabels[s.status] || s.status}</span></td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="viewBidSheet('${s._id}')">View</button>
+                        ${s.status === 'draft' ? `<button class="btn btn-sm btn-primary" onclick="sendBidSheet('${s._id}')">Send</button>` : ''}
+                        ${s.status === 'responses_received' || s.status === 'evaluating' ? `<button class="btn btn-sm btn-primary" onclick="compareBids('${s._id}')">Compare</button>` : ''}
+                        ${s.status === 'awarded' ? `<button class="btn btn-sm btn-primary" onclick="createPOFromBid('${s._id}')">Create PO</button>` : ''}
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        async function createBidSheetFromVolume() {
+            closeVolumeNeedsModal();
+
+            const title = prompt('Enter a title for this bid sheet:', `Volume Needs - ${new Date().toLocaleDateString()}`);
+            if (!title) return;
+
+            const suppliersInput = prompt('Enter supplier names (comma-separated):\nExample: CPD, Sims, Jabco', 'CPD, Sims');
+            if (!suppliersInput) return;
+
+            const suppliers = suppliersInput.split(',').map(s => ({
+                supplierName: s.trim()
+            })).filter(s => s.supplierName);
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/from-volume-needs`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        title,
+                        invitedSuppliers: suppliers,
+                        responseDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
+                    })
+                });
+
+                if (res.ok) {
+                    const bidSheet = await res.json();
+                    alert(`Bid Sheet ${bidSheet.bidNumber} created with ${bidSheet.items.length} items!\n\nGo to Price Mining tab to send to suppliers.`);
+                    navigateToTab('price-mining');
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error creating bid sheet:', error);
+                alert('Error creating bid sheet');
+            }
+        }
+
+        async function viewBidSheet(bidId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const sheet = await res.json();
+
+                const itemsList = sheet.items.map(i =>
+                    `<tr><td>${i.productName}</td><td>${i.packSize || '-'}</td><td>${i.quantityNeeded} ${i.unit || ''}</td></tr>`
+                ).join('');
+
+                const suppliersList = sheet.invitedSuppliers.map(s =>
+                    `<span style="background: #e5e7eb; padding: 4px 8px; border-radius: 4px; margin: 2px;">${s.supplierName} (${s.status})</span>`
+                ).join(' ');
+
+                const bidsList = sheet.supplierBids.length > 0
+                    ? sheet.supplierBids.map(b => `
+                        <div style="border: 2px solid ${b.isSelected ? '#10b981' : '#e5e7eb'}; border-radius: 8px; padding: 16px; margin-bottom: 12px; ${b.isSelected ? 'background: #ecfdf5;' : ''}">
+                            <div style="display: flex; justify-content: space-between; align-items: center;">
+                                <strong style="font-size: 1.1rem;">${b.supplierName}</strong>
+                                <span style="font-size: 1.25rem; font-weight: 700; color: #10b981;">$${b.totalBid?.toLocaleString() || '0'}</span>
+                            </div>
+                            <div style="margin-top: 8px; color: #6b7280; font-size: 0.9rem;">
+                                Freight: $${b.freight || 0} | Terms: ${b.paymentTerms || 'N/A'}
+                            </div>
+                            ${b.isSelected ? '<div style="margin-top: 8px; color: #10b981; font-weight: 600;">✓ AWARDED</div>' : ''}
+                        </div>
+                    `).join('')
+                    : '<p style="color: #6b7280;">No bids received yet</p>';
+
+                document.getElementById('bidSheetModalContent').innerHTML = `
+                    <div style="display: flex; justify-content: space-between; align-items: start; margin-bottom: 20px;">
+                        <div>
+                            <h2 style="margin: 0;">⛏️ ${sheet.bidNumber}</h2>
+                            <p style="color: var(--text-muted); margin: 4px 0;">${sheet.title}</p>
+                        </div>
+                        <span class="order-status" style="padding: 8px 16px;">${sheet.status.toUpperCase()}</span>
+                    </div>
+
+                    <h3>Items Needed (${sheet.items.length})</h3>
+                    <table class="admin-table" style="margin-bottom: 20px;">
+                        <thead><tr><th>Product</th><th>Pack Size</th><th>Qty Needed</th></tr></thead>
+                        <tbody>${itemsList}</tbody>
+                    </table>
+
+                    <h3>Invited Suppliers</h3>
+                    <div style="margin-bottom: 20px;">${suppliersList}</div>
+
+                    <h3>Supplier Bids (${sheet.supplierBids.length})</h3>
+                    ${bidsList}
+
+                    <div style="margin-top: 20px; display: flex; gap: 12px; justify-content: flex-end;">
+                        ${sheet.status === 'draft' ? `<button class="btn btn-primary" onclick="addSuppliersToBid('${sheet._id}')">Add Suppliers</button>` : ''}
+                        ${sheet.status === 'draft' ? `<button class="btn btn-primary" onclick="sendBidSheet('${sheet._id}')" style="background: #f59e0b;">Send to Suppliers</button>` : ''}
+                        ${['sent', 'responses_received'].includes(sheet.status) ? `<button class="btn btn-primary" onclick="recordSupplierBid('${sheet._id}')">Record Bid</button>` : ''}
+                        ${sheet.supplierBids.length > 0 && !sheet.supplierBids.some(b => b.isSelected) ? `<button class="btn btn-primary" onclick="awardBid('${sheet._id}')" style="background: #10b981;">Award Bid</button>` : ''}
+                    </div>
+                `;
+
+                document.getElementById('bidSheetModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Error viewing bid sheet:', error);
+            }
+        }
+
+        function closeBidSheetModal() {
+            document.getElementById('bidSheetModal').style.display = 'none';
+        }
+
+        async function sendBidSheet(bidId) {
+            if (!confirm('Send this bid sheet to all invited suppliers?')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/send`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    alert('Bid sheet sent to suppliers!');
+                    closeBidSheetModal();
+                    loadBidSheets();
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error sending bid sheet:', error);
+            }
+        }
+
+        async function recordSupplierBid(bidId) {
+            const supplierName = prompt('Supplier name:');
+            if (!supplierName) return;
+
+            const totalBid = prompt('Total bid amount (including freight):');
+            if (!totalBid) return;
+
+            const freight = prompt('Freight cost (or 0):', '0');
+
+            try {
+                // Get the bid sheet to know item count
+                const sheetRes = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const sheet = await sheetRes.json();
+
+                // Simple pricing - spread total across items evenly for now
+                const subtotal = parseFloat(totalBid) - parseFloat(freight || 0);
+                const pricePerItem = subtotal / sheet.items.length;
+
+                const itemPricing = sheet.items.map((item, idx) => ({
+                    itemIndex: idx,
+                    productName: item.productName,
+                    pricePerUnit: pricePerItem / item.quantityNeeded,
+                    availableQuantity: item.quantityNeeded
+                }));
+
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/responses`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        supplierName,
+                        itemPricing,
+                        freight: parseFloat(freight || 0),
+                        paymentTerms: 'Net 30'
+                    })
+                });
+
+                if (res.ok) {
+                    alert(`Bid from ${supplierName} recorded!`);
+                    viewBidSheet(bidId); // Refresh modal
+                    loadBidSheets();
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error recording bid:', error);
+            }
+        }
+
+        async function compareBids(bidId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/compare`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const comparison = await res.json();
+
+                if (comparison.comparison.length === 0) {
+                    alert('No bids to compare yet');
+                    return;
+                }
+
+                let msg = `BID COMPARISON - ${comparison.bidNumber}\n`;
+                msg += `${comparison.itemCount} items, ${comparison.supplierCount} suppliers\n\n`;
+
+                comparison.comparison.forEach(c => {
+                    msg += `#${c.rank} ${c.supplierName}: $${c.totalBid.toLocaleString()}`;
+                    if (c.rank > 1) msg += ` (+${c.percentAboveLowest}%)`;
+                    msg += '\n';
+                });
+
+                msg += `\nLowest: $${comparison.comparison[0].totalBid.toLocaleString()} from ${comparison.comparison[0].supplierName}`;
+
+                alert(msg);
+            } catch (error) {
+                console.error('Error comparing bids:', error);
+            }
+        }
+
+        async function awardBid(bidId) {
+            try {
+                const sheetRes = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const sheet = await sheetRes.json();
+
+                if (sheet.supplierBids.length === 0) {
+                    alert('No bids to award');
+                    return;
+                }
+
+                const options = sheet.supplierBids.map((b, i) =>
+                    `${i + 1}. ${b.supplierName} - $${b.totalBid?.toLocaleString() || 0}`
+                ).join('\n');
+
+                const choice = prompt(`Select winning supplier:\n\n${options}\n\nEnter number (1-${sheet.supplierBids.length}):`);
+                if (!choice) return;
+
+                const idx = parseInt(choice) - 1;
+                if (idx < 0 || idx >= sheet.supplierBids.length) {
+                    alert('Invalid selection');
+                    return;
+                }
+
+                const winningBid = sheet.supplierBids[idx];
+
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/award`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ supplierName: winningBid.supplierName })
+                });
+
+                if (res.ok) {
+                    alert(`Bid awarded to ${winningBid.supplierName}!`);
+                    closeBidSheetModal();
+                    loadBidSheets();
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error awarding bid:', error);
+            }
+        }
+
+        async function createPOFromBid(bidId) {
+            if (!confirm('Create a Purchase Order from the awarded bid?')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/create-po`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    alert(`Purchase Order ${result.purchaseOrder.poNumber} created!`);
+                    loadBidSheets();
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error creating PO:', error);
+            }
+        }
+
+        async function addSuppliersToBid(bidId) {
+            const suppliersInput = prompt('Enter additional supplier names (comma-separated):');
+            if (!suppliersInput) return;
+
+            const suppliers = suppliersInput.split(',').map(s => ({
+                supplierName: s.trim()
+            })).filter(s => s.supplierName);
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/suppliers`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ suppliers })
+                });
+
+                if (res.ok) {
+                    alert('Suppliers added!');
+                    viewBidSheet(bidId);
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error adding suppliers:', error);
+            }
         }
 
         // ===== LEDGER TAB =====

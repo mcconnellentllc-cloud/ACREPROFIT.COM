@@ -1226,6 +1226,114 @@ quoteRequestSchema.index({ submittedAt: -1 });
 
 const QuoteRequest = mongoose.model('QuoteRequest', quoteRequestSchema);
 
+// Supplier Bid Sheet Model - Send quantity needs to suppliers, compare prices
+const supplierBidSheetSchema = new mongoose.Schema({
+    // Auto-generated bid number: BID-2026-00001
+    bidNumber: { type: String, unique: true },
+
+    // Title/description for this bid
+    title: { type: String, required: true },
+    description: String,
+
+    // Items we need quotes for
+    items: [{
+        productName: { type: String, required: true },
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        category: String,
+        packSize: String,
+        unit: String,
+        quantityNeeded: { type: Number, required: true },
+        notes: String // Any special requirements
+    }],
+
+    // Suppliers invited to bid
+    invitedSuppliers: [{
+        supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+        supplierName: String,
+        contactEmail: String,
+        contactPhone: String,
+        invitedAt: Date,
+        status: {
+            type: String,
+            enum: ['invited', 'viewed', 'responded', 'declined', 'no_response'],
+            default: 'invited'
+        }
+    }],
+
+    // Supplier responses/bids
+    supplierBids: [{
+        supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+        supplierName: String,
+        receivedAt: { type: Date, default: Date.now },
+
+        // Their pricing for each item
+        itemPricing: [{
+            productName: String,
+            itemIndex: Number, // Reference to items array
+            pricePerUnit: Number,
+            totalPrice: Number,
+            availableQuantity: Number, // How much they can supply
+            leadTimeDays: Number,
+            notes: String
+        }],
+
+        // Totals
+        subtotal: Number,
+        freight: Number,
+        totalBid: Number,
+
+        // Validity
+        validUntil: Date,
+        paymentTerms: String,
+        deliveryTerms: String,
+        bidNotes: String,
+
+        // Selection
+        isSelected: { type: Boolean, default: false },
+        selectedAt: Date
+    }],
+
+    // Status workflow
+    status: {
+        type: String,
+        enum: ['draft', 'sent', 'responses_received', 'evaluating', 'awarded', 'po_created', 'cancelled', 'expired'],
+        default: 'draft'
+    },
+
+    // Dates
+    createdAt: { type: Date, default: Date.now },
+    sentAt: Date,
+    responseDueDate: Date,
+    awardedAt: Date,
+    expiresAt: Date,
+
+    // If converted to PO
+    awardedSupplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+    awardedSupplierName: String,
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+
+    // Metadata
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Auto-generate bid number
+supplierBidSheetSchema.pre('save', async function(next) {
+    if (!this.bidNumber) {
+        const year = new Date().getFullYear();
+        const count = await SupplierBidSheet.countDocuments();
+        this.bidNumber = `BID-${year}-${String(count + 1).padStart(5, '0')}`;
+    }
+    next();
+});
+
+supplierBidSheetSchema.index({ status: 1 });
+supplierBidSheetSchema.index({ createdAt: -1 });
+supplierBidSheetSchema.index({ 'invitedSuppliers.supplierId': 1 });
+
+const SupplierBidSheet = mongoose.model('SupplierBidSheet', supplierBidSheetSchema);
+
 // Purchase Order Split Model (How a PO is split between distributors)
 const purchaseOrderSplitSchema = new mongoose.Schema({
     // Link to parent purchase order
@@ -10197,6 +10305,457 @@ app.get('/api/admin/chemical-volume-needs', authMiddleware, adminMiddleware, asy
         result.sort((a, b) => b.totalQuantity - a.totalQuantity);
 
         res.json(result);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ SUPPLIER BID SHEETS ============
+
+// Create a bid sheet from volume needs
+app.post('/api/admin/bid-sheets', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { title, description, items, invitedSuppliers, responseDueDate } = req.body;
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: 'At least one item is required' });
+        }
+
+        const bidSheet = new SupplierBidSheet({
+            title: title || `Bid Request - ${new Date().toLocaleDateString()}`,
+            description,
+            items: items.map(item => ({
+                productName: item.productName,
+                chemicalId: item.chemicalId,
+                category: item.category,
+                packSize: item.packSize,
+                unit: item.unit,
+                quantityNeeded: item.quantityNeeded,
+                notes: item.notes
+            })),
+            invitedSuppliers: (invitedSuppliers || []).map(s => ({
+                supplierId: s.supplierId,
+                supplierName: s.supplierName,
+                contactEmail: s.contactEmail,
+                contactPhone: s.contactPhone,
+                status: 'invited'
+            })),
+            responseDueDate: responseDueDate ? new Date(responseDueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            status: 'draft',
+            createdBy: req.user._id
+        });
+
+        await bidSheet.save();
+        res.status(201).json(bidSheet);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create bid sheet from aggregated volume needs
+app.post('/api/admin/bid-sheets/from-volume-needs', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { title, description, invitedSuppliers, responseDueDate } = req.body;
+
+        // Get current volume needs
+        const volumeNeeds = {};
+        const orderStatuses = ['pending', 'payment_pending', 'payment_secured', 'manufacturer_ordered'];
+        const quoteStatuses = ['submitted', 'pricing', 'quoted', 'accepted'];
+
+        // From orders
+        const orders = await Order.find({ status: { $in: orderStatuses } }).select('chemicals');
+        for (const order of orders) {
+            for (const chem of order.chemicals || []) {
+                const key = `${chem.name || chem.productName}|${chem.packSize || 'N/A'}|${chem.unit || 'unit'}`;
+                if (!volumeNeeds[key]) {
+                    volumeNeeds[key] = {
+                        productName: chem.name || chem.productName,
+                        packSize: chem.packSize || 'N/A',
+                        unit: chem.unit || 'unit',
+                        chemicalId: chem.chemicalId,
+                        quantityNeeded: 0
+                    };
+                }
+                volumeNeeds[key].quantityNeeded += (chem.qty || chem.quantity || chem.packagesNeeded || 0);
+            }
+        }
+
+        // From quotes
+        const quotes = await QuoteRequest.find({ status: { $in: quoteStatuses } }).select('items');
+        for (const quote of quotes) {
+            for (const item of quote.items || []) {
+                const key = `${item.productName}|${item.packSize || 'N/A'}|${item.unit || 'unit'}`;
+                if (!volumeNeeds[key]) {
+                    volumeNeeds[key] = {
+                        productName: item.productName,
+                        packSize: item.packSize || 'N/A',
+                        unit: item.unit || 'unit',
+                        chemicalId: item.chemicalId,
+                        quantityNeeded: 0
+                    };
+                }
+                volumeNeeds[key].quantityNeeded += (item.quantityNeeded || 0);
+            }
+        }
+
+        const items = Object.values(volumeNeeds).filter(i => i.quantityNeeded > 0);
+
+        if (items.length === 0) {
+            return res.status(400).json({ error: 'No pending volume needs found' });
+        }
+
+        const bidSheet = new SupplierBidSheet({
+            title: title || `Volume Needs Bid - ${new Date().toLocaleDateString()}`,
+            description: description || 'Auto-generated from pending orders and quote requests',
+            items,
+            invitedSuppliers: (invitedSuppliers || []).map(s => ({
+                supplierId: s.supplierId,
+                supplierName: s.supplierName,
+                contactEmail: s.contactEmail,
+                contactPhone: s.contactPhone,
+                status: 'invited'
+            })),
+            responseDueDate: responseDueDate ? new Date(responseDueDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+            status: 'draft',
+            createdBy: req.user._id
+        });
+
+        await bidSheet.save();
+        res.status(201).json(bidSheet);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get all bid sheets
+app.get('/api/admin/bid-sheets', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status } = req.query;
+        let query = {};
+        if (status) query.status = status;
+
+        const bidSheets = await SupplierBidSheet.find(query)
+            .sort({ createdAt: -1 })
+            .populate('createdBy', 'name');
+
+        res.json(bidSheets);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single bid sheet
+app.get('/api/admin/bid-sheets/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const bidSheet = await SupplierBidSheet.findById(req.params.id)
+            .populate('createdBy', 'name')
+            .populate('items.chemicalId', 'productName costPrice sellPrice');
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        res.json(bidSheet);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Add suppliers to bid sheet
+app.put('/api/admin/bid-sheets/:id/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { suppliers } = req.body;
+        const bidSheet = await SupplierBidSheet.findById(req.params.id);
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        // Add new suppliers
+        for (const s of suppliers) {
+            const exists = bidSheet.invitedSuppliers.find(
+                inv => inv.supplierName === s.supplierName || inv.supplierId?.toString() === s.supplierId
+            );
+            if (!exists) {
+                bidSheet.invitedSuppliers.push({
+                    supplierId: s.supplierId,
+                    supplierName: s.supplierName,
+                    contactEmail: s.contactEmail,
+                    contactPhone: s.contactPhone,
+                    status: 'invited'
+                });
+            }
+        }
+
+        bidSheet.updatedAt = new Date();
+        bidSheet.updatedBy = req.user._id;
+        await bidSheet.save();
+
+        res.json(bidSheet);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Send bid sheet to suppliers (mark as sent)
+app.put('/api/admin/bid-sheets/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const bidSheet = await SupplierBidSheet.findById(req.params.id);
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        if (bidSheet.invitedSuppliers.length === 0) {
+            return res.status(400).json({ error: 'No suppliers invited to bid' });
+        }
+
+        bidSheet.status = 'sent';
+        bidSheet.sentAt = new Date();
+        bidSheet.invitedSuppliers.forEach(s => {
+            s.invitedAt = new Date();
+        });
+        bidSheet.updatedAt = new Date();
+        bidSheet.updatedBy = req.user._id;
+
+        await bidSheet.save();
+
+        // TODO: Send emails to suppliers with bid request details
+
+        res.json({ message: 'Bid sheet sent to suppliers', bidSheet });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Record a supplier's bid response
+app.post('/api/admin/bid-sheets/:id/responses', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { supplierName, supplierId, itemPricing, freight, validUntil, paymentTerms, deliveryTerms, bidNotes } = req.body;
+
+        const bidSheet = await SupplierBidSheet.findById(req.params.id);
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        // Calculate totals
+        let subtotal = 0;
+        const pricedItems = itemPricing.map((ip, idx) => {
+            const item = bidSheet.items[ip.itemIndex] || bidSheet.items[idx];
+            const totalPrice = (ip.pricePerUnit || 0) * (item?.quantityNeeded || ip.quantity || 0);
+            subtotal += totalPrice;
+            return {
+                productName: item?.productName || ip.productName,
+                itemIndex: ip.itemIndex ?? idx,
+                pricePerUnit: ip.pricePerUnit,
+                totalPrice,
+                availableQuantity: ip.availableQuantity,
+                leadTimeDays: ip.leadTimeDays,
+                notes: ip.notes
+            };
+        });
+
+        const totalBid = subtotal + (freight || 0);
+
+        // Add or update supplier response
+        const existingBidIdx = bidSheet.supplierBids.findIndex(
+            b => b.supplierName === supplierName || b.supplierId?.toString() === supplierId
+        );
+
+        const bidResponse = {
+            supplierId,
+            supplierName,
+            receivedAt: new Date(),
+            itemPricing: pricedItems,
+            subtotal,
+            freight: freight || 0,
+            totalBid,
+            validUntil: validUntil ? new Date(validUntil) : new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
+            paymentTerms,
+            deliveryTerms,
+            bidNotes,
+            isSelected: false
+        };
+
+        if (existingBidIdx >= 0) {
+            bidSheet.supplierBids[existingBidIdx] = bidResponse;
+        } else {
+            bidSheet.supplierBids.push(bidResponse);
+        }
+
+        // Update invited supplier status
+        const invitedIdx = bidSheet.invitedSuppliers.findIndex(
+            s => s.supplierName === supplierName || s.supplierId?.toString() === supplierId
+        );
+        if (invitedIdx >= 0) {
+            bidSheet.invitedSuppliers[invitedIdx].status = 'responded';
+        }
+
+        // Update bid sheet status
+        if (bidSheet.status === 'sent') {
+            bidSheet.status = 'responses_received';
+        }
+
+        bidSheet.updatedAt = new Date();
+        bidSheet.updatedBy = req.user._id;
+        await bidSheet.save();
+
+        res.json(bidSheet);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Award bid to a supplier
+app.put('/api/admin/bid-sheets/:id/award', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { supplierBidId, supplierName } = req.body;
+
+        const bidSheet = await SupplierBidSheet.findById(req.params.id);
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        // Find the winning bid
+        const winningBid = bidSheet.supplierBids.find(
+            b => b._id.toString() === supplierBidId || b.supplierName === supplierName
+        );
+
+        if (!winningBid) {
+            return res.status(400).json({ error: 'Supplier bid not found' });
+        }
+
+        // Mark as selected
+        bidSheet.supplierBids.forEach(b => {
+            b.isSelected = false;
+        });
+        winningBid.isSelected = true;
+        winningBid.selectedAt = new Date();
+
+        bidSheet.status = 'awarded';
+        bidSheet.awardedAt = new Date();
+        bidSheet.awardedSupplierId = winningBid.supplierId;
+        bidSheet.awardedSupplierName = winningBid.supplierName;
+        bidSheet.updatedAt = new Date();
+        bidSheet.updatedBy = req.user._id;
+
+        await bidSheet.save();
+
+        res.json({ message: `Bid awarded to ${winningBid.supplierName}`, bidSheet });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create PO from awarded bid
+app.post('/api/admin/bid-sheets/:id/create-po', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const bidSheet = await SupplierBidSheet.findById(req.params.id);
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        if (bidSheet.status !== 'awarded') {
+            return res.status(400).json({ error: 'Bid must be awarded before creating PO' });
+        }
+
+        const winningBid = bidSheet.supplierBids.find(b => b.isSelected);
+        if (!winningBid) {
+            return res.status(400).json({ error: 'No winning bid found' });
+        }
+
+        // Create PO from winning bid
+        const poItems = winningBid.itemPricing.map((ip, idx) => {
+            const bidItem = bidSheet.items[ip.itemIndex] || bidSheet.items[idx];
+            return {
+                productName: bidItem?.productName || ip.productName,
+                chemicalId: bidItem?.chemicalId,
+                packSize: bidItem?.packSize,
+                unit: bidItem?.unit,
+                quantityOrdered: bidItem?.quantityNeeded || ip.availableQuantity,
+                pricePerUnit: ip.pricePerUnit,
+                totalPrice: ip.totalPrice
+            };
+        });
+
+        const po = new PurchaseOrder({
+            supplier: {
+                name: winningBid.supplierName,
+                contact: '',
+                phone: '',
+                email: ''
+            },
+            items: poItems,
+            subtotal: winningBid.subtotal,
+            freight: winningBid.freight,
+            totalCost: winningBid.totalBid,
+            status: 'draft',
+            orderDate: new Date(),
+            notes: `Created from Bid Sheet ${bidSheet.bidNumber}`,
+            createdBy: req.user._id
+        });
+
+        await po.save();
+
+        // Update bid sheet
+        bidSheet.status = 'po_created';
+        bidSheet.purchaseOrderId = po._id;
+        bidSheet.updatedAt = new Date();
+        bidSheet.updatedBy = req.user._id;
+        await bidSheet.save();
+
+        res.json({ message: 'Purchase Order created', purchaseOrder: po, bidSheet });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Compare supplier bids (returns ranked comparison)
+app.get('/api/admin/bid-sheets/:id/compare', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const bidSheet = await SupplierBidSheet.findById(req.params.id);
+
+        if (!bidSheet) {
+            return res.status(404).json({ error: 'Bid sheet not found' });
+        }
+
+        if (bidSheet.supplierBids.length === 0) {
+            return res.json({ message: 'No supplier bids to compare', comparison: [] });
+        }
+
+        // Rank by total bid (lowest first)
+        const ranked = bidSheet.supplierBids
+            .map(bid => ({
+                supplierName: bid.supplierName,
+                totalBid: bid.totalBid,
+                subtotal: bid.subtotal,
+                freight: bid.freight,
+                itemCount: bid.itemPricing.length,
+                avgPricePerItem: bid.subtotal / bid.itemPricing.length,
+                validUntil: bid.validUntil,
+                paymentTerms: bid.paymentTerms,
+                isSelected: bid.isSelected,
+                receivedAt: bid.receivedAt
+            }))
+            .sort((a, b) => a.totalBid - b.totalBid);
+
+        // Add rank and savings info
+        const lowestBid = ranked[0]?.totalBid || 0;
+        ranked.forEach((bid, idx) => {
+            bid.rank = idx + 1;
+            bid.savingsVsHighest = ranked[ranked.length - 1].totalBid - bid.totalBid;
+            bid.percentAboveLowest = lowestBid > 0 ? ((bid.totalBid - lowestBid) / lowestBid * 100).toFixed(1) : 0;
+        });
+
+        res.json({
+            bidNumber: bidSheet.bidNumber,
+            itemCount: bidSheet.items.length,
+            supplierCount: bidSheet.supplierBids.length,
+            comparison: ranked
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
