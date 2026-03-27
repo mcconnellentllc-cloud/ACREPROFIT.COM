@@ -1021,10 +1021,11 @@
                                 <th>Inventory</th>
                                 <th>Units Sold</th>
                                 <th>Revenue</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
-                            <tr><td colspan="10" class="loading">Loading products...</td></tr>
+                            <tr><td colspan="11" class="loading">Loading products...</td></tr>
                         </tbody>
                     </table>
                 </div>
@@ -1199,6 +1200,57 @@
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closeAddProductModal()">Cancel</button>
                         <button class="btn btn-primary" onclick="addProduct()">Add Product</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Product Modal -->
+            <div class="modal-overlay" id="editProductModal" style="display: none;">
+                <div class="modal-content" style="max-width: 500px;">
+                    <button class="modal-close" onclick="closeEditProductModal()">&times;</button>
+                    <h2 style="margin-bottom: 20px;">Edit Product Margins</h2>
+                    <input type="hidden" id="editProductId">
+                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="font-weight: 700; font-size: 1.1rem;" id="editProductName"></div>
+                        <div style="color: var(--text-muted);" id="editProductDetails"></div>
+                    </div>
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600;">Cost Price</label>
+                        <input type="number" id="editProductCost" step="0.01" min="0" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);" oninput="calcEditPricePreview()">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600;">Admin Margin $ <small style="color: var(--text-muted);">(Acre Profit margin per unit)</small></label>
+                        <input type="number" id="editProductAdminMargin" step="0.01" min="0" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);" oninput="calcEditPricePreview()">
+                    </div>
+                    <div class="form-group" style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600;">Rep Margin $ <small style="color: var(--text-muted);">(Rep commission per unit)</small></label>
+                        <input type="number" id="editProductMargin" step="0.01" min="0" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);" oninput="calcEditPricePreview()">
+                    </div>
+                    <div style="background: #dcfce7; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span>Cost:</span>
+                            <span id="editPreviewCost">$0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span>+ Admin Margin:</span>
+                            <span id="editPreviewAdminMargin">$0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px; color: #d97706;">
+                            <span>= Admin Price:</span>
+                            <span id="editPreviewAdminPrice">$0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 8px;">
+                            <span>+ Rep Margin:</span>
+                            <span id="editPreviewMargin">$0.00</span>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; font-weight: 700; font-size: 1.1rem; border-top: 2px solid #059669; padding-top: 8px; color: #059669;">
+                            <span>= Sell Price:</span>
+                            <span id="editPreviewSellPrice">$0.00</span>
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; justify-content: flex-end;">
+                        <button class="btn btn-outline" onclick="closeEditProductModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveProductMargins()">Save Changes</button>
                     </div>
                 </div>
             </div>
@@ -2924,6 +2976,11 @@
                     </td>
                     <td>${p.unitsSold || 0}</td>
                     <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins">
+                            Edit
+                        </button>
+                    </td>
                 </tr>
                 `;
             }).join('');
@@ -2938,6 +2995,84 @@
 
         function closeAddProductModal() {
             document.getElementById('addProductModal').style.display = 'none';
+        }
+
+        // Edit Product Modal
+        function openEditProductModal(product) {
+            document.getElementById('editProductModal').style.display = 'flex';
+            document.getElementById('editProductId').value = product._id;
+            document.getElementById('editProductName').textContent = product.productName;
+            document.getElementById('editProductDetails').textContent = `${product.sourceSupplier} | ${product.packSize} (${product.unit})`;
+
+            const cost = product.costPrice || 0;
+            const adminPrice = product.adminPrice || cost;
+            const sellPrice = product.sellPrice || adminPrice;
+            const adminMargin = product.adminMarginDollars !== undefined ? product.adminMarginDollars : (adminPrice - cost);
+            const margin = product.marginDollars !== undefined ? product.marginDollars : (sellPrice - adminPrice);
+
+            document.getElementById('editProductCost').value = cost.toFixed(2);
+            document.getElementById('editProductAdminMargin').value = adminMargin.toFixed(2);
+            document.getElementById('editProductMargin').value = margin.toFixed(2);
+
+            calcEditPricePreview();
+        }
+
+        function closeEditProductModal() {
+            document.getElementById('editProductModal').style.display = 'none';
+        }
+
+        function calcEditPricePreview() {
+            const cost = parseFloat(document.getElementById('editProductCost').value) || 0;
+            const adminMargin = parseFloat(document.getElementById('editProductAdminMargin').value) || 0;
+            const margin = parseFloat(document.getElementById('editProductMargin').value) || 0;
+
+            const adminPrice = cost + adminMargin;
+            const sellPrice = adminPrice + margin;
+
+            document.getElementById('editPreviewCost').textContent = '$' + cost.toFixed(2);
+            document.getElementById('editPreviewAdminMargin').textContent = '$' + adminMargin.toFixed(2);
+            document.getElementById('editPreviewAdminPrice').textContent = '$' + adminPrice.toFixed(2);
+            document.getElementById('editPreviewMargin').textContent = '$' + margin.toFixed(2);
+            document.getElementById('editPreviewSellPrice').textContent = '$' + sellPrice.toFixed(2);
+        }
+
+        async function saveProductMargins() {
+            const productId = document.getElementById('editProductId').value;
+            const costPrice = parseFloat(document.getElementById('editProductCost').value) || 0;
+            const adminMarginDollars = parseFloat(document.getElementById('editProductAdminMargin').value) || 0;
+            const marginDollars = parseFloat(document.getElementById('editProductMargin').value) || 0;
+
+            const adminPrice = costPrice + adminMarginDollars;
+            const sellPrice = adminPrice + marginDollars;
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/${productId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        costPrice,
+                        adminMarginDollars,
+                        marginDollars,
+                        adminPrice,
+                        sellPrice
+                    })
+                });
+
+                if (res.ok) {
+                    closeEditProductModal();
+                    loadProducts();
+                    alert('Product margins updated successfully!');
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to update product');
+                }
+            } catch (error) {
+                console.error('Error updating product:', error);
+                alert('Error updating product. Please try again.');
+            }
         }
 
         function calcPricePreview() {
