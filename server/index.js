@@ -2999,12 +2999,70 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
         await order.save();
 
+        // Reserve inventory and calculate commissions for each chemical
+        const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
+        if (chemicalIds.length > 0) {
+            try {
+                // Fetch chemical pricing data for commission calculation
+                const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
+                    .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars');
+
+                const pricingMap = {};
+                chemicalPricing.forEach(c => {
+                    pricingMap[c._id.toString()] = c;
+                });
+
+                let totalRepCommission = 0;
+                let totalAdminRevenue = 0;
+
+                // Reserve inventory and calculate commissions for each item
+                for (const chem of normalizedChemicals) {
+                    const qty = chem.qty || chem.quantity || 0;
+                    if (chem.chemicalId && qty > 0) {
+                        // Reserve inventory
+                        try {
+                            await reserveInventory({
+                                chemicalId: chem.chemicalId,
+                                quantity: qty,
+                                location: 'main',
+                                orderId: order._id,
+                                orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                                userId: req.user._id,
+                                notes: `Reserved for order - ${crop}`
+                            });
+                        } catch (invErr) {
+                            console.warn('Inventory reservation warning:', invErr.message);
+                            // Continue even if reservation fails (might not have inventory records yet)
+                        }
+
+                        // Calculate commission from pricing data
+                        const pricing = pricingMap[chem.chemicalId.toString()];
+                        if (pricing) {
+                            // Rep commission = marginDollars * quantity
+                            totalRepCommission += (pricing.marginDollars || 0) * qty;
+                            // Admin revenue = adminMarginDollars * quantity
+                            totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                        }
+                    }
+                }
+
+                // Update order with commission data
+                if (totalRepCommission > 0 || totalAdminRevenue > 0) {
+                    order.repCommission = totalRepCommission;
+                    order.adminRevenue = totalAdminRevenue;
+                    await order.save();
+                }
+            } catch (err) {
+                console.error('Error processing inventory/commissions:', err.message);
+                // Don't fail order creation if this fails
+            }
+        }
+
         // Send order confirmation email to customer
         const transporter = createEmailTransporter();
         if (transporter && customer.email) {
             try {
-                // Fetch chemical details to get label URLs
-                const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
+                // Fetch chemical details to get label URLs (already have chemicalIds from above)
                 const chemicalDetails = chemicalIds.length > 0
                     ? await Chemical.find({ _id: { $in: chemicalIds } }).select('productName labelUrl sdsUrl')
                     : [];
@@ -3130,6 +3188,39 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
             } catch (invError) {
                 console.error('Inventory update warning:', invError.message);
                 // Continue with order update even if inventory tracking fails
+            }
+
+            // Recalculate commissions when chemicals change
+            try {
+                const chemicalIds = chemicals.map(c => c.chemicalId).filter(Boolean);
+                if (chemicalIds.length > 0) {
+                    const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
+                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars');
+
+                    const pricingMap = {};
+                    chemicalPricing.forEach(c => {
+                        pricingMap[c._id.toString()] = c;
+                    });
+
+                    let totalRepCommission = 0;
+                    let totalAdminRevenue = 0;
+
+                    for (const chem of chemicals) {
+                        const qty = chem.packagesNeeded || chem.qty || chem.quantity || 0;
+                        if (chem.chemicalId && qty > 0) {
+                            const pricing = pricingMap[chem.chemicalId.toString()];
+                            if (pricing) {
+                                totalRepCommission += (pricing.marginDollars || 0) * qty;
+                                totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                            }
+                        }
+                    }
+
+                    order.repCommission = totalRepCommission;
+                    order.adminRevenue = totalAdminRevenue;
+                }
+            } catch (commErr) {
+                console.error('Commission calculation warning:', commErr.message);
             }
         }
 
@@ -7361,10 +7452,10 @@ app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) =
 
 // ============ INVENTORY API ENDPOINTS ============
 
-// Get all inventory
+// Get all inventory (with option to include products without inventory records)
 app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { location, lowStock } = req.query;
+        const { location, lowStock, includeAll } = req.query;
         let query = {};
 
         if (location) query.location = location;
@@ -7373,9 +7464,188 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
         }
 
         const inventory = await Inventory.find(query)
-            .populate('chemicalId', 'productName packSize unit sellPrice costPrice category')
+            .populate('chemicalId', 'productName packSize unit sellPrice costPrice adminPrice category')
             .populate('distributorId', 'name email')
             .sort({ productName: 1 });
+
+        // Get "On Order" quantities from pending POs (not yet received)
+        const pendingPOs = await PurchaseOrder.find({
+            status: { $in: ['pending', 'submitted', 'approved', 'ordered'] }
+        }).select('items');
+
+        // Build map of chemicalId -> quantity on order
+        const onOrderMap = {};
+        for (const po of pendingPOs) {
+            for (const item of po.items || []) {
+                if (item.chemicalId) {
+                    const key = item.chemicalId.toString();
+                    onOrderMap[key] = (onOrderMap[key] || 0) + (item.quantityOrdered || 0);
+                }
+            }
+        }
+
+        // Add onOrder quantity to each inventory item
+        const enrichedInventory = inventory.map(inv => {
+            const invObj = inv.toObject();
+            const chemId = inv.chemicalId?._id?.toString() || inv.chemicalId?.toString();
+            invObj.quantityOnOrder = chemId ? (onOrderMap[chemId] || 0) : 0;
+            return invObj;
+        });
+
+        // If includeAll is true, also include chemicals without inventory records
+        if (includeAll === 'true') {
+            const existingChemicalIds = inventory.map(i => i.chemicalId?._id?.toString()).filter(Boolean);
+            const missingChemicals = await Chemical.find({
+                _id: { $nin: existingChemicalIds }
+            }).select('productName packSize unit sellPrice costPrice adminPrice category');
+
+            // Add placeholder records for missing chemicals
+            const placeholders = missingChemicals.map(chem => ({
+                _id: null,
+                chemicalId: chem,
+                productName: chem.productName,
+                packSize: chem.packSize,
+                unit: chem.unit,
+                quantityOnHand: 0,
+                quantityReserved: 0,
+                quantityAvailable: 0,
+                quantityOnOrder: onOrderMap[chem._id.toString()] || 0,
+                averageCost: chem.costPrice || 0,
+                location: 'main',
+                needsInventoryRecord: true
+            }));
+
+            res.json([...enrichedInventory, ...placeholders]);
+            return;
+        }
+
+        res.json(enrichedInventory);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Sync all products to inventory - creates inventory records for products that don't have one
+app.post('/api/admin/inventory/sync', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { location = 'main' } = req.body;
+
+        // Get all chemicals
+        const chemicals = await Chemical.find({});
+
+        // Get existing inventory records for this location
+        const existingInventory = await Inventory.find({ location });
+        const existingChemicalIds = new Set(existingInventory.map(i => i.chemicalId.toString()));
+
+        const created = [];
+        const skipped = [];
+
+        for (const chem of chemicals) {
+            if (existingChemicalIds.has(chem._id.toString())) {
+                skipped.push(chem.productName);
+                continue;
+            }
+
+            const inventory = new Inventory({
+                chemicalId: chem._id,
+                productName: chem.productName,
+                packSize: chem.packSize,
+                unit: chem.unit,
+                location,
+                quantityOnHand: 0,
+                quantityReserved: 0,
+                quantityAvailable: 0,
+                averageCost: chem.costPrice || 0,
+                lastCost: chem.costPrice || 0,
+                reorderPoint: 0,
+                reorderQuantity: 0
+            });
+
+            await inventory.save();
+            created.push(chem.productName);
+        }
+
+        res.json({
+            success: true,
+            message: `Synced ${created.length} products to inventory`,
+            created,
+            skipped: skipped.length
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Add inventory for a specific chemical
+app.post('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { chemicalId, quantity, location = 'main', costPerUnit, notes } = req.body;
+
+        if (!chemicalId) {
+            return res.status(400).json({ error: 'Chemical ID is required' });
+        }
+
+        const chemical = await Chemical.findById(chemicalId);
+        if (!chemical) {
+            return res.status(404).json({ error: 'Chemical not found' });
+        }
+
+        // Check if inventory record exists
+        let inventory = await Inventory.findOne({ chemicalId, location });
+
+        if (inventory) {
+            // Update existing record
+            const previousQty = inventory.quantityOnHand;
+            inventory.quantityOnHand += (quantity || 0);
+            inventory.quantityAvailable = inventory.quantityOnHand - inventory.quantityReserved;
+            if (costPerUnit) {
+                inventory.lastCost = costPerUnit;
+                // Update average cost
+                if (previousQty > 0) {
+                    inventory.averageCost = ((previousQty * inventory.averageCost) + (quantity * costPerUnit)) / inventory.quantityOnHand;
+                } else {
+                    inventory.averageCost = costPerUnit;
+                }
+            }
+            inventory.updatedAt = new Date();
+            if (quantity > 0) inventory.lastReceivedDate = new Date();
+            await inventory.save();
+        } else {
+            // Create new record
+            inventory = new Inventory({
+                chemicalId,
+                productName: chemical.productName,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                location,
+                quantityOnHand: quantity || 0,
+                quantityReserved: 0,
+                quantityAvailable: quantity || 0,
+                averageCost: costPerUnit || chemical.costPrice || 0,
+                lastCost: costPerUnit || chemical.costPrice || 0,
+                lastReceivedDate: quantity > 0 ? new Date() : null
+            });
+            await inventory.save();
+        }
+
+        // Create transaction record if quantity was added
+        if (quantity > 0) {
+            const transaction = new InventoryTransaction({
+                inventoryId: inventory._id,
+                chemicalId,
+                productName: chemical.productName,
+                type: 'receive',
+                quantityChange: quantity,
+                previousQuantity: inventory.quantityOnHand - quantity,
+                newQuantity: inventory.quantityOnHand,
+                unitCost: costPerUnit || chemical.costPrice || 0,
+                totalCost: quantity * (costPerUnit || chemical.costPrice || 0),
+                location,
+                notes: notes || 'Manual inventory addition',
+                createdBy: req.user._id
+            });
+            await transaction.save();
+        }
 
         res.json(inventory);
     } catch (error) {
@@ -7533,11 +7803,36 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
                 return res.status(400).json({ error: `Invalid item index: ${receiveItem.itemIndex}` });
             }
 
+            // Get chemicalId - use from PO item, or look up by product name
+            let chemicalId = poItem.chemicalId;
+            if (!chemicalId && poItem.productName) {
+                // Try to find chemical by product name (fallback for old POs without chemicalId)
+                const chemical = await Chemical.findOne({
+                    productName: { $regex: new RegExp(`^${poItem.productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                });
+                if (chemical) {
+                    chemicalId = chemical._id;
+                    // Update the PO item with the found chemicalId for future reference
+                    poItem.chemicalId = chemicalId;
+                } else {
+                    console.warn(`Could not find chemical for product: ${poItem.productName}`);
+                    return res.status(400).json({
+                        error: `Product "${poItem.productName}" not found in catalog. Please add it to Products first.`
+                    });
+                }
+            }
+
+            if (!chemicalId) {
+                return res.status(400).json({
+                    error: `Missing product reference for item: ${poItem.productName || 'Unknown'}`
+                });
+            }
+
             const quantityReceived = receiveItem.quantityReceived || poItem.quantityOrdered;
 
             // Add to inventory with batch tracking
             const result = await receiveInventory({
-                chemicalId: poItem.chemicalId,
+                chemicalId: chemicalId,
                 productName: poItem.productName,
                 packSize: poItem.packSize,
                 unit: poItem.unit,
