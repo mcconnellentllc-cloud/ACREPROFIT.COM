@@ -2563,7 +2563,7 @@ app.post('/api/orders', authMiddleware, async (req, res) => {
             chemicals,
             seeds,
             pivotBio,
-            totalPrice,
+            totalCost: totalPrice,
             costPerAcre,
             status: 'draft'
         });
@@ -2838,7 +2838,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             chemicals,
             seeds,
             pivotBio,
-            totalPrice,
+            totalCost: totalPrice,
             costPerAcre,
             status: status || 'draft',
             notes,
@@ -2846,6 +2846,61 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
         });
 
         await order.save();
+
+        // Send order confirmation email to customer
+        const transporter = createEmailTransporter();
+        if (transporter && customer.email) {
+            try {
+                const chemicalsList = (chemicals || []).map(c =>
+                    `<li>${c.productName || c.name} - ${c.qty || c.quantity} ${c.unit || 'units'}</li>`
+                ).join('');
+
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    to: customer.email,
+                    subject: `Order Created - ${crop} (${acres} acres)`,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: #4a7c59; color: white; padding: 20px; text-align: center;">
+                                <h1 style="margin: 0;">Acre Profit</h1>
+                            </div>
+                            <div style="padding: 20px; background: #f9f9f9;">
+                                <h2>Order Created</h2>
+                                <p>Hi ${customer.name},</p>
+                                <p>An order has been created on your behalf by your representative.</p>
+
+                                <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                                    <h3 style="margin-top: 0;">Order Details</h3>
+                                    <p><strong>Crop:</strong> ${crop}</p>
+                                    <p><strong>Acres:</strong> ${acres.toLocaleString()}</p>
+                                    <p><strong>Year:</strong> ${year || new Date().getFullYear()}</p>
+                                    <p><strong>Total:</strong> $${totalPrice.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</p>
+                                    <p><strong>Status:</strong> ${status || 'Draft'}</p>
+                                    ${chemicals && chemicals.length > 0 ? `
+                                        <h4>Products:</h4>
+                                        <ul>${chemicalsList}</ul>
+                                    ` : ''}
+                                    ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+                                </div>
+
+                                <p>Log in to your dashboard to view and manage your order:</p>
+                                <p><a href="${process.env.FRONTEND_URL || 'https://acreprofit.com'}/dashboard.html" style="background: #4a7c59; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Dashboard</a></p>
+
+                                <p>If you have any questions, please contact your representative.</p>
+                            </div>
+                            <div style="padding: 15px; text-align: center; color: #666; font-size: 12px;">
+                                <p>&copy; ${new Date().getFullYear()} Acre Profit. All rights reserved.</p>
+                            </div>
+                        </div>
+                    `
+                });
+                console.log(`Order confirmation email sent to ${customer.email}`);
+            } catch (emailError) {
+                console.error('Failed to send order confirmation email:', emailError.message);
+                // Don't fail the order creation if email fails
+            }
+        }
+
         res.status(201).json(order);
     } catch (error) {
         res.status(400).json({ error: error.message });

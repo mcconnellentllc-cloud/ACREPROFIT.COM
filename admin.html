@@ -2254,8 +2254,8 @@
         // Load dashboard data
         async function loadDashboardData() {
             try {
-                // Load orders
-                const ordersRes = await fetch(`${API_URL}/api/orders`, {
+                // Load orders (use admin endpoint to see all orders)
+                const ordersRes = await fetch(`${API_URL}/api/admin/orders`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const orders = await ordersRes.json();
@@ -5273,7 +5273,7 @@
                 });
                 const customers = await customersRes.json();
 
-                const ordersRes = await fetch(`${API_URL}/api/orders`, {
+                const ordersRes = await fetch(`${API_URL}/api/admin/orders`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const orders = await ordersRes.json();
@@ -5369,7 +5369,7 @@
                 const myCustomers = allCustomers.filter(c => c.representativeId === repId);
 
                 // Get orders for this rep
-                const ordersRes = await fetch(`${API_URL}/api/orders`, {
+                const ordersRes = await fetch(`${API_URL}/api/admin/orders`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const allOrders = await ordersRes.json();
