@@ -2259,7 +2259,7 @@
                         <div>
                             <div style="font-size: 1.5rem;">2️⃣</div>
                             <div style="font-weight: 600; color: #92400e;">Send to Suppliers</div>
-                            <div style="font-size: 0.85rem; color: #78350f;">CPD, Sims, Jabco, etc.</div>
+                            <div style="font-size: 0.85rem; color: #78350f;">Request quotes from your suppliers</div>
                         </div>
                         <div>
                             <div style="font-size: 1.5rem;">3️⃣</div>
@@ -5331,7 +5331,7 @@
             const title = prompt('Enter a title for this bid sheet:', `Volume Needs - ${new Date().toLocaleDateString()}`);
             if (!title) return;
 
-            const suppliersInput = prompt('Enter supplier names (comma-separated):\nExample: CPD, Sims, Jabco', 'CPD, Sims');
+            const suppliersInput = prompt('Enter supplier names (comma-separated):\nExample: Supplier A, Supplier B', '');
             if (!suppliersInput) return;
 
             const suppliers = suppliersInput.split(',').map(s => ({
