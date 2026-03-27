@@ -2910,7 +2910,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 // Edit an order (admin only)
 app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { crop, acres, chemicals, seeds, pivotBio, totalPrice, status } = req.body;
+        const { crop, acres, chemicals, seeds, pivotBio, totalPrice, totalCost, status } = req.body;
 
         let query = { _id: req.params.orderId };
 
@@ -2930,9 +2930,12 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
         if (chemicals !== undefined) order.chemicals = chemicals;
         if (seeds !== undefined) order.seeds = seeds;
         if (pivotBio !== undefined) order.pivotBio = pivotBio;
-        if (totalPrice !== undefined) {
-            order.totalPrice = totalPrice;
-            order.costPerAcre = order.acres > 0 ? Math.round((totalPrice / order.acres) * 100) / 100 : 0;
+
+        // Handle both totalPrice and totalCost (schema uses totalCost)
+        const newTotal = totalCost !== undefined ? totalCost : totalPrice;
+        if (newTotal !== undefined) {
+            order.totalCost = newTotal;
+            order.costPerAcre = order.acres > 0 ? Math.round((newTotal / order.acres) * 100) / 100 : 0;
         }
         if (status !== undefined) order.status = status;
 
