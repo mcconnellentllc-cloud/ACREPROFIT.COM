@@ -273,7 +273,7 @@ const orderSchema = new mongoose.Schema({
     paidAt: Date,
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered', 'archived', 'cancelled'],
         default: 'draft'
     },
     createdAt: { type: Date, default: Date.now },
@@ -791,7 +791,7 @@ const chemicalOrderSchema = new mongoose.Schema({
     // Status tracking
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'ordered_from_supplier', 'received', 'ready_for_pickup', 'delivered', 'cancelled'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered_from_supplier', 'received', 'ready_for_pickup', 'delivered', 'cancelled', 'archived'],
         default: 'draft'
     },
 
@@ -3065,6 +3065,59 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
         }
 
         res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Archive order (admin only) - soft delete for order issues
+app.put('/api/admin/orders/:orderId/archive', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        let query = { _id: req.params.orderId };
+
+        if (isDistributor(req.user)) {
+            query.representativeId = req.user._id;
+        }
+
+        const order = await Order.findOne(query);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found or access denied' });
+        }
+
+        order.status = 'archived';
+        order.updatedAt = new Date();
+        order.lastEditedBy = req.user._id;
+        await order.save();
+
+        res.json({ message: 'Order archived successfully', order });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete order permanently (admin only) - only for superadmin or owner
+app.delete('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        let query = { _id: req.params.orderId };
+
+        // Distributors can only delete their own orders
+        if (isDistributor(req.user)) {
+            query.representativeId = req.user._id;
+        }
+
+        const order = await Order.findOne(query);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found or access denied' });
+        }
+
+        // Only allow deletion if order is in draft, archived, or cancelled state
+        if (!['draft', 'archived', 'cancelled'].includes(order.status)) {
+            return res.status(400).json({ error: 'Can only delete orders that are draft, archived, or cancelled. Please archive the order first.' });
+        }
+
+        await Order.deleteOne({ _id: req.params.orderId });
+
+        res.json({ message: 'Order deleted successfully' });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -5667,6 +5720,53 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
         }
 
         res.json(order);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Archive chemical order (admin only) - soft delete for order issues
+app.put('/api/chemical-orders/:id/archive', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await ChemicalOrder.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (isDistributor(req.user) && order.representativeId?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized to archive this order' });
+        }
+
+        order.status = 'archived';
+        order.updatedAt = new Date();
+        await order.save();
+
+        res.json({ message: 'Order archived successfully', order });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete chemical order permanently (admin only)
+app.delete('/api/chemical-orders/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const order = await ChemicalOrder.findById(req.params.id);
+        if (!order) {
+            return res.status(404).json({ error: 'Order not found' });
+        }
+
+        if (isDistributor(req.user) && order.representativeId?.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Not authorized to delete this order' });
+        }
+
+        // Only allow deletion if order is in draft, archived, or cancelled state
+        if (!['draft', 'archived', 'cancelled'].includes(order.status)) {
+            return res.status(400).json({ error: 'Can only delete orders that are draft, archived, or cancelled. Please archive the order first.' });
+        }
+
+        await ChemicalOrder.deleteOne({ _id: req.params.id });
+
+        res.json({ message: 'Order deleted successfully' });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

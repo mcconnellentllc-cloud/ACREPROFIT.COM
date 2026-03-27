@@ -323,9 +323,15 @@
                             <span style="font-size: 1.25rem; font-weight: 600;">Order Total: <span id="orderEditTotal">$0.00</span></span>
                         </div>
 
-                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                            <button class="btn btn-outline" onclick="closeOrderEditModal()">Cancel</button>
-                            <button class="btn btn-primary" onclick="saveOrderChanges()">Save Changes</button>
+                        <div style="display: flex; justify-content: space-between; gap: 10px;">
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-outline" onclick="archiveEditOrder()" style="color: #f59e0b;">Archive</button>
+                                <button class="btn btn-outline" onclick="deleteEditOrder()" style="color: #dc2626;">Delete</button>
+                            </div>
+                            <div style="display: flex; gap: 10px;">
+                                <button class="btn btn-outline" onclick="closeOrderEditModal()">Cancel</button>
+                                <button class="btn btn-primary" onclick="saveOrderEditChanges()">Save Changes</button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -706,6 +712,14 @@
 
                     <div class="order-detail-actions">
                         <button class="btn btn-outline" onclick="closeOrderDetailModal()">Close</button>
+                        <button class="btn btn-outline" onclick="archiveOrder()" style="color: #f59e0b;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="4" rx="1"></rect><path d="M4 7v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7"></path><path d="M10 12h4"></path></svg>
+                            Archive
+                        </button>
+                        <button class="btn btn-outline" onclick="deleteOrder()" style="color: #dc2626;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+                            Delete
+                        </button>
                         <button class="btn btn-outline" onclick="saveOrderChanges()">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
                             Save Changes
@@ -2560,7 +2574,7 @@
             document.getElementById('orderEditTotal').textContent = '$' + totalCost.toFixed(2);
         }
 
-        async function saveOrderChanges() {
+        async function saveOrderEditChanges() {
             if (!currentEditingOrder) return;
 
             const totalCost = orderEditProducts.reduce((sum, p) => sum + (p.total || 0), 0);
@@ -2603,6 +2617,72 @@
             } catch (error) {
                 console.error('Error saving order:', error);
                 alert('Error saving order: ' + error.message);
+            }
+        }
+
+        async function archiveEditOrder() {
+            if (!currentEditingOrder) return;
+
+            if (!confirm('Are you sure you want to archive this order? It will be removed from active orders but can still be viewed.')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/orders/${currentEditingOrder._id}/archive`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to archive order');
+                }
+
+                alert('Order archived successfully!');
+                closeOrderEditModal();
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error archiving order:', error);
+                alert('Error archiving order: ' + error.message);
+            }
+        }
+
+        async function deleteEditOrder() {
+            if (!currentEditingOrder) return;
+
+            const isArchived = currentEditingOrder.status === 'archived' || currentEditingOrder.status === 'cancelled' || currentEditingOrder.status === 'draft';
+
+            if (!isArchived) {
+                alert('You can only delete orders that are draft, archived, or cancelled. Please archive the order first.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to PERMANENTLY delete this order? This action cannot be undone!')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/orders/${currentEditingOrder._id}`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to delete order');
+                }
+
+                alert('Order deleted successfully!');
+                closeOrderEditModal();
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error deleting order:', error);
+                alert('Error deleting order: ' + error.message);
             }
         }
 
@@ -3178,6 +3258,90 @@
             document.getElementById('orderDetailModal').style.display = 'none';
             currentOrder = null;
             orderItems = [];
+        }
+
+        async function archiveOrder() {
+            if (!currentOrder) return;
+
+            if (!confirm('Are you sure you want to archive this order? It will be removed from active orders but can still be viewed.')) {
+                return;
+            }
+
+            try {
+                // Determine if this is a ChemicalOrder or regular Order
+                const isChemicalOrder = currentOrder.orderNumber || currentOrder.items;
+                const endpoint = isChemicalOrder
+                    ? `${API_URL}/api/chemical-orders/${currentOrder._id}/archive`
+                    : `${API_URL}/api/admin/orders/${currentOrder._id}/archive`;
+
+                const res = await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to archive order');
+                }
+
+                alert('Order archived successfully!');
+                closeOrderDetailModal();
+                if (selectedCustomer) {
+                    viewCustomer(selectedCustomer._id);
+                }
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error archiving order:', error);
+                alert('Error archiving order: ' + error.message);
+            }
+        }
+
+        async function deleteOrder() {
+            if (!currentOrder) return;
+
+            const isArchived = currentOrder.status === 'archived' || currentOrder.status === 'cancelled' || currentOrder.status === 'draft';
+
+            if (!isArchived) {
+                alert('You can only delete orders that are draft, archived, or cancelled. Please archive the order first.');
+                return;
+            }
+
+            if (!confirm('Are you sure you want to PERMANENTLY delete this order? This action cannot be undone!')) {
+                return;
+            }
+
+            try {
+                // Determine if this is a ChemicalOrder or regular Order
+                const isChemicalOrder = currentOrder.orderNumber || currentOrder.items;
+                const endpoint = isChemicalOrder
+                    ? `${API_URL}/api/chemical-orders/${currentOrder._id}`
+                    : `${API_URL}/api/admin/orders/${currentOrder._id}`;
+
+                const res = await fetch(endpoint, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to delete order');
+                }
+
+                alert('Order deleted successfully!');
+                closeOrderDetailModal();
+                if (selectedCustomer) {
+                    viewCustomer(selectedCustomer._id);
+                }
+                loadDashboardData();
+            } catch (error) {
+                console.error('Error deleting order:', error);
+                alert('Error deleting order: ' + error.message);
+            }
         }
 
         // ============ INVOICE MODAL ============
