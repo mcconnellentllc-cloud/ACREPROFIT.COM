@@ -2946,6 +2946,20 @@
 
         async function openOrderDetail(orderId) {
             try {
+                // Load products first if not already loaded (for price lookup)
+                if (typeof allProducts === 'undefined' || allProducts.length === 0) {
+                    try {
+                        const productsRes = await fetch(`${API_URL}/api/admin/products-with-inventory`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (productsRes.ok) {
+                            allProducts = await productsRes.json();
+                        }
+                    } catch (e) {
+                        console.warn('Could not load products for price lookup:', e);
+                    }
+                }
+
                 const res = await fetch(`${API_URL}/api/admin/orders/${orderId}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
@@ -2998,6 +3012,30 @@
             } else {
                 orderItems = [];
             }
+
+            // Look up retail prices from chemicals database for items with 0 price
+            if (typeof allProducts !== 'undefined' && allProducts.length > 0) {
+                orderItems.forEach(item => {
+                    if ((item.unitPrice === 0 || !item.unitPrice) && item.chemicalId) {
+                        const chemical = allProducts.find(p => p._id === item.chemicalId || p._id === item.chemicalId?.toString());
+                        if (chemical && chemical.sellPrice > 0) {
+                            item.unitPrice = chemical.sellPrice;
+                            item.totalPrice = (item.quantity || 0) * chemical.sellPrice;
+                        }
+                    }
+                    // Also try matching by product name if no chemicalId
+                    if ((item.unitPrice === 0 || !item.unitPrice) && item.productName) {
+                        const chemical = allProducts.find(p =>
+                            p.productName.toLowerCase() === item.productName.toLowerCase()
+                        );
+                        if (chemical && chemical.sellPrice > 0) {
+                            item.unitPrice = chemical.sellPrice;
+                            item.totalPrice = (item.quantity || 0) * chemical.sellPrice;
+                        }
+                    }
+                });
+            }
+
             renderOrderItems();
 
             // Totals
@@ -3080,22 +3118,50 @@
             const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
 
             try {
-                const res = await fetch(`${API_URL}/api/chemical-orders/${currentOrder._id}`, {
-                    method: 'PUT',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
+                // Determine if this is a ChemicalOrder (has orderNumber) or regular Order
+                const isChemicalOrder = currentOrder.orderNumber || currentOrder.items;
+                const endpoint = isChemicalOrder
+                    ? `${API_URL}/api/chemical-orders/${currentOrder._id}`
+                    : `${API_URL}/api/admin/orders/${currentOrder._id}`;
+
+                // Build payload based on order type
+                let payload;
+                if (isChemicalOrder) {
+                    payload = {
                         items: orderItems,
                         subtotal: subtotal,
                         discount: discount,
                         total: subtotal - discount,
                         internalNotes: notes
-                    })
+                    };
+                } else {
+                    // Regular Order uses chemicals array format
+                    payload = {
+                        chemicals: orderItems.map(item => ({
+                            name: item.productName,
+                            packagesNeeded: item.quantity,
+                            packageUnit: item.unit || 'units',
+                            pricePerPackage: item.unitPrice,
+                            totalPrice: (item.quantity || 0) * (item.unitPrice || 0)
+                        })),
+                        totalCost: subtotal - discount,
+                        notes: notes
+                    };
+                }
+
+                const res = await fetch(endpoint, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
                 });
 
-                if (!res.ok) throw new Error('Failed to save order');
+                if (!res.ok) {
+                    const errorData = await res.json().catch(() => ({}));
+                    throw new Error(errorData.error || 'Failed to save order');
+                }
 
                 alert('Order saved successfully!');
                 // Refresh customer data if modal is open
@@ -3104,7 +3170,7 @@
                 }
             } catch (error) {
                 console.error('Error saving order:', error);
-                alert('Error saving order changes');
+                alert('Error saving order: ' + error.message);
             }
         }
 
