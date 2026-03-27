@@ -1733,6 +1733,7 @@
                 <div class="tab-header">
                     <h2>Current Inventory</h2>
                     <div class="tab-header-actions">
+                        <button class="btn btn-outline" onclick="syncProductsToInventory()">Sync All Products</button>
                         <button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Inventory</button>
                         <div class="search-box">
                             <input type="text" id="inventorySearch" placeholder="Search inventory..." oninput="filterInventory()">
@@ -1872,14 +1873,21 @@
                     <div class="customer-modal-body">
                         <form id="addInventoryForm" class="edit-customer-form">
                             <input type="hidden" id="editInventoryId">
+                            <input type="hidden" id="invChemicalId">
+                            <div class="form-group" style="margin-bottom: 16px;">
+                                <label>Select Product from Catalog *</label>
+                                <select id="invChemicalSelect" onchange="onChemicalSelect(this)" style="width: 100%; padding: 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                                    <option value="">-- Select a product --</option>
+                                </select>
+                            </div>
                             <div class="form-row">
                                 <div class="form-group">
-                                    <label>Product Name *</label>
-                                    <input type="text" id="invProductName" required placeholder="e.g., Glyphosate 41%">
+                                    <label>Product Name</label>
+                                    <input type="text" id="invProductName" readonly placeholder="Auto-filled from selection">
                                 </div>
                                 <div class="form-group">
-                                    <label>Category *</label>
-                                    <select id="invCategory" required>
+                                    <label>Category</label>
+                                    <select id="invCategory">
                                         <option value="">Select Category</option>
                                         <option value="herbicide">Herbicide</option>
                                         <option value="fungicide">Fungicide</option>
@@ -6740,8 +6748,53 @@
             renderInventory(filtered);
         }
 
+        // Sync all products to inventory
+        async function syncProductsToInventory() {
+            if (!confirm('This will create inventory records for all products that don\'t have one yet. Continue?')) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/sync`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ location: 'main' })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to sync products');
+                }
+
+                const result = await res.json();
+                alert(`${result.message}\n\nProducts added: ${result.created.length}\nAlready existed: ${result.skipped}`);
+                loadInventory();
+            } catch (error) {
+                console.error('Error syncing products:', error);
+                alert('Error syncing products: ' + error.message);
+            }
+        }
+
+        // Load chemicals for inventory dropdown
+        let inventoryChemicals = [];
+        async function loadChemicalsForInventory() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    inventoryChemicals = await res.json();
+                }
+            } catch (e) {
+                console.warn('Could not load chemicals for inventory:', e);
+            }
+        }
+
         // Open add inventory modal
-        function openAddInventoryModal() {
+        async function openAddInventoryModal() {
             document.getElementById('addInventoryModal').style.display = 'flex';
             document.getElementById('addInventoryForm').reset();
             document.getElementById('editInventoryId').value = '';
@@ -6750,11 +6803,43 @@
             document.getElementById('invTotalValue').textContent = '$0.00';
             document.getElementById('invMargin').value = '15'; // Default 15% margin
             document.getElementById('invAvailableToSell').checked = false;
+
+            // Load chemicals if not already loaded
+            if (inventoryChemicals.length === 0) {
+                await loadChemicalsForInventory();
+            }
+
+            // Populate chemical select
+            const select = document.getElementById('invChemicalSelect');
+            if (select) {
+                select.innerHTML = '<option value="">-- Select a product --</option>' +
+                    inventoryChemicals.map(c => `<option value="${c._id}" data-cost="${c.costPrice || 0}" data-admin="${c.adminPrice || 0}" data-sell="${c.sellPrice || 0}" data-unit="${c.unit || 'units'}" data-pack="${c.packSize || ''}">${c.productName} (${c.packSize || 'N/A'})</option>`).join('');
+            }
         }
 
         // Close add inventory modal
         function closeAddInventoryModal() {
             document.getElementById('addInventoryModal').style.display = 'none';
+        }
+
+        // Handle chemical selection in inventory modal
+        function onChemicalSelect(select) {
+            const option = select.options[select.selectedIndex];
+            if (!option.value) return;
+
+            document.getElementById('invChemicalId').value = option.value;
+            document.getElementById('invProductName').value = option.text.split(' (')[0];
+            document.getElementById('invUnit').value = option.dataset.unit || 'gallon';
+            document.getElementById('invCostPerUnit').value = option.dataset.cost || '';
+            document.getElementById('invSellPrice').value = option.dataset.sell || '';
+
+            // Find the chemical to get category
+            const chem = inventoryChemicals.find(c => c._id === option.value);
+            if (chem && chem.category) {
+                document.getElementById('invCategory').value = chem.category;
+            }
+
+            calcInventoryPricing();
         }
 
         // Calculate inventory pricing with margin
@@ -6777,35 +6862,75 @@
         // Save inventory item
         async function saveInventory() {
             const editId = document.getElementById('editInventoryId').value;
+            const chemicalId = document.getElementById('invChemicalId').value;
 
             const costPerUnit = parseFloat(document.getElementById('invCostPerUnit').value) || 0;
-            const margin = parseFloat(document.getElementById('invMargin').value) || 0;
-            const sellPrice = parseFloat(document.getElementById('invSellPrice').value) || (costPerUnit * (1 + margin / 100));
+            const quantity = parseFloat(document.getElementById('invQuantity').value) || 0;
+            const notes = document.getElementById('invNotes').value;
+            const location = document.getElementById('invLocation').value || 'main';
 
-            const item = {
-                id: editId || 'inv_' + Date.now(),
-                productName: document.getElementById('invProductName').value,
-                category: document.getElementById('invCategory').value,
-                sku: document.getElementById('invSku').value,
-                manufacturer: document.getElementById('invManufacturer').value,
-                quantity: parseFloat(document.getElementById('invQuantity').value) || 0,
-                unit: document.getElementById('invUnit').value,
-                costPerUnit: costPerUnit,
-                margin: margin,
-                sellPrice: sellPrice,
-                availableToSell: document.getElementById('invAvailableToSell').checked,
-                location: document.getElementById('invLocation').value,
-                lowStockThreshold: parseFloat(document.getElementById('invLowStockThreshold').value) || 0,
-                expirationDate: document.getElementById('invExpirationDate').value,
-                dateReceived: document.getElementById('invDateReceived').value || new Date().toISOString().split('T')[0],
-                notes: document.getElementById('invNotes').value,
-                addedBy: userData.name,
-                addedById: userData._id || userData.id,
-                updatedAt: new Date().toISOString()
-            };
+            // For new items, require chemical selection
+            if (!editId && !chemicalId) {
+                alert('Please select a product from the catalog');
+                return;
+            }
 
             try {
-                // Try API first
+                if (chemicalId && !editId) {
+                    // Use new API endpoint for adding inventory
+                    const res = await fetch(`${API_URL}/api/admin/inventory`, {
+                        method: 'POST',
+                        headers: {
+                            'Authorization': `Bearer ${token}`,
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify({
+                            chemicalId,
+                            quantity,
+                            location,
+                            costPerUnit,
+                            notes
+                        })
+                    });
+
+                    if (res.ok) {
+                        closeAddInventoryModal();
+                        loadInventory();
+                        alert('Inventory added successfully!');
+                        return;
+                    } else {
+                        const err = await res.json();
+                        throw new Error(err.error || 'Failed to add inventory');
+                    }
+                }
+
+                // Fall through to legacy handling for edits
+                const margin = parseFloat(document.getElementById('invMargin').value) || 0;
+                const sellPrice = parseFloat(document.getElementById('invSellPrice').value) || (costPerUnit * (1 + margin / 100));
+
+                const item = {
+                    id: editId || 'inv_' + Date.now(),
+                    productName: document.getElementById('invProductName').value,
+                    category: document.getElementById('invCategory').value,
+                    sku: document.getElementById('invSku').value,
+                    manufacturer: document.getElementById('invManufacturer').value,
+                    quantity: quantity,
+                    unit: document.getElementById('invUnit').value,
+                    costPerUnit: costPerUnit,
+                    margin: margin,
+                    sellPrice: sellPrice,
+                    availableToSell: document.getElementById('invAvailableToSell').checked,
+                    location: location,
+                    lowStockThreshold: parseFloat(document.getElementById('invLowStockThreshold').value) || 0,
+                    expirationDate: document.getElementById('invExpirationDate').value,
+                    dateReceived: document.getElementById('invDateReceived').value || new Date().toISOString().split('T')[0],
+                    notes: notes,
+                    addedBy: userData.name,
+                    addedById: userData._id || userData.id,
+                    updatedAt: new Date().toISOString()
+                };
+
+                // Try legacy API for edits
                 const method = editId ? 'PUT' : 'POST';
                 const url = editId ? `${API_URL}/api/inventory/${editId}` : `${API_URL}/api/inventory`;
                 const res = await fetch(url, {
