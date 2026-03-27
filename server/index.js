@@ -362,13 +362,15 @@ const chemicalSchema = new mongoose.Schema({
     unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
     unitsPerPack: { type: Number }, // e.g., 250 for a Shuttle (250 gal)
 
-    // Pricing - 3-tier pricing model with two margins
+    // Pricing - 3-tier pricing model with two dollar amount margins
     costPrice: { type: Number, required: true }, // Tier 1: What we pay the supplier (per unit)
-    adminMargin: { type: Number, default: 0 }, // Admin margin % applied to costPrice
-    adminPrice: { type: Number }, // Tier 2: Cost + admin margin (per unit) - auto-calculated
-    regularMargin: { type: Number, default: 0 }, // Regular margin % applied to adminPrice
+    adminMarginDollars: { type: Number, default: 0 }, // Admin margin $ - dollar amount added to cost
+    adminPrice: { type: Number }, // Tier 2: Cost + admin margin dollars (per unit)
+    marginDollars: { type: Number, default: 0 }, // Rep margin $ - dollar amount added to admin price
     sellPrice: { type: Number, required: true }, // Tier 3: Retail price - what customer pays (per unit)
-    // Rep commission = sellPrice - adminPrice (goes to the customer's assigned rep)
+    // Legacy fields (kept for backward compatibility)
+    adminMargin: { type: Number, default: 0 }, // Legacy: Admin margin % (no longer used)
+    regularMargin: { type: Number, default: 0 }, // Legacy: Regular margin %
     margin: { type: Number }, // Total margin: (sellPrice - costPrice) / sellPrice * 100
 
     // Application info (for program building)
@@ -491,21 +493,30 @@ const chemicalSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
-// Auto-calculate adminPrice and margins before save
+// Calculate prices from dollar margin amounts before save
 chemicalSchema.pre('save', function(next) {
     if (this.costPrice) {
-        // Calculate adminPrice from costPrice + adminMargin
-        const adminMarginPct = this.adminMargin || 0;
-        this.adminPrice = Math.round((this.costPrice / (1 - adminMarginPct / 100)) * 100) / 100;
+        // Use adminPrice if explicitly set, otherwise calculate from dollar margin
+        if (!this.adminPrice && this.adminMarginDollars !== undefined) {
+            this.adminPrice = Math.round((this.costPrice + (this.adminMarginDollars || 0)) * 100) / 100;
+        } else if (!this.adminPrice) {
+            // Fallback: admin price = cost price if no margin set
+            this.adminPrice = this.costPrice;
+        }
 
-        // If sellPrice is set, calculate the total margin
-        if (this.sellPrice) {
+        // Calculate adminMarginDollars from adminPrice if not explicitly set
+        if (this.adminMarginDollars === undefined || this.adminMarginDollars === null) {
+            this.adminMarginDollars = Math.round((this.adminPrice - this.costPrice) * 100) / 100;
+        }
+
+        // Calculate marginDollars from sellPrice and adminPrice if not explicitly set
+        if ((this.marginDollars === undefined || this.marginDollars === null) && this.sellPrice && this.adminPrice) {
+            this.marginDollars = Math.round((this.sellPrice - this.adminPrice) * 100) / 100;
+        }
+
+        // Calculate total margin percentage for reference
+        if (this.sellPrice && this.sellPrice > 0) {
             this.margin = Math.round(((this.sellPrice - this.costPrice) / this.sellPrice) * 100 * 100) / 100;
-
-            // Calculate regularMargin from adminPrice to sellPrice (if not explicitly set)
-            if (this.adminPrice > 0 && this.sellPrice > this.adminPrice) {
-                this.regularMargin = Math.round(((this.sellPrice - this.adminPrice) / this.sellPrice) * 100 * 100) / 100;
-            }
         }
     }
     next();
