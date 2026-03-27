@@ -2999,12 +2999,70 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
         await order.save();
 
+        // Reserve inventory and calculate commissions for each chemical
+        const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
+        if (chemicalIds.length > 0) {
+            try {
+                // Fetch chemical pricing data for commission calculation
+                const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
+                    .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars');
+
+                const pricingMap = {};
+                chemicalPricing.forEach(c => {
+                    pricingMap[c._id.toString()] = c;
+                });
+
+                let totalRepCommission = 0;
+                let totalAdminRevenue = 0;
+
+                // Reserve inventory and calculate commissions for each item
+                for (const chem of normalizedChemicals) {
+                    const qty = chem.qty || chem.quantity || 0;
+                    if (chem.chemicalId && qty > 0) {
+                        // Reserve inventory
+                        try {
+                            await reserveInventory({
+                                chemicalId: chem.chemicalId,
+                                quantity: qty,
+                                location: 'main',
+                                orderId: order._id,
+                                orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                                userId: req.user._id,
+                                notes: `Reserved for order - ${crop}`
+                            });
+                        } catch (invErr) {
+                            console.warn('Inventory reservation warning:', invErr.message);
+                            // Continue even if reservation fails (might not have inventory records yet)
+                        }
+
+                        // Calculate commission from pricing data
+                        const pricing = pricingMap[chem.chemicalId.toString()];
+                        if (pricing) {
+                            // Rep commission = marginDollars * quantity
+                            totalRepCommission += (pricing.marginDollars || 0) * qty;
+                            // Admin revenue = adminMarginDollars * quantity
+                            totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                        }
+                    }
+                }
+
+                // Update order with commission data
+                if (totalRepCommission > 0 || totalAdminRevenue > 0) {
+                    order.repCommission = totalRepCommission;
+                    order.adminRevenue = totalAdminRevenue;
+                    await order.save();
+                }
+            } catch (err) {
+                console.error('Error processing inventory/commissions:', err.message);
+                // Don't fail order creation if this fails
+            }
+        }
+
         // Send order confirmation email to customer
         const transporter = createEmailTransporter();
         if (transporter && customer.email) {
             try {
-                // Fetch chemical details to get label URLs
-                const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
+                // Fetch chemical details to get label URLs (already have chemicalIds from above)
                 const chemicalDetails = chemicalIds.length > 0
                     ? await Chemical.find({ _id: { $in: chemicalIds } }).select('productName labelUrl sdsUrl')
                     : [];
@@ -3130,6 +3188,39 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
             } catch (invError) {
                 console.error('Inventory update warning:', invError.message);
                 // Continue with order update even if inventory tracking fails
+            }
+
+            // Recalculate commissions when chemicals change
+            try {
+                const chemicalIds = chemicals.map(c => c.chemicalId).filter(Boolean);
+                if (chemicalIds.length > 0) {
+                    const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
+                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars');
+
+                    const pricingMap = {};
+                    chemicalPricing.forEach(c => {
+                        pricingMap[c._id.toString()] = c;
+                    });
+
+                    let totalRepCommission = 0;
+                    let totalAdminRevenue = 0;
+
+                    for (const chem of chemicals) {
+                        const qty = chem.packagesNeeded || chem.qty || chem.quantity || 0;
+                        if (chem.chemicalId && qty > 0) {
+                            const pricing = pricingMap[chem.chemicalId.toString()];
+                            if (pricing) {
+                                totalRepCommission += (pricing.marginDollars || 0) * qty;
+                                totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                            }
+                        }
+                    }
+
+                    order.repCommission = totalRepCommission;
+                    order.adminRevenue = totalAdminRevenue;
+                }
+            } catch (commErr) {
+                console.error('Commission calculation warning:', commErr.message);
             }
         }
 

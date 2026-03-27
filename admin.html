@@ -396,15 +396,9 @@
                                     <input type="text" id="addState" placeholder="Colorado">
                                 </div>
                             </div>
-                            <div class="form-row">
-                                <div class="form-group">
-                                    <label>Acres</label>
-                                    <input type="number" id="addAcres" min="0" placeholder="500">
-                                </div>
-                                <div class="form-group">
-                                    <label>Crops (comma-separated)</label>
-                                    <input type="text" id="addCrops" placeholder="Corn, Wheat, Soybeans">
-                                </div>
+                            <div class="form-group">
+                                <label>Crops (comma-separated)</label>
+                                <input type="text" id="addCrops" placeholder="Corn, Wheat, Soybeans">
                             </div>
                             <div class="form-group">
                                 <label>Representative / Pickup Location *</label>
@@ -449,10 +443,6 @@
                             <div class="info-item">
                                 <span class="info-label">State</span>
                                 <span class="info-value" id="modalCustomerState">-</span>
-                            </div>
-                            <div class="info-item">
-                                <span class="info-label">Acres</span>
-                                <span class="info-value" id="modalCustomerAcres">-</span>
                             </div>
                             <div class="info-item">
                                 <span class="info-label">Crops</span>
@@ -506,13 +496,9 @@
                                     <input type="text" id="editState">
                                 </div>
                                 <div class="form-group">
-                                    <label>Acres</label>
-                                    <input type="number" id="editAcres" min="0">
+                                    <label>Crops (comma-separated)</label>
+                                    <input type="text" id="editCrops" placeholder="e.g., Corn, Wheat, Soybeans">
                                 </div>
-                            </div>
-                            <div class="form-group">
-                                <label>Crops (comma-separated)</label>
-                                <input type="text" id="editCrops" placeholder="e.g., Corn, Wheat, Soybeans">
                             </div>
 
                             <!-- Private Applicator License Section -->
@@ -2912,7 +2898,7 @@
                     <div class="customer-info">
                         <h4>${c.name}</h4>
                         <p>${c.farm || 'No farm name'}</p>
-                        <p class="customer-detail">${c.acres?.toLocaleString() || 0} acres • ${c.state || 'N/A'}</p>
+                        <p class="customer-detail">${c.crops?.join(', ') || 'No crops'} • ${c.state || 'N/A'}</p>
                         <div class="customer-contact">
                             <a href="mailto:${c.email}">${c.email}</a>
                             ${c.phone ? `<a href="tel:${c.phone}">${c.phone}</a>` : ''}
@@ -2971,7 +2957,6 @@
             document.getElementById('modalCustomerEmail').textContent = customer.email;
             document.getElementById('modalCustomerPhone').textContent = customer.phone || '-';
             document.getElementById('modalCustomerState').textContent = customer.farm?.state || '-';
-            document.getElementById('modalCustomerAcres').textContent = customer.farm?.acres ? customer.farm.acres.toLocaleString() : '-';
             document.getElementById('modalCustomerCrops').textContent = customer.crops?.join(', ') || '-';
             document.getElementById('modalCustomerOrderCount').textContent = customer.orderCount || 0;
 
@@ -3002,7 +2987,7 @@
                     </div>
                     <div class="order-item-details">
                         <span class="order-acres">${order.acres?.toLocaleString() || 0} acres</span>
-                        <span class="order-total">$${order.totalPrice?.toLocaleString() || 0}</span>
+                        <span class="order-total">$${(order.totalCost || order.totalPrice || 0).toLocaleString()}</span>
                         <span class="order-status status-${order.status}">${order.status.toUpperCase()}</span>
                     </div>
                 </div>
@@ -3084,10 +3069,11 @@
             } else if (order.chemicals) {
                 orderItems = order.chemicals.map(c => ({
                     productName: c.name,
-                    quantity: c.packagesNeeded || c.totalAmount || 0,
-                    unit: c.packageUnit || c.totalUnit || 'units',
-                    pricePerUnit: c.pricePerPackage || 0,
-                    totalPrice: c.totalPrice || 0
+                    quantity: c.packagesNeeded || c.totalAmount || c.qty || 0,
+                    unit: c.packageUnit || c.totalUnit || c.unit || 'units',
+                    unitPrice: c.pricePerPackage || c.pricePerUnit || 0,
+                    totalPrice: c.totalPrice || 0,
+                    chemicalId: c.chemicalId
                 }));
             } else {
                 orderItems = [];
@@ -3487,7 +3473,6 @@
             document.getElementById('addPassword').value = '';
             document.getElementById('addFarm').value = '';
             document.getElementById('addState').value = '';
-            document.getElementById('addAcres').value = '';
             document.getElementById('addCrops').value = '';
 
             // Load representatives dynamically
@@ -3515,7 +3500,6 @@
             const password = document.getElementById('addPassword').value.trim() || 'Farm2026!';
             const farm = document.getElementById('addFarm').value.trim();
             const state = document.getElementById('addState').value.trim();
-            const acres = parseInt(document.getElementById('addAcres').value) || 0;
             const cropsStr = document.getElementById('addCrops').value.trim();
             const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
             const representativeId = document.getElementById('addRepresentative').value;
@@ -3532,7 +3516,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ name, email, password, phone, farm, state, acres, crops, representativeId })
+                    body: JSON.stringify({ name, email, password, phone, farm, state, crops, representativeId })
                 });
 
                 if (res.ok) {
@@ -3585,7 +3569,6 @@
             document.getElementById('editPhone').value = selectedCustomer.phone || '';
             document.getElementById('editFarm').value = selectedCustomer.farm?.name || '';
             document.getElementById('editState').value = selectedCustomer.farm?.state || '';
-            document.getElementById('editAcres').value = selectedCustomer.farm?.acres || '';
             document.getElementById('editCrops').value = selectedCustomer.crops?.join(', ') || '';
 
             // Populate applicator license fields
@@ -3679,7 +3662,6 @@
             const phone = document.getElementById('editPhone').value.trim();
             const farm = document.getElementById('editFarm').value.trim();
             const state = document.getElementById('editState').value.trim();
-            const acres = parseInt(document.getElementById('editAcres').value) || 0;
             const cropsStr = document.getElementById('editCrops').value.trim();
             const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
 
@@ -3706,7 +3688,7 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({ name, email, phone, farm, state, acres, crops, privateApplicatorLicense })
+                    body: JSON.stringify({ name, email, phone, farm, state, crops, privateApplicatorLicense })
                 });
 
                 if (res.ok) {
@@ -6327,12 +6309,11 @@
                                         <th>Customer</th>
                                         <th>Farm</th>
                                         <th>Location</th>
-                                        <th>Acres</th>
                                         <th>Orders</th>
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    ${myCustomers.length === 0 ? '<tr><td colspan="5">No customers yet</td></tr>' :
+                                    ${myCustomers.length === 0 ? '<tr><td colspan="4">No customers yet</td></tr>' :
                                     myCustomers.map(c => {
                                         const custOrders = myOrders.filter(o => o.userId === c._id || o.userId?._id === c._id);
                                         return `
@@ -6340,7 +6321,6 @@
                                                 <td><strong>${c.name}</strong><br><span style="color: var(--text-muted); font-size: 0.85rem;">${c.email}</span></td>
                                                 <td>${c.farm?.name || '-'}</td>
                                                 <td>${c.farm?.county || ''} ${c.farm?.state || ''}</td>
-                                                <td>${c.farm?.acres?.toLocaleString() || '-'}</td>
                                                 <td>${custOrders.length}</td>
                                             </tr>
                                         `;
