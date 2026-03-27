@@ -263,6 +263,73 @@
                         </tbody>
                     </table>
                 </div>
+
+                <!-- Order Edit Modal -->
+                <div class="modal-overlay" id="orderEditModal" style="display: none;">
+                    <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+                        <button class="modal-close" onclick="closeOrderEditModal()">&times;</button>
+                        <h2 style="margin-bottom: 20px;">Edit Order</h2>
+
+                        <div class="order-edit-header" style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; padding: 15px; background: #f9fafb; border-radius: 8px;">
+                            <div>
+                                <label style="font-weight: 600; color: #374151;">Customer</label>
+                                <p id="orderEditCustomer" style="margin: 4px 0;">-</p>
+                            </div>
+                            <div>
+                                <label style="font-weight: 600; color: #374151;">Crop / Acres</label>
+                                <p id="orderEditCropAcres" style="margin: 4px 0;">-</p>
+                            </div>
+                        </div>
+
+                        <h3 style="margin-bottom: 12px;">Products</h3>
+
+                        <!-- Add Product Row -->
+                        <div style="display: flex; gap: 10px; margin-bottom: 15px; align-items: flex-end;">
+                            <div style="flex: 2;">
+                                <label style="font-size: 0.875rem; color: #6b7280;">Product</label>
+                                <select id="orderProductSelect" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                                    <option value="">Select a product...</option>
+                                </select>
+                            </div>
+                            <div style="flex: 1;">
+                                <label style="font-size: 0.875rem; color: #6b7280;">Quantity</label>
+                                <input type="number" id="orderProductQty" placeholder="0" min="0" step="0.01" style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px;">
+                            </div>
+                            <div style="flex: 0.5;">
+                                <label style="font-size: 0.875rem; color: #6b7280;">Unit</label>
+                                <input type="text" id="orderProductUnit" value="gal" readonly style="width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; background: #f3f4f6;">
+                            </div>
+                            <button class="btn btn-primary" onclick="addProductToOrder()" style="height: 38px;">Add</button>
+                        </div>
+
+                        <!-- Products Table -->
+                        <table class="admin-table" style="margin-bottom: 20px;">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Qty</th>
+                                    <th>Unit</th>
+                                    <th>Price/Unit</th>
+                                    <th>Total</th>
+                                    <th></th>
+                                </tr>
+                            </thead>
+                            <tbody id="orderProductsTableBody">
+                                <tr><td colspan="6" class="empty">No products added</td></tr>
+                            </tbody>
+                        </table>
+
+                        <!-- Order Total -->
+                        <div style="text-align: right; padding: 15px; background: #f0fdf4; border-radius: 8px; margin-bottom: 20px;">
+                            <span style="font-size: 1.25rem; font-weight: 600;">Order Total: <span id="orderEditTotal">$0.00</span></span>
+                        </div>
+
+                        <div style="display: flex; justify-content: flex-end; gap: 10px;">
+                            <button class="btn btn-outline" onclick="closeOrderEditModal()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveOrderChanges()">Save Changes</button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <!-- Customers Tab -->
@@ -2208,6 +2275,217 @@
         let allCustomers = [];
         let selectedCustomer = null;
 
+        // Store for orders data
+        let allOrders = [];
+        let currentEditingOrder = null;
+        let orderEditProducts = [];
+
+        // Order Edit Modal Functions
+        async function openOrderEditModal(orderId) {
+            const order = allOrders.find(o => o._id === orderId);
+            if (!order) {
+                alert('Order not found');
+                return;
+            }
+            currentEditingOrder = order;
+            orderEditProducts = [];
+
+            // Populate header info
+            document.getElementById('orderEditCustomer').textContent = order.userId?.name || 'Unknown';
+            document.getElementById('orderEditCropAcres').textContent = `${order.crop} - ${order.acres?.toLocaleString() || 0} acres`;
+
+            // Load existing chemicals into products list
+            if (order.chemicals && Array.isArray(order.chemicals)) {
+                orderEditProducts = order.chemicals.map(c => ({
+                    name: c.name || c.productName,
+                    qty: c.qty || c.quantity || c.totalAmount || 0,
+                    unit: c.unit || c.totalUnit || 'gal',
+                    pricePerUnit: c.pricePerUnit || c.pricePerPackage || 0,
+                    total: c.total || c.totalPrice || 0,
+                    chemicalId: c.chemicalId || c._id
+                }));
+            }
+
+            // Load products if not already loaded
+            if (typeof allProducts === 'undefined' || allProducts.length === 0) {
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/products-with-inventory`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) {
+                        allProducts = await res.json();
+                    }
+                } catch (e) {
+                    console.error('Error loading products:', e);
+                }
+            }
+
+            // Populate product dropdown from allProducts
+            populateOrderProductSelect();
+            renderOrderProducts();
+
+            document.getElementById('orderEditModal').style.display = 'flex';
+        }
+
+        function closeOrderEditModal() {
+            document.getElementById('orderEditModal').style.display = 'none';
+            currentEditingOrder = null;
+            orderEditProducts = [];
+        }
+
+        function populateOrderProductSelect() {
+            const select = document.getElementById('orderProductSelect');
+            select.innerHTML = '<option value="">Select a product...</option>';
+
+            // Use allProducts (the chemicals/products list)
+            if (typeof allProducts !== 'undefined' && allProducts.length > 0) {
+                allProducts.forEach(p => {
+                    const opt = document.createElement('option');
+                    opt.value = p._id;
+                    opt.textContent = `${p.productName} - $${p.sellPrice?.toFixed(2) || '0.00'}/${p.unit || 'unit'}`;
+                    opt.dataset.price = p.sellPrice || 0;
+                    opt.dataset.unit = p.unit || 'gal';
+                    opt.dataset.name = p.productName;
+                    select.appendChild(opt);
+                });
+            }
+        }
+
+        // Update unit when product selected
+        document.addEventListener('DOMContentLoaded', function() {
+            const productSelect = document.getElementById('orderProductSelect');
+            if (productSelect) {
+                productSelect.addEventListener('change', function() {
+                    const opt = this.options[this.selectedIndex];
+                    if (opt && opt.dataset.unit) {
+                        document.getElementById('orderProductUnit').value = opt.dataset.unit;
+                    }
+                });
+            }
+        });
+
+        function addProductToOrder() {
+            const select = document.getElementById('orderProductSelect');
+            const qtyInput = document.getElementById('orderProductQty');
+            const unitInput = document.getElementById('orderProductUnit');
+
+            if (!select.value) {
+                alert('Please select a product');
+                return;
+            }
+
+            const qty = parseFloat(qtyInput.value);
+            if (!qty || qty <= 0) {
+                alert('Please enter a valid quantity');
+                return;
+            }
+
+            const opt = select.options[select.selectedIndex];
+            const pricePerUnit = parseFloat(opt.dataset.price) || 0;
+
+            orderEditProducts.push({
+                name: opt.dataset.name,
+                qty: qty,
+                unit: unitInput.value,
+                pricePerUnit: pricePerUnit,
+                total: Math.round(qty * pricePerUnit * 100) / 100,
+                chemicalId: select.value
+            });
+
+            // Reset inputs
+            select.value = '';
+            qtyInput.value = '';
+            unitInput.value = 'gal';
+
+            renderOrderProducts();
+        }
+
+        function removeProductFromOrder(index) {
+            orderEditProducts.splice(index, 1);
+            renderOrderProducts();
+        }
+
+        function renderOrderProducts() {
+            const tbody = document.getElementById('orderProductsTableBody');
+
+            if (orderEditProducts.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" class="empty">No products added</td></tr>';
+                document.getElementById('orderEditTotal').textContent = '$0.00';
+                return;
+            }
+
+            let totalCost = 0;
+            tbody.innerHTML = orderEditProducts.map((p, idx) => {
+                totalCost += p.total;
+                return `
+                    <tr>
+                        <td>${p.name}</td>
+                        <td>${p.qty}</td>
+                        <td>${p.unit}</td>
+                        <td>$${p.pricePerUnit?.toFixed(2) || '0.00'}</td>
+                        <td>$${p.total?.toFixed(2) || '0.00'}</td>
+                        <td><button class="btn btn-sm" style="color: #dc2626;" onclick="removeProductFromOrder(${idx})">Remove</button></td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('orderEditTotal').textContent = '$' + totalCost.toFixed(2);
+        }
+
+        async function saveOrderChanges() {
+            if (!currentEditingOrder) return;
+
+            const totalCost = orderEditProducts.reduce((sum, p) => sum + (p.total || 0), 0);
+
+            // Format chemicals for the order schema
+            const chemicals = orderEditProducts.map(p => ({
+                name: p.name,
+                qty: p.qty,
+                quantity: p.qty,
+                unit: p.unit,
+                totalAmount: p.qty,
+                totalUnit: p.unit,
+                pricePerUnit: p.pricePerUnit,
+                pricePerPackage: p.pricePerUnit,
+                totalPrice: p.total,
+                chemicalId: p.chemicalId
+            }));
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/orders/${currentEditingOrder._id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        chemicals: chemicals,
+                        totalCost: totalCost
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to update order');
+                }
+
+                alert('Order updated successfully!');
+                closeOrderEditModal();
+                loadDashboardData(); // Reload orders
+            } catch (error) {
+                console.error('Error saving order:', error);
+                alert('Error saving order: ' + error.message);
+            }
+        }
+
+        // Function to switch tabs programmatically (used by overview cards)
+        window.switchTab = function(tabName) {
+            const tabEl = document.querySelector(`.admin-tab[data-tab="${tabName}"]`);
+            if (tabEl) {
+                tabEl.click();
+            }
+        };
+
         // Tab navigation
         document.querySelectorAll('.admin-tab').forEach(tab => {
             tab.addEventListener('click', function(e) {
@@ -2280,6 +2558,7 @@
                 `).join('') : '<p class="empty">No orders yet</p>';
 
                 // Orders table
+                allOrders = orders; // Store for editing
                 document.getElementById('ordersTableBody').innerHTML = orders.length ? orders.map(order => `
                     <tr>
                         <td>${new Date(order.createdAt).toLocaleDateString()}</td>
@@ -2288,7 +2567,8 @@
                         <td>${order.acres?.toLocaleString()}</td>
                         <td>$${order.totalCost?.toLocaleString() || '0'}</td>
                         <td><span class="order-status status-${order.status}">${order.status}</span></td>
-                        <td>
+                        <td style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-sm btn-outline" onclick="openOrderEditModal('${order._id}')">Edit</button>
                             <select class="status-select" data-order-id="${order._id}">
                                 <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Order Created</option>
                                 <option value="payment_pending" ${order.status === 'payment_pending' ? 'selected' : ''}>Payment Pending</option>
@@ -2872,6 +3152,9 @@
         });
         document.getElementById('addLedgerModal').addEventListener('click', function(e) {
             if (e.target === this) closeAddLedgerModal();
+        });
+        document.getElementById('orderEditModal').addEventListener('click', function(e) {
+            if (e.target === this) closeOrderEditModal();
         });
 
         // ===== PRODUCTS TAB =====
