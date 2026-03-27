@@ -2900,6 +2900,13 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                                     ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
                                 </div>
 
+                                <div style="background: #d1fae5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #10b981;">
+                                    <h4 style="margin-top: 0; color: #065f46;">Ready to Pay?</h4>
+                                    <p style="margin-bottom: 10px; color: #065f46;">Pay securely via bank transfer (ACH) - no fees, fast processing.</p>
+                                    <a href="${frontendUrl}/my-orders.html" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 600;">Pay with ACH Bank Transfer</a>
+                                    <p style="margin-top: 10px; font-size: 12px; color: #065f46;">Or pay by check - contact your representative for details.</p>
+                                </div>
+
                                 <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ffc107;">
                                     <h4 style="margin-top: 0; color: #856404;">Product Labels & Safety Data Sheets</h4>
                                     <p style="margin-bottom: 10px; color: #856404;">Access EPA-approved labels and SDS documents for all products in your order:</p>
