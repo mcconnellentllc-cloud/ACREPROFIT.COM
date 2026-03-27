@@ -56,6 +56,7 @@
                     <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
                     <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
+                    <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Quote Requests</a>
 
                     <!-- AcreProfit Business Dropdown -->
                     <div class="admin-tab-dropdown">
@@ -284,10 +285,32 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Bulk Actions Toolbar -->
+                <div id="bulkActionsToolbar" class="bulk-actions-toolbar" style="display: none; background: #166534; color: white; padding: 12px 20px; border-radius: 8px; margin-bottom: 16px; display: none; align-items: center; gap: 16px; flex-wrap: wrap;">
+                    <span id="selectedCount" style="font-weight: 600;">0 selected</span>
+                    <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+                        <select id="bulkStatusSelect" style="padding: 8px 12px; border-radius: 6px; border: none; background: white;">
+                            <option value="">Change Status To...</option>
+                            <option value="pending">Order Created</option>
+                            <option value="payment_pending">Payment Pending</option>
+                            <option value="payment_secured">Payment Secured</option>
+                            <option value="manufacturer_ordered">Ordered from Mfg</option>
+                            <option value="bol_assigned">BOL Assigned</option>
+                            <option value="shipped">Shipped</option>
+                            <option value="delivered">Delivered</option>
+                            <option value="signed_off">Delivery Signed Off</option>
+                        </select>
+                        <button class="btn btn-sm" onclick="applyBulkStatus()" style="background: white; color: #166534; font-weight: 600;">Apply</button>
+                        <button class="btn btn-sm" onclick="clearSelection()" style="background: transparent; color: white; border: 1px solid white;">Clear Selection</button>
+                    </div>
+                </div>
+
                 <div class="orders-table-wrapper">
                     <table class="admin-table">
                         <thead>
                             <tr>
+                                <th style="width: 40px;"><input type="checkbox" id="selectAllOrders" onchange="toggleSelectAll(this)" title="Select All"></th>
                                 <th>Date</th>
                                 <th>Customer</th>
                                 <th>Crop/Program</th>
@@ -1442,6 +1465,7 @@
                     <div class="tab-header-actions">
                         <button class="btn btn-primary" onclick="openAddProductModal()">+ Add Product</button>
                         <button class="btn btn-outline" onclick="importCPDProducts()" id="importCPDBtn">Import CPD Products</button>
+                        <button class="btn btn-outline" onclick="importSimsProducts()" id="importSimsBtn" style="background: #7c3aed; color: white; border-color: #7c3aed;">Import Sims Products</button>
                         <div class="search-box">
                             <input type="text" id="productSearch" placeholder="Search products..." oninput="filterProducts()">
                         </div>
@@ -2106,6 +2130,84 @@
                         </thead>
                         <tbody id="inventoryTableBody">
                             <tr><td colspan="11" class="loading">Loading inventory...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Quote Requests Tab -->
+            <div id="quote-requestsTab" class="tab-content">
+                <div class="tab-header">
+                    <div>
+                        <h2>Quote Requests</h2>
+                        <p class="tab-subtitle">Customers submit quantities needed - you provide pricing</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openCreateQuoteModal()">+ Create Quote Request</button>
+                </div>
+
+                <!-- Volume Needs Summary -->
+                <div style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; color: white;">
+                    <h3 style="margin: 0 0 12px 0; font-size: 1rem;">Chemical Volume Needs (Pending Orders + Quotes)</h3>
+                    <div id="volumeNeedsSummary" style="display: flex; gap: 20px; flex-wrap: wrap;">
+                        <span>Loading...</span>
+                    </div>
+                </div>
+
+                <!-- Quote Filters -->
+                <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                    <select id="quoteStatusFilter" onchange="loadQuoteRequests()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                        <option value="">All Status</option>
+                        <option value="submitted">Submitted (New)</option>
+                        <option value="pricing">Pricing In Progress</option>
+                        <option value="quoted">Quote Sent</option>
+                        <option value="accepted">Accepted</option>
+                        <option value="declined">Declined</option>
+                        <option value="converted">Converted to Order</option>
+                    </select>
+                    <button class="btn btn-outline" onclick="loadQuoteRequests()">Refresh</button>
+                    <button class="btn btn-outline" onclick="loadVolumeNeeds()" style="background: #7c3aed; color: white;">View All Volume Needs</button>
+                </div>
+
+                <!-- Quotes Table -->
+                <div class="orders-table-wrapper">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Quote #</th>
+                                <th>Customer</th>
+                                <th>Items</th>
+                                <th>Total Qty</th>
+                                <th>Est. Value</th>
+                                <th>Status</th>
+                                <th>Submitted</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="quoteRequestsTableBody">
+                            <tr><td colspan="8" class="loading">Loading quote requests...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Volume Needs Modal -->
+            <div class="modal-overlay" id="volumeNeedsModal" style="display: none;">
+                <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
+                    <button class="modal-close" onclick="closeVolumeNeedsModal()">&times;</button>
+                    <h2 style="margin-bottom: 20px;">Chemical Volume Needs</h2>
+                    <p style="color: var(--text-muted); margin-bottom: 20px;">Aggregated quantities from pending orders and quote requests. Use this to plan your purchasing.</p>
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Pack Size</th>
+                                <th>From Orders</th>
+                                <th>From Quotes</th>
+                                <th>Total Needed</th>
+                                <th>Sources</th>
+                            </tr>
+                        </thead>
+                        <tbody id="volumeNeedsTableBody">
                         </tbody>
                     </table>
                 </div>
@@ -3096,6 +3198,7 @@
             if (tabName === 'inventory') loadInventory();
             if (tabName === 'distributors') loadDistributors();
             if (tabName === 'suppliers') loadSuppliers();
+            if (tabName === 'quote-requests') loadQuoteRequests();
         }
 
         // Tab navigation - regular tabs
@@ -3226,6 +3329,7 @@
                 allOrders = orders; // Store for editing
                 document.getElementById('ordersTableBody').innerHTML = orders.length ? orders.map(order => `
                     <tr>
+                        <td><input type="checkbox" class="order-checkbox" data-order-id="${order._id}" onchange="updateBulkSelection()"></td>
                         <td>${new Date(order.createdAt).toLocaleDateString()}</td>
                         <td>${order.userId?.name || 'Unknown'}</td>
                         <td>${order.crop}${order.program ? ' / ' + order.program : ''}</td>
@@ -3246,7 +3350,7 @@
                             </select>
                         </td>
                     </tr>
-                `).join('') : '<tr><td colspan="7" class="empty">No orders yet</td></tr>';
+                `).join('') : '<tr><td colspan="8" class="empty">No orders yet</td></tr>';
 
                 // Load customers
                 const customersRes = await fetch(`${API_URL}/api/admin/customers`, {
@@ -3360,6 +3464,99 @@
                 }
             }
         });
+
+        // ===== BULK ACTIONS FOR ORDERS =====
+        let selectedOrderIds = [];
+
+        function toggleSelectAll(checkbox) {
+            const checkboxes = document.querySelectorAll('.order-checkbox');
+            checkboxes.forEach(cb => {
+                cb.checked = checkbox.checked;
+            });
+            updateBulkSelection();
+        }
+
+        function updateBulkSelection() {
+            const checkboxes = document.querySelectorAll('.order-checkbox:checked');
+            selectedOrderIds = Array.from(checkboxes).map(cb => cb.dataset.orderId);
+
+            const toolbar = document.getElementById('bulkActionsToolbar');
+            const countSpan = document.getElementById('selectedCount');
+            const selectAllCheckbox = document.getElementById('selectAllOrders');
+
+            if (selectedOrderIds.length > 0) {
+                toolbar.style.display = 'flex';
+                countSpan.textContent = `${selectedOrderIds.length} selected`;
+            } else {
+                toolbar.style.display = 'none';
+            }
+
+            // Update select all checkbox state
+            const allCheckboxes = document.querySelectorAll('.order-checkbox');
+            selectAllCheckbox.checked = allCheckboxes.length > 0 && checkboxes.length === allCheckboxes.length;
+            selectAllCheckbox.indeterminate = checkboxes.length > 0 && checkboxes.length < allCheckboxes.length;
+        }
+
+        function clearSelection() {
+            document.querySelectorAll('.order-checkbox').forEach(cb => cb.checked = false);
+            document.getElementById('selectAllOrders').checked = false;
+            document.getElementById('selectAllOrders').indeterminate = false;
+            document.getElementById('bulkStatusSelect').value = '';
+            selectedOrderIds = [];
+            document.getElementById('bulkActionsToolbar').style.display = 'none';
+        }
+
+        async function applyBulkStatus() {
+            const status = document.getElementById('bulkStatusSelect').value;
+            if (!status) {
+                alert('Please select a status to apply');
+                return;
+            }
+
+            if (selectedOrderIds.length === 0) {
+                alert('No orders selected');
+                return;
+            }
+
+            const statusLabels = {
+                'pending': 'Order Created',
+                'payment_pending': 'Payment Pending',
+                'payment_secured': 'Payment Secured',
+                'manufacturer_ordered': 'Ordered from Mfg',
+                'bol_assigned': 'BOL Assigned',
+                'shipped': 'Shipped',
+                'delivered': 'Delivered',
+                'signed_off': 'Delivery Signed Off'
+            };
+
+            if (!confirm(`Update ${selectedOrderIds.length} order(s) to "${statusLabels[status]}"?`)) {
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/orders/bulk-status`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ orderIds: selectedOrderIds, status })
+                });
+
+                const result = await res.json();
+
+                if (res.ok) {
+                    alert(`Successfully updated ${result.success.length} order(s)${result.failed.length > 0 ? `. ${result.failed.length} failed.` : ''}`);
+                    clearSelection();
+                    loadDashboard(); // Refresh the orders
+                } else {
+                    alert('Error: ' + result.error);
+                }
+            } catch (error) {
+                console.error('Bulk update error:', error);
+                alert('Failed to update orders');
+            }
+        }
 
         // Render customers grid
         function renderCustomers(customers) {
@@ -4268,10 +4465,20 @@
                 return;
             }
 
+            const now = new Date();
+            const oneMonthAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+
             tbody.innerHTML = products.map(p => {
                 const costPrice = p.costPrice || 0;
                 const adminPrice = p.adminPrice || costPrice;
                 const sellPrice = p.sellPrice || adminPrice;
+
+                // Check price age - warn if over 1 month old
+                const priceDate = p.priceDate ? new Date(p.priceDate) : null;
+                const isPriceStale = !priceDate || priceDate < oneMonthAgo;
+                const priceAgeDisplay = priceDate
+                    ? `${Math.floor((now - priceDate) / (24 * 60 * 60 * 1000))}d ago`
+                    : 'unknown';
 
                 // Admin margin $: dollar amount from cost to admin price
                 const adminMarginDollars = p.adminMarginDollars !== undefined ? p.adminMarginDollars : (adminPrice - costPrice);
@@ -4290,15 +4497,19 @@
                     : '';
 
                 return `
-                <tr>
+                <tr ${isPriceStale ? 'style="background: #fef3c7;"' : ''}>
                     <td>
                         <strong>${p.productName}</strong>
+                        ${isPriceStale ? '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;" title="Price may be outdated">STALE</span>' : ''}
                         ${activeIngredientsDisplay ? `<br><small style="color:var(--text-muted)">${activeIngredientsDisplay}</small>` : ''}
                         <br><small style="color:var(--text-muted); font-style:italic;">${p.category || ''}</small>
                     </td>
                     <td>${p.sourceSupplier}</td>
                     <td>${p.packSize} <small>(${p.unit})</small></td>
-                    <td>$${costPrice.toFixed(2)}</td>
+                    <td>
+                        $${costPrice.toFixed(2)}
+                        <br><small style="color: ${isPriceStale ? '#f59e0b' : 'var(--text-muted)'};">${priceAgeDisplay}</small>
+                    </td>
                     <td>
                         <span style="color: ${adminMarginColor}; font-weight: 700;">$${adminMarginDollars.toFixed(2)}</span>
                         <br><small style="color: var(--text-muted);">Admin: $${adminPrice.toFixed(2)}</small>
@@ -4597,6 +4808,342 @@
 
             btn.disabled = false;
             btn.textContent = 'Import CPD Products';
+        }
+
+        // Bulk import Sims products
+        async function importSimsProducts() {
+            if (!confirm('This will import Sims products with 3-tier pricing:\n\n• Cost = Sims supplier price\n• Admin = Cost + $0.10/unit (Acre Profit margin)\n• Retail = Admin + $0.15/unit (Rep commission)\n\nPrices will be marked with today\'s date.\nProducts over 30 days old will show STALE warning.\n\nContinue?')) {
+                return;
+            }
+
+            const btn = document.getElementById('importSimsBtn');
+            btn.disabled = true;
+            btn.textContent = 'Importing...';
+
+            // Sims Products - add your Sims product list here
+            // costPrice = Sims supplier cost, server calculates admin/retail
+            const simsProducts = [
+                // Herbicides
+                { productName: 'Glyphosate 4+', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Glyphosate 4+', packSize: '265 gal', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote', unitsPerPack: 265 },
+                { productName: 'Dicamba DMA 4', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: '2,4-D Amine 4', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: '2,4-D LV6', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Atrazine 4L', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Metolachlor 7.62', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Acetochlor', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Clethodim 2E', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'herbicide', notes: 'Price TBD - submit for quote' },
+                // Adjuvants
+                { productName: 'Crop Oil Concentrate', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'adjuvant', notes: 'Price TBD - submit for quote' },
+                { productName: 'Non-Ionic Surfactant', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'adjuvant', notes: 'Price TBD - submit for quote' },
+                { productName: 'AMS (Ammonium Sulfate)', packSize: '50 lb', unit: 'lb', costPrice: 0, category: 'adjuvant', notes: 'Price TBD - submit for quote' },
+                // Insecticides
+                { productName: 'Bifenthrin 2EC', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'insecticide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Lambda-Cyhalothrin', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'insecticide', notes: 'Price TBD - submit for quote' },
+                // Fungicides
+                { productName: 'Propiconazole 3.6', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'fungicide', notes: 'Price TBD - submit for quote' },
+                { productName: 'Azoxystrobin', packSize: '2x2.5', unit: 'gl', costPrice: 0, category: 'fungicide', notes: 'Price TBD - submit for quote' },
+            ];
+
+            // Set default margins for Sims products
+            const productsToImport = simsProducts.map(p => ({
+                ...p,
+                sourceSupplier: 'Sims',
+                adminMarginDollars: 0.10,  // $0.10 admin margin per unit
+                marginDollars: 0.15,        // $0.15 rep margin per unit
+                priceDate: new Date()       // Mark with today's date
+            }));
+
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/bulk-import`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        chemicals: productsToImport,
+                        sourceSupplier: 'Sims',
+                        priceVersion: new Date().toISOString().split('T')[0]
+                    })
+                });
+
+                if (res.ok) {
+                    const result = await res.json();
+                    alert(`Sims Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}\n\nNote: Products with $0 cost need price quotes.`);
+                    loadProducts();
+                } else {
+                    const errorText = await res.text();
+                    console.error('Import failed:', res.status, errorText);
+                    try {
+                        const error = JSON.parse(errorText);
+                        alert('Import failed (' + res.status + '): ' + (error.error || errorText));
+                    } catch {
+                        alert('Import failed (' + res.status + '): ' + errorText);
+                    }
+                }
+            } catch (error) {
+                console.error('Error importing Sims products:', error);
+                alert('Error importing products: ' + error.message);
+            }
+
+            btn.disabled = false;
+            btn.textContent = 'Import Sims Products';
+        }
+
+        // ===== QUOTE REQUESTS TAB =====
+        let quoteRequests = [];
+
+        async function loadQuoteRequests() {
+            try {
+                const status = document.getElementById('quoteStatusFilter').value;
+                let url = `${API_URL}/api/admin/quote-requests`;
+                if (status) url += `?status=${status}`;
+
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                quoteRequests = await res.json();
+                renderQuoteRequests(quoteRequests);
+
+                // Also load volume needs summary
+                loadVolumeNeedsSummary();
+            } catch (error) {
+                console.error('Error loading quote requests:', error);
+            }
+        }
+
+        function renderQuoteRequests(quotes) {
+            const tbody = document.getElementById('quoteRequestsTableBody');
+
+            if (!quotes.length) {
+                tbody.innerHTML = '<tr><td colspan="8" class="empty">No quote requests yet. Customers can submit quantity requests, or create one for them.</td></tr>';
+                return;
+            }
+
+            const statusColors = {
+                submitted: '#f59e0b',
+                pricing: '#3b82f6',
+                quoted: '#8b5cf6',
+                accepted: '#10b981',
+                declined: '#ef4444',
+                expired: '#6b7280',
+                converted: '#059669'
+            };
+
+            tbody.innerHTML = quotes.map(q => {
+                const totalQty = q.items.reduce((sum, i) => sum + (i.quantityNeeded || 0), 0);
+                return `
+                <tr>
+                    <td><strong>${q.quoteNumber}</strong></td>
+                    <td>${q.customerId?.name || q.customerName || 'Unknown'}</td>
+                    <td>${q.items.length} items</td>
+                    <td>${totalQty.toLocaleString()}</td>
+                    <td>${q.estimatedTotal ? '$' + q.estimatedTotal.toLocaleString() : '-'}</td>
+                    <td><span class="order-status" style="background: ${statusColors[q.status]}20; color: ${statusColors[q.status]};">${q.status}</span></td>
+                    <td>${new Date(q.submittedAt).toLocaleDateString()}</td>
+                    <td>
+                        <button class="btn btn-sm btn-outline" onclick="viewQuoteRequest('${q._id}')">View</button>
+                        ${q.status === 'submitted' || q.status === 'pricing' ? `<button class="btn btn-sm btn-primary" onclick="openPriceQuoteModal('${q._id}')">Price</button>` : ''}
+                        ${q.status === 'accepted' ? `<button class="btn btn-sm btn-primary" onclick="convertQuoteToOrder('${q._id}')">Convert</button>` : ''}
+                    </td>
+                </tr>
+                `;
+            }).join('');
+        }
+
+        async function loadVolumeNeedsSummary() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemical-volume-needs?includeOrders=true&includeQuotes=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const needs = await res.json();
+
+                const container = document.getElementById('volumeNeedsSummary');
+                if (!needs.length) {
+                    container.innerHTML = '<span>No pending volume needs</span>';
+                    return;
+                }
+
+                // Show top 5 products by volume
+                const top5 = needs.slice(0, 5);
+                container.innerHTML = top5.map(n => `
+                    <div style="background: rgba(255,255,255,0.1); padding: 10px 14px; border-radius: 8px;">
+                        <div style="font-weight: 600;">${n.productName}</div>
+                        <div style="font-size: 1.25rem; font-weight: 700;">${n.totalQuantity.toLocaleString()} ${n.unit}</div>
+                        <div style="font-size: 0.75rem; opacity: 0.8;">${n.sources}</div>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Error loading volume summary:', error);
+            }
+        }
+
+        async function loadVolumeNeeds() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemical-volume-needs?includeOrders=true&includeQuotes=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const needs = await res.json();
+
+                const tbody = document.getElementById('volumeNeedsTableBody');
+                if (!needs.length) {
+                    tbody.innerHTML = '<tr><td colspan="6" class="empty">No pending volume needs</td></tr>';
+                } else {
+                    tbody.innerHTML = needs.map(n => `
+                        <tr>
+                            <td><strong>${n.productName}</strong></td>
+                            <td>${n.packSize}</td>
+                            <td>${n.totalQuantityOrders.toLocaleString()} ${n.unit}</td>
+                            <td>${n.totalQuantityQuotes.toLocaleString()} ${n.unit}</td>
+                            <td style="font-weight: 700; color: #7c3aed;">${n.totalQuantity.toLocaleString()} ${n.unit}</td>
+                            <td><small>${n.sources}</small></td>
+                        </tr>
+                    `).join('');
+                }
+
+                document.getElementById('volumeNeedsModal').style.display = 'flex';
+            } catch (error) {
+                console.error('Error loading volume needs:', error);
+            }
+        }
+
+        function closeVolumeNeedsModal() {
+            document.getElementById('volumeNeedsModal').style.display = 'none';
+        }
+
+        async function viewQuoteRequest(quoteId) {
+            // For now, show a simple alert with quote details
+            try {
+                const res = await fetch(`${API_URL}/api/quote-requests/${quoteId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const quote = await res.json();
+
+                const itemsList = quote.items.map(i =>
+                    `• ${i.productName} (${i.packSize || 'N/A'}): ${i.quantityNeeded} ${i.unit || 'units'}` +
+                    (i.isPriced ? ` @ $${i.sellPrice}/unit = $${i.totalPrice}` : ' - NOT PRICED')
+                ).join('\n');
+
+                alert(`Quote ${quote.quoteNumber}\nCustomer: ${quote.customerName || 'Unknown'}\nStatus: ${quote.status}\n\nItems:\n${itemsList}\n\n${quote.estimatedTotal ? 'Total: $' + quote.estimatedTotal.toLocaleString() : 'Total: Not yet priced'}`);
+            } catch (error) {
+                console.error('Error viewing quote:', error);
+            }
+        }
+
+        async function openPriceQuoteModal(quoteId) {
+            // Simplified pricing - prompt for each item
+            try {
+                const res = await fetch(`${API_URL}/api/quote-requests/${quoteId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const quote = await res.json();
+
+                const pricedItems = [];
+                for (const item of quote.items) {
+                    const price = prompt(`Enter sell price per ${item.unit || 'unit'} for:\n${item.productName} (${item.packSize || 'N/A'})\nQuantity: ${item.quantityNeeded}`, item.sellPrice || '0');
+                    if (price === null) return; // Cancelled
+
+                    pricedItems.push({
+                        _id: item._id,
+                        costPrice: parseFloat(price) * 0.7, // Estimate cost as 70% of sell
+                        adminPrice: parseFloat(price) * 0.85, // Admin at 85%
+                        sellPrice: parseFloat(price)
+                    });
+                }
+
+                // Update pricing
+                const updateRes = await fetch(`${API_URL}/api/admin/quote-requests/${quoteId}/price`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ items: pricedItems })
+                });
+
+                if (updateRes.ok) {
+                    if (confirm('Pricing saved! Send quote to customer now?')) {
+                        await fetch(`${API_URL}/api/admin/quote-requests/${quoteId}/send`, {
+                            method: 'PUT',
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        alert('Quote sent to customer!');
+                    }
+                    loadQuoteRequests();
+                } else {
+                    alert('Failed to save pricing');
+                }
+            } catch (error) {
+                console.error('Error pricing quote:', error);
+            }
+        }
+
+        async function convertQuoteToOrder(quoteId) {
+            if (!confirm('Convert this accepted quote to an order?')) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/quote-requests/${quoteId}/convert-to-order`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (res.ok) {
+                    alert('Quote converted to order successfully!');
+                    loadQuoteRequests();
+                } else {
+                    const error = await res.json();
+                    alert('Failed: ' + error.error);
+                }
+            } catch (error) {
+                console.error('Error converting quote:', error);
+            }
+        }
+
+        function openCreateQuoteModal() {
+            // Simplified quote creation - could be expanded to a full modal
+            const customerName = prompt('Customer name:');
+            if (!customerName) return;
+
+            const products = prompt('Enter products (one per line, format: ProductName, Quantity, Unit)\nExample:\nGlyphosate 4+, 100, gal\nAtrazine 4L, 50, gal');
+            if (!products) return;
+
+            const items = products.split('\n').map(line => {
+                const parts = line.split(',').map(p => p.trim());
+                return {
+                    productName: parts[0] || 'Unknown',
+                    quantityNeeded: parseInt(parts[1]) || 1,
+                    unit: parts[2] || 'unit'
+                };
+            }).filter(i => i.productName);
+
+            if (items.length === 0) {
+                alert('No valid items entered');
+                return;
+            }
+
+            // Submit the quote request
+            fetch(`${API_URL}/api/quote-requests`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    items,
+                    customerNotes: `Created by admin for: ${customerName}`
+                })
+            }).then(res => {
+                if (res.ok) {
+                    alert('Quote request created!');
+                    loadQuoteRequests();
+                } else {
+                    alert('Failed to create quote request');
+                }
+            }).catch(err => {
+                console.error('Error:', err);
+                alert('Error creating quote request');
+            });
         }
 
         // ===== LEDGER TAB =====

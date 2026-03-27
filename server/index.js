@@ -1141,6 +1141,91 @@ const supplierSchema = new mongoose.Schema({
 supplierSchema.index({ name: 1 });
 const Supplier = mongoose.model('Supplier', supplierSchema);
 
+// Quote Request Model - Customers submit quantity needed, admin provides pricing
+const quoteRequestSchema = new mongoose.Schema({
+    // Auto-generated quote number: QR-2026-00001
+    quoteNumber: { type: String, unique: true },
+
+    // Customer info
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    customerName: String,
+    customerEmail: String,
+    customerPhone: String,
+
+    // Representative (if any)
+    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    // Items requested - customer specifies product and quantity needed
+    items: [{
+        productName: { type: String, required: true },
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        category: String,
+        packSize: String,
+        unit: String,
+        quantityNeeded: { type: Number, required: true },
+
+        // Admin fills in pricing after quote review
+        costPrice: Number,        // Supplier cost (admin enters)
+        adminPrice: Number,       // Admin price
+        sellPrice: Number,        // Customer price (what they'll pay)
+        totalPrice: Number,       // sellPrice * quantityNeeded
+        priceNotes: String,       // Notes about pricing (e.g., "bulk discount applied")
+        isPriced: { type: Boolean, default: false }
+    }],
+
+    // Totals (calculated after pricing)
+    estimatedTotal: Number,
+
+    // Status workflow
+    status: {
+        type: String,
+        enum: ['submitted', 'pricing', 'quoted', 'accepted', 'declined', 'expired', 'converted'],
+        default: 'submitted'
+    },
+
+    // Important dates
+    submittedAt: { type: Date, default: Date.now },
+    pricedAt: Date,           // When admin added pricing
+    quotedAt: Date,           // When quote was sent to customer
+    expiresAt: Date,          // Quote expiration (e.g., 7 days from quoted)
+    respondedAt: Date,        // When customer accepted/declined
+
+    // If converted to order
+    convertedToOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'Order' },
+    convertedAt: Date,
+
+    // Notes
+    customerNotes: String,    // Notes from customer about their request
+    adminNotes: String,       // Internal admin notes
+
+    // Delivery info for quote
+    deliveryLocation: String,
+    preferredDeliveryDate: Date,
+
+    // Metadata
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+// Auto-generate quote number
+quoteRequestSchema.pre('save', async function(next) {
+    if (!this.quoteNumber) {
+        const year = new Date().getFullYear();
+        const count = await QuoteRequest.countDocuments();
+        this.quoteNumber = `QR-${year}-${String(count + 1).padStart(5, '0')}`;
+    }
+    next();
+});
+
+quoteRequestSchema.index({ customerId: 1 });
+quoteRequestSchema.index({ representativeId: 1 });
+quoteRequestSchema.index({ status: 1 });
+quoteRequestSchema.index({ submittedAt: -1 });
+
+const QuoteRequest = mongoose.model('QuoteRequest', quoteRequestSchema);
+
 // Purchase Order Split Model (How a PO is split between distributors)
 const purchaseOrderSplitSchema = new mongoose.Schema({
     // Link to parent purchase order
@@ -3434,6 +3519,104 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
     }
 });
 
+// Bulk update order statuses (admin only)
+app.put('/api/admin/orders/bulk-status', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { orderIds, status } = req.body;
+
+        if (!orderIds || !Array.isArray(orderIds) || orderIds.length === 0) {
+            return res.status(400).json({ error: 'No orders selected' });
+        }
+
+        if (!status) {
+            return res.status(400).json({ error: 'Status is required' });
+        }
+
+        const results = { success: [], failed: [] };
+
+        for (const orderId of orderIds) {
+            try {
+                let query = { _id: orderId };
+
+                // If not superadmin, can only update their own customers' orders
+                if (isDistributor(req.user)) {
+                    query.representativeId = req.user._id;
+                }
+
+                const order = await Order.findOne(query);
+                if (!order) {
+                    results.failed.push({ orderId, error: 'Order not found' });
+                    continue;
+                }
+
+                const oldStatus = order.status;
+
+                // Release inventory if order is being cancelled or archived
+                if ((status === 'cancelled' || status === 'archived') &&
+                    oldStatus !== 'cancelled' && oldStatus !== 'archived') {
+                    try {
+                        for (const chem of order.chemicals || []) {
+                            if (chem.chemicalId && (chem.packagesNeeded || chem.qty) > 0) {
+                                await releaseInventory({
+                                    chemicalId: chem.chemicalId,
+                                    quantity: chem.packagesNeeded || chem.qty,
+                                    location: 'main',
+                                    orderId: order._id,
+                                    orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                                    userId: req.user._id,
+                                    notes: `Bulk ${status}: inventory released`
+                                });
+                            }
+                        }
+                    } catch (invError) {
+                        console.error('Inventory release warning:', invError.message);
+                    }
+                }
+
+                // Update the order
+                order.status = status;
+                order.updatedAt = new Date();
+                await order.save();
+
+                // Auto-create ledger entry when regular order is delivered
+                if (status === 'delivered' && order.representativeId) {
+                    const existingEntry = await LedgerEntry.findOne({
+                        referenceType: 'Order',
+                        referenceId: order._id,
+                        category: 'order'
+                    });
+
+                    if (!existingEntry) {
+                        await createLedgerEntry({
+                            representativeId: order.representativeId,
+                            description: `Order delivered - ${order.crop} program, ${order.acres} acres`,
+                            amount: order.totalCost || 0,
+                            type: 'debit',
+                            category: 'order',
+                            referenceType: 'Order',
+                            referenceId: order._id,
+                            createdBy: req.user._id,
+                            notes: 'Bulk update - auto-created on delivery'
+                        });
+                    }
+                }
+
+                results.success.push(orderId);
+            } catch (err) {
+                results.failed.push({ orderId, error: err.message });
+            }
+        }
+
+        res.json({
+            message: `Updated ${results.success.length} orders`,
+            success: results.success,
+            failed: results.failed
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Archive order (admin only) - soft delete for order issues
 app.put('/api/admin/orders/:orderId/archive', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -4130,7 +4313,7 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
     }
 });
 
-// Stripe webhook for payment confirmations
+// Stripe webhook for payment confirmations (including ACH)
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
@@ -4142,31 +4325,54 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    if (event.type === 'payment_intent.succeeded') {
+    // Helper to find order by ID
+    async function findOrder(orderId, orderType) {
+        if (orderType === 'chemical') {
+            return await ChemicalOrder.findById(orderId);
+        }
+        let order = await Order.findById(orderId);
+        if (!order) {
+            order = await ChemicalOrder.findById(orderId);
+        }
+        return order;
+    }
+
+    // ACH payments go through processing state before succeeding
+    if (event.type === 'payment_intent.processing') {
         const paymentIntent = event.data.object;
         const orderId = paymentIntent.metadata.orderId;
         const orderType = paymentIntent.metadata.orderType;
 
         if (orderId) {
-            // Try to find the order in the appropriate collection
-            let order;
-            if (orderType === 'chemical') {
-                order = await ChemicalOrder.findById(orderId);
-            } else {
-                order = await Order.findById(orderId);
-                // Fallback to ChemicalOrder if not found in Order
-                if (!order) {
-                    order = await ChemicalOrder.findById(orderId);
-                }
+            const order = await findOrder(orderId, orderType);
+            if (order) {
+                order.paymentStatus = 'processing';
+                order.paymentMethod = paymentIntent.payment_method_types?.includes('us_bank_account') ? 'stripe_ach' : order.paymentMethod;
+                order.updatedAt = new Date();
+                await order.save();
+                console.log(`ACH payment processing for order ${orderId}`);
             }
+        }
+    }
+
+    if (event.type === 'payment_intent.succeeded') {
+        const paymentIntent = event.data.object;
+        const orderId = paymentIntent.metadata.orderId;
+        const orderType = paymentIntent.metadata.orderType;
+        const isACH = paymentIntent.payment_method_types?.includes('us_bank_account');
+
+        if (orderId) {
+            const order = await findOrder(orderId, orderType);
 
             if (order) {
                 order.paymentStatus = 'paid';
                 order.paidAt = new Date();
-                order.status = 'confirmed';
+                // Update status to payment_secured (matches admin workflow)
+                order.status = 'payment_secured';
+                order.paymentMethod = isACH ? 'stripe_ach' : (order.paymentMethod || 'stripe');
                 order.updatedAt = new Date();
                 await order.save();
-                console.log(`Payment confirmed for order ${orderId}`);
+                console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
             }
         }
     }
@@ -4177,21 +4383,35 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
         const orderType = paymentIntent.metadata.orderType;
 
         if (orderId) {
-            let order;
-            if (orderType === 'chemical') {
-                order = await ChemicalOrder.findById(orderId);
-            } else {
-                order = await Order.findById(orderId);
-                if (!order) {
-                    order = await ChemicalOrder.findById(orderId);
-                }
-            }
+            const order = await findOrder(orderId, orderType);
 
             if (order) {
                 order.paymentStatus = 'failed';
+                order.status = 'payment_pending'; // Reset to payment pending
                 order.updatedAt = new Date();
                 await order.save();
                 console.log(`Payment failed for order ${orderId}`);
+            }
+        }
+    }
+
+    // Handle charge events for ACH (backup confirmation)
+    if (event.type === 'charge.succeeded') {
+        const charge = event.data.object;
+        const orderId = charge.metadata?.orderId;
+        const orderType = charge.metadata?.orderType;
+        const isACH = charge.payment_method_details?.type === 'us_bank_account';
+
+        if (orderId && isACH) {
+            const order = await findOrder(orderId, orderType);
+            if (order && order.paymentStatus !== 'paid') {
+                order.paymentStatus = 'paid';
+                order.paidAt = new Date();
+                order.status = 'payment_secured';
+                order.paymentMethod = 'stripe_ach';
+                order.updatedAt = new Date();
+                await order.save();
+                console.log(`ACH charge confirmed for order ${orderId}`);
             }
         }
     }
@@ -9585,6 +9805,398 @@ app.get('/api/admin/distributor-pricing', authMiddleware, adminMiddleware, async
             .sort({ 'distributorId': 1 });
 
         res.json(pricing);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ QUOTE REQUEST / SUBMIT QUANTITY FOR BID ============
+
+// Submit a quote request (customer or admin on behalf of customer)
+app.post('/api/quote-requests', authMiddleware, async (req, res) => {
+    try {
+        const { items, customerNotes, deliveryLocation, preferredDeliveryDate, customerId } = req.body;
+
+        if (!items || items.length === 0) {
+            return res.status(400).json({ error: 'At least one item is required' });
+        }
+
+        // Determine customer
+        let targetCustomerId = req.user._id;
+        let customerName = req.user.name;
+        let customerEmail = req.user.email;
+        let customerPhone = req.user.phone;
+
+        // Admin can submit on behalf of a customer
+        if (customerId && (req.user.role === 'admin' || req.user.role === 'superadmin' || req.user.role === 'distributor')) {
+            const customer = await User.findById(customerId);
+            if (customer) {
+                targetCustomerId = customer._id;
+                customerName = customer.name;
+                customerEmail = customer.email;
+                customerPhone = customer.phone;
+            }
+        }
+
+        const quoteRequest = new QuoteRequest({
+            customerId: targetCustomerId,
+            customerName,
+            customerEmail,
+            customerPhone,
+            representativeId: req.user.role === 'customer' ? req.user.representativeId : req.user._id,
+            items: items.map(item => ({
+                productName: item.productName,
+                chemicalId: item.chemicalId,
+                category: item.category,
+                packSize: item.packSize,
+                unit: item.unit,
+                quantityNeeded: item.quantityNeeded,
+                isPriced: false
+            })),
+            customerNotes,
+            deliveryLocation,
+            preferredDeliveryDate,
+            status: 'submitted',
+            createdBy: req.user._id
+        });
+
+        await quoteRequest.save();
+
+        res.status(201).json(quoteRequest);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get quote requests (customer sees their own, admin sees all)
+app.get('/api/quote-requests', authMiddleware, async (req, res) => {
+    try {
+        let query = {};
+
+        if (req.user.role === 'customer') {
+            query.customerId = req.user._id;
+        } else if (isDistributor(req.user)) {
+            // Distributors see quotes from their customers
+            query.representativeId = req.user._id;
+        }
+        // Superadmin sees all
+
+        const quotes = await QuoteRequest.find(query)
+            .populate('customerId', 'name email')
+            .populate('representativeId', 'name')
+            .sort({ submittedAt: -1 });
+
+        res.json(quotes);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get single quote request
+app.get('/api/quote-requests/:id', authMiddleware, async (req, res) => {
+    try {
+        const quote = await QuoteRequest.findById(req.params.id)
+            .populate('customerId', 'name email phone')
+            .populate('representativeId', 'name')
+            .populate('items.chemicalId', 'productName packSize unit costPrice sellPrice');
+
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote request not found' });
+        }
+
+        // Check access
+        if (req.user.role === 'customer' && quote.customerId._id.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Add pricing to quote request items
+app.put('/api/admin/quote-requests/:id/price', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { items, adminNotes, expiresAt } = req.body;
+
+        const quote = await QuoteRequest.findById(req.params.id);
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote request not found' });
+        }
+
+        // Update pricing for each item
+        let estimatedTotal = 0;
+        for (const updatedItem of items) {
+            const item = quote.items.id(updatedItem._id);
+            if (item) {
+                item.costPrice = updatedItem.costPrice;
+                item.adminPrice = updatedItem.adminPrice;
+                item.sellPrice = updatedItem.sellPrice;
+                item.totalPrice = (updatedItem.sellPrice || 0) * item.quantityNeeded;
+                item.priceNotes = updatedItem.priceNotes;
+                item.isPriced = updatedItem.sellPrice > 0;
+                estimatedTotal += item.totalPrice;
+            }
+        }
+
+        quote.estimatedTotal = estimatedTotal;
+        quote.status = 'pricing';
+        quote.pricedAt = new Date();
+        quote.adminNotes = adminNotes;
+        quote.updatedBy = req.user._id;
+        quote.updatedAt = new Date();
+
+        if (expiresAt) {
+            quote.expiresAt = new Date(expiresAt);
+        }
+
+        await quote.save();
+
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Send quote to customer
+app.put('/api/admin/quote-requests/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const quote = await QuoteRequest.findById(req.params.id);
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote request not found' });
+        }
+
+        // Ensure all items are priced
+        const unpricedItems = quote.items.filter(i => !i.isPriced);
+        if (unpricedItems.length > 0) {
+            return res.status(400).json({ error: `${unpricedItems.length} item(s) still need pricing` });
+        }
+
+        quote.status = 'quoted';
+        quote.quotedAt = new Date();
+        quote.expiresAt = quote.expiresAt || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days default
+        quote.updatedBy = req.user._id;
+        quote.updatedAt = new Date();
+
+        await quote.save();
+
+        // TODO: Send email notification to customer
+
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Customer: Accept or decline quote
+app.put('/api/quote-requests/:id/respond', authMiddleware, async (req, res) => {
+    try {
+        const { response } = req.body; // 'accept' or 'decline'
+
+        const quote = await QuoteRequest.findById(req.params.id);
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote request not found' });
+        }
+
+        // Verify customer owns this quote
+        if (req.user.role === 'customer' && quote.customerId.toString() !== req.user._id.toString()) {
+            return res.status(403).json({ error: 'Access denied' });
+        }
+
+        if (quote.status !== 'quoted') {
+            return res.status(400).json({ error: 'Quote is not in a state that can be responded to' });
+        }
+
+        // Check expiration
+        if (quote.expiresAt && new Date() > quote.expiresAt) {
+            quote.status = 'expired';
+            await quote.save();
+            return res.status(400).json({ error: 'Quote has expired' });
+        }
+
+        if (response === 'accept') {
+            quote.status = 'accepted';
+            quote.respondedAt = new Date();
+            // Quote can now be converted to an order
+        } else if (response === 'decline') {
+            quote.status = 'declined';
+            quote.respondedAt = new Date();
+        } else {
+            return res.status(400).json({ error: 'Invalid response. Use "accept" or "decline"' });
+        }
+
+        quote.updatedAt = new Date();
+        await quote.save();
+
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Convert accepted quote to order
+app.post('/api/admin/quote-requests/:id/convert-to-order', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const quote = await QuoteRequest.findById(req.params.id)
+            .populate('customerId');
+
+        if (!quote) {
+            return res.status(404).json({ error: 'Quote request not found' });
+        }
+
+        if (quote.status !== 'accepted') {
+            return res.status(400).json({ error: 'Quote must be accepted before converting to order' });
+        }
+
+        // Create order from quote
+        const order = new Order({
+            userId: quote.customerId._id,
+            representativeId: quote.representativeId,
+            crop: 'Quote Order',
+            acres: 0,
+            chemicals: quote.items.map(item => ({
+                name: item.productName,
+                chemicalId: item.chemicalId,
+                qty: item.quantityNeeded,
+                packSize: item.packSize,
+                unit: item.unit,
+                pricePerUnit: item.sellPrice,
+                totalPrice: item.totalPrice,
+                sourceSupplier: 'Quote'
+            })),
+            totalCost: quote.estimatedTotal,
+            status: 'payment_pending',
+            paymentStatus: 'pending',
+            deliveryAddress: { notes: quote.deliveryLocation },
+            notes: `Converted from Quote ${quote.quoteNumber}`
+        });
+
+        await order.save();
+
+        // Update quote
+        quote.status = 'converted';
+        quote.convertedToOrderId = order._id;
+        quote.convertedAt = new Date();
+        quote.updatedBy = req.user._id;
+        quote.updatedAt = new Date();
+        await quote.save();
+
+        res.json({ quote, order });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Get all quote requests with filters
+app.get('/api/admin/quote-requests', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { status, repId } = req.query;
+
+        let query = {};
+        if (status) query.status = status;
+
+        if (isDistributor(req.user)) {
+            query.representativeId = req.user._id;
+        } else if (repId) {
+            query.representativeId = repId;
+        }
+
+        const quotes = await QuoteRequest.find(query)
+            .populate('customerId', 'name email')
+            .populate('representativeId', 'name')
+            .sort({ submittedAt: -1 });
+
+        res.json(quotes);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ CHEMICAL VOLUME AGGREGATOR ============
+
+// Get aggregated volume needs across all pending orders and quotes
+app.get('/api/admin/chemical-volume-needs', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { includeOrders = true, includeQuotes = true } = req.query;
+
+        const volumeNeeds = {};
+
+        // Aggregate from pending/confirmed orders
+        if (includeOrders === 'true' || includeOrders === true) {
+            const orderStatuses = ['pending', 'payment_pending', 'payment_secured', 'manufacturer_ordered'];
+            let orderQuery = { status: { $in: orderStatuses } };
+
+            if (isDistributor(req.user)) {
+                orderQuery.representativeId = req.user._id;
+            }
+
+            const orders = await Order.find(orderQuery).select('chemicals');
+
+            for (const order of orders) {
+                for (const chem of order.chemicals || []) {
+                    const key = `${chem.name || chem.productName}|${chem.packSize || 'N/A'}|${chem.unit || 'unit'}`;
+                    if (!volumeNeeds[key]) {
+                        volumeNeeds[key] = {
+                            productName: chem.name || chem.productName,
+                            packSize: chem.packSize || 'N/A',
+                            unit: chem.unit || 'unit',
+                            chemicalId: chem.chemicalId,
+                            totalQuantityOrders: 0,
+                            totalQuantityQuotes: 0,
+                            orderCount: 0,
+                            quoteCount: 0
+                        };
+                    }
+                    volumeNeeds[key].totalQuantityOrders += (chem.qty || chem.quantity || chem.packagesNeeded || 0);
+                    volumeNeeds[key].orderCount++;
+                }
+            }
+        }
+
+        // Aggregate from submitted/pricing quotes
+        if (includeQuotes === 'true' || includeQuotes === true) {
+            const quoteStatuses = ['submitted', 'pricing', 'quoted', 'accepted'];
+            let quoteQuery = { status: { $in: quoteStatuses } };
+
+            if (isDistributor(req.user)) {
+                quoteQuery.representativeId = req.user._id;
+            }
+
+            const quotes = await QuoteRequest.find(quoteQuery).select('items');
+
+            for (const quote of quotes) {
+                for (const item of quote.items || []) {
+                    const key = `${item.productName}|${item.packSize || 'N/A'}|${item.unit || 'unit'}`;
+                    if (!volumeNeeds[key]) {
+                        volumeNeeds[key] = {
+                            productName: item.productName,
+                            packSize: item.packSize || 'N/A',
+                            unit: item.unit || 'unit',
+                            chemicalId: item.chemicalId,
+                            totalQuantityOrders: 0,
+                            totalQuantityQuotes: 0,
+                            orderCount: 0,
+                            quoteCount: 0
+                        };
+                    }
+                    volumeNeeds[key].totalQuantityQuotes += (item.quantityNeeded || 0);
+                    volumeNeeds[key].quoteCount++;
+                }
+            }
+        }
+
+        // Convert to array and add totals
+        const result = Object.values(volumeNeeds).map(item => ({
+            ...item,
+            totalQuantity: item.totalQuantityOrders + item.totalQuantityQuotes,
+            sources: `${item.orderCount} orders, ${item.quoteCount} quotes`
+        }));
+
+        // Sort by total quantity descending
+        result.sort((a, b) => b.totalQuantity - a.totalQuantity);
+
+        res.json(result);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
