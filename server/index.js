@@ -2767,7 +2767,7 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
         // Update private applicator license if provided
         if (privateApplicatorLicense !== undefined) {
             customer.privateApplicatorLicense = {
-                ...customer.privateApplicatorLicense,
+                ...(customer.privateApplicatorLicense?.toObject?.() || customer.privateApplicatorLicense || {}),
                 ...privateApplicatorLicense,
                 verifiedBy: privateApplicatorLicense.hasLicense ? req.user._id : undefined,
                 verifiedAt: privateApplicatorLicense.hasLicense ? new Date() : undefined
@@ -2851,9 +2851,26 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
         const transporter = createEmailTransporter();
         if (transporter && customer.email) {
             try {
-                const chemicalsList = (chemicals || []).map(c =>
-                    `<li>${c.productName || c.name} - ${c.qty || c.quantity} ${c.unit || 'units'}</li>`
-                ).join('');
+                // Fetch chemical details to get label URLs
+                const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
+                const chemicalDetails = chemicalIds.length > 0
+                    ? await Chemical.find({ _id: { $in: chemicalIds } }).select('productName labelUrl sdsUrl')
+                    : [];
+
+                const chemicalLabelMap = {};
+                chemicalDetails.forEach(c => {
+                    chemicalLabelMap[c._id.toString()] = { labelUrl: c.labelUrl, sdsUrl: c.sdsUrl };
+                });
+
+                const chemicalsList = (chemicals || []).map(c => {
+                    const details = chemicalLabelMap[c.chemicalId] || {};
+                    const labelLink = details.labelUrl
+                        ? `<a href="${details.labelUrl}" style="color: #4a7c59; margin-left: 8px;">View Label</a>`
+                        : '';
+                    return `<li>${c.productName || c.name} - ${c.qty || c.quantity} ${c.unit || 'units'}${labelLink}</li>`;
+                }).join('');
+
+                const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
 
                 await transporter.sendMail({
                     from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
@@ -2883,8 +2900,21 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                                     ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
                                 </div>
 
+                                <div style="background: #d1fae5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #10b981;">
+                                    <h4 style="margin-top: 0; color: #065f46;">Ready to Pay?</h4>
+                                    <p style="margin-bottom: 10px; color: #065f46;">Pay securely via bank transfer (ACH) - no fees, fast processing.</p>
+                                    <a href="${frontendUrl}/my-orders.html" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 600;">Pay with ACH Bank Transfer</a>
+                                    <p style="margin-top: 10px; font-size: 12px; color: #065f46;">Or pay by check - contact your representative for details.</p>
+                                </div>
+
+                                <div style="background: #fff3cd; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #ffc107;">
+                                    <h4 style="margin-top: 0; color: #856404;">Product Labels & Safety Data Sheets</h4>
+                                    <p style="margin-bottom: 10px; color: #856404;">Access EPA-approved labels and SDS documents for all products in your order:</p>
+                                    <a href="${frontendUrl}/chemical-docs.html" style="background: #4a7c59; color: white; padding: 8px 16px; text-decoration: none; border-radius: 5px; display: inline-block;">View All Labels & SDS</a>
+                                </div>
+
                                 <p>Log in to your dashboard to view and manage your order:</p>
-                                <p><a href="${process.env.FRONTEND_URL || 'https://acreprofit.com'}/dashboard.html" style="background: #4a7c59; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Dashboard</a></p>
+                                <p><a href="${frontendUrl}/dashboard.html" style="background: #4a7c59; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View Dashboard</a></p>
 
                                 <p>If you have any questions, please contact your representative.</p>
                             </div>
