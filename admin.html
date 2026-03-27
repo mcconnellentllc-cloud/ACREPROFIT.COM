@@ -1015,7 +1015,7 @@
                                 <th>Supplier</th>
                                 <th>Pack Size</th>
                                 <th>Cost</th>
-                                <th>Admin Margin</th>
+                                <th>Admin Margin $</th>
                                 <th>Margin $</th>
                                 <th>Sell Price</th>
                                 <th>Inventory</th>
@@ -1094,15 +1094,21 @@
                             <div class="form-row" style="background: var(--secondary); padding: 16px; border-radius: var(--radius);">
                                 <div class="form-group">
                                     <label>Cost Price (per unit) *</label>
-                                    <input type="number" id="addProductCostPrice" required step="0.01" min="0" placeholder="What you pay" oninput="calcMarginPreview()">
+                                    <input type="number" id="addProductCostPrice" required step="0.01" min="0" placeholder="What you pay" oninput="calcPricePreview()">
                                 </div>
                                 <div class="form-group">
-                                    <label>Sell Price (per unit) *</label>
-                                    <input type="number" id="addProductSellPrice" required step="0.01" min="0" placeholder="What customers pay" oninput="calcMarginPreview()">
+                                    <label>Admin Margin $ *</label>
+                                    <input type="number" id="addProductAdminMargin" required step="0.01" min="0" placeholder="Acre Profit margin" oninput="calcPricePreview()">
+                                    <small style="color: var(--text-muted);">Added to cost for admin price</small>
                                 </div>
                                 <div class="form-group">
-                                    <label>Margin Preview</label>
-                                    <div id="marginPreview" style="padding: 10px 14px; background: var(--white); border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;">--%</div>
+                                    <label>Margin $ *</label>
+                                    <input type="number" id="addProductMarginDollars" required step="0.01" min="0" placeholder="Rep commission per unit" oninput="calcPricePreview()">
+                                    <small style="color: var(--text-muted);">Added to admin price for sell price</small>
+                                </div>
+                                <div class="form-group">
+                                    <label>Sell Price Preview</label>
+                                    <div id="marginPreview" style="padding: 10px 14px; background: var(--white); border-radius: var(--radius); font-weight: 700; font-size: 1.1rem;">$0.00</div>
                                 </div>
                             </div>
 
@@ -2877,13 +2883,13 @@
                 const adminPrice = p.adminPrice || costPrice;
                 const sellPrice = p.sellPrice || adminPrice;
 
-                // Admin margin: the % markup from cost to admin price
-                const adminMarginPct = p.adminMargin || (costPrice > 0 ? ((adminPrice - costPrice) / costPrice * 100) : 0);
-                const adminMarginColor = adminMarginPct >= 10 ? '#059669' : adminMarginPct >= 5 ? '#d97706' : '#dc2626';
+                // Admin margin $: dollar amount from cost to admin price
+                const adminMarginDollars = p.adminMarginDollars !== undefined ? p.adminMarginDollars : (adminPrice - costPrice);
+                const adminMarginColor = adminMarginDollars >= 1 ? '#059669' : adminMarginDollars >= 0.50 ? '#d97706' : '#dc2626';
 
-                // Margin $: the profit per unit (sell - cost)
-                const marginDollars = sellPrice - costPrice;
-                const marginDollarColor = marginDollars >= 3 ? '#059669' : marginDollars >= 1 ? '#d97706' : '#dc2626';
+                // Margin $: dollar amount from admin to sell price (rep commission)
+                const marginDollars = p.marginDollars !== undefined ? p.marginDollars : (sellPrice - adminPrice);
+                const marginDollarColor = marginDollars >= 1 ? '#059669' : marginDollars >= 0.50 ? '#d97706' : '#dc2626';
 
                 const inventory = p.quantityOnHand || 0;
                 const inventoryColor = inventory === 0 ? '#dc2626' : inventory < 10 ? '#d97706' : '#059669';
@@ -2904,8 +2910,8 @@
                     <td>${p.packSize} <small>(${p.unit})</small></td>
                     <td>$${costPrice.toFixed(2)}</td>
                     <td>
-                        <span style="color: ${adminMarginColor}; font-weight: 700;">${adminMarginPct.toFixed(1)}%</span>
-                        <br><small style="color: var(--text-muted);">$${adminPrice.toFixed(2)}</small>
+                        <span style="color: ${adminMarginColor}; font-weight: 700;">$${adminMarginDollars.toFixed(2)}</span>
+                        <br><small style="color: var(--text-muted);">Admin: $${adminPrice.toFixed(2)}</small>
                     </td>
                     <td>
                         <span style="color: ${marginDollarColor}; font-weight: 700;">$${marginDollars.toFixed(2)}</span>
@@ -2927,25 +2933,26 @@
         function openAddProductModal() {
             document.getElementById('addProductModal').style.display = 'flex';
             document.getElementById('addProductForm').reset();
-            document.getElementById('marginPreview').textContent = '--%';
+            document.getElementById('marginPreview').textContent = '$0.00';
         }
 
         function closeAddProductModal() {
             document.getElementById('addProductModal').style.display = 'none';
         }
 
-        function calcMarginPreview() {
+        function calcPricePreview() {
             const cost = parseFloat(document.getElementById('addProductCostPrice').value) || 0;
-            const sell = parseFloat(document.getElementById('addProductSellPrice').value) || 0;
+            const adminMargin = parseFloat(document.getElementById('addProductAdminMargin').value) || 0;
+            const marginDollars = parseFloat(document.getElementById('addProductMarginDollars').value) || 0;
             const preview = document.getElementById('marginPreview');
 
-            if (cost > 0 && sell > 0) {
-                const margin = ((sell - cost) / sell * 100).toFixed(1);
-                const profit = (sell - cost).toFixed(2);
-                const color = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
-                preview.innerHTML = `<span style="color: ${color}">${margin}%</span> <small>($${profit}/unit)</small>`;
+            const adminPrice = cost + adminMargin;
+            const sellPrice = adminPrice + marginDollars;
+
+            if (cost > 0) {
+                preview.innerHTML = `<span style="color: #059669; font-weight: 700;">$${sellPrice.toFixed(2)}</span>`;
             } else {
-                preview.textContent = '--%';
+                preview.textContent = '$0.00';
             }
         }
 
@@ -2967,7 +2974,11 @@
             const unit = document.getElementById('addProductUnit').value.trim();
             const unitsPerPack = parseInt(document.getElementById('addProductUnitsPerPack').value) || undefined;
             const costPrice = parseFloat(document.getElementById('addProductCostPrice').value);
-            const sellPrice = parseFloat(document.getElementById('addProductSellPrice').value);
+            const adminMarginDollars = parseFloat(document.getElementById('addProductAdminMargin').value) || 0;
+            const marginDollars = parseFloat(document.getElementById('addProductMarginDollars').value) || 0;
+            // Calculate prices from dollar amounts
+            const adminPrice = costPrice + adminMarginDollars;
+            const sellPrice = adminPrice + marginDollars;
             const notes = document.getElementById('addProductNotes').value.trim();
 
             // Active Ingredients (comma-separated)
@@ -2997,7 +3008,7 @@
             // Set requiresApplicatorVerification if RUP
             const requiresApplicatorVerification = isRestrictedUse;
 
-            if (!productName || !sourceSupplier || !packSize || !unit || isNaN(costPrice) || isNaN(sellPrice)) {
+            if (!productName || !sourceSupplier || !packSize || !unit || isNaN(costPrice)) {
                 alert('Please fill in all required fields');
                 return;
             }
@@ -3010,7 +3021,8 @@
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        productName, sourceSupplier, category, packSize, unit, costPrice, sellPrice, unitsPerPack, notes,
+                        productName, sourceSupplier, category, packSize, unit, costPrice, adminPrice, sellPrice,
+                        adminMarginDollars, marginDollars, unitsPerPack, notes,
                         activeIngredients,
                         // Compliance fields
                         epaRegistrationNumber, signalWord, isRestrictedUse, rupStates, requiredCertifications,
