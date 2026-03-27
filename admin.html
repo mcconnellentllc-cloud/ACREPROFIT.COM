@@ -38,15 +38,37 @@
                 <div class="admin-tabs" id="adminTabs">
                     <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
                     <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
+
+                    <!-- Inventory Dropdown -->
+                    <div class="admin-tab-dropdown">
+                        <button class="admin-tab dropdown-trigger" id="inventoryDropdown">
+                            Inventory <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="#products" class="dropdown-item" data-tab="products">Products Catalog</a>
+                            <a href="#inventory" class="dropdown-item" data-tab="inventory">Stock Levels</a>
+                            <a href="#purchase-orders" class="dropdown-item" data-tab="purchase-orders">Purchase Orders</a>
+                            <a href="#suppliers" class="dropdown-item" data-tab="suppliers">Suppliers</a>
+                        </div>
+                    </div>
+
                     <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
-                    <a href="#products" class="admin-tab" data-tab="products">Products</a>
+                    <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
-                    <a href="#purchase-orders" class="admin-tab" data-tab="purchase-orders">Purchase Orders</a>
-                    <a href="#compliance" class="admin-tab tab-warning" data-tab="compliance">Compliance</a>
-                    <span id="commissionsNav" style="display: none;"><a href="#commissions" class="admin-tab" data-tab="commissions">Commissions</a></span>
-                    <span id="inventoryNav" style="display: none;"><a href="#inventory" class="admin-tab" data-tab="inventory">Inventory</a></span>
+
+                    <!-- AcreProfit Business Dropdown -->
+                    <div class="admin-tab-dropdown">
+                        <button class="admin-tab dropdown-trigger" id="businessDropdown">
+                            AcreProfit Business <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="#compliance" class="dropdown-item tab-warning-item" data-tab="compliance">Compliance</a>
+                            <a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a>
+                            <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
+                        </div>
+                    </div>
+
                     <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
-                    <span id="companySettingsNav" style="display: none;"><a href="#company-settings" class="admin-tab" data-tab="company-settings">Company</a></span>
                 </div>
                 <button class="admin-tabs-scroll-btn right" onclick="scrollTabs(200)" aria-label="Scroll tabs right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -86,15 +108,15 @@
                         <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="overview-card" onclick="switchTab('products')" style="cursor: pointer;">
+                    <div class="overview-card" onclick="switchTab('inventory')" style="cursor: pointer;">
                         <div class="overview-card-icon" style="background: #dbeafe; color: #2563eb;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
                         </div>
                         <div class="overview-card-content">
-                            <h2>Products</h2>
+                            <h2>Inventory</h2>
                             <div class="overview-card-stats">
                                 <span class="big-number" id="totalProductsCount">0</span>
-                                <span class="stat-detail">Products</span>
+                                <span class="stat-detail">Products in Stock</span>
                             </div>
                             <div class="overview-card-sub">
                                 <span><strong id="lowStockProducts">0</strong> low stock</span>
@@ -121,7 +143,24 @@
                         <div class="overview-card-arrow">→</div>
                     </div>
 
-                    <div class="overview-card" onclick="switchTab('company-settings')" style="cursor: pointer;">
+                    <div class="overview-card" onclick="switchTab('distributors')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #ecfdf5; color: #059669;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        </div>
+                        <div class="overview-card-content">
+                            <h2>Distributors</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="totalDistributorsCount">5</span>
+                                <span class="stat-detail">Active Distributors</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span>Suppliers: <strong>Jabco, Corbet</strong></span>
+                            </div>
+                        </div>
+                        <div class="overview-card-arrow">→</div>
+                    </div>
+
+                    <div class="overview-card" onclick="switchTab('compliance')" style="cursor: pointer;">
                         <div class="overview-card-icon" style="background: #f3e8ff; color: #7c3aed;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                         </div>
@@ -856,6 +895,220 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path><polyline points="22,6 12,13 2,6"></polyline></svg>
                             Send to Customer
                         </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Distributors Tab -->
+            <div id="distributorsTab" class="tab-content">
+                <div class="tab-header">
+                    <div>
+                        <h2>Distributors</h2>
+                        <p class="tab-subtitle">Manage your distribution network - track inventory splits and supplier relationships</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddDistributorModal()">+ Add Distributor</button>
+                </div>
+
+                <!-- Distributor Stats -->
+                <div class="stats-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalDistributors">5</span>
+                            <span class="stat-label">Active Distributors</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalSuppliers">2</span>
+                            <span class="stat-label">Suppliers (Jabco, Corbet)</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="distributorInventoryValue">$0</span>
+                            <span class="stat-label">Total Inventory Value</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Distributors Grid -->
+                <div class="distributors-grid" id="distributorsGrid">
+                    <div class="distributor-card">
+                        <div class="distributor-header">
+                            <div class="distributor-avatar">D1</div>
+                            <div class="distributor-info">
+                                <h3>Distributor 1</h3>
+                                <span class="distributor-location">Location TBD</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="distributor-stats">
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">$0</span>
+                                <span class="dist-stat-label">Inventory</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Orders</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Customers</span>
+                            </div>
+                        </div>
+                        <div class="distributor-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(1)">View Inventory</button>
+                            <button class="btn btn-sm btn-outline" onclick="editDistributor(1)">Edit</button>
+                        </div>
+                    </div>
+
+                    <div class="distributor-card">
+                        <div class="distributor-header">
+                            <div class="distributor-avatar">D2</div>
+                            <div class="distributor-info">
+                                <h3>Distributor 2</h3>
+                                <span class="distributor-location">Location TBD</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="distributor-stats">
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">$0</span>
+                                <span class="dist-stat-label">Inventory</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Orders</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Customers</span>
+                            </div>
+                        </div>
+                        <div class="distributor-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(2)">View Inventory</button>
+                            <button class="btn btn-sm btn-outline" onclick="editDistributor(2)">Edit</button>
+                        </div>
+                    </div>
+
+                    <div class="distributor-card">
+                        <div class="distributor-header">
+                            <div class="distributor-avatar">D3</div>
+                            <div class="distributor-info">
+                                <h3>Distributor 3</h3>
+                                <span class="distributor-location">Location TBD</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="distributor-stats">
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">$0</span>
+                                <span class="dist-stat-label">Inventory</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Orders</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Customers</span>
+                            </div>
+                        </div>
+                        <div class="distributor-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(3)">View Inventory</button>
+                            <button class="btn btn-sm btn-outline" onclick="editDistributor(3)">Edit</button>
+                        </div>
+                    </div>
+
+                    <div class="distributor-card">
+                        <div class="distributor-header">
+                            <div class="distributor-avatar">D4</div>
+                            <div class="distributor-info">
+                                <h3>Distributor 4</h3>
+                                <span class="distributor-location">Location TBD</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="distributor-stats">
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">$0</span>
+                                <span class="dist-stat-label">Inventory</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Orders</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Customers</span>
+                            </div>
+                        </div>
+                        <div class="distributor-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(4)">View Inventory</button>
+                            <button class="btn btn-sm btn-outline" onclick="editDistributor(4)">Edit</button>
+                        </div>
+                    </div>
+
+                    <div class="distributor-card">
+                        <div class="distributor-header">
+                            <div class="distributor-avatar">D5</div>
+                            <div class="distributor-info">
+                                <h3>Distributor 5</h3>
+                                <span class="distributor-location">Location TBD</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="distributor-stats">
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">$0</span>
+                                <span class="dist-stat-label">Inventory</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Orders</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Customers</span>
+                            </div>
+                        </div>
+                        <div class="distributor-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(5)">View Inventory</button>
+                            <button class="btn btn-sm btn-outline" onclick="editDistributor(5)">Edit</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suppliers Section -->
+                <div class="card" style="margin-top: 24px;">
+                    <div class="card-header">
+                        <h3>Suppliers</h3>
+                        <button class="btn btn-sm btn-outline" onclick="openAddSupplierModal()">+ Add Supplier</button>
+                    </div>
+                    <div class="suppliers-list">
+                        <div class="supplier-row">
+                            <div class="supplier-info">
+                                <strong>Jabco</strong>
+                                <span class="supplier-contact">Contact sales rep for details</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
+                        <div class="supplier-row">
+                            <div class="supplier-info">
+                                <strong>Corbet</strong>
+                                <span class="supplier-contact">Contact sales rep for details</span>
+                            </div>
+                            <span class="status-badge status-active">Active</span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1857,6 +2110,109 @@
                 </div>
             </div>
 
+            <!-- Suppliers Tab -->
+            <div id="suppliersTab" class="tab-content">
+                <div class="tab-header">
+                    <div>
+                        <h2>Suppliers</h2>
+                        <p class="tab-subtitle">Manage supplier relationships and contact information</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openAddSupplierModal()">+ Add Supplier</button>
+                </div>
+
+                <!-- Supplier Stats -->
+                <div class="stats-grid" style="margin-bottom: 24px;">
+                    <div class="stat-card">
+                        <div class="stat-icon green">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalSuppliersCount">2</span>
+                            <span class="stat-label">Active Suppliers</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon blue">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalPOsFromSuppliers">0</span>
+                            <span class="stat-label">Purchase Orders</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon purple">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="stat-content">
+                            <span class="stat-value" id="totalPurchasedFromSuppliers">$0</span>
+                            <span class="stat-label">Total Purchased</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Suppliers Table -->
+                <div class="orders-table-wrapper">
+                    <table class="admin-table" id="suppliersTable">
+                        <thead>
+                            <tr>
+                                <th>Supplier Name</th>
+                                <th>Contact Name</th>
+                                <th>Phone</th>
+                                <th>Email</th>
+                                <th>Total Orders</th>
+                                <th>Total Value</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="suppliersTableBody">
+                            <tr>
+                                <td><strong>Jabco</strong></td>
+                                <td>Sales Rep</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>0</td>
+                                <td>$0</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline" onclick="editSupplier('jabco')">Edit</button>
+                                    <button class="btn btn-sm btn-outline" onclick="viewSupplierOrders('jabco')">View POs</button>
+                                </td>
+                            </tr>
+                            <tr>
+                                <td><strong>Corbet</strong></td>
+                                <td>Sales Rep</td>
+                                <td>-</td>
+                                <td>-</td>
+                                <td>0</td>
+                                <td>$0</td>
+                                <td><span class="status-badge status-active">Active</span></td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline" onclick="editSupplier('corbet')">Edit</button>
+                                    <button class="btn btn-sm btn-outline" onclick="viewSupplierOrders('corbet')">View POs</button>
+                                </td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Supplier Notes -->
+                <div class="card" style="margin-top: 24px; background: #f0fdf4; border: 2px solid #22c55e;">
+                    <div class="card-header">
+                        <h3 style="color: #166534;">Supplier Quick Reference</h3>
+                    </div>
+                    <div style="padding: 0 20px 20px;">
+                        <p style="color: #166534; margin-bottom: 12px;">Use this page to manage your supplier contacts. When creating Purchase Orders, you can quickly select from saved suppliers.</p>
+                        <ul style="color: #166534; padding-left: 20px;">
+                            <li>Add complete contact info for quick ordering</li>
+                            <li>Track purchase history by supplier</li>
+                            <li>View all POs from each supplier</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
             <!-- Add Inventory Modal -->
             <div class="modal-overlay" id="addInventoryModal" style="display: none;">
                 <div class="modal-content customer-modal-content">
@@ -2069,6 +2425,8 @@
                                 <label>Select Existing Supplier</label>
                                 <select id="poSupplierSelect" onchange="fillSupplierInfo()" style="padding: 10px; border: 2px solid var(--border); border-radius: 8px;">
                                     <option value="">-- New Supplier --</option>
+                                    <option value="jabco" data-name="Jabco" data-contact="Sales Rep" data-phone="" data-email="">Jabco</option>
+                                    <option value="corbet" data-name="Corbet" data-contact="Sales Rep" data-phone="" data-email="">Corbet</option>
                                 </select>
                             </div>
                             <div class="form-row">
@@ -2682,23 +3040,32 @@
 
         // Function to switch tabs programmatically (used by overview cards)
         window.switchTab = function(tabName) {
-            const tabEl = document.querySelector(`.admin-tab[data-tab="${tabName}"]`);
+            // Try regular admin-tab first
+            let tabEl = document.querySelector(`.admin-tab[data-tab="${tabName}"]`);
+            // If not found, try dropdown-item
+            if (!tabEl) {
+                tabEl = document.querySelector(`.dropdown-item[data-tab="${tabName}"]`);
+            }
             if (tabEl) {
                 tabEl.click();
             }
         };
 
-        // Tab navigation
-        document.querySelectorAll('.admin-tab').forEach(tab => {
+        // Tab navigation - regular tabs
+        document.querySelectorAll('.admin-tab:not(.dropdown-trigger)').forEach(tab => {
             tab.addEventListener('click', function(e) {
                 e.preventDefault();
                 const tabName = this.dataset.tab;
+                if (!tabName) return;
 
+                // Remove active from all tabs and dropdown triggers
                 document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.dropdown-item').forEach(t => t.classList.remove('active'));
                 document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
 
                 this.classList.add('active');
-                document.getElementById(tabName + 'Tab').classList.add('active');
+                const tabContent = document.getElementById(tabName + 'Tab');
+                if (tabContent) tabContent.classList.add('active');
 
                 // Lazy-load tab data
                 if (tabName === 'products' && allProducts.length === 0) loadProducts();
@@ -2706,8 +3073,55 @@
                 if (tabName === 'purchase-orders') loadPurchaseOrders();
                 if (tabName === 'compliance') loadComplianceDashboard();
                 if (tabName === 'inventory') loadInventory();
+                if (tabName === 'distributors') loadDistributors();
+                if (tabName === 'suppliers') loadSuppliers();
             });
         });
+
+        // Tab navigation - dropdown items
+        document.querySelectorAll('.dropdown-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.preventDefault();
+                const tabName = this.dataset.tab;
+                if (!tabName) return;
+
+                // Remove active from all tabs and dropdown items
+                document.querySelectorAll('.admin-tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.dropdown-item').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+
+                // Mark this item and its parent dropdown trigger as active
+                this.classList.add('active');
+                const dropdown = this.closest('.admin-tab-dropdown');
+                if (dropdown) {
+                    const trigger = dropdown.querySelector('.dropdown-trigger');
+                    if (trigger) trigger.classList.add('active');
+                }
+
+                const tabContent = document.getElementById(tabName + 'Tab');
+                if (tabContent) tabContent.classList.add('active');
+
+                // Lazy-load tab data
+                if (tabName === 'products' && allProducts.length === 0) loadProducts();
+                if (tabName === 'ledger') loadLedger();
+                if (tabName === 'purchase-orders') loadPurchaseOrders();
+                if (tabName === 'compliance') loadComplianceDashboard();
+                if (tabName === 'inventory') loadInventory();
+                if (tabName === 'distributors') loadDistributors();
+                if (tabName === 'suppliers') loadSuppliers();
+            });
+        });
+
+        // Placeholder functions for new tabs
+        function loadDistributors() {
+            // Future: Load distributor data from API
+            console.log('Loading distributors...');
+        }
+
+        function loadSuppliers() {
+            // Future: Load supplier data from API
+            console.log('Loading suppliers...');
+        }
 
         // Handle URL hash for direct tab links
         if (window.location.hash) {
@@ -6836,7 +7250,22 @@
                 }
 
                 const result = await res.json();
-                alert(`${result.message}\n\nProducts added: ${result.created.length}\nAlready existed: ${result.skipped}`);
+                console.log('Sync result:', result); // Debug output
+
+                let message = `${result.message}\n\nTotal products in catalog: ${result.totalProducts}\nProducts added to inventory: ${result.created.length}\nAlready in inventory: ${result.skipped}`;
+
+                if (result.created.length > 0) {
+                    message += `\n\nAdded:\n${result.created.slice(0, 10).join('\n')}`;
+                    if (result.created.length > 10) {
+                        message += `\n...and ${result.created.length - 10} more`;
+                    }
+                }
+
+                if (result.errors && result.errors.length > 0) {
+                    message += `\n\nErrors (${result.errors.length}):\n${result.errors.map(e => `${e.name}: ${e.error}`).join('\n')}`;
+                }
+
+                alert(message);
                 loadInventory();
             } catch (error) {
                 console.error('Error syncing products:', error);

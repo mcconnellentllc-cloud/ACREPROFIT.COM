@@ -7530,46 +7530,65 @@ app.post('/api/admin/inventory/sync', authMiddleware, adminMiddleware, async (re
     try {
         const { location = 'main' } = req.body;
 
-        // Get all chemicals
-        const chemicals = await Chemical.find({});
+        // Get all chemicals (active products)
+        const chemicals = await Chemical.find({ isActive: { $ne: false } });
 
         // Get existing inventory records for this location
         const existingInventory = await Inventory.find({ location });
-        const existingChemicalIds = new Set(existingInventory.map(i => i.chemicalId.toString()));
+
+        // Build sets for matching - by chemicalId AND by productName+packSize
+        const existingChemicalIds = new Set(existingInventory.map(i => i.chemicalId?.toString()).filter(Boolean));
+        const existingProductKeys = new Set(existingInventory.map(i => `${i.productName?.toLowerCase()}_${i.packSize?.toLowerCase()}`));
 
         const created = [];
         const skipped = [];
+        const errors = [];
 
         for (const chem of chemicals) {
-            if (existingChemicalIds.has(chem._id.toString())) {
-                skipped.push(chem.productName);
+            const chemIdStr = chem._id.toString();
+            const productKey = `${chem.productName?.toLowerCase()}_${chem.packSize?.toLowerCase()}`;
+
+            // Skip if already exists by chemicalId OR by product name + pack size
+            if (existingChemicalIds.has(chemIdStr)) {
+                skipped.push({ name: chem.productName, packSize: chem.packSize, reason: 'chemicalId exists' });
+                continue;
+            }
+            if (existingProductKeys.has(productKey)) {
+                skipped.push({ name: chem.productName, packSize: chem.packSize, reason: 'name+packSize exists' });
                 continue;
             }
 
-            const inventory = new Inventory({
-                chemicalId: chem._id,
-                productName: chem.productName,
-                packSize: chem.packSize,
-                unit: chem.unit,
-                location,
-                quantityOnHand: 0,
-                quantityReserved: 0,
-                quantityAvailable: 0,
-                averageCost: chem.costPrice || 0,
-                lastCost: chem.costPrice || 0,
-                reorderPoint: 0,
-                reorderQuantity: 0
-            });
+            try {
+                const inventory = new Inventory({
+                    chemicalId: chem._id,
+                    productName: chem.productName,
+                    packSize: chem.packSize,
+                    unit: chem.unit,
+                    location,
+                    quantityOnHand: 0,
+                    quantityReserved: 0,
+                    quantityAvailable: 0,
+                    averageCost: chem.costPrice || 0,
+                    lastCost: chem.costPrice || 0,
+                    reorderPoint: 0,
+                    reorderQuantity: 0
+                });
 
-            await inventory.save();
-            created.push(chem.productName);
+                await inventory.save();
+                created.push(`${chem.productName} (${chem.packSize})`);
+            } catch (err) {
+                errors.push({ name: chem.productName, packSize: chem.packSize, error: err.message });
+            }
         }
 
         res.json({
             success: true,
             message: `Synced ${created.length} products to inventory`,
             created,
-            skipped: skipped.length
+            skipped: skipped.length,
+            skippedDetails: skipped,
+            errors: errors.length > 0 ? errors : undefined,
+            totalProducts: chemicals.length
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
