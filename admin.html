@@ -1014,13 +1014,13 @@
                                 <th>Product</th>
                                 <th>Supplier</th>
                                 <th>Pack Size</th>
-                                <th>Cost Price</th>
+                                <th>Cost</th>
+                                <th>Admin Margin</th>
+                                <th>Margin $</th>
                                 <th>Sell Price</th>
-                                <th>Margin %</th>
                                 <th>Inventory</th>
                                 <th>Units Sold</th>
                                 <th>Revenue</th>
-                                <th>Added By</th>
                             </tr>
                         </thead>
                         <tbody id="productsTableBody">
@@ -1066,8 +1066,9 @@
                                     </select>
                                 </div>
                                 <div class="form-group">
-                                    <label>Crops</label>
-                                    <input type="text" id="addProductCrops" placeholder="corn, wheat, soybeans">
+                                    <label>Active Ingredient(s)</label>
+                                    <input type="text" id="addProductActiveIngredients" placeholder="e.g., Glyphosate, 2,4-D">
+                                    <small style="color: var(--text-muted);">Comma-separated for multiple</small>
                                 </div>
                             </div>
                             <div class="form-row">
@@ -2847,10 +2848,15 @@
 
             let filtered = allProducts;
             if (search) {
-                filtered = filtered.filter(p =>
-                    p.productName.toLowerCase().includes(search) ||
-                    p.sourceSupplier.toLowerCase().includes(search)
-                );
+                filtered = filtered.filter(p => {
+                    const nameMatch = p.productName.toLowerCase().includes(search);
+                    const supplierMatch = p.sourceSupplier.toLowerCase().includes(search);
+                    // Search active ingredients too
+                    const aiMatch = p.activeIngredients && p.activeIngredients.some(
+                        ai => ai.name && ai.name.toLowerCase().includes(search)
+                    );
+                    return nameMatch || supplierMatch || aiMatch;
+                });
             }
             if (category) {
                 filtered = filtered.filter(p => p.category === category);
@@ -2867,33 +2873,51 @@
             }
 
             tbody.innerHTML = products.map(p => {
-                const margin = p.margin || 0;
-                const marginColor = margin >= 20 ? '#059669' : margin >= 10 ? '#d97706' : '#dc2626';
-                const profit = p.sellPrice - p.costPrice;
+                const costPrice = p.costPrice || 0;
+                const adminPrice = p.adminPrice || costPrice;
+                const sellPrice = p.sellPrice || adminPrice;
+
+                // Admin margin: the % markup from cost to admin price
+                const adminMarginPct = p.adminMargin || (costPrice > 0 ? ((adminPrice - costPrice) / costPrice * 100) : 0);
+                const adminMarginColor = adminMarginPct >= 10 ? '#059669' : adminMarginPct >= 5 ? '#d97706' : '#dc2626';
+
+                // Margin $: the profit per unit (sell - cost)
+                const marginDollars = sellPrice - costPrice;
+                const marginDollarColor = marginDollars >= 3 ? '#059669' : marginDollars >= 1 ? '#d97706' : '#dc2626';
+
                 const inventory = p.quantityOnHand || 0;
                 const inventoryColor = inventory === 0 ? '#dc2626' : inventory < 10 ? '#d97706' : '#059669';
+
+                // Format active ingredients for display
+                const activeIngredientsDisplay = p.activeIngredients && p.activeIngredients.length
+                    ? p.activeIngredients.map(ai => ai.name).join(', ')
+                    : '';
 
                 return `
                 <tr>
                     <td>
                         <strong>${p.productName}</strong>
-                        <br><small style="color:var(--text-muted)">${p.category || ''}</small>
+                        ${activeIngredientsDisplay ? `<br><small style="color:var(--text-muted)">${activeIngredientsDisplay}</small>` : ''}
+                        <br><small style="color:var(--text-muted); font-style:italic;">${p.category || ''}</small>
                     </td>
                     <td>${p.sourceSupplier}</td>
                     <td>${p.packSize} <small>(${p.unit})</small></td>
-                    <td>$${p.costPrice.toFixed(2)}</td>
-                    <td>$${p.sellPrice.toFixed(2)}</td>
+                    <td>$${costPrice.toFixed(2)}</td>
                     <td>
-                        <span style="color: ${marginColor}; font-weight: 700;">${margin.toFixed(1)}%</span>
-                        <br><small style="color: ${marginColor}">$${profit.toFixed(2)}/unit</small>
+                        <span style="color: ${adminMarginColor}; font-weight: 700;">${adminMarginPct.toFixed(1)}%</span>
+                        <br><small style="color: var(--text-muted);">$${adminPrice.toFixed(2)}</small>
                     </td>
+                    <td>
+                        <span style="color: ${marginDollarColor}; font-weight: 700;">$${marginDollars.toFixed(2)}</span>
+                        <br><small style="color: var(--text-muted);">/unit</small>
+                    </td>
+                    <td>$${sellPrice.toFixed(2)}</td>
                     <td>
                         <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
                         ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
                     </td>
                     <td>${p.unitsSold || 0}</td>
                     <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
-                    <td style="font-size:0.8rem;">${p.createdBy?.name || '-'}</td>
                 </tr>
                 `;
             }).join('');
@@ -2939,14 +2963,18 @@
             const productName = document.getElementById('addProductName').value.trim();
             const sourceSupplier = document.getElementById('addProductSupplier').value.trim();
             const category = document.getElementById('addProductCategory').value;
-            const cropsStr = document.getElementById('addProductCrops').value.trim();
-            const crops = cropsStr ? cropsStr.split(',').map(c => c.trim()).filter(c => c) : [];
             const packSize = document.getElementById('addProductPackSize').value.trim();
             const unit = document.getElementById('addProductUnit').value.trim();
             const unitsPerPack = parseInt(document.getElementById('addProductUnitsPerPack').value) || undefined;
             const costPrice = parseFloat(document.getElementById('addProductCostPrice').value);
             const sellPrice = parseFloat(document.getElementById('addProductSellPrice').value);
             const notes = document.getElementById('addProductNotes').value.trim();
+
+            // Active Ingredients (comma-separated)
+            const activeIngredientsStr = document.getElementById('addProductActiveIngredients').value.trim();
+            const activeIngredients = activeIngredientsStr
+                ? activeIngredientsStr.split(',').map(ai => ({ name: ai.trim() })).filter(ai => ai.name)
+                : [];
 
             // Compliance fields
             const epaRegistrationNumber = document.getElementById('addProductEpaReg').value.trim();
@@ -2961,9 +2989,6 @@
             if (document.getElementById('addProductReqCommercial').checked) requiredCertifications.push('commercial_applicator');
             if (document.getElementById('addProductReqParaquat').checked) requiredCertifications.push('paraquat_training');
             if (document.getElementById('addProductReqDicamba').checked) requiredCertifications.push('dicamba_training');
-
-            const activeIngredientStr = document.getElementById('addProductActiveIngredient').value.trim();
-            const activeIngredients = activeIngredientStr ? [{ name: activeIngredientStr }] : [];
             const manufacturer = document.getElementById('addProductManufacturer').value.trim();
             const sdsUrl = document.getElementById('addProductSdsUrl').value.trim();
             const labelUrl = document.getElementById('addProductLabelUrl').value.trim();
@@ -2985,10 +3010,11 @@
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
-                        productName, sourceSupplier, category, crops, packSize, unit, costPrice, sellPrice, unitsPerPack, notes,
+                        productName, sourceSupplier, category, packSize, unit, costPrice, sellPrice, unitsPerPack, notes,
+                        activeIngredients,
                         // Compliance fields
                         epaRegistrationNumber, signalWord, isRestrictedUse, rupStates, requiredCertifications,
-                        activeIngredients, manufacturer, sdsUrl, labelUrl, complianceNotes, requiresApplicatorVerification
+                        manufacturer, sdsUrl, labelUrl, complianceNotes, requiresApplicatorVerification
                     })
                 });
 
