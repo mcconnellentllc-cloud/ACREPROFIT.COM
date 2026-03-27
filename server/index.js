@@ -1187,7 +1187,7 @@ const inventoryTransactionSchema = new mongoose.Schema({
     // Transaction type
     type: {
         type: String,
-        enum: ['receive', 'sale', 'adjustment', 'transfer', 'return', 'damage', 'expired'],
+        enum: ['receive', 'sale', 'adjustment', 'transfer', 'return', 'damage', 'expired', 'reserve', 'release'],
         required: true
     },
 
@@ -1528,6 +1528,161 @@ async function deductInventory({ chemicalId, quantity, location, orderId, orderN
     await transaction.save();
 
     return { inventory, transaction };
+}
+
+// Helper: Reserve inventory when an order is placed/updated
+async function reserveInventory({ chemicalId, quantity, location, orderId, orderNumber, userId, notes }) {
+    let inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+
+    if (!inventory) {
+        // No inventory record yet - create one with zero quantities
+        // This tracks the reservation even before stock arrives
+        const chemical = await Chemical.findById(chemicalId);
+        inventory = new Inventory({
+            chemicalId,
+            productName: chemical?.name || 'Unknown Product',
+            packSize: chemical?.packSize || '',
+            unit: chemical?.unit || 'units',
+            location: location || 'main',
+            quantityOnHand: 0,
+            quantityReserved: 0,
+            quantityAvailable: 0,
+            averageCost: 0,
+            lastCost: 0
+        });
+    }
+
+    const previousReserved = inventory.quantityReserved || 0;
+    inventory.quantityReserved = previousReserved + quantity;
+    inventory.quantityAvailable = inventory.quantityOnHand - inventory.quantityReserved;
+    inventory.updatedAt = new Date();
+
+    await inventory.save();
+
+    // Create transaction record for audit trail
+    const transaction = new InventoryTransaction({
+        inventoryId: inventory._id,
+        chemicalId,
+        productName: inventory.productName,
+        type: 'reserve',
+        quantityChange: quantity,
+        previousQuantity: previousReserved,
+        newQuantity: inventory.quantityReserved,
+        unitCost: inventory.averageCost || 0,
+        totalCost: quantity * (inventory.averageCost || 0),
+        referenceType: 'ChemicalOrder',
+        referenceId: orderId,
+        referenceNumber: orderNumber,
+        location: location || 'main',
+        notes: notes || 'Inventory reserved for order',
+        createdBy: userId
+    });
+
+    await transaction.save();
+
+    return { inventory, transaction };
+}
+
+// Helper: Release reserved inventory (order cancelled/modified)
+async function releaseInventory({ chemicalId, quantity, location, orderId, orderNumber, userId, notes }) {
+    const inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+
+    if (!inventory) {
+        // No inventory to release from
+        return null;
+    }
+
+    const previousReserved = inventory.quantityReserved || 0;
+    const releaseQty = Math.min(quantity, previousReserved); // Can't release more than reserved
+
+    inventory.quantityReserved = previousReserved - releaseQty;
+    inventory.quantityAvailable = inventory.quantityOnHand - inventory.quantityReserved;
+    inventory.updatedAt = new Date();
+
+    await inventory.save();
+
+    // Create transaction record for audit trail
+    const transaction = new InventoryTransaction({
+        inventoryId: inventory._id,
+        chemicalId,
+        productName: inventory.productName,
+        type: 'release',
+        quantityChange: -releaseQty,
+        previousQuantity: previousReserved,
+        newQuantity: inventory.quantityReserved,
+        unitCost: inventory.averageCost || 0,
+        totalCost: releaseQty * (inventory.averageCost || 0),
+        referenceType: 'ChemicalOrder',
+        referenceId: orderId,
+        referenceNumber: orderNumber,
+        location: location || 'main',
+        notes: notes || 'Inventory released from order',
+        createdBy: userId
+    });
+
+    await transaction.save();
+
+    return { inventory, transaction };
+}
+
+// Helper: Update order inventory reservations (handles item changes)
+async function updateOrderInventory({ oldItems, newItems, orderId, orderNumber, location, userId }) {
+    const changes = [];
+
+    // Build maps of old and new quantities by chemicalId
+    const oldQtyMap = new Map();
+    const newQtyMap = new Map();
+
+    (oldItems || []).forEach(item => {
+        if (item.chemicalId) {
+            const key = item.chemicalId.toString();
+            oldQtyMap.set(key, (oldQtyMap.get(key) || 0) + (item.quantity || 0));
+        }
+    });
+
+    (newItems || []).forEach(item => {
+        if (item.chemicalId) {
+            const key = item.chemicalId.toString();
+            newQtyMap.set(key, (newQtyMap.get(key) || 0) + (item.quantity || 0));
+        }
+    });
+
+    // Get all unique chemicalIds
+    const allChemicalIds = new Set([...oldQtyMap.keys(), ...newQtyMap.keys()]);
+
+    for (const chemicalId of allChemicalIds) {
+        const oldQty = oldQtyMap.get(chemicalId) || 0;
+        const newQty = newQtyMap.get(chemicalId) || 0;
+        const diff = newQty - oldQty;
+
+        if (diff > 0) {
+            // Need to reserve more
+            const result = await reserveInventory({
+                chemicalId,
+                quantity: diff,
+                location,
+                orderId,
+                orderNumber,
+                userId,
+                notes: `Order updated: reserved ${diff} more units`
+            });
+            changes.push({ chemicalId, action: 'reserve', quantity: diff, result });
+        } else if (diff < 0) {
+            // Need to release some
+            const result = await releaseInventory({
+                chemicalId,
+                quantity: Math.abs(diff),
+                location,
+                orderId,
+                orderNumber,
+                userId,
+                notes: `Order updated: released ${Math.abs(diff)} units`
+            });
+            changes.push({ chemicalId, action: 'release', quantity: Math.abs(diff), result });
+        }
+    }
+
+    return changes;
 }
 
 // Helper: Generate next PO number
@@ -2951,6 +3106,33 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
             return res.status(404).json({ error: 'Order not found or access denied' });
         }
 
+        // Track inventory changes if chemicals are being modified
+        if (chemicals !== undefined && order.status !== 'cancelled' && order.status !== 'archived') {
+            // Convert Order chemicals format to the format updateOrderInventory expects
+            const oldItems = (order.chemicals || []).map(c => ({
+                chemicalId: c.chemicalId,
+                quantity: c.packagesNeeded || c.qty || 0
+            }));
+            const newItems = chemicals.map(c => ({
+                chemicalId: c.chemicalId,
+                quantity: c.packagesNeeded || c.qty || c.quantity || 0
+            }));
+
+            try {
+                await updateOrderInventory({
+                    oldItems,
+                    newItems,
+                    orderId: order._id,
+                    orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                    location: 'main',
+                    userId: req.user._id
+                });
+            } catch (invError) {
+                console.error('Inventory update warning:', invError.message);
+                // Continue with order update even if inventory tracking fails
+            }
+        }
+
         // Update fields
         if (crop !== undefined) order.crop = crop;
         if (acres !== undefined) order.acres = acres;
@@ -3031,15 +3213,40 @@ app.put('/api/admin/orders/:orderId/status', authMiddleware, adminMiddleware, as
             query.representativeId = req.user._id;
         }
 
-        const order = await Order.findOneAndUpdate(
-            query,
-            { status, updatedAt: new Date() },
-            { new: true }
-        );
-
+        // Get order first to check status and handle inventory
+        const order = await Order.findOne(query);
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
         }
+
+        const oldStatus = order.status;
+
+        // Release inventory if order is being cancelled or archived
+        if ((status === 'cancelled' || status === 'archived') &&
+            oldStatus !== 'cancelled' && oldStatus !== 'archived') {
+            try {
+                for (const chem of order.chemicals || []) {
+                    if (chem.chemicalId && (chem.packagesNeeded || chem.qty) > 0) {
+                        await releaseInventory({
+                            chemicalId: chem.chemicalId,
+                            quantity: chem.packagesNeeded || chem.qty,
+                            location: 'main',
+                            orderId: order._id,
+                            orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                            userId: req.user._id,
+                            notes: `Order ${status}: inventory released`
+                        });
+                    }
+                }
+            } catch (invError) {
+                console.error('Inventory release warning:', invError.message);
+            }
+        }
+
+        // Update the order
+        order.status = status;
+        order.updatedAt = new Date();
+        await order.save();
 
         // Auto-create ledger entry when regular order is delivered
         if (status === 'delivered' && order.representativeId) {
@@ -3082,6 +3289,27 @@ app.put('/api/admin/orders/:orderId/archive', authMiddleware, adminMiddleware, a
         const order = await Order.findOne(query);
         if (!order) {
             return res.status(404).json({ error: 'Order not found or access denied' });
+        }
+
+        // Release inventory if not already cancelled/archived
+        if (order.status !== 'cancelled' && order.status !== 'archived') {
+            try {
+                for (const chem of order.chemicals || []) {
+                    if (chem.chemicalId && (chem.packagesNeeded || chem.qty) > 0) {
+                        await releaseInventory({
+                            chemicalId: chem.chemicalId,
+                            quantity: chem.packagesNeeded || chem.qty,
+                            location: 'main',
+                            orderId: order._id,
+                            orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                            userId: req.user._id,
+                            notes: 'Order archived: inventory released'
+                        });
+                    }
+                }
+            } catch (invError) {
+                console.error('Inventory release warning:', invError.message);
+            }
         }
 
         order.status = 'archived';
@@ -5627,6 +5855,24 @@ app.put('/api/chemical-orders/:id', authMiddleware, adminMiddleware, async (req,
 
         const { items, subtotal, discount, total, internalNotes, status } = req.body;
 
+        // Track inventory changes if items are being modified
+        if (items !== undefined && order.status !== 'cancelled' && order.status !== 'archived') {
+            const oldItems = order.items || [];
+            try {
+                await updateOrderInventory({
+                    oldItems,
+                    newItems: items,
+                    orderId: order._id,
+                    orderNumber: order.orderNumber,
+                    location: order.pickupLocation || 'main',
+                    userId: req.user._id
+                });
+            } catch (invError) {
+                console.error('Inventory update warning:', invError.message);
+                // Continue with order update even if inventory tracking fails
+            }
+        }
+
         // Update fields if provided
         if (items !== undefined) order.items = items;
         if (subtotal !== undefined) order.subtotal = subtotal;
@@ -5670,6 +5916,31 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
         const order = await ChemicalOrder.findById(req.params.id);
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
+        }
+
+        const oldStatus = order.status;
+
+        // Release inventory if order is being cancelled or archived
+        if ((status === 'cancelled' || status === 'archived') &&
+            oldStatus !== 'cancelled' && oldStatus !== 'archived') {
+            try {
+                // Release all reserved inventory for this order
+                for (const item of order.items || []) {
+                    if (item.chemicalId && item.quantity > 0) {
+                        await releaseInventory({
+                            chemicalId: item.chemicalId,
+                            quantity: item.quantity,
+                            location: order.pickupLocation || 'main',
+                            orderId: order._id,
+                            orderNumber: order.orderNumber,
+                            userId: req.user._id,
+                            notes: `Order ${status}: inventory released`
+                        });
+                    }
+                }
+            } catch (invError) {
+                console.error('Inventory release warning:', invError.message);
+            }
         }
 
         order.status = status;
@@ -5735,6 +6006,27 @@ app.put('/api/chemical-orders/:id/archive', authMiddleware, adminMiddleware, asy
 
         if (isDistributor(req.user) && order.representativeId?.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Not authorized to archive this order' });
+        }
+
+        // Release inventory if not already cancelled/archived
+        if (order.status !== 'cancelled' && order.status !== 'archived') {
+            try {
+                for (const item of order.items || []) {
+                    if (item.chemicalId && item.quantity > 0) {
+                        await releaseInventory({
+                            chemicalId: item.chemicalId,
+                            quantity: item.quantity,
+                            location: order.pickupLocation || 'main',
+                            orderId: order._id,
+                            orderNumber: order.orderNumber,
+                            userId: req.user._id,
+                            notes: 'Order archived: inventory released'
+                        });
+                    }
+                }
+            } catch (invError) {
+                console.error('Inventory release warning:', invError.message);
+            }
         }
 
         order.status = 'archived';
