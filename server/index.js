@@ -273,31 +273,14 @@ const orderSchema = new mongoose.Schema({
     paidAt: Date,
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'bundled', 'ordered', 'shipped', 'delivered'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered'],
         default: 'draft'
     },
-    bundleId: { type: mongoose.Schema.Types.ObjectId, ref: 'Bundle' },
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
 const Order = mongoose.model('Order', orderSchema);
-
-// Bundle Model (for truckload bundling)
-const bundleSchema = new mongoose.Schema({
-    product: String,
-    targetQuantity: Number, // e.g., 250 gal for a shuttle
-    currentQuantity: { type: Number, default: 0 },
-    orders: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Order' }],
-    status: {
-        type: String,
-        enum: ['collecting', 'ready', 'ordered', 'shipped', 'delivered'],
-        default: 'collecting'
-    },
-    createdAt: { type: Date, default: Date.now }
-});
-
-const Bundle = mongoose.model('Bundle', bundleSchema);
 
 // Rep Application Model
 const repApplicationSchema = new mongoose.Schema({
@@ -3077,62 +3060,6 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
             totalAcres: totalAcres[0]?.total || 0,
             totalCustomers
         });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Bundle orders for truckload (superadmin only)
-app.post('/api/admin/bundles', authMiddleware, superAdminMiddleware, async (req, res) => {
-    try {
-        const { product, orderIds, targetQuantity } = req.body;
-
-        const bundle = new Bundle({
-            product,
-            targetQuantity,
-            orders: orderIds
-        });
-
-        // Calculate current quantity from orders
-        const orders = await Order.find({ _id: { $in: orderIds } });
-        let currentQuantity = 0;
-        orders.forEach(order => {
-            order.chemicals.forEach(chem => {
-                if (chem.name === product) {
-                    currentQuantity += chem.totalAmount;
-                }
-            });
-        });
-
-        bundle.currentQuantity = currentQuantity;
-        if (currentQuantity >= targetQuantity) {
-            bundle.status = 'ready';
-        }
-
-        await bundle.save();
-
-        // Update orders with bundle ID
-        await Order.updateMany(
-            { _id: { $in: orderIds } },
-            { bundleId: bundle._id, status: 'bundled' }
-        );
-
-        res.status(201).json(bundle);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Get bundles (superadmin only)
-app.get('/api/admin/bundles', authMiddleware, superAdminMiddleware, async (req, res) => {
-    try {
-        const bundles = await Bundle.find()
-            .populate({
-                path: 'orders',
-                populate: { path: 'userId', select: 'name email farm' }
-            })
-            .sort({ createdAt: -1 });
-        res.json(bundles);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
