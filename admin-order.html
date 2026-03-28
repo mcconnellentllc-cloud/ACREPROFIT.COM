@@ -17,251 +17,48 @@
             <a href="/" class="logo">
                 <img src="logo.svg" alt="Acre Profit">
             </a>
-            <ul class="nav-links">
-                <li><a href="/admin.html">Back to Dashboard</a></li>
-                <li><a href="#" id="logoutBtn" class="btn btn-outline">Logout</a></li>
-            </ul>
+            <div class="nav-center">
+                <a href="/admin.html" class="nav-back">← Back to Dashboard</a>
+                <span class="nav-title">Place Order for Customer</span>
+            </div>
+            <div class="nav-right">
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
         </div>
     </nav>
 
-    <main class="admin-order-page">
+    <main class="admin-customer-select-page">
         <div class="container">
-            <div class="admin-order-header">
-                <h1>Place Order for Customer</h1>
-                <p>Select a customer and create an order on their behalf</p>
+            <div class="customer-select-hero">
+                <h1>Select a Customer</h1>
+                <p>Choose the customer you want to place an order for. You'll then use the same ordering experience they would.</p>
             </div>
 
-            <!-- Step 1: Select Customer -->
-            <div class="order-step" id="step1">
-                <div class="step-header">
-                    <span class="step-number">1</span>
-                    <h2>Select Customer</h2>
+            <!-- Search Box -->
+            <div class="customer-search-box">
+                <div class="search-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="11" cy="11" r="8"></circle>
+                        <path d="m21 21-4.35-4.35"></path>
+                    </svg>
                 </div>
-                <div class="step-content">
-                    <div class="customer-select-wrapper">
-                        <input type="text" id="customerSearchInput" placeholder="Search customers by name, email, or farm..." class="customer-search-input">
-                        <div id="customerDropdown" class="customer-dropdown"></div>
-                    </div>
-                    <div id="selectedCustomerCard" class="selected-customer-card" style="display: none;">
-                        <div class="selected-customer-info">
-                            <div class="selected-avatar" id="selectedAvatar">JD</div>
-                            <div class="selected-details">
-                                <h3 id="selectedName">Customer Name</h3>
-                                <p id="selectedFarm">Farm Name</p>
-                                <p class="selected-contact"><span id="selectedEmail">email@example.com</span> | <span id="selectedPhone">-</span></p>
-                            </div>
-                        </div>
-                        <button class="btn btn-sm btn-outline" onclick="clearCustomer()">Change</button>
-                    </div>
+                <input type="text" id="customerSearchInput" placeholder="Search by name, email, or farm..." autofocus>
+            </div>
+
+            <!-- Customer Results -->
+            <div class="customer-results" id="customerResults">
+                <div class="loading-state">
+                    <div class="spinner"></div>
+                    <p>Loading customers...</p>
                 </div>
             </div>
 
-            <!-- Step 2: Order Details -->
-            <div class="order-step" id="step2" style="display: none;">
-                <div class="step-header">
-                    <span class="step-number">2</span>
-                    <h2>Order Details</h2>
+            <!-- Recent Customers Section -->
+            <div class="recent-customers-section" id="recentCustomersSection" style="display: none;">
+                <h3>Recent Customers</h3>
+                <div class="recent-customers-grid" id="recentCustomersGrid">
+                    <!-- Populated by JS -->
                 </div>
-                <div class="step-content">
-                    <div class="order-form-grid">
-                        <div class="form-group">
-                            <label>Growing Year</label>
-                            <select id="orderYear">
-                                <option value="2025">2025</option>
-                                <option value="2026" selected>2026</option>
-                                <option value="2027">2027</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Crop</label>
-                            <select id="orderCrop">
-                                <option value="">Select crop...</option>
-                                <option value="irrigated-corn">Irrigated Corn</option>
-                                <option value="dryland-corn">Dryland Corn</option>
-                                <option value="milo">Milo (Grain Sorghum)</option>
-                                <option value="millet">Millet</option>
-                                <option value="summer-fallow">Summer Fallow</option>
-                                <option value="wheat">Wheat</option>
-                                <option value="soybeans">Soybeans</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Program</label>
-                            <select id="orderProgram">
-                                <option value="">Select program...</option>
-                                <option value="standard">Standard</option>
-                                <option value="premium">Premium</option>
-                                <option value="basic">Basic</option>
-                                <option value="custom">Custom</option>
-                            </select>
-                        </div>
-                        <div class="form-group">
-                            <label>Acres</label>
-                            <input type="number" id="orderAcres" placeholder="Enter acres" min="0">
-                        </div>
-                        <div class="form-group">
-                            <label>GPA (Gallons/Acre)</label>
-                            <input type="number" id="orderGPA" placeholder="e.g., 15" min="0" step="0.1">
-                        </div>
-                        <div class="form-group">
-                            <label>Order Status</label>
-                            <select id="orderStatus">
-                                <option value="draft">Draft</option>
-                                <option value="submitted">Submitted</option>
-                                <option value="confirmed">Confirmed</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Products Section -->
-                    <div class="products-section">
-                        <h3>Products</h3>
-                        <p class="section-desc">Add chemicals and products to this order</p>
-
-                        <div id="productsList" class="products-list">
-                            <!-- Products will be added here dynamically -->
-                        </div>
-
-                        <!-- Chemical Catalog - Browse Available Products -->
-                        <div class="chemical-catalog">
-                            <div class="catalog-header">
-                                <h4>Available Products</h4>
-                                <div class="catalog-filters">
-                                    <select id="catalogCategory" onchange="filterCatalog()">
-                                        <option value="">All Categories</option>
-                                        <option value="herbicide">Herbicides</option>
-                                        <option value="adjuvant">Adjuvants</option>
-                                        <option value="fungicide">Fungicides</option>
-                                        <option value="insecticide">Insecticides</option>
-                                    </select>
-                                    <input type="text" id="catalogSearch" placeholder="Search products..." oninput="filterCatalog()">
-                                </div>
-                            </div>
-                            <div id="chemicalCatalog" class="catalog-grid">
-                                <p class="loading">Loading products...</p>
-                            </div>
-                        </div>
-
-                        <div class="add-product-form manual-entry">
-                            <h4>Manual Entry</h4>
-                            <div class="form-row">
-                                <div class="form-group flex-2">
-                                    <label>Product Name</label>
-                                    <div class="chemical-select-wrapper">
-                                        <input type="text" id="productName" placeholder="Search chemicals..." autocomplete="off">
-                                        <div id="chemicalDropdown" class="chemical-dropdown"></div>
-                                    </div>
-                                </div>
-                                <div class="form-group flex-1">
-                                    <label>Pack Size</label>
-                                    <input type="text" id="productPackSize" readonly placeholder="-">
-                                </div>
-                                <div class="form-group flex-1">
-                                    <label>Quantity</label>
-                                    <input type="number" id="productQty" placeholder="0" min="0">
-                                </div>
-                                <div class="form-group flex-1">
-                                    <label>Unit</label>
-                                    <select id="productUnit">
-                                        <option value="gallons">Gallons</option>
-                                        <option value="shuttle">Shuttle (250 gal)</option>
-                                        <option value="oz">Ounces</option>
-                                        <option value="lbs">Pounds</option>
-                                        <option value="bags">Bags</option>
-                                    </select>
-                                </div>
-                                <div class="form-group flex-1">
-                                    <label>Cost</label>
-                                    <input type="text" id="productCost" readonly placeholder="-" style="background: #f3f4f6; color: #666;">
-                                </div>
-                                <div class="form-group flex-1">
-                                    <label>Sell Price/Unit <span style="color: #2d5a27; font-size: 0.75rem;">(editable)</span></label>
-                                    <input type="number" id="productPrice" placeholder="$0.00" min="0" step="0.01" style="border-color: #2d5a27; border-width: 2px;">
-                                </div>
-                                <div class="form-group flex-shrink">
-                                    <label>&nbsp;</label>
-                                    <button class="btn btn-primary" onclick="addProduct()">Add</button>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Order Notes -->
-                    <div class="form-group full-width">
-                        <label>Order Notes (optional)</label>
-                        <textarea id="orderNotes" placeholder="Add any notes about this order..."></textarea>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Step 3: Review & Submit -->
-            <div class="order-step" id="step3" style="display: none;">
-                <div class="step-header">
-                    <span class="step-number">3</span>
-                    <h2>Review & Submit</h2>
-                    <button class="btn btn-sm btn-outline" style="margin-left: auto;" onclick="scrollToStep2()">Edit Order Details</button>
-                </div>
-                <div class="step-content">
-                    <div class="order-summary">
-                        <div class="summary-row">
-                            <span>Customer:</span>
-                            <strong id="summaryCustomer">-</strong>
-                            <button class="btn-edit" onclick="clearCustomer()" title="Change customer">Change</button>
-                        </div>
-                        <div class="summary-row editable-row">
-                            <span>Crop:</span>
-                            <strong id="summaryCrop" class="editable-value">-</strong>
-                            <select id="summaryCropEdit" class="summary-edit-input" style="display:none;" onchange="updateCropFromSummary(this.value)">
-                                <option value="">Select crop...</option>
-                                <option value="irrigated-corn">Irrigated Corn</option>
-                                <option value="dryland-corn">Dryland Corn</option>
-                                <option value="milo">Milo (Grain Sorghum)</option>
-                                <option value="millet">Millet</option>
-                                <option value="summer-fallow">Summer Fallow</option>
-                                <option value="wheat">Wheat</option>
-                                <option value="soybeans">Soybeans</option>
-                            </select>
-                            <button class="btn-edit" onclick="toggleSummaryEdit('Crop')" title="Edit">Edit</button>
-                        </div>
-                        <div class="summary-row">
-                            <span>Program:</span>
-                            <strong id="summaryProgram">-</strong>
-                        </div>
-                        <div class="summary-row editable-row">
-                            <span>Acres:</span>
-                            <strong id="summaryAcres" class="editable-value">-</strong>
-                            <input type="number" id="summaryAcresEdit" class="summary-edit-input" style="display:none;" onchange="updateAcresFromSummary(this.value)" min="0">
-                            <button class="btn-edit" onclick="toggleSummaryEdit('Acres')" title="Edit">Edit</button>
-                        </div>
-                        <div class="summary-row editable-row">
-                            <span>GPA:</span>
-                            <strong id="summaryGPA" class="editable-value">-</strong>
-                            <input type="number" id="summaryGPAEdit" class="summary-edit-input" style="display:none;" onchange="updateGPAFromSummary(this.value)" min="0" step="0.1">
-                            <button class="btn-edit" onclick="toggleSummaryEdit('GPA')" title="Edit">Edit</button>
-                        </div>
-                        <div class="summary-row">
-                            <span>Products:</span>
-                            <strong id="summaryProducts">0 items</strong>
-                            <button class="btn-edit" onclick="scrollToProducts()" title="Edit products">Edit</button>
-                        </div>
-
-                        <!-- Editable Products List in Summary -->
-                        <div id="summaryProductsList" class="summary-products-list">
-                            <!-- Products rendered here -->
-                        </div>
-
-                        <div class="summary-row total">
-                            <span>Total Price:</span>
-                            <strong id="summaryTotal">$0.00</strong>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Actions -->
-            <div class="order-actions">
-                <button class="btn btn-outline" onclick="window.location.href='/admin.html'">Cancel</button>
-                <button class="btn btn-primary" id="submitOrderBtn" onclick="submitOrder()" disabled>Create Order</button>
             </div>
         </div>
     </main>
@@ -302,10 +99,7 @@
 
         // State
         let allCustomers = [];
-        let selectedCustomer = null;
-        let products = [];
-        let allChemicals = [];
-        let selectedChemical = null;
+        let recentCustomerIds = JSON.parse(localStorage.getItem('recentCustomers') || '[]');
 
         // Load customers
         async function loadCustomers() {
@@ -314,692 +108,288 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 allCustomers = await res.json();
+
+                // Show all customers initially
+                renderCustomerList(allCustomers.slice(0, 20));
+
+                // Show recent customers
+                showRecentCustomers();
+
             } catch (error) {
                 console.error('Error loading customers:', error);
+                document.getElementById('customerResults').innerHTML = `
+                    <div class="error-state">
+                        <p>Failed to load customers. Please try again.</p>
+                        <button class="btn btn-primary" onclick="loadCustomers()">Retry</button>
+                    </div>
+                `;
             }
         }
 
-        // Load chemicals from database
-        async function loadChemicals() {
-            try {
-                const res = await fetch(`${API_URL}/api/chemicals/admin`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (res.ok) {
-                    allChemicals = await res.json();
-                    // Filter to only available chemicals
-                    allChemicals = allChemicals.filter(c => c.isActive !== false && c.availableForOrder !== false);
-                }
-            } catch (error) {
-                console.error('Error loading chemicals:', error);
-            }
+        // Show recent customers
+        function showRecentCustomers() {
+            if (recentCustomerIds.length === 0) return;
+
+            const recentCustomers = recentCustomerIds
+                .map(id => allCustomers.find(c => c._id === id))
+                .filter(c => c);
+
+            if (recentCustomers.length === 0) return;
+
+            const section = document.getElementById('recentCustomersSection');
+            const grid = document.getElementById('recentCustomersGrid');
+
+            grid.innerHTML = recentCustomers.slice(0, 4).map(c => `
+                <div class="recent-customer-card" onclick="selectCustomer('${c._id}')">
+                    <div class="recent-customer-avatar">${getInitials(c.name)}</div>
+                    <div class="recent-customer-info">
+                        <strong>${c.name}</strong>
+                        <span>${c.farm || c.email}</span>
+                    </div>
+                </div>
+            `).join('');
+
+            section.style.display = 'block';
         }
 
         // Customer search
         const searchInput = document.getElementById('customerSearchInput');
-        const dropdown = document.getElementById('customerDropdown');
+        let searchTimeout;
 
         searchInput.addEventListener('input', function(e) {
+            clearTimeout(searchTimeout);
             const term = e.target.value.toLowerCase().trim();
 
-            if (term.length < 2) {
-                dropdown.style.display = 'none';
+            searchTimeout = setTimeout(() => {
+                if (term.length === 0) {
+                    renderCustomerList(allCustomers.slice(0, 20));
+                    return;
+                }
+
+                const filtered = allCustomers.filter(c =>
+                    c.name.toLowerCase().includes(term) ||
+                    c.email.toLowerCase().includes(term) ||
+                    (c.farm && c.farm.toLowerCase().includes(term)) ||
+                    (c.phone && c.phone.includes(term))
+                );
+
+                renderCustomerList(filtered);
+            }, 150);
+        });
+
+        // Render customer list
+        function renderCustomerList(customers) {
+            const container = document.getElementById('customerResults');
+
+            if (customers.length === 0) {
+                container.innerHTML = `
+                    <div class="empty-state">
+                        <div class="empty-icon">
+                            <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                                <circle cx="11" cy="11" r="8"></circle>
+                                <path d="m21 21-4.35-4.35"></path>
+                            </svg>
+                        </div>
+                        <p>No customers found</p>
+                        <span>Try a different search term</span>
+                    </div>
+                `;
                 return;
             }
 
-            const filtered = allCustomers.filter(c =>
-                c.name.toLowerCase().includes(term) ||
-                c.email.toLowerCase().includes(term) ||
-                (c.farm && c.farm.toLowerCase().includes(term))
-            ).slice(0, 10);
-
-            if (filtered.length === 0) {
-                dropdown.innerHTML = '<div class="dropdown-empty">No customers found</div>';
-            } else {
-                dropdown.innerHTML = filtered.map(c => `
-                    <div class="dropdown-item" onclick="selectCustomer('${c._id}')">
-                        <div class="dropdown-avatar">${c.name.split(' ').map(n => n[0]).join('')}</div>
-                        <div class="dropdown-info">
-                            <strong>${c.name}</strong>
-                            <span>${c.farm || c.email}</span>
+            container.innerHTML = `
+                <div class="customer-grid">
+                    ${customers.map(c => `
+                        <div class="customer-card" onclick="selectCustomer('${c._id}')">
+                            <div class="customer-avatar">${getInitials(c.name)}</div>
+                            <div class="customer-info">
+                                <h4>${c.name}</h4>
+                                <p class="customer-farm">${c.farm || 'No farm name'}</p>
+                                <p class="customer-contact">${c.email}</p>
+                                ${c.phone ? `<p class="customer-phone">${c.phone}</p>` : ''}
+                            </div>
+                            <div class="customer-action">
+                                <span class="select-arrow">→</span>
+                            </div>
                         </div>
-                    </div>
-                `).join('');
-            }
-            dropdown.style.display = 'block';
-        });
-
-        // Hide dropdown when clicking outside
-        document.addEventListener('click', function(e) {
-            if (!e.target.closest('.customer-select-wrapper')) {
-                dropdown.style.display = 'none';
-            }
-            if (!e.target.closest('.chemical-select-wrapper')) {
-                document.getElementById('chemicalDropdown').style.display = 'none';
-            }
-        });
-
-        // Chemical search/autocomplete
-        const chemicalInput = document.getElementById('productName');
-        const chemicalDropdown = document.getElementById('chemicalDropdown');
-
-        chemicalInput.addEventListener('input', function(e) {
-            const term = e.target.value.toLowerCase().trim();
-            selectedChemical = null;
-
-            if (term.length < 2) {
-                chemicalDropdown.style.display = 'none';
-                return;
-            }
-
-            const filtered = allChemicals.filter(c =>
-                c.productName.toLowerCase().includes(term) ||
-                (c.sourceSupplier && c.sourceSupplier.toLowerCase().includes(term)) ||
-                (c.category && c.category.toLowerCase().includes(term))
-            ).slice(0, 15);
-
-            if (filtered.length === 0) {
-                chemicalDropdown.innerHTML = '<div class="dropdown-empty">No chemicals found</div>';
-            } else {
-                chemicalDropdown.innerHTML = filtered.map(c => `
-                    <div class="dropdown-item chemical-item" onclick="selectChemical('${c._id}')">
-                        <div class="chemical-info">
-                            <strong>${c.productName}</strong>
-                            <span class="chemical-details">${c.sourceSupplier || ''} | ${c.packSize} ${c.unit} | $${(c.sellPrice || 0).toFixed(2)}/${c.unit}</span>
-                        </div>
-                    </div>
-                `).join('');
-            }
-            chemicalDropdown.style.display = 'block';
-        });
-
-        // Select chemical from dropdown
-        function selectChemical(chemicalId) {
-            selectedChemical = allChemicals.find(c => c._id === chemicalId);
-            if (!selectedChemical) return;
-
-            // Fill in the form fields
-            document.getElementById('productName').value = selectedChemical.productName;
-            // Show pack size (avoid duplicating unit if already in packSize)
-            const packDisplay = selectedChemical.unitsPerPack
-                ? `${selectedChemical.packSize} (${selectedChemical.unitsPerPack} ${selectedChemical.unit})`
-                : selectedChemical.packSize || '-';
-            document.getElementById('productPackSize').value = packDisplay;
-            // Show cost as reference (read-only)
-            document.getElementById('productCost').value = selectedChemical.costPrice ? `$${selectedChemical.costPrice.toFixed(2)}` : '-';
-            // Default to retail price, but admin can edit
-            document.getElementById('productPrice').value = selectedChemical.sellPrice || 0;
-
-            // Set unit based on chemical's unit
-            const unitSelect = document.getElementById('productUnit');
-            const unitMap = {
-                'gl': 'gallons',
-                'gal': 'gallons',
-                'gallon': 'gallons',
-                'oz': 'oz',
-                'lb': 'lbs',
-                'lbs': 'lbs'
-            };
-            const mappedUnit = unitMap[selectedChemical.unit?.toLowerCase()] || 'gallons';
-            unitSelect.value = mappedUnit;
-
-            chemicalDropdown.style.display = 'none';
-
-            // Focus on quantity
-            document.getElementById('productQty').focus();
+                    `).join('')}
+                </div>
+                ${customers.length >= 20 ? `<p class="results-note">Showing first 20 results. Search to find more.</p>` : ''}
+            `;
         }
 
-        // Select customer
+        // Get initials from name
+        function getInitials(name) {
+            return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+        }
+
+        // Select customer and redirect to order page
         function selectCustomer(customerId) {
-            selectedCustomer = allCustomers.find(c => c._id === customerId);
-            if (!selectedCustomer) return;
+            const customer = allCustomers.find(c => c._id === customerId);
+            if (!customer) return;
 
-            // Update UI
-            const initials = selectedCustomer.name.split(' ').map(n => n[0]).join('');
-            document.getElementById('selectedAvatar').textContent = initials;
-            document.getElementById('selectedName').textContent = selectedCustomer.name;
-            document.getElementById('selectedFarm').textContent = selectedCustomer.farm || 'No farm name';
-            document.getElementById('selectedEmail').textContent = selectedCustomer.email;
-            document.getElementById('selectedPhone').textContent = selectedCustomer.phone || '-';
+            // Save to recent customers
+            recentCustomerIds = recentCustomerIds.filter(id => id !== customerId);
+            recentCustomerIds.unshift(customerId);
+            recentCustomerIds = recentCustomerIds.slice(0, 10);
+            localStorage.setItem('recentCustomers', JSON.stringify(recentCustomerIds));
 
-            // Show selected card, hide search
-            document.getElementById('selectedCustomerCard').style.display = 'flex';
-            searchInput.style.display = 'none';
-            dropdown.style.display = 'none';
+            // Set the acting as customer in session storage
+            sessionStorage.setItem('actingAsCustomer', JSON.stringify({
+                _id: customer._id,
+                name: customer.name,
+                email: customer.email,
+                farm: customer.farm,
+                phone: customer.phone
+            }));
 
-            // Show step 2
-            document.getElementById('step2').style.display = 'block';
-            document.getElementById('step3').style.display = 'block';
-
-            updateSummary();
+            // Redirect to the customer-facing order page
+            // The order.html page will detect actingAsCustomer and show the banner
+            window.location.href = '/order.html';
         }
 
-        // Clear customer selection
-        function clearCustomer() {
-            selectedCustomer = null;
-            document.getElementById('selectedCustomerCard').style.display = 'none';
-            searchInput.style.display = 'block';
-            searchInput.value = '';
-            document.getElementById('step2').style.display = 'none';
-            document.getElementById('step3').style.display = 'none';
-            updateSummary();
-        }
-
-        // Add product
-        function addProduct() {
-            const name = document.getElementById('productName').value.trim();
-            const qty = parseFloat(document.getElementById('productQty').value) || 0;
-            const unit = document.getElementById('productUnit').value;
-            const price = parseFloat(document.getElementById('productPrice').value) || 0;
-
-            if (!name || qty <= 0) {
-                alert('Please enter product name and quantity');
-                return;
-            }
-
-            const product = {
-                name,
-                qty,
-                unit,
-                price,
-                total: qty * price,
-                chemicalId: selectedChemical ? selectedChemical._id : null,
-                packSize: selectedChemical ? selectedChemical.packSize : null,
-                sourceSupplier: selectedChemical ? selectedChemical.sourceSupplier : null
-            };
-
-            products.push(product);
-
-            renderProducts();
-            updateSummary();
-
-            // Clear form
-            document.getElementById('productName').value = '';
-            document.getElementById('productPackSize').value = '-';
-            document.getElementById('productCost').value = '-';
-            document.getElementById('productQty').value = '';
-            document.getElementById('productPrice').value = '';
-            selectedChemical = null;
-        }
-
-        // Render products list
-        function renderProducts() {
-            const list = document.getElementById('productsList');
-
-            if (products.length === 0) {
-                list.innerHTML = '<p class="empty-products">No products added yet</p>';
-                return;
-            }
-
-            list.innerHTML = products.map((p, i) => `
-                <div class="product-item ${p.chemicalId ? 'linked' : 'manual'}">
-                    <div class="product-item-info">
-                        <strong>${p.name}</strong>
-                        <span>${p.qty} ${p.unit} @ $${p.price.toFixed(2)}/${p.unit}</span>
-                        ${p.sourceSupplier ? `<span class="product-supplier">${p.sourceSupplier} - ${p.packSize}</span>` : ''}
-                    </div>
-                    <div class="product-item-price">
-                        <span>$${p.total.toFixed(2)}</span>
-                        <button class="btn-remove" onclick="removeProduct(${i})">&times;</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        // Remove product
-        function removeProduct(index) {
-            products.splice(index, 1);
-            renderProducts();
-            updateSummary();
-        }
-
-        // Update summary
-        function updateSummary() {
-            document.getElementById('summaryCustomer').textContent = selectedCustomer ? selectedCustomer.name : '-';
-            document.getElementById('summaryCrop').textContent = document.getElementById('orderCrop').value || '-';
-            document.getElementById('summaryProgram').textContent = document.getElementById('orderProgram').value || '-';
-            document.getElementById('summaryAcres').textContent = document.getElementById('orderAcres').value || '-';
-            document.getElementById('summaryGPA').textContent = document.getElementById('orderGPA').value || '-';
-            document.getElementById('summaryProducts').textContent = `${products.length} items`;
-
-            const total = products.reduce((sum, p) => sum + p.total, 0);
-            document.getElementById('summaryTotal').textContent = `$${total.toLocaleString(undefined, {minimumFractionDigits: 2})}`;
-
-            // Render editable products in summary
-            renderSummaryProducts();
-
-            // Enable/disable submit button
-            const canSubmit = selectedCustomer &&
-                              document.getElementById('orderCrop').value &&
-                              document.getElementById('orderAcres').value > 0;
-            document.getElementById('submitOrderBtn').disabled = !canSubmit;
-        }
-
-        // Listen for form changes
-        document.getElementById('orderCrop').addEventListener('change', updateSummary);
-        document.getElementById('orderProgram').addEventListener('change', updateSummary);
-        document.getElementById('orderAcres').addEventListener('input', updateSummary);
-        document.getElementById('orderGPA').addEventListener('input', updateSummary);
-
-        // Scroll to Step 2 for editing
-        function scrollToStep2() {
-            document.getElementById('step2').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Scroll to products section
-        function scrollToProducts() {
-            document.querySelector('.products-section').scrollIntoView({ behavior: 'smooth' });
-        }
-
-        // Toggle summary field edit mode
-        function toggleSummaryEdit(field) {
-            const valueEl = document.getElementById('summary' + field);
-            const editEl = document.getElementById('summary' + field + 'Edit');
-
-            if (editEl.style.display === 'none') {
-                // Show edit input
-                editEl.style.display = 'inline-block';
-                valueEl.style.display = 'none';
-                // Set current value
-                if (field === 'Crop') {
-                    editEl.value = document.getElementById('orderCrop').value;
-                } else if (field === 'Acres') {
-                    editEl.value = document.getElementById('orderAcres').value;
-                } else if (field === 'GPA') {
-                    editEl.value = document.getElementById('orderGPA').value;
-                }
-                editEl.focus();
-            } else {
-                // Hide edit input
-                editEl.style.display = 'none';
-                valueEl.style.display = 'inline';
-            }
-        }
-
-        // Update crop from summary edit
-        function updateCropFromSummary(value) {
-            document.getElementById('orderCrop').value = value;
-            document.getElementById('summaryCrop').textContent = value || '-';
-            document.getElementById('summaryCropEdit').style.display = 'none';
-            document.getElementById('summaryCrop').style.display = 'inline';
-            updateSummary();
-        }
-
-        // Update acres from summary edit
-        function updateAcresFromSummary(value) {
-            document.getElementById('orderAcres').value = value;
-            document.getElementById('summaryAcres').textContent = value || '-';
-            document.getElementById('summaryAcresEdit').style.display = 'none';
-            document.getElementById('summaryAcres').style.display = 'inline';
-            updateSummary();
-        }
-
-        // Update GPA from summary edit
-        function updateGPAFromSummary(value) {
-            document.getElementById('orderGPA').value = value;
-            document.getElementById('summaryGPA').textContent = value || '-';
-            document.getElementById('summaryGPAEdit').style.display = 'none';
-            document.getElementById('summaryGPA').style.display = 'inline';
-            updateSummary();
-        }
-
-        // Update product quantity inline in summary
-        function updateProductQty(index, newQty) {
-            newQty = parseFloat(newQty) || 0;
-            if (newQty <= 0) {
-                removeProduct(index);
-                return;
-            }
-            products[index].qty = newQty;
-            products[index].total = newQty * products[index].price;
-            renderProducts();
-            updateSummary();
-        }
-
-        // Update product price inline in summary
-        function updateProductPrice(index, newPrice) {
-            newPrice = parseFloat(newPrice) || 0;
-            products[index].price = newPrice;
-            products[index].total = products[index].qty * newPrice;
-            renderProducts();
-            updateSummary();
-        }
-
-        // Render summary products with edit capability
-        function renderSummaryProducts() {
-            const container = document.getElementById('summaryProductsList');
-            if (!container) return;
-
-            if (products.length === 0) {
-                container.innerHTML = '<p class="no-products">No products added</p>';
-                return;
-            }
-
-            container.innerHTML = products.map((p, i) => `
-                <div class="summary-product-row">
-                    <div class="summary-product-name">${p.name}</div>
-                    <div class="summary-product-qty">
-                        <input type="number" value="${p.qty}" min="0" step="1" class="summary-qty-input" onchange="updateProductQty(${i}, this.value)">
-                        <span>${p.unit}</span>
-                    </div>
-                    <div class="summary-product-price">
-                        <span>@</span>
-                        <input type="number" value="${p.price.toFixed(2)}" min="0" step="0.01" class="summary-price-input" onchange="updateProductPrice(${i}, this.value)">
-                        <span>/${p.unit}</span>
-                    </div>
-                    <div class="summary-product-total">$${p.total.toFixed(2)}</div>
-                    <button class="btn-remove-sm" onclick="removeProduct(${i})" title="Remove">&times;</button>
-                </div>
-            `).join('');
-        }
-
-        // Submit order
-        async function submitOrder() {
-            if (!selectedCustomer) {
-                alert('Please select a customer');
-                return;
-            }
-
-            const crop = document.getElementById('orderCrop').value;
-            const program = document.getElementById('orderProgram').value;
-            const acres = parseInt(document.getElementById('orderAcres').value) || 0;
-            const gpa = parseFloat(document.getElementById('orderGPA').value) || 0;
-            const year = document.getElementById('orderYear').value;
-            const status = document.getElementById('orderStatus').value;
-            const notes = document.getElementById('orderNotes').value;
-            const totalPrice = products.reduce((sum, p) => sum + p.total, 0);
-
-            if (!crop || acres <= 0) {
-                alert('Please select a crop and enter acres');
-                return;
-            }
-
-            // Warn if no products added
-            if (products.length === 0 || totalPrice === 0) {
-                const proceed = confirm('Warning: No products have been added to this order (total is $0).\n\nDo you want to create this order anyway?');
-                if (!proceed) return;
-            }
-
-            try {
-                const response = await fetch(`${API_URL}/api/admin/orders/for-customer`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify({
-                        customerId: selectedCustomer._id,
-                        crop,
-                        programId: program,
-                        acres,
-                        gpa,
-                        year,
-                        status,
-                        notes,
-                        chemicals: products,
-                        totalPrice
-                    })
-                });
-
-                if (response.ok) {
-                    alert(`Order created successfully for ${selectedCustomer.name}!`);
-                    window.location.href = '/admin.html';
-                } else {
-                    const error = await response.json();
-                    alert(error.error || 'Failed to create order');
-                }
-            } catch (error) {
-                console.error('Error creating order:', error);
-                alert('Error creating order. Please try again.');
-            }
-        }
-
-        // Check for customer param in URL
-        async function checkUrlCustomer() {
+        // Check for customer param in URL (for direct links)
+        function checkUrlCustomer() {
             const params = new URLSearchParams(window.location.search);
             const customerId = params.get('customer');
 
-            if (customerId) {
-                await loadCustomers();
+            if (customerId && allCustomers.length > 0) {
                 selectCustomer(customerId);
             }
         }
 
-        // Render chemical catalog
-        function renderCatalog() {
-            const container = document.getElementById('chemicalCatalog');
-            const categoryFilter = document.getElementById('catalogCategory').value.toLowerCase();
-            const searchTerm = document.getElementById('catalogSearch').value.toLowerCase();
-
-            let filtered = allChemicals.filter(c => {
-                const matchCategory = !categoryFilter || (c.category && c.category.toLowerCase() === categoryFilter);
-                const matchSearch = !searchTerm ||
-                    c.productName.toLowerCase().includes(searchTerm) ||
-                    (c.notes && c.notes.toLowerCase().includes(searchTerm));
-                return matchCategory && matchSearch;
-            });
-
-            if (filtered.length === 0) {
-                container.innerHTML = '<p class="empty">No products found</p>';
-                return;
-            }
-
-            container.innerHTML = filtered.map(chem => `
-                <div class="catalog-item" data-id="${chem._id}">
-                    <div class="catalog-item-name">${chem.productName}</div>
-                    <div class="catalog-item-packaging">
-                        <span class="packaging-badge">${chem.packSize || '-'}</span>
-                        ${chem.unitsPerPack ? `<span class="units-info">${chem.unitsPerPack} ${chem.unit}</span>` : ''}
-                    </div>
-                    <div class="catalog-item-price">
-                        <strong>$${(chem.sellPrice || 0).toFixed(2)}</strong><span class="per-unit">/${chem.unit || 'unit'}</span>
-                    </div>
-                    ${chem.notes ? `<div class="catalog-item-note">${chem.notes}</div>` : ''}
-                    <div class="catalog-add-row">
-                        <input type="number" class="qty-input" id="qty-${chem._id}" value="1" min="1" step="1" onclick="event.stopPropagation()">
-                        <button class="btn btn-sm btn-primary" onclick="addFromCatalog('${chem._id}')">+ Add</button>
-                    </div>
-                </div>
-            `).join('');
-        }
-
-        function filterCatalog() {
-            renderCatalog();
-        }
-
-        // Add from catalog using inline quantity
-        function addFromCatalog(chemicalId) {
-            const chem = allChemicals.find(c => c._id === chemicalId);
-            if (!chem) return;
-
-            const qtyInput = document.getElementById(`qty-${chemicalId}`);
-            const qty = parseFloat(qtyInput?.value) || 1;
-            if (qty <= 0) return;
-
-            const product = {
-                name: chem.productName,
-                qty: qty,
-                unit: chem.unit || 'gallons',
-                price: chem.sellPrice || 0,
-                total: qty * (chem.sellPrice || 0),
-                chemicalId: chem._id,
-                packSize: chem.packSize,
-                sourceSupplier: chem.sourceSupplier
-            };
-
-            products.push(product);
-            renderProducts();
-            updateSummary();
-
-            // Reset qty input
-            if (qtyInput) qtyInput.value = 1;
-
-            // Visual feedback
-            const card = document.querySelector(`.catalog-item[data-id="${chemicalId}"]`);
-            if (card) {
-                card.style.background = '#d4edda';
-                setTimeout(() => card.style.background = '', 500);
-            }
-        }
-
         // Initialize
-        Promise.all([loadCustomers(), loadChemicals()]).then(() => {
+        loadCustomers().then(() => {
             checkUrlCustomer();
-            renderCatalog();
         });
-        renderProducts();
     </script>
 
     <style>
-        .admin-order-page {
-            padding: 100px 0 60px;
+        .admin-customer-select-page {
+            padding: 120px 0 60px;
             background: var(--secondary);
             min-height: 100vh;
         }
 
-        .admin-order-header {
-            margin-bottom: 32px;
+        .customer-select-hero {
+            text-align: center;
+            margin-bottom: 40px;
         }
 
-        .admin-order-header h1 {
-            font-size: 2rem;
-            margin-bottom: 8px;
+        .customer-select-hero h1 {
+            font-size: 2.5rem;
+            margin-bottom: 12px;
+            color: var(--primary);
         }
 
-        .admin-order-header p {
+        .customer-select-hero p {
+            color: var(--text-muted);
+            font-size: 1.125rem;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        .customer-search-box {
+            position: relative;
+            max-width: 600px;
+            margin: 0 auto 40px;
+        }
+
+        .customer-search-box .search-icon {
+            position: absolute;
+            left: 20px;
+            top: 50%;
+            transform: translateY(-50%);
             color: var(--text-muted);
         }
 
-        .order-step {
-            background: var(--white);
+        .customer-search-box input {
+            width: 100%;
+            padding: 20px 20px 20px 56px;
+            border: 2px solid var(--border);
             border-radius: var(--radius-lg);
-            margin-bottom: 24px;
-            box-shadow: var(--shadow);
-            overflow: hidden;
+            font-size: 1.125rem;
+            background: var(--white);
+            box-shadow: var(--shadow-lg);
+            transition: all 0.2s;
         }
 
-        .step-header {
+        .customer-search-box input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: var(--shadow-lg), 0 0 0 4px rgba(45, 90, 39, 0.1);
+        }
+
+        .customer-results {
+            max-width: 900px;
+            margin: 0 auto;
+        }
+
+        .loading-state,
+        .empty-state,
+        .error-state {
+            text-align: center;
+            padding: 60px 20px;
+            background: var(--white);
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
+        }
+
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid var(--border);
+            border-top-color: var(--primary);
+            border-radius: 50%;
+            margin: 0 auto 16px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .empty-state .empty-icon {
+            color: var(--text-muted);
+            margin-bottom: 16px;
+        }
+
+        .empty-state p {
+            font-size: 1.125rem;
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .empty-state span {
+            color: var(--text-muted);
+        }
+
+        .customer-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .customer-card {
             display: flex;
             align-items: center;
             gap: 16px;
             padding: 20px 24px;
-            background: var(--secondary);
-            border-bottom: 1px solid var(--border);
-        }
-
-        .step-number {
-            width: 32px;
-            height: 32px;
-            background: var(--primary);
-            color: var(--white);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-        }
-
-        .step-header h2 {
-            font-size: 1.125rem;
-            margin: 0;
-        }
-
-        .step-content {
-            padding: 24px;
-        }
-
-        .customer-select-wrapper {
-            position: relative;
-        }
-
-        .customer-search-input {
-            width: 100%;
-            padding: 16px 20px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 1rem;
-        }
-
-        .customer-search-input:focus {
-            outline: none;
-            border-color: var(--primary);
-        }
-
-        .customer-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
             background: var(--white);
-            border: 2px solid var(--border);
-            border-top: none;
-            border-radius: 0 0 var(--radius) var(--radius);
-            max-height: 300px;
-            overflow-y: auto;
-            display: none;
-            z-index: 100;
-        }
-
-        .dropdown-item {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 12px 16px;
+            border-radius: var(--radius-lg);
+            box-shadow: var(--shadow);
             cursor: pointer;
-            transition: background 0.2s;
+            transition: all 0.2s;
+            border: 2px solid transparent;
         }
 
-        .dropdown-item:hover {
-            background: var(--secondary);
+        .customer-card:hover {
+            border-color: var(--primary);
+            transform: translateY(-2px);
+            box-shadow: var(--shadow-lg);
         }
 
-        .dropdown-avatar {
-            width: 40px;
-            height: 40px;
-            background: var(--primary);
-            color: var(--white);
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .dropdown-info {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-
-        .dropdown-info span {
-            font-size: 0.875rem;
-            color: var(--text-muted);
-        }
-
-        .dropdown-empty {
-            padding: 16px;
-            color: var(--text-muted);
-            text-align: center;
-        }
-
-        .selected-customer-card {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding: 20px;
-            background: var(--secondary);
-            border-radius: var(--radius);
-            border: 2px solid var(--primary);
-        }
-
-        .selected-customer-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .selected-avatar {
+        .customer-avatar {
             width: 56px;
             height: 56px;
             background: var(--primary);
@@ -1010,542 +400,180 @@
             justify-content: center;
             font-weight: 700;
             font-size: 1.25rem;
+            flex-shrink: 0;
         }
 
-        .selected-details h3 {
-            margin-bottom: 4px;
-        }
-
-        .selected-details p {
-            color: var(--text-muted);
-            font-size: 0.875rem;
-        }
-
-        .selected-contact {
-            margin-top: 4px;
-        }
-
-        .order-form-grid {
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 20px;
-            margin-bottom: 32px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-        }
-
-        .form-group label {
-            font-weight: 600;
-            font-size: 0.875rem;
-        }
-
-        .form-group input,
-        .form-group select,
-        .form-group textarea {
-            padding: 12px 16px;
-            border: 2px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 1rem;
-        }
-
-        .form-group textarea {
-            min-height: 100px;
-            resize: vertical;
-        }
-
-        .form-group.full-width {
-            grid-column: 1 / -1;
-        }
-
-        .products-section {
-            margin-bottom: 24px;
-        }
-
-        .products-section h3 {
-            margin-bottom: 4px;
-        }
-
-        .section-desc {
-            color: var(--text-muted);
-            font-size: 0.875rem;
-            margin-bottom: 16px;
-        }
-
-        .products-list {
-            background: var(--secondary);
-            border-radius: var(--radius);
-            padding: 16px;
-            margin-bottom: 16px;
-            min-height: 60px;
-        }
-
-        .empty-products {
-            color: var(--text-muted);
-            text-align: center;
-            margin: 0;
-        }
-
-        .product-item {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 12px;
-            background: var(--white);
-            border-radius: var(--radius);
-            margin-bottom: 8px;
-        }
-
-        .product-item:last-child {
-            margin-bottom: 0;
-        }
-
-        .product-item-info {
-            display: flex;
-            align-items: center;
-            gap: 16px;
-        }
-
-        .product-item-info span {
-            color: var(--text-muted);
-        }
-
-        .product-item-price {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .product-item-price span {
-            font-weight: 600;
-        }
-
-        .btn-remove {
-            background: none;
-            border: none;
-            color: #ef4444;
-            font-size: 1.25rem;
-            cursor: pointer;
-            padding: 4px 8px;
-        }
-
-        .add-product-form .form-row {
-            display: flex;
-            gap: 16px;
-            align-items: flex-end;
-        }
-
-        .flex-1 { flex: 1; }
-        .flex-2 { flex: 2; }
-        .flex-shrink { flex-shrink: 0; }
-
-        .order-summary {
-            background: var(--secondary);
-            border-radius: var(--radius);
-            padding: 20px;
-        }
-
-        .summary-row {
-            display: flex;
-            justify-content: space-between;
-            padding: 12px 0;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .summary-row:last-child {
-            border-bottom: none;
-        }
-
-        .summary-row.total {
-            font-size: 1.25rem;
-            padding-top: 16px;
-        }
-
-        .summary-row.total strong {
-            color: var(--primary);
-        }
-
-        .order-actions {
-            display: flex;
-            justify-content: flex-end;
-            gap: 16px;
-            padding: 24px 0;
-        }
-
-        /* Chemical dropdown styles */
-        .chemical-select-wrapper {
-            position: relative;
-        }
-
-        .chemical-dropdown {
-            position: absolute;
-            top: 100%;
-            left: 0;
-            right: 0;
-            background: var(--white);
-            border: 2px solid var(--primary);
-            border-top: none;
-            border-radius: 0 0 var(--radius) var(--radius);
-            max-height: 300px;
-            overflow-y: auto;
-            display: none;
-            z-index: 100;
-            box-shadow: var(--shadow-lg);
-        }
-
-        .chemical-item {
-            display: block;
-            padding: 10px 14px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .chemical-item:last-child {
-            border-bottom: none;
-        }
-
-        .chemical-item:hover {
-            background: var(--secondary);
-        }
-
-        .chemical-info strong {
-            display: block;
-            font-size: 0.95rem;
-        }
-
-        .chemical-details {
-            display: block;
-            font-size: 0.8rem;
-            color: var(--text-muted);
-            margin-top: 2px;
-        }
-
-        .product-item.linked {
-            border-left: 3px solid var(--primary);
-        }
-
-        .product-item.manual {
-            border-left: 3px solid #f59e0b;
-        }
-
-        .product-item-info {
-            flex-direction: column;
-            align-items: flex-start;
-            gap: 4px;
-        }
-
-        .product-supplier {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        #productPackSize {
-            background: var(--secondary);
-            color: var(--text-muted);
-        }
-
-        /* Chemical Catalog */
-        .chemical-catalog {
-            background: var(--white);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 16px;
-            margin-bottom: 24px;
-        }
-
-        .catalog-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 16px;
-            flex-wrap: wrap;
-            gap: 12px;
-        }
-
-        .catalog-header h4 {
-            margin: 0;
-            font-size: 1rem;
-        }
-
-        .catalog-filters {
-            display: flex;
-            gap: 12px;
-        }
-
-        .catalog-filters select,
-        .catalog-filters input {
-            padding: 8px 12px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            font-size: 0.875rem;
-        }
-
-        .catalog-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
-            gap: 12px;
-            max-height: 400px;
-            overflow-y: auto;
-        }
-
-        .catalog-item {
-            background: var(--secondary);
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            padding: 12px;
-            cursor: pointer;
-            transition: all 0.2s;
-            position: relative;
-        }
-
-        .catalog-item:hover {
-            border-color: var(--primary);
-            box-shadow: 0 2px 8px rgba(45, 90, 39, 0.15);
-        }
-
-        .catalog-item-name {
-            font-weight: 600;
-            margin-bottom: 6px;
-            font-size: 0.95rem;
-            color: var(--text);
-        }
-
-        .catalog-item-packaging {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            margin-bottom: 6px;
-        }
-
-        .packaging-badge {
-            background: #e5e7eb;
-            color: #374151;
-            padding: 2px 8px;
-            border-radius: 4px;
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        .units-info {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-        }
-
-        .catalog-item-price {
-            margin-bottom: 8px;
-        }
-
-        .catalog-item-price strong {
-            font-size: 1.1rem;
-            color: var(--primary);
-        }
-
-        .catalog-item-price .per-unit {
-            font-size: 0.8rem;
-            color: var(--text-muted);
-        }
-
-        .catalog-item-note {
-            font-size: 0.75rem;
-            color: var(--text-muted);
-            font-style: italic;
-            margin-bottom: 8px;
-        }
-
-        .catalog-add-row {
-            display: flex;
-            gap: 8px;
-            align-items: center;
-        }
-
-        .catalog-add-row .qty-input {
-            width: 60px;
-            padding: 6px 8px;
-            border: 1px solid var(--border);
-            border-radius: var(--radius);
-            text-align: center;
-            font-size: 0.9rem;
-        }
-
-        .catalog-add-row .btn {
+        .customer-info {
             flex: 1;
-            padding: 6px 12px !important;
-            font-size: 0.85rem !important;
+            min-width: 0;
         }
 
-        .manual-entry {
-            border-top: 1px solid var(--border);
-            padding-top: 16px;
-            margin-top: 16px;
+        .customer-info h4 {
+            font-size: 1.125rem;
+            margin: 0 0 4px;
         }
 
-        .manual-entry h4 {
-            margin-bottom: 12px;
+        .customer-farm {
             color: var(--text-muted);
+            margin: 0 0 2px;
             font-size: 0.9rem;
         }
 
-        @media (max-width: 768px) {
-            .order-form-grid {
-                grid-template-columns: 1fr 1fr;
-            }
-
-            .add-product-form .form-row {
-                flex-wrap: wrap;
-            }
-
-            .flex-2, .flex-1 {
-                flex: 1 1 45%;
-            }
-
-            .catalog-grid {
-                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-            }
-
-            .catalog-filters {
-                width: 100%;
-            }
-
-            .catalog-filters select,
-            .catalog-filters input {
-                flex: 1;
-            }
+        .customer-contact,
+        .customer-phone {
+            color: var(--text-muted);
+            font-size: 0.875rem;
+            margin: 0;
         }
 
-        /* Inline Edit Styles for Summary */
-        .summary-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
+        .customer-action {
+            flex-shrink: 0;
         }
 
-        .summary-row .btn-edit {
-            margin-left: auto;
-            padding: 4px 10px;
-            font-size: 0.75rem;
-            background: transparent;
-            border: 1px solid var(--border);
-            border-radius: 4px;
+        .select-arrow {
+            font-size: 1.5rem;
             color: var(--primary);
-            cursor: pointer;
+            opacity: 0;
             transition: all 0.2s;
         }
 
-        .summary-row .btn-edit:hover {
-            background: var(--primary);
-            color: white;
-            border-color: var(--primary);
+        .customer-card:hover .select-arrow {
+            opacity: 1;
+            transform: translateX(4px);
         }
 
-        .summary-edit-input {
-            padding: 6px 10px;
-            border: 2px solid var(--primary);
-            border-radius: 4px;
-            font-size: 1rem;
-            min-width: 120px;
-        }
-
-        .summary-edit-input:focus {
-            outline: none;
-            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
-        }
-
-        /* Summary Products List - Editable */
-        .summary-products-list {
-            margin-top: 16px;
-            padding-top: 16px;
-            border-top: 1px dashed var(--border);
-        }
-
-        .summary-product-row {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            padding: 10px 0;
-            border-bottom: 1px solid #f0f0f0;
-        }
-
-        .summary-product-row:last-child {
-            border-bottom: none;
-        }
-
-        .summary-product-name {
-            flex: 2;
-            font-weight: 500;
-            color: var(--text);
-        }
-
-        .summary-product-qty,
-        .summary-product-price {
-            display: flex;
-            align-items: center;
-            gap: 4px;
-            font-size: 0.9rem;
-        }
-
-        .summary-qty-input,
-        .summary-price-input {
-            width: 70px;
-            padding: 4px 8px;
-            border: 1px solid var(--border);
-            border-radius: 4px;
-            text-align: right;
-            font-size: 0.9rem;
-        }
-
-        .summary-qty-input:focus,
-        .summary-price-input:focus {
-            outline: none;
-            border-color: var(--primary);
-            box-shadow: 0 0 0 2px rgba(45, 90, 39, 0.1);
-        }
-
-        .summary-product-total {
-            font-weight: 600;
-            color: var(--primary);
-            min-width: 80px;
-            text-align: right;
-        }
-
-        .btn-remove-sm {
-            width: 24px;
-            height: 24px;
-            border: none;
-            background: #fee;
-            color: #c00;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 1.2rem;
-            line-height: 1;
-            transition: all 0.2s;
-        }
-
-        .btn-remove-sm:hover {
-            background: #c00;
-            color: white;
-        }
-
-        .no-products {
+        .results-note {
             text-align: center;
             color: var(--text-muted);
-            font-style: italic;
+            margin-top: 16px;
+            font-size: 0.875rem;
+        }
+
+        /* Recent Customers */
+        .recent-customers-section {
+            max-width: 900px;
+            margin: 0 auto 40px;
+        }
+
+        .recent-customers-section h3 {
+            font-size: 1rem;
+            color: var(--text-muted);
+            margin-bottom: 16px;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .recent-customers-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+        }
+
+        .recent-customer-card {
+            display: flex;
+            align-items: center;
+            gap: 12px;
             padding: 16px;
+            background: var(--white);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            cursor: pointer;
+            transition: all 0.2s;
+            border: 2px solid transparent;
         }
 
-        .editable-row {
-            position: relative;
+        .recent-customer-card:hover {
+            border-color: var(--primary);
         }
 
+        .recent-customer-avatar {
+            width: 40px;
+            height: 40px;
+            background: var(--primary);
+            color: var(--white);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 0.875rem;
+            flex-shrink: 0;
+        }
+
+        .recent-customer-info {
+            flex: 1;
+            min-width: 0;
+            overflow: hidden;
+        }
+
+        .recent-customer-info strong {
+            display: block;
+            font-size: 0.9rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .recent-customer-info span {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        /* Nav styling */
+        .nav-center {
+            display: flex;
+            align-items: center;
+            gap: 16px;
+        }
+
+        .nav-back {
+            color: var(--text-muted);
+            text-decoration: none;
+            font-size: 0.875rem;
+        }
+
+        .nav-back:hover {
+            color: var(--primary);
+        }
+
+        .nav-title {
+            font-weight: 600;
+            color: var(--dark);
+        }
+
+        .nav-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Responsive */
         @media (max-width: 768px) {
-            .summary-product-row {
-                flex-wrap: wrap;
+            .customer-select-hero h1 {
+                font-size: 1.75rem;
             }
 
-            .summary-product-name {
-                flex: 1 1 100%;
-                margin-bottom: 8px;
+            .customer-search-box input {
+                font-size: 1rem;
+                padding: 16px 16px 16px 48px;
+            }
+
+            .customer-card {
+                padding: 16px;
+            }
+
+            .customer-avatar {
+                width: 48px;
+                height: 48px;
+                font-size: 1rem;
+            }
+
+            .recent-customers-grid {
+                grid-template-columns: 1fr;
             }
         }
     </style>

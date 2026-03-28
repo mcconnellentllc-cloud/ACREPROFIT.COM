@@ -1695,6 +1695,205 @@ invoiceSchema.index({ invoiceDate: -1 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 
+// ============ CHEMICAL MIX RECIPE BOOK ============
+
+// Chemical Mix Model - "Recipe Book" for custom chemical cocktails
+const chemicalMixSchema = new mongoose.Schema({
+    // Mix identification
+    name: { type: String, required: true }, // "Dad's Bean Blend", "Kyle's Burndown Special"
+    slug: { type: String, unique: true }, // URL-friendly version of name
+
+    // Creator info
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    isAnonymous: { type: Boolean, default: true }, // Hide creator identity
+    creatorDisplayName: String, // Optional: show this name instead (e.g., "McConnell Farms")
+
+    // Crop and timing
+    crop: { type: String, required: true }, // corn, soybeans, wheat, etc.
+    timing: {
+        type: String,
+        enum: [
+            'burndown',           // Pre-plant burndown
+            'pre-emerge',         // After planting, before emergence
+            'early-post',         // V1-V3 / VC-V2 beans
+            'post-emerge',        // General post-emerge
+            'v4-v6',              // Corn V4-V6 window
+            'v6-plus',            // Corn V6+ / late post
+            'r1-r3',              // Reproductive stages (beans)
+            'layby',              // Last application before canopy
+            'tassel',             // At/around tasseling
+            'harvest-aid',        // Pre-harvest / desiccant
+            'fall-application',   // Post-harvest fall app
+            'cover-crop',         // Cover crop termination
+            'other'
+        ],
+        required: true
+    },
+    maxGrowthStage: String, // e.g., "V6", "R2" - max crop height/stage for this mix
+    timingNotes: String, // e.g., "Apply before 12 inch weeds", "Best in morning"
+
+    // The recipe - ingredients list
+    ingredients: [{
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        productName: String, // Stored for reference even if chemical deleted
+        category: String, // herbicide, fungicide, etc.
+        rate: { type: Number, required: true }, // Application rate
+        rateUnit: { type: String, required: true }, // oz/acre, pt/acre, qt/acre, lb/acre
+        notes: String // e.g., "Can sub with generic glyphosate"
+    }],
+
+    // Total water/carrier volume
+    gallonsPerAcre: { type: Number, default: 15 }, // GPA for the mix
+
+    // Story and description
+    description: String, // Brief description of what it does
+    story: String, // The full story - why they developed it, how it came to be
+    tips: String, // Application tips, what to watch for
+
+    // Media
+    images: [{
+        url: String,
+        caption: String,
+        uploadedAt: { type: Date, default: Date.now }
+    }],
+
+    // Yield map / success data
+    yieldData: [{
+        year: Number,
+        crop: String,
+        acres: Number,
+        yieldPerAcre: Number, // bu/acre, tons/acre, etc.
+        yieldUnit: { type: String, default: 'bu/acre' },
+        location: String, // General area, county, etc.
+        notes: String,
+        imageUrl: String // Yield map image
+    }],
+
+    // AI Analysis (from Claude)
+    aiAnalysis: {
+        lastAnalyzedAt: Date,
+        compatibility: String, // Tank mix compatibility notes
+        restrictions: String, // Label restrictions summary
+        rotationalCrops: String, // Rotational restrictions
+        bufferZones: String, // Buffer zone requirements
+        ppeRequired: String, // PPE requirements
+        modesOfAction: [String], // List of MOA groups
+        resistanceManagement: String, // Resistance management notes
+        warnings: [String], // Any warnings or cautions
+        fullAnalysis: String // Complete analysis text
+    },
+
+    // Ratings and popularity
+    totalRatings: { type: Number, default: 0 },
+    averageRating: { type: Number, default: 0 },
+    totalViews: { type: Number, default: 0 },
+    totalOrders: { type: Number, default: 0 }, // Times ingredients were ordered
+
+    // Tags for searchability
+    tags: [String], // e.g., ["waterhemp", "marestail", "burndown", "no-till"]
+
+    // Status
+    status: {
+        type: String,
+        enum: ['draft', 'published', 'archived'],
+        default: 'draft'
+    },
+    isPublic: { type: Boolean, default: true }, // Visible to other farmers
+    isFeatured: { type: Boolean, default: false }, // Admin can feature top recipes
+
+    // Timestamps
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now },
+    publishedAt: Date
+});
+
+// Indexes for searching
+chemicalMixSchema.index({ crop: 1, timing: 1 });
+chemicalMixSchema.index({ status: 1, isPublic: 1 });
+chemicalMixSchema.index({ averageRating: -1 });
+chemicalMixSchema.index({ totalOrders: -1 });
+chemicalMixSchema.index({ tags: 1 });
+chemicalMixSchema.index({ createdBy: 1 });
+chemicalMixSchema.index({ slug: 1 });
+chemicalMixSchema.index({ name: 'text', description: 'text', story: 'text', tags: 'text' });
+
+// Generate slug before save
+chemicalMixSchema.pre('save', function(next) {
+    if (this.isModified('name') || !this.slug) {
+        // Create URL-friendly slug
+        let slug = this.name
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-|-$/g, '');
+        // Add random suffix for uniqueness
+        slug = `${slug}-${Math.random().toString(36).substring(2, 8)}`;
+        this.slug = slug;
+    }
+    this.updatedAt = new Date();
+    next();
+});
+
+const ChemicalMix = mongoose.model('ChemicalMix', chemicalMixSchema);
+
+// Chemical Mix Rating Model
+const chemicalMixRatingSchema = new mongoose.Schema({
+    mixId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChemicalMix', required: true },
+    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+
+    // Rating (1-5 stars)
+    rating: { type: Number, required: true, min: 1, max: 5 },
+
+    // Optional review
+    review: String,
+
+    // Their results
+    usedOnCrop: String,
+    usedOnAcres: Number,
+    yieldResult: Number,
+    yieldUnit: String,
+    wouldRecommend: { type: Boolean, default: true },
+
+    // Did they modify it?
+    madeModifications: { type: Boolean, default: false },
+    modifications: String, // What they changed
+
+    // Photos of their results
+    images: [{
+        url: String,
+        caption: String
+    }],
+
+    // Helpful votes
+    helpfulVotes: { type: Number, default: 0 },
+
+    createdAt: { type: Date, default: Date.now }
+});
+
+// One rating per user per mix
+chemicalMixRatingSchema.index({ mixId: 1, userId: 1 }, { unique: true });
+chemicalMixRatingSchema.index({ mixId: 1, rating: -1 });
+
+const ChemicalMixRating = mongoose.model('ChemicalMixRating', chemicalMixRatingSchema);
+
+// Helper: Update mix rating averages
+async function updateMixRatingStats(mixId) {
+    const stats = await ChemicalMixRating.aggregate([
+        { $match: { mixId: new mongoose.Types.ObjectId(mixId) } },
+        { $group: {
+            _id: '$mixId',
+            averageRating: { $avg: '$rating' },
+            totalRatings: { $sum: 1 }
+        }}
+    ]);
+
+    if (stats.length > 0) {
+        await ChemicalMix.findByIdAndUpdate(mixId, {
+            averageRating: Math.round(stats[0].averageRating * 10) / 10,
+            totalRatings: stats[0].totalRatings
+        });
+    }
+}
+
 // Helper: Generate invoice number
 async function generateInvoiceNumber() {
     const year = new Date().getFullYear();
@@ -11498,6 +11697,703 @@ app.get('/api/admin/bid-sheets/:id/compare', authMiddleware, adminMiddleware, as
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// ---- CHEMICAL MIX RECIPE BOOK ROUTES ----
+
+// Get all public mixes (recipe book browse)
+app.get('/api/mixes', async (req, res) => {
+    try {
+        const {
+            crop,
+            timing,
+            search,
+            tags,
+            sort = 'popular',
+            page = 1,
+            limit = 20
+        } = req.query;
+
+        const query = { status: 'published', isPublic: true };
+
+        if (crop) query.crop = crop;
+        if (timing) query.timing = timing;
+        if (tags) query.tags = { $in: tags.split(',') };
+
+        // Text search
+        if (search) {
+            query.$text = { $search: search };
+        }
+
+        // Sorting options
+        let sortOption = {};
+        switch (sort) {
+            case 'popular':
+                sortOption = { totalOrders: -1, averageRating: -1 };
+                break;
+            case 'rating':
+                sortOption = { averageRating: -1, totalRatings: -1 };
+                break;
+            case 'newest':
+                sortOption = { publishedAt: -1 };
+                break;
+            case 'views':
+                sortOption = { totalViews: -1 };
+                break;
+            default:
+                sortOption = { totalOrders: -1 };
+        }
+
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const [mixes, total] = await Promise.all([
+            ChemicalMix.find(query)
+                .sort(sortOption)
+                .skip(skip)
+                .limit(parseInt(limit))
+                .populate('ingredients.chemicalId', 'productName category sellPrice packSize unit')
+                .lean(),
+            ChemicalMix.countDocuments(query)
+        ]);
+
+        // Hide creator info for anonymous mixes
+        const safeMixes = mixes.map(mix => {
+            if (mix.isAnonymous) {
+                delete mix.createdBy;
+            }
+            return mix;
+        });
+
+        res.json({
+            mixes: safeMixes,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get single mix by slug or ID
+app.get('/api/mixes/:identifier', async (req, res) => {
+    try {
+        const { identifier } = req.params;
+
+        // Try to find by slug first, then by ID
+        let mix = await ChemicalMix.findOne({ slug: identifier })
+            .populate('ingredients.chemicalId', 'productName category sellPrice packSize unit epaRegistrationNumber isRestrictedUse signalWord activeIngredients')
+            .populate('createdBy', 'name farm.name');
+
+        if (!mix && mongoose.Types.ObjectId.isValid(identifier)) {
+            mix = await ChemicalMix.findById(identifier)
+                .populate('ingredients.chemicalId', 'productName category sellPrice packSize unit epaRegistrationNumber isRestrictedUse signalWord activeIngredients')
+                .populate('createdBy', 'name farm.name');
+        }
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        // Increment view count
+        await ChemicalMix.findByIdAndUpdate(mix._id, { $inc: { totalViews: 1 } });
+
+        // Convert to object and handle anonymity
+        const mixObj = mix.toObject();
+        if (mixObj.isAnonymous) {
+            mixObj.createdBy = mixObj.creatorDisplayName ? { name: mixObj.creatorDisplayName } : { name: 'Anonymous Farmer' };
+        }
+
+        res.json(mixObj);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get my mixes (authenticated)
+app.get('/api/my-mixes', authMiddleware, async (req, res) => {
+    try {
+        const mixes = await ChemicalMix.find({ createdBy: req.user._id })
+            .sort({ updatedAt: -1 })
+            .populate('ingredients.chemicalId', 'productName category sellPrice packSize unit')
+            .lean();
+
+        res.json(mixes);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Create a new mix
+app.post('/api/mixes', authMiddleware, async (req, res) => {
+    try {
+        const {
+            name,
+            crop,
+            timing,
+            timingNotes,
+            ingredients,
+            gallonsPerAcre,
+            description,
+            story,
+            tips,
+            tags,
+            isAnonymous,
+            creatorDisplayName,
+            status
+        } = req.body;
+
+        if (!name || !crop || !timing || !ingredients || ingredients.length === 0) {
+            return res.status(400).json({ error: 'Name, crop, timing, and at least one ingredient are required' });
+        }
+
+        // Validate and populate ingredient names
+        const populatedIngredients = await Promise.all(
+            ingredients.map(async (ing) => {
+                if (ing.chemicalId) {
+                    const chemical = await Chemical.findById(ing.chemicalId);
+                    if (chemical) {
+                        return {
+                            ...ing,
+                            productName: chemical.productName,
+                            category: chemical.category
+                        };
+                    }
+                }
+                return ing;
+            })
+        );
+
+        const mix = new ChemicalMix({
+            name,
+            crop,
+            timing,
+            timingNotes,
+            ingredients: populatedIngredients,
+            gallonsPerAcre: gallonsPerAcre || 15,
+            description,
+            story,
+            tips,
+            tags: tags || [],
+            isAnonymous: isAnonymous !== false, // Default to anonymous
+            creatorDisplayName,
+            createdBy: req.user._id,
+            status: status || 'draft',
+            publishedAt: status === 'published' ? new Date() : null
+        });
+
+        await mix.save();
+        res.status(201).json(mix);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update a mix
+app.put('/api/mixes/:id', authMiddleware, async (req, res) => {
+    try {
+        const mix = await ChemicalMix.findById(req.params.id);
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        // Only creator can edit (or admin)
+        if (mix.createdBy.toString() !== req.user._id.toString() && !isAdminLevel(req.user)) {
+            return res.status(403).json({ error: 'Not authorized to edit this mix' });
+        }
+
+        const updates = req.body;
+
+        // If changing to published, set publishedAt
+        if (updates.status === 'published' && mix.status !== 'published') {
+            updates.publishedAt = new Date();
+        }
+
+        // Re-populate ingredient names if ingredients changed
+        if (updates.ingredients) {
+            updates.ingredients = await Promise.all(
+                updates.ingredients.map(async (ing) => {
+                    if (ing.chemicalId) {
+                        const chemical = await Chemical.findById(ing.chemicalId);
+                        if (chemical) {
+                            return {
+                                ...ing,
+                                productName: chemical.productName,
+                                category: chemical.category
+                            };
+                        }
+                    }
+                    return ing;
+                })
+            );
+        }
+
+        Object.assign(mix, updates);
+        await mix.save();
+
+        res.json(mix);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete a mix
+app.delete('/api/mixes/:id', authMiddleware, async (req, res) => {
+    try {
+        const mix = await ChemicalMix.findById(req.params.id);
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        // Only creator can delete (or admin)
+        if (mix.createdBy.toString() !== req.user._id.toString() && !isAdminLevel(req.user)) {
+            return res.status(403).json({ error: 'Not authorized to delete this mix' });
+        }
+
+        await ChemicalMix.findByIdAndDelete(req.params.id);
+        await ChemicalMixRating.deleteMany({ mixId: req.params.id });
+
+        res.json({ message: 'Mix deleted successfully' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Add yield data to a mix
+app.post('/api/mixes/:id/yield-data', authMiddleware, async (req, res) => {
+    try {
+        const mix = await ChemicalMix.findById(req.params.id);
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        if (mix.createdBy.toString() !== req.user._id.toString() && !isAdminLevel(req.user)) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const yieldEntry = {
+            year: req.body.year || new Date().getFullYear(),
+            crop: req.body.crop || mix.crop,
+            acres: req.body.acres,
+            yieldPerAcre: req.body.yieldPerAcre,
+            yieldUnit: req.body.yieldUnit || 'bu/acre',
+            location: req.body.location,
+            notes: req.body.notes,
+            imageUrl: req.body.imageUrl
+        };
+
+        mix.yieldData.push(yieldEntry);
+        await mix.save();
+
+        res.json(mix);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Add images to a mix
+app.post('/api/mixes/:id/images', authMiddleware, async (req, res) => {
+    try {
+        const mix = await ChemicalMix.findById(req.params.id);
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        if (mix.createdBy.toString() !== req.user._id.toString() && !isAdminLevel(req.user)) {
+            return res.status(403).json({ error: 'Not authorized' });
+        }
+
+        const { url, caption } = req.body;
+
+        if (!url) {
+            return res.status(400).json({ error: 'Image URL is required' });
+        }
+
+        mix.images.push({ url, caption, uploadedAt: new Date() });
+        await mix.save();
+
+        res.json(mix);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Rate a mix
+app.post('/api/mixes/:id/ratings', authMiddleware, async (req, res) => {
+    try {
+        const { rating, review, usedOnCrop, usedOnAcres, yieldResult, yieldUnit, wouldRecommend, madeModifications, modifications, images } = req.body;
+
+        if (!rating || rating < 1 || rating > 5) {
+            return res.status(400).json({ error: 'Rating must be between 1 and 5' });
+        }
+
+        const mix = await ChemicalMix.findById(req.params.id);
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        // Check for existing rating
+        let existingRating = await ChemicalMixRating.findOne({
+            mixId: req.params.id,
+            userId: req.user._id
+        });
+
+        if (existingRating) {
+            // Update existing rating
+            existingRating.rating = rating;
+            existingRating.review = review;
+            existingRating.usedOnCrop = usedOnCrop;
+            existingRating.usedOnAcres = usedOnAcres;
+            existingRating.yieldResult = yieldResult;
+            existingRating.yieldUnit = yieldUnit;
+            existingRating.wouldRecommend = wouldRecommend;
+            existingRating.madeModifications = madeModifications;
+            existingRating.modifications = modifications;
+            existingRating.images = images || [];
+            await existingRating.save();
+        } else {
+            // Create new rating
+            existingRating = new ChemicalMixRating({
+                mixId: req.params.id,
+                userId: req.user._id,
+                rating,
+                review,
+                usedOnCrop,
+                usedOnAcres,
+                yieldResult,
+                yieldUnit,
+                wouldRecommend,
+                madeModifications,
+                modifications,
+                images: images || []
+            });
+            await existingRating.save();
+        }
+
+        // Update mix stats
+        await updateMixRatingStats(req.params.id);
+
+        res.json(existingRating);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get ratings for a mix
+app.get('/api/mixes/:id/ratings', async (req, res) => {
+    try {
+        const { page = 1, limit = 10 } = req.query;
+        const skip = (parseInt(page) - 1) * parseInt(limit);
+
+        const [ratings, total] = await Promise.all([
+            ChemicalMixRating.find({ mixId: req.params.id })
+                .sort({ helpfulVotes: -1, createdAt: -1 })
+                .skip(skip)
+                .limit(parseInt(limit))
+                .populate('userId', 'name farm.state')
+                .lean(),
+            ChemicalMixRating.countDocuments({ mixId: req.params.id })
+        ]);
+
+        res.json({
+            ratings,
+            pagination: {
+                page: parseInt(page),
+                limit: parseInt(limit),
+                total,
+                pages: Math.ceil(total / parseInt(limit))
+            }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Vote a rating as helpful
+app.post('/api/ratings/:id/helpful', authMiddleware, async (req, res) => {
+    try {
+        const rating = await ChemicalMixRating.findByIdAndUpdate(
+            req.params.id,
+            { $inc: { helpfulVotes: 1 } },
+            { new: true }
+        );
+
+        if (!rating) {
+            return res.status(404).json({ error: 'Rating not found' });
+        }
+
+        res.json(rating);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Order ingredients from a mix (create order from mix)
+app.post('/api/mixes/:id/order', authMiddleware, async (req, res) => {
+    try {
+        const { acres, gallonsPerAcre } = req.body;
+
+        if (!acres || acres <= 0) {
+            return res.status(400).json({ error: 'Acres is required' });
+        }
+
+        const mix = await ChemicalMix.findById(req.params.id)
+            .populate('ingredients.chemicalId');
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        // Calculate quantities needed for each ingredient
+        const orderItems = mix.ingredients.map(ing => {
+            const chemical = ing.chemicalId;
+            if (!chemical) {
+                return null; // Chemical no longer exists
+            }
+
+            // Calculate total needed based on rate and acres
+            const ratePerAcre = ing.rate;
+            const totalNeeded = ratePerAcre * acres;
+
+            // Convert to packages based on pack size
+            const unitsPerPack = chemical.unitsPerPack || 1;
+            const packagesNeeded = Math.ceil(totalNeeded / unitsPerPack);
+
+            return {
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                category: chemical.category,
+                rate: ing.rate,
+                rateUnit: ing.rateUnit,
+                totalNeeded,
+                packagesNeeded,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                pricePerPackage: chemical.sellPrice,
+                lineTotal: packagesNeeded * chemical.sellPrice
+            };
+        }).filter(item => item !== null);
+
+        // Increment mix order count
+        await ChemicalMix.findByIdAndUpdate(mix._id, { $inc: { totalOrders: 1 } });
+
+        // Return order summary (user can proceed to checkout)
+        res.json({
+            mix: {
+                id: mix._id,
+                name: mix.name,
+                crop: mix.crop,
+                timing: mix.timing
+            },
+            acres,
+            gallonsPerAcre: gallonsPerAcre || mix.gallonsPerAcre,
+            totalWaterVolume: (gallonsPerAcre || mix.gallonsPerAcre) * acres,
+            items: orderItems,
+            subtotal: orderItems.reduce((sum, item) => sum + item.lineTotal, 0)
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// AI Analysis - Analyze mix for restrictions, compatibility, etc.
+app.post('/api/mixes/:id/analyze', authMiddleware, async (req, res) => {
+    try {
+        const mix = await ChemicalMix.findById(req.params.id)
+            .populate('ingredients.chemicalId', 'productName category activeIngredients isRestrictedUse signalWord hazardClassifications requiredCertifications sdsUrl labelUrl');
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        // Build analysis data from chemicals
+        const ingredientData = mix.ingredients.map(ing => {
+            const chem = ing.chemicalId;
+            if (!chem) return { productName: ing.productName, rate: ing.rate, rateUnit: ing.rateUnit };
+
+            return {
+                productName: chem.productName,
+                category: chem.category,
+                rate: ing.rate,
+                rateUnit: ing.rateUnit,
+                activeIngredients: chem.activeIngredients,
+                isRestrictedUse: chem.isRestrictedUse,
+                signalWord: chem.signalWord,
+                hazardClassifications: chem.hazardClassifications,
+                requiredCertifications: chem.requiredCertifications
+            };
+        });
+
+        // Extract modes of action from active ingredients
+        const modesOfAction = [];
+        const activeIngredientsList = [];
+
+        ingredientData.forEach(ing => {
+            if (ing.activeIngredients) {
+                ing.activeIngredients.forEach(ai => {
+                    if (ai.name && !activeIngredientsList.includes(ai.name)) {
+                        activeIngredientsList.push(ai.name);
+                    }
+                });
+            }
+        });
+
+        // Check for restricted use products
+        const hasRestrictedUse = ingredientData.some(ing => ing.isRestrictedUse);
+
+        // Check required certifications
+        const requiredCerts = new Set();
+        ingredientData.forEach(ing => {
+            if (ing.requiredCertifications) {
+                ing.requiredCertifications.forEach(cert => requiredCerts.add(cert));
+            }
+        });
+
+        // Build analysis object
+        const analysis = {
+            lastAnalyzedAt: new Date(),
+            modesOfAction: modesOfAction,
+            warnings: [],
+            compatibility: 'Analysis based on product labels. Always refer to product labels for tank mix compatibility.',
+            restrictions: hasRestrictedUse ? 'This mix contains Restricted Use Pesticides (RUP). Applicator certification required.' : 'No restricted use products in this mix.',
+            ppeRequired: 'Refer to individual product labels for PPE requirements. Use the most restrictive PPE when tank mixing.',
+            fullAnalysis: JSON.stringify({
+                ingredients: ingredientData,
+                activeIngredients: activeIngredientsList,
+                requiredCertifications: Array.from(requiredCerts),
+                hasRestrictedUse,
+                analyzedAt: new Date().toISOString()
+            }, null, 2)
+        };
+
+        if (hasRestrictedUse) {
+            analysis.warnings.push('Contains Restricted Use Pesticide(s) - Applicator license required');
+        }
+
+        if (requiredCerts.has('dicamba_training')) {
+            analysis.warnings.push('Contains Dicamba product - Annual training certification required');
+        }
+
+        if (requiredCerts.has('paraquat_training')) {
+            analysis.warnings.push('Contains Paraquat - EPA Paraquat training certification required');
+        }
+
+        // Save analysis to mix
+        mix.aiAnalysis = analysis;
+        await mix.save();
+
+        res.json({
+            message: 'Analysis complete',
+            analysis,
+            ingredientDetails: ingredientData
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get featured mixes
+app.get('/api/mixes-featured', async (req, res) => {
+    try {
+        const featured = await ChemicalMix.find({
+            status: 'published',
+            isPublic: true,
+            isFeatured: true
+        })
+            .sort({ averageRating: -1 })
+            .limit(6)
+            .populate('ingredients.chemicalId', 'productName category')
+            .lean();
+
+        res.json(featured);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Get top mixes by crop
+app.get('/api/mixes-by-crop/:crop', async (req, res) => {
+    try {
+        const { timing } = req.query;
+        const query = {
+            status: 'published',
+            isPublic: true,
+            crop: req.params.crop.toLowerCase()
+        };
+
+        if (timing) query.timing = timing;
+
+        const mixes = await ChemicalMix.find(query)
+            .sort({ averageRating: -1, totalOrders: -1 })
+            .limit(20)
+            .populate('ingredients.chemicalId', 'productName category')
+            .lean();
+
+        res.json(mixes);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Feature/unfeature a mix
+app.put('/api/admin/mixes/:id/feature', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { isFeatured } = req.body;
+
+        const mix = await ChemicalMix.findByIdAndUpdate(
+            req.params.id,
+            { isFeatured: !!isFeatured },
+            { new: true }
+        );
+
+        if (!mix) {
+            return res.status(404).json({ error: 'Mix not found' });
+        }
+
+        res.json(mix);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get available crops and timings for filtering
+app.get('/api/mixes-filters', async (req, res) => {
+    try {
+        const [crops, tags] = await Promise.all([
+            ChemicalMix.distinct('crop', { status: 'published', isPublic: true }),
+            ChemicalMix.distinct('tags', { status: 'published', isPublic: true })
+        ]);
+
+        res.json({
+            crops: crops.sort(),
+            timings: [
+                { value: 'burndown', label: 'Burndown', description: 'Pre-plant weed control' },
+                { value: 'pre-emerge', label: 'Pre-Emerge', description: 'After planting, before crop emerges' },
+                { value: 'early-post', label: 'Early Post', description: 'V1-V3 corn / VC-V2 beans' },
+                { value: 'post-emerge', label: 'Post-Emerge', description: 'General post-emergence' },
+                { value: 'v4-v6', label: 'V4-V6 Window', description: 'Mid-season corn window' },
+                { value: 'v6-plus', label: 'V6+ / Late Post', description: 'Late post applications' },
+                { value: 'r1-r3', label: 'R1-R3 (Beans)', description: 'Reproductive stage soybeans' },
+                { value: 'layby', label: 'Layby', description: 'Last app before canopy closes' },
+                { value: 'tassel', label: 'Tassel', description: 'At or around tasseling' },
+                { value: 'harvest-aid', label: 'Harvest Aid', description: 'Pre-harvest desiccant' },
+                { value: 'fall-application', label: 'Fall Application', description: 'Post-harvest' },
+                { value: 'cover-crop', label: 'Cover Crop', description: 'Cover crop termination' },
+                { value: 'other', label: 'Other', description: 'Other timing' }
+            ],
+            tags: tags.sort(),
+            defaultCrops: ['corn', 'soybeans', 'wheat', 'sorghum', 'cotton', 'sunflowers', 'dry-beans', 'sugar-beets']
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 

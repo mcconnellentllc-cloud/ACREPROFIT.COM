@@ -706,6 +706,33 @@
             'mollohan': { name: 'Ty Mollohan', phone: '(970) 520-2340', email: 'Tymollohan77@gmail.com' }
         };
 
+        function showActingAsCustomerBanner(customer) {
+            const banner = document.createElement('div');
+            banner.id = 'actingAsBanner';
+            banner.innerHTML = `
+                <div style="background: linear-gradient(135deg, #2D5A27 0%, #4a7c44 100%); color: white; padding: 12px 24px; position: fixed; top: 0; left: 0; right: 0; z-index: 9999;">
+                    <div style="max-width: 1000px; margin: 0 auto; display: flex; align-items: center; gap: 12px;">
+                        <span style="font-size: 1.25rem;">&#128100;</span>
+                        <span style="flex: 1;">
+                            <strong>Placing order for:</strong> ${customer.name}
+                            ${customer.farm ? `(${customer.farm})` : ''}
+                        </span>
+                        <button onclick="exitActingAs()" style="background: rgba(255,255,255,0.2); color: white; border: 1px solid rgba(255,255,255,0.3); padding: 6px 12px; border-radius: 4px; cursor: pointer;">Exit</button>
+                    </div>
+                </div>
+            `;
+            document.body.insertBefore(banner, document.body.firstChild);
+
+            // Adjust page padding
+            document.querySelector('.checkout-page').style.paddingTop = '148px';
+        }
+
+        function exitActingAs() {
+            sessionStorage.removeItem('actingAsCustomer');
+            sessionStorage.removeItem('checkoutOrder');
+            window.location.href = '/admin.html';
+        }
+
         async function initCheckout() {
             // Get order data from session
             const savedOrder = sessionStorage.getItem('checkoutOrder');
@@ -718,11 +745,21 @@
 
             orderData = JSON.parse(savedOrder);
 
-            // Populate contact info from user data
-            document.getElementById('customerName').value = userData.name || '';
-            document.getElementById('customerEmail').value = userData.email || '';
-            document.getElementById('customerPhone').value = userData.phone || '';
-            document.getElementById('customerFarm').value = userData.farm?.name || '';
+            // Check if admin is placing order for a customer
+            if (orderData.actingAsCustomer) {
+                showActingAsCustomerBanner(orderData.actingAsCustomer);
+                // Populate with customer's info
+                document.getElementById('customerName').value = orderData.actingAsCustomer.name || '';
+                document.getElementById('customerEmail').value = orderData.actingAsCustomer.email || '';
+                document.getElementById('customerPhone').value = orderData.actingAsCustomer.phone || '';
+                document.getElementById('customerFarm').value = orderData.actingAsCustomer.farm || '';
+            } else {
+                // Populate contact info from user data
+                document.getElementById('customerName').value = userData.name || '';
+                document.getElementById('customerEmail').value = userData.email || '';
+                document.getElementById('customerPhone').value = userData.phone || '';
+                document.getElementById('customerFarm').value = userData.farm?.name || '';
+            }
 
             // Render order items
             renderOrderItems();
@@ -910,6 +947,12 @@
                     customerFarm: document.getElementById('customerFarm').value.trim(),
                     notes: document.getElementById('orderNotes').value.trim()
                 };
+
+                // Include acting as customer data if admin is placing order for customer
+                if (orderData.actingAsCustomer) {
+                    orderPayload.actingAsCustomer = orderData.actingAsCustomer;
+                    orderPayload.customerId = orderData.actingAsCustomer._id;
+                }
 
                 if (selectedPaymentMethod === 'ach' && stripe && elements) {
                     // Submit Stripe ACH payment
