@@ -16,6 +16,23 @@ services:
         sync: false
       - key: NODE_ENV
         value: production
+      - key: JWT_SECRET
+        sync: false
+      - key: FRONTEND_URL
+        value: https://acreprofit.com
+      # Email configuration (Microsoft 365 / Office 365)
+      - key: SMTP_HOST
+        value: smtp.office365.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_SECURE
+        value: "false"
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
 
   # Static Site (optional - if not using GitHub Pages)
   # - type: web
