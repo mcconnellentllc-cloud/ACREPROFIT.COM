@@ -2656,6 +2656,21 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
+        // Look up the distributor ObjectId based on representativeId
+        const repEmails = {
+            kyle: 'office@togoag.com',
+            ty: 'tymollohan77@gmail.com',
+            chad: 'ckbamford@yahoo.com',
+            seth: 'seth@acreprofit.com'
+        };
+        let representativeObjectId = null;
+        if (representativeId && repEmails[representativeId]) {
+            const distributor = await User.findOne({ email: repEmails[representativeId] });
+            if (distributor) {
+                representativeObjectId = distributor._id;
+            }
+        }
+
         const user = new User({
             name,
             email,
@@ -2665,6 +2680,7 @@ app.post('/api/auth/signup', async (req, res) => {
             farm,
             crops,
             representativeId,
+            representative: representativeObjectId, // Set the ObjectId for permission checks
             role: 'customer'
         });
         await user.save();
@@ -3432,6 +3448,46 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
         await customer.save();
 
         res.json(customer);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Reassign customer to a different distributor (superadmin only)
+app.put('/api/admin/customers/:customerId/assign', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const { distributorId } = req.body;
+        const customer = await User.findById(req.params.customerId);
+
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Find the distributor
+        const distributor = await User.findById(distributorId);
+        if (!distributor || !['admin', 'distributor'].includes(distributor.role)) {
+            return res.status(404).json({ error: 'Distributor not found' });
+        }
+
+        // Update customer's representative
+        customer.representative = distributor._id;
+
+        // Also update representativeId string based on distributor email
+        const emailToRepId = {
+            'office@togoag.com': 'kyle',
+            'tymollohan77@gmail.com': 'ty',
+            'ckbamford@yahoo.com': 'chad',
+            'seth@acreprofit.com': 'seth'
+        };
+        customer.representativeId = emailToRepId[distributor.email] || customer.representativeId;
+
+        await customer.save();
+
+        const updated = await User.findById(customer._id)
+            .select('-password')
+            .populate('representative', 'name email');
+
+        res.json(updated);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -12399,7 +12455,46 @@ app.get('/api/mixes-filters', async (req, res) => {
 
 // ============ START SERVER ============
 
-connectDB().then(() => {
+// Migration: Fix customers without representative ObjectId
+async function migrateCustomerRepresentatives() {
+    const repEmails = {
+        kyle: 'office@togoag.com',
+        ty: 'tymollohan77@gmail.com',
+        chad: 'ckbamford@yahoo.com',
+        seth: 'seth@acreprofit.com'
+    };
+
+    // Find all customers without representative but with representativeId
+    const customersToUpdate = await User.find({
+        role: 'customer',
+        representative: { $exists: false },
+        representativeId: { $exists: true, $ne: null }
+    });
+
+    if (customersToUpdate.length === 0) {
+        console.log('Customer representative migration: No customers need updating');
+        return;
+    }
+
+    let updated = 0;
+    for (const customer of customersToUpdate) {
+        const repEmail = repEmails[customer.representativeId];
+        if (repEmail) {
+            const distributor = await User.findOne({ email: repEmail });
+            if (distributor) {
+                customer.representative = distributor._id;
+                await customer.save();
+                updated++;
+            }
+        }
+    }
+    console.log(`Customer representative migration: Updated ${updated} of ${customersToUpdate.length} customers`);
+}
+
+connectDB().then(async () => {
+    // Run migrations
+    await migrateCustomerRepresentatives();
+
     app.listen(PORT, () => {
         console.log(`Acre Profit API running on port ${PORT}`);
 
