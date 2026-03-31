@@ -48,7 +48,7 @@
                             <a href="#products" class="dropdown-item" data-tab="products">Products Catalog</a>
                             <a href="#inventory" class="dropdown-item" data-tab="inventory">Stock Levels</a>
                             <a href="#purchase-orders" class="dropdown-item" data-tab="purchase-orders">Purchase Orders</a>
-                            <a href="#suppliers" class="dropdown-item" data-tab="suppliers">Suppliers</a>
+                            <span id="suppliersNav"><a href="#suppliers" class="dropdown-item" data-tab="suppliers">Suppliers</a></span>
                             <a href="/quoter.html" class="dropdown-item" target="_blank">Price Quoter Tool</a>
                         </div>
                     </div>
@@ -65,8 +65,8 @@
                             AcreProfit Business <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
                         <div class="dropdown-menu">
-                            <a href="#compliance" class="dropdown-item tab-warning-item" data-tab="compliance">Compliance</a>
-                            <a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a>
+                            <span id="complianceNav"><a href="#compliance" class="dropdown-item tab-warning-item" data-tab="compliance">Compliance</a></span>
+                            <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                         </div>
                     </div>
@@ -2936,6 +2936,9 @@
             setDisplay('commissionsNav', 'block');
             setDisplay('inventoryNav', 'block');
             setDisplay('companySettingsNav', 'block');
+            setDisplay('distributorsNav', 'block');
+            setDisplay('suppliersNav', 'block');
+            setDisplay('complianceNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
@@ -2948,15 +2951,25 @@
         } else if (userData.role === 'distributor') {
             document.getElementById('adminRole').textContent = 'Distributor';
             setDisplay('inventoryNav', 'block');
-            // Hide tabs that distributors shouldn't see
-            // Pricing tab removed
+            // Hide tabs that distributors shouldn't see - superadmin only features
             setDisplay('commissionsNav', 'none');
             setDisplay('repAppsNav', 'none');
+            setDisplay('distributorsNav', 'none');
+            setDisplay('suppliersNav', 'none');
+            setDisplay('companySettingsNav', 'none');
+            setDisplay('complianceNav', 'none');
         } else {
+            // Regular admin/representative
             document.getElementById('adminRole').textContent = 'Representative';
             setDisplay('inventoryNav', 'block');
             // Show rep's own commission view
             setDisplay('commissionsNav', 'block');
+            // Hide superadmin-only tabs
+            setDisplay('repAppsNav', 'none');
+            setDisplay('distributorsNav', 'none');
+            setDisplay('suppliersNav', 'none');
+            setDisplay('companySettingsNav', 'none');
+            setDisplay('complianceNav', 'none');
             loadRepOwnCommission(userData);
         }
 

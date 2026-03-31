@@ -53,6 +53,8 @@ const connectDB = async () => {
             await initializeAdmins();
             // Seed initial inventory
             await seedJabcoInventory();
+            // Seed March 2026 purchase orders
+            await seedMarch2026PurchaseOrders();
         } else {
             console.log('No MongoDB URI provided, running without database');
         }
@@ -2380,6 +2382,286 @@ async function seedJabcoInventory() {
     }
 }
 
+// Seed March 30, 2026 Purchase Orders (JABCO SO2129, Sims #103850, Sims #103849)
+async function seedMarch2026PurchaseOrders() {
+    try {
+        // Check if already seeded
+        const existingJabco = await PurchaseOrder.findOne({ poNumber: 'JABCO-SO2129' });
+        const existingSims850 = await PurchaseOrder.findOne({ poNumber: 'SIMS-103850' });
+        const existingSims849 = await PurchaseOrder.findOne({ poNumber: 'SIMS-103849' });
+
+        if (existingJabco && existingSims850 && existingSims849) {
+            console.log('March 2026 purchase orders already seeded');
+            return;
+        }
+
+        // ============ JABCO SO2129 - Acre Profit LLC - 3/30/2026 ============
+        if (!existingJabco) {
+            // Find or create products for JABCO order
+            const jabcoProducts = [
+                {
+                    productName: 'CPD Mesotrione',
+                    packSize: '2x2.5 GL Case',
+                    unit: 'gal',
+                    unitsPerPack: 5,
+                    qty: 720,
+                    unitPrice: 45.75,
+                    lineTotal: 32940.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: 'Flumioxazin 51%',
+                    packSize: '4x5 Lb Case',
+                    unit: 'lb',
+                    unitsPerPack: 20,
+                    qty: 1440,
+                    unitPrice: 14.00,
+                    lineTotal: 20160.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: 'Sulfentrazone 4SC',
+                    packSize: '2x2.5 Gl Case',
+                    unit: 'gal',
+                    unitsPerPack: 5,
+                    qty: 180,
+                    unitPrice: 71.50,
+                    lineTotal: 12870.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: 'Dicamba DMA',
+                    packSize: '2x2.5 Gl Case',
+                    unit: 'gal',
+                    unitsPerPack: 5,
+                    qty: 180,
+                    unitPrice: 30.25,
+                    lineTotal: 5445.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: '2,4-D LV6',
+                    packSize: '2x2.5 Gl Case',
+                    unit: 'gal',
+                    unitsPerPack: 5,
+                    qty: 180,
+                    unitPrice: 28.90,
+                    lineTotal: 5202.00,
+                    category: 'herbicide'
+                }
+            ];
+
+            const jabcoItems = [];
+            for (const prod of jabcoProducts) {
+                // Find or create the product
+                let chemical = await Chemical.findOne({
+                    productName: prod.productName,
+                    packSize: prod.packSize
+                });
+
+                if (!chemical) {
+                    chemical = await Chemical.create({
+                        productName: prod.productName,
+                        packSize: prod.packSize,
+                        unit: prod.unit,
+                        unitsPerPack: prod.unitsPerPack,
+                        costPrice: prod.unitPrice,
+                        adminPrice: prod.unitPrice * 1.05, // 5% admin margin
+                        sellPrice: prod.unitPrice * 1.15, // 15% retail margin
+                        category: prod.category,
+                        sourceSupplier: 'JABCO',
+                        signalWord: 'CAUTION'
+                    });
+                }
+
+                jabcoItems.push({
+                    productName: prod.productName,
+                    chemicalId: chemical._id,
+                    packSize: prod.packSize,
+                    unit: prod.unit,
+                    quantityOrdered: prod.qty,
+                    pricePerUnit: prod.unitPrice,
+                    totalPrice: prod.lineTotal,
+                    quantityAllocated: 0,
+                    quantityRemaining: prod.qty
+                });
+            }
+
+            await PurchaseOrder.create({
+                poNumber: 'JABCO-SO2129',
+                supplier: {
+                    name: 'JABCO LLC',
+                    contact: 'JABCO Sales'
+                },
+                items: jabcoItems,
+                subtotal: 76617.00,
+                freight: 0,
+                totalCost: 76617.00,
+                status: 'confirmed',
+                orderDate: new Date('2026-03-30'),
+                notes: 'Billed to: Acre Profit LLC'
+            });
+
+            console.log('Created JABCO SO2129 - $76,617.00 (5 products)');
+        }
+
+        // ============ Sims #103850 - Ty Mollohan - 3/30/2026 ============
+        if (!existingSims850) {
+            const simsProducts850 = [
+                {
+                    productName: 'Dicamba DMA (Tigris)',
+                    packSize: '265 gal',
+                    unit: 'gal',
+                    unitsPerPack: 265,
+                    qty: 1060,
+                    unitPrice: 25.50,
+                    lineTotal: 27030.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: 'LV6 De-Ester LV6 (Drexel)',
+                    packSize: '265 gal',
+                    unit: 'gal',
+                    unitsPerPack: 265,
+                    qty: 1060,
+                    unitPrice: 22.75,
+                    lineTotal: 24115.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: 'Anthem NXT',
+                    packSize: '2x2.5 gal',
+                    unit: 'gal',
+                    unitsPerPack: 5,
+                    qty: 90,
+                    unitPrice: 430.00,
+                    lineTotal: 38700.00,
+                    category: 'herbicide'
+                },
+                {
+                    productName: 'Mivum',
+                    packSize: '8x16 oz',
+                    unit: 'oz',
+                    unitsPerPack: 128,
+                    qty: 1600,
+                    unitPrice: 2.25,
+                    lineTotal: 3600.00,
+                    category: 'herbicide'
+                }
+            ];
+
+            const simsItems850 = [];
+            for (const prod of simsProducts850) {
+                let chemical = await Chemical.findOne({
+                    productName: prod.productName,
+                    packSize: prod.packSize
+                });
+
+                if (!chemical) {
+                    chemical = await Chemical.create({
+                        productName: prod.productName,
+                        packSize: prod.packSize,
+                        unit: prod.unit,
+                        unitsPerPack: prod.unitsPerPack,
+                        costPrice: prod.unitPrice,
+                        adminPrice: prod.unitPrice * 1.05,
+                        sellPrice: prod.unitPrice * 1.15,
+                        category: prod.category,
+                        sourceSupplier: 'Sims Fertilizer & Chemical',
+                        signalWord: 'CAUTION'
+                    });
+                }
+
+                simsItems850.push({
+                    productName: prod.productName,
+                    chemicalId: chemical._id,
+                    packSize: prod.packSize,
+                    unit: prod.unit,
+                    quantityOrdered: prod.qty,
+                    pricePerUnit: prod.unitPrice,
+                    totalPrice: prod.lineTotal,
+                    quantityAllocated: 0,
+                    quantityRemaining: prod.qty
+                });
+            }
+
+            await PurchaseOrder.create({
+                poNumber: 'SIMS-103850',
+                supplier: {
+                    name: 'Sims Fertilizer & Chemical',
+                    contact: 'Sims Sales'
+                },
+                items: simsItems850,
+                subtotal: 93445.00,
+                freight: 0,
+                totalCost: 93445.00,
+                status: 'confirmed',
+                orderDate: new Date('2026-03-30'),
+                notes: 'Billed to: Ty Mollohan'
+            });
+
+            console.log('Created Sims #103850 - $93,445.00 (4 products)');
+        }
+
+        // ============ Sims #103849 - Ty Mollohan - 3/30/2026 ============
+        if (!existingSims849) {
+            // Find or create Atrazine 4L Tote
+            let atrazineTote = await Chemical.findOne({
+                productName: 'Atrazine 4L',
+                packSize: 'Tote'
+            });
+
+            if (!atrazineTote) {
+                atrazineTote = await Chemical.create({
+                    productName: 'Atrazine 4L',
+                    packSize: 'Tote',
+                    unit: 'gal',
+                    unitsPerPack: 265, // Standard tote size
+                    costPrice: 12.50,
+                    adminPrice: 13.00,
+                    sellPrice: 14.50,
+                    category: 'herbicide',
+                    sourceSupplier: 'Sims Fertilizer & Chemical',
+                    signalWord: 'CAUTION',
+                    isRestrictedUse: true,
+                    notes: 'Restricted Use Pesticide'
+                });
+            }
+
+            await PurchaseOrder.create({
+                poNumber: 'SIMS-103849',
+                supplier: {
+                    name: 'Sims Fertilizer & Chemical',
+                    contact: 'Sims Sales'
+                },
+                items: [{
+                    productName: 'Atrazine 4L',
+                    chemicalId: atrazineTote._id,
+                    packSize: 'Tote',
+                    unit: 'gal',
+                    quantityOrdered: 4240,
+                    pricePerUnit: 12.50,
+                    totalPrice: 53000.00,
+                    quantityAllocated: 0,
+                    quantityRemaining: 4240
+                }],
+                subtotal: 53000.00,
+                freight: 0,
+                totalCost: 53000.00,
+                status: 'confirmed',
+                orderDate: new Date('2026-03-30'),
+                notes: 'Billed to: Ty Mollohan'
+            });
+
+            console.log('Created Sims #103849 - $53,000.00 (Atrazine 4L Tote)');
+        }
+
+        console.log('March 2026 purchase orders seeded successfully. Total: $223,062.00');
+    } catch (error) {
+        console.error('Error seeding March 2026 purchase orders:', error.message);
+    }
+}
+
 // ============ SPRAY PROGRAMS DATA ============
 
 const sprayPrograms = {
@@ -2656,6 +2938,21 @@ app.post('/api/auth/signup', async (req, res) => {
             return res.status(400).json({ error: 'Email already registered' });
         }
 
+        // Look up the distributor ObjectId based on representativeId
+        const repEmails = {
+            kyle: 'office@togoag.com',
+            ty: 'tymollohan77@gmail.com',
+            chad: 'ckbamford@yahoo.com',
+            seth: 'seth@acreprofit.com'
+        };
+        let representativeObjectId = null;
+        if (representativeId && repEmails[representativeId]) {
+            const distributor = await User.findOne({ email: repEmails[representativeId] });
+            if (distributor) {
+                representativeObjectId = distributor._id;
+            }
+        }
+
         const user = new User({
             name,
             email,
@@ -2665,6 +2962,7 @@ app.post('/api/auth/signup', async (req, res) => {
             farm,
             crops,
             representativeId,
+            representative: representativeObjectId, // Set the ObjectId for permission checks
             role: 'customer'
         });
         await user.save();
@@ -3432,6 +3730,46 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
         await customer.save();
 
         res.json(customer);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Reassign customer to a different distributor (superadmin only)
+app.put('/api/admin/customers/:customerId/assign', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const { distributorId } = req.body;
+        const customer = await User.findById(req.params.customerId);
+
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Find the distributor
+        const distributor = await User.findById(distributorId);
+        if (!distributor || !['admin', 'distributor'].includes(distributor.role)) {
+            return res.status(404).json({ error: 'Distributor not found' });
+        }
+
+        // Update customer's representative
+        customer.representative = distributor._id;
+
+        // Also update representativeId string based on distributor email
+        const emailToRepId = {
+            'office@togoag.com': 'kyle',
+            'tymollohan77@gmail.com': 'ty',
+            'ckbamford@yahoo.com': 'chad',
+            'seth@acreprofit.com': 'seth'
+        };
+        customer.representativeId = emailToRepId[distributor.email] || customer.representativeId;
+
+        await customer.save();
+
+        const updated = await User.findById(customer._id)
+            .select('-password')
+            .populate('representative', 'name email');
+
+        res.json(updated);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -12399,7 +12737,46 @@ app.get('/api/mixes-filters', async (req, res) => {
 
 // ============ START SERVER ============
 
-connectDB().then(() => {
+// Migration: Fix customers without representative ObjectId
+async function migrateCustomerRepresentatives() {
+    const repEmails = {
+        kyle: 'office@togoag.com',
+        ty: 'tymollohan77@gmail.com',
+        chad: 'ckbamford@yahoo.com',
+        seth: 'seth@acreprofit.com'
+    };
+
+    // Find all customers without representative but with representativeId
+    const customersToUpdate = await User.find({
+        role: 'customer',
+        representative: { $exists: false },
+        representativeId: { $exists: true, $ne: null }
+    });
+
+    if (customersToUpdate.length === 0) {
+        console.log('Customer representative migration: No customers need updating');
+        return;
+    }
+
+    let updated = 0;
+    for (const customer of customersToUpdate) {
+        const repEmail = repEmails[customer.representativeId];
+        if (repEmail) {
+            const distributor = await User.findOne({ email: repEmail });
+            if (distributor) {
+                customer.representative = distributor._id;
+                await customer.save();
+                updated++;
+            }
+        }
+    }
+    console.log(`Customer representative migration: Updated ${updated} of ${customersToUpdate.length} customers`);
+}
+
+connectDB().then(async () => {
+    // Run migrations
+    await migrateCustomerRepresentatives();
+
     app.listen(PORT, () => {
         console.log(`Acre Profit API running on port ${PORT}`);
 
