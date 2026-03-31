@@ -1,0 +1,1220 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit Distributor Invoicing">
+    <title>Invoicing - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+</head>
+<body>
+    <nav class="navbar admin-nav">
+        <div class="container">
+            <a href="/admin.html" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <div class="nav-center">
+                <a href="/admin.html" class="nav-back">← Admin Panel</a>
+                <span class="nav-title">Invoicing</span>
+            </div>
+            <div class="nav-right">
+                <span id="userName" class="nav-user"></span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="invoice-page-layout">
+                <!-- Left: Invoice Builder -->
+                <div class="invoice-builder">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Create Invoice</h2>
+                        </div>
+                        <div class="card-body">
+                            <!-- Distributor Selection (superadmin only) -->
+                            <div class="form-section" id="distributorSection" style="display: none;">
+                                <label class="form-label">Invoice As Distributor</label>
+                                <select id="distributorSelect" class="form-control" onchange="selectDistributor()">
+                                    <option value="">Select distributor...</option>
+                                </select>
+                            </div>
+
+                            <!-- Customer Selection -->
+                            <div class="form-section">
+                                <label class="form-label">Customer</label>
+                                <select id="customerSelect" class="form-control" onchange="selectCustomer()">
+                                    <option value="">Select a customer...</option>
+                                </select>
+                                <div id="customerInfo" class="customer-info-box" style="display: none;">
+                                    <p><strong id="customerName"></strong></p>
+                                    <p id="customerEmail"></p>
+                                    <p id="customerPhone"></p>
+                                    <p id="customerFarm"></p>
+                                </div>
+                            </div>
+
+                            <!-- Product Selection -->
+                            <div class="form-section">
+                                <label class="form-label">Add Products</label>
+                                <div class="product-search-container">
+                                    <input type="text" id="productSearch" class="form-control" placeholder="Search products..." oninput="filterProducts()">
+                                    <div id="productDropdown" class="product-dropdown" style="display: none;"></div>
+                                </div>
+                            </div>
+
+                            <!-- Invoice Items -->
+                            <div class="form-section">
+                                <label class="form-label">Invoice Items</label>
+                                <div id="invoiceItems" class="invoice-items-list">
+                                    <p class="empty-state">No items added yet. Search and add products above.</p>
+                                </div>
+                            </div>
+
+                            <!-- Discount -->
+                            <div class="form-section discount-section">
+                                <div class="discount-row">
+                                    <label class="form-label">Discount</label>
+                                    <div class="discount-input-group">
+                                        <span class="input-prefix">$</span>
+                                        <input type="number" id="discountAmount" class="form-control" value="0" min="0" step="0.01" onchange="updateTotals()">
+                                    </div>
+                                </div>
+                                <input type="text" id="discountReason" class="form-control" placeholder="Discount reason (optional)">
+                            </div>
+
+                            <!-- Notes -->
+                            <div class="form-section">
+                                <label class="form-label">Notes (optional)</label>
+                                <textarea id="invoiceNotes" class="form-control" rows="2" placeholder="Additional notes for the invoice..."></textarea>
+                            </div>
+
+                            <!-- Due Date -->
+                            <div class="form-section">
+                                <label class="form-label">Due Date</label>
+                                <input type="date" id="dueDate" class="form-control">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Invoice Preview -->
+                <div class="invoice-preview-panel">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Invoice Preview</h2>
+                        </div>
+                        <div class="card-body">
+                            <div class="invoice-preview-content">
+                                <!-- Header -->
+                                <div class="preview-header">
+                                    <div class="preview-logo">
+                                        <img src="logo.svg" alt="Acre Profit" style="height: 40px;">
+                                    </div>
+                                    <div class="preview-title">
+                                        <h3>INVOICE</h3>
+                                        <span class="preview-invoice-number" id="previewInvoiceNumber">INV-DRAFT</span>
+                                    </div>
+                                </div>
+
+                                <!-- Bill To -->
+                                <div class="preview-bill-to">
+                                    <strong>Bill To:</strong>
+                                    <p id="previewCustomerName">Select a customer</p>
+                                    <p id="previewCustomerEmail"></p>
+                                </div>
+
+                                <!-- Items Table -->
+                                <div class="preview-items">
+                                    <table class="preview-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Product</th>
+                                                <th>Qty</th>
+                                                <th>Price</th>
+                                                <th>Total</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="previewItemsBody">
+                                            <tr class="empty-row">
+                                                <td colspan="4">No items</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+
+                                <!-- Totals -->
+                                <div class="preview-totals">
+                                    <div class="total-row">
+                                        <span>Subtotal:</span>
+                                        <span id="previewSubtotal">$0.00</span>
+                                    </div>
+                                    <div class="total-row discount-row" id="previewDiscountRow" style="display: none;">
+                                        <span>Discount:</span>
+                                        <span id="previewDiscount">-$0.00</span>
+                                    </div>
+                                    <div class="total-row total-final">
+                                        <span>Total Due:</span>
+                                        <span id="previewTotal">$0.00</span>
+                                    </div>
+                                </div>
+
+                                <!-- Due Date -->
+                                <div class="preview-due-date">
+                                    <span>Due: <strong id="previewDueDate">--</strong></span>
+                                </div>
+                            </div>
+
+                            <!-- Actions -->
+                            <div class="invoice-actions">
+                                <button class="btn btn-outline btn-block" onclick="saveAsDraft()" id="saveDraftBtn" disabled>
+                                    Save as Draft
+                                </button>
+                                <button class="btn btn-primary btn-block" onclick="createAndSendInvoice()" id="sendInvoiceBtn" disabled>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg>
+                                    Send Invoice
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Payment Info -->
+                    <div class="card payment-info-card">
+                        <div class="card-body">
+                            <h4>Payment Options</h4>
+                            <p>Your customers will receive payment instructions for:</p>
+                            <ul>
+                                <li><strong>ACH Bank Transfer</strong> - Direct bank payment (no fees)</li>
+                                <li><strong>Check</strong> - Mail to your address</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Existing Invoices -->
+            <div class="card" style="margin-top: 32px;">
+                <div class="card-header">
+                    <h2>Recent Invoices</h2>
+                    <div class="header-actions">
+                        <select id="invoiceStatusFilter" class="form-control-sm" onchange="loadInvoices()">
+                            <option value="">All Statuses</option>
+                            <option value="draft">Draft</option>
+                            <option value="sent">Sent</option>
+                            <option value="paid">Paid</option>
+                            <option value="overdue">Overdue</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="table-container">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Customer</th>
+                                <th>Amount</th>
+                                <th>Status</th>
+                                <th>Date</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="invoicesTableBody">
+                            <tr><td colspan="6" class="loading">Loading invoices...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = 'https://acreprofit-com.onrender.com';
+        let token = localStorage.getItem('token');
+        let user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        let customers = [];
+        let allCustomers = [];
+        let products = [];
+        let distributors = [];
+        let selectedCustomer = null;
+        let selectedDistributor = null;
+        let invoiceItems = [];
+
+        // Check authentication
+        if (!token || !['admin', 'distributor', 'superadmin'].includes(user.role)) {
+            window.location.href = '/login.html';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            document.getElementById('userName').textContent = user.name;
+
+            // Set default due date (30 days from now)
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30);
+            document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
+            updatePreviewDueDate();
+
+            // If superadmin, show distributor selector
+            if (user.role === 'superadmin') {
+                document.getElementById('distributorSection').style.display = 'block';
+                await loadDistributors();
+            } else {
+                // For distributors, set themselves as the selected distributor
+                selectedDistributor = { _id: user._id, name: user.name, email: user.email };
+            }
+
+            await loadCustomers();
+            loadProducts();
+            loadInvoices();
+            setupLogout();
+        });
+
+        async function loadDistributors() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/distributors`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load distributors');
+
+                distributors = await response.json();
+
+                const select = document.getElementById('distributorSelect');
+                select.innerHTML = '<option value="">Select distributor...</option>' +
+                    distributors.map(d => `<option value="${d._id}">${d.name}</option>`).join('');
+            } catch (error) {
+                console.error('Error loading distributors:', error);
+            }
+        }
+
+        function selectDistributor() {
+            const distributorId = document.getElementById('distributorSelect').value;
+            selectedDistributor = distributors.find(d => d._id === distributorId);
+
+            // Filter customers for this distributor
+            if (selectedDistributor) {
+                customers = allCustomers.filter(c =>
+                    c.representative === distributorId ||
+                    c.representative?._id === distributorId
+                );
+            } else {
+                customers = [];
+            }
+
+            // Update customer dropdown
+            const select = document.getElementById('customerSelect');
+            select.innerHTML = '<option value="">Select a customer...</option>' +
+                customers.map(c => `<option value="${c._id}">${c.name} - ${c.farm?.name || c.email}</option>`).join('');
+
+            // Reset customer selection
+            selectedCustomer = null;
+            document.getElementById('customerInfo').style.display = 'none';
+            document.getElementById('previewCustomerName').textContent = 'Select a customer';
+            document.getElementById('previewCustomerEmail').textContent = '';
+            updateActionButtons();
+        }
+
+        async function loadCustomers() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/customers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load customers');
+
+                const data = await response.json();
+
+                if (user.role === 'superadmin') {
+                    // Store all customers for filtering
+                    allCustomers = data;
+                    customers = []; // Will be populated when distributor is selected
+                } else {
+                    // For distributors, the API already filters to their customers
+                    customers = data;
+                    allCustomers = data;
+                }
+
+                const select = document.getElementById('customerSelect');
+                select.innerHTML = '<option value="">Select a customer...</option>' +
+                    customers.map(c => `<option value="${c._id}">${c.name} - ${c.farm?.name || c.email}</option>`).join('');
+            } catch (error) {
+                console.error('Error loading customers:', error);
+            }
+        }
+
+        async function loadProducts() {
+            try {
+                const response = await fetch(`${API_URL}/api/distributor/products`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load products');
+
+                products = await response.json();
+            } catch (error) {
+                console.error('Error loading products:', error);
+            }
+        }
+
+        function selectCustomer() {
+            const customerId = document.getElementById('customerSelect').value;
+            selectedCustomer = customers.find(c => c._id === customerId);
+
+            const infoBox = document.getElementById('customerInfo');
+            if (selectedCustomer) {
+                document.getElementById('customerName').textContent = selectedCustomer.name;
+                document.getElementById('customerEmail').textContent = selectedCustomer.email;
+                document.getElementById('customerPhone').textContent = selectedCustomer.phone || '';
+                document.getElementById('customerFarm').textContent = selectedCustomer.farm?.name || '';
+                infoBox.style.display = 'block';
+
+                // Update preview
+                document.getElementById('previewCustomerName').textContent = selectedCustomer.name;
+                document.getElementById('previewCustomerEmail').textContent = selectedCustomer.email;
+            } else {
+                infoBox.style.display = 'none';
+                document.getElementById('previewCustomerName').textContent = 'Select a customer';
+                document.getElementById('previewCustomerEmail').textContent = '';
+            }
+
+            updateActionButtons();
+        }
+
+        function filterProducts() {
+            const search = document.getElementById('productSearch').value.toLowerCase();
+            const dropdown = document.getElementById('productDropdown');
+
+            if (search.length < 2) {
+                dropdown.style.display = 'none';
+                return;
+            }
+
+            const filtered = products.filter(p =>
+                p.productName.toLowerCase().includes(search) ||
+                (p.category && p.category.toLowerCase().includes(search))
+            ).slice(0, 10);
+
+            if (filtered.length === 0) {
+                dropdown.innerHTML = '<div class="dropdown-empty">No products found</div>';
+            } else {
+                dropdown.innerHTML = filtered.map(p => `
+                    <div class="dropdown-item" onclick="addProduct('${p._id}')">
+                        <span class="product-name">${p.productName}</span>
+                        <span class="product-details">${p.packSize} - $${(p.customRetailPrice || p.sellPrice || 0).toFixed(2)}/${p.unit}</span>
+                    </div>
+                `).join('');
+            }
+
+            dropdown.style.display = 'block';
+        }
+
+        function addProduct(productId) {
+            const product = products.find(p => p._id === productId);
+            if (!product) return;
+
+            // Check if already added
+            const existing = invoiceItems.find(i => i.productId === productId);
+            if (existing) {
+                existing.quantity++;
+                existing.total = existing.quantity * existing.unitPrice;
+            } else {
+                invoiceItems.push({
+                    productId: product._id,
+                    productName: product.productName,
+                    description: `${product.packSize} ${product.unit}`,
+                    packSize: product.packSize,
+                    unit: product.unit,
+                    quantity: 1,
+                    unitPrice: product.customRetailPrice || product.sellPrice || 0,
+                    total: product.customRetailPrice || product.sellPrice || 0
+                });
+            }
+
+            // Clear search
+            document.getElementById('productSearch').value = '';
+            document.getElementById('productDropdown').style.display = 'none';
+
+            renderInvoiceItems();
+            updateTotals();
+            updateActionButtons();
+        }
+
+        function renderInvoiceItems() {
+            const container = document.getElementById('invoiceItems');
+
+            if (invoiceItems.length === 0) {
+                container.innerHTML = '<p class="empty-state">No items added yet. Search and add products above.</p>';
+                return;
+            }
+
+            container.innerHTML = invoiceItems.map((item, index) => `
+                <div class="invoice-item-row">
+                    <div class="item-info">
+                        <span class="item-name">${item.productName}</span>
+                        <span class="item-details">${item.packSize}</span>
+                    </div>
+                    <div class="item-qty">
+                        <button class="qty-btn" onclick="adjustQty(${index}, -1)">-</button>
+                        <input type="number" value="${item.quantity}" min="1" onchange="setQty(${index}, this.value)">
+                        <button class="qty-btn" onclick="adjustQty(${index}, 1)">+</button>
+                    </div>
+                    <div class="item-price">
+                        <span>$${item.unitPrice.toFixed(2)}</span>
+                    </div>
+                    <div class="item-total">
+                        <span>$${item.total.toFixed(2)}</span>
+                    </div>
+                    <button class="item-remove" onclick="removeItem(${index})">×</button>
+                </div>
+            `).join('');
+        }
+
+        function adjustQty(index, delta) {
+            invoiceItems[index].quantity = Math.max(1, invoiceItems[index].quantity + delta);
+            invoiceItems[index].total = invoiceItems[index].quantity * invoiceItems[index].unitPrice;
+            renderInvoiceItems();
+            updateTotals();
+        }
+
+        function setQty(index, value) {
+            invoiceItems[index].quantity = Math.max(1, parseInt(value) || 1);
+            invoiceItems[index].total = invoiceItems[index].quantity * invoiceItems[index].unitPrice;
+            renderInvoiceItems();
+            updateTotals();
+        }
+
+        function removeItem(index) {
+            invoiceItems.splice(index, 1);
+            renderInvoiceItems();
+            updateTotals();
+            updateActionButtons();
+        }
+
+        function updateTotals() {
+            const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
+            const discount = parseFloat(document.getElementById('discountAmount').value) || 0;
+            const total = Math.max(0, subtotal - discount);
+
+            // Update preview
+            document.getElementById('previewSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('previewDiscount').textContent = '-$' + discount.toFixed(2);
+            document.getElementById('previewTotal').textContent = '$' + total.toFixed(2);
+
+            const discountRow = document.getElementById('previewDiscountRow');
+            discountRow.style.display = discount > 0 ? 'flex' : 'none';
+
+            // Update preview items
+            const tbody = document.getElementById('previewItemsBody');
+            if (invoiceItems.length === 0) {
+                tbody.innerHTML = '<tr class="empty-row"><td colspan="4">No items</td></tr>';
+            } else {
+                tbody.innerHTML = invoiceItems.map(item => `
+                    <tr>
+                        <td>${item.productName}</td>
+                        <td>${item.quantity}</td>
+                        <td>$${item.unitPrice.toFixed(2)}</td>
+                        <td>$${item.total.toFixed(2)}</td>
+                    </tr>
+                `).join('');
+            }
+
+            updatePreviewDueDate();
+        }
+
+        function updatePreviewDueDate() {
+            const dueDateInput = document.getElementById('dueDate').value;
+            if (dueDateInput) {
+                const date = new Date(dueDateInput + 'T00:00:00');
+                document.getElementById('previewDueDate').textContent = date.toLocaleDateString('en-US', {
+                    year: 'numeric', month: 'short', day: 'numeric'
+                });
+            }
+        }
+
+        document.getElementById('dueDate').addEventListener('change', updatePreviewDueDate);
+
+        function updateActionButtons() {
+            const canSave = selectedCustomer && invoiceItems.length > 0;
+            document.getElementById('saveDraftBtn').disabled = !canSave;
+            document.getElementById('sendInvoiceBtn').disabled = !canSave;
+        }
+
+        async function saveAsDraft() {
+            await createInvoice(false);
+        }
+
+        async function createAndSendInvoice() {
+            const invoice = await createInvoice(true);
+            if (invoice) {
+                alert('Invoice sent successfully to ' + selectedCustomer.email);
+            }
+        }
+
+        async function createInvoice(sendEmail = false) {
+            if (!selectedCustomer || invoiceItems.length === 0) return null;
+
+            const btn = sendEmail ? document.getElementById('sendInvoiceBtn') : document.getElementById('saveDraftBtn');
+            const originalText = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = sendEmail ? 'Sending...' : 'Saving...';
+
+            try {
+                // Create invoice
+                const invoiceData = {
+                    customerId: selectedCustomer._id,
+                    items: invoiceItems.map(item => ({
+                        productName: item.productName,
+                        description: item.description,
+                        packSize: item.packSize,
+                        unit: item.unit,
+                        quantity: item.quantity,
+                        unitPrice: item.unitPrice
+                    })),
+                    discount: parseFloat(document.getElementById('discountAmount').value) || 0,
+                    discountReason: document.getElementById('discountReason').value,
+                    notes: document.getElementById('invoiceNotes').value,
+                    dueDate: document.getElementById('dueDate').value
+                };
+
+                // If superadmin selected a distributor, include it
+                if (user.role === 'superadmin' && selectedDistributor) {
+                    invoiceData.representativeId = selectedDistributor._id;
+                }
+
+                const response = await fetch(`${API_URL}/api/admin/invoices`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(invoiceData)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to create invoice');
+                }
+
+                const invoice = await response.json();
+
+                // Send email if requested
+                if (sendEmail) {
+                    const sendRes = await fetch(`${API_URL}/api/admin/invoices/${invoice._id}/send`, {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+
+                    if (!sendRes.ok) {
+                        const err = await sendRes.json();
+                        throw new Error(err.error || 'Invoice created but failed to send email');
+                    }
+                }
+
+                // Reset form
+                resetForm();
+                loadInvoices();
+
+                return invoice;
+            } catch (error) {
+                alert('Error: ' + error.message);
+                return null;
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalText;
+                updateActionButtons();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('customerSelect').value = '';
+            selectedCustomer = null;
+            invoiceItems = [];
+            document.getElementById('discountAmount').value = '0';
+            document.getElementById('discountReason').value = '';
+            document.getElementById('invoiceNotes').value = '';
+
+            const dueDate = new Date();
+            dueDate.setDate(dueDate.getDate() + 30);
+            document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
+
+            document.getElementById('customerInfo').style.display = 'none';
+            selectCustomer();
+            renderInvoiceItems();
+            updateTotals();
+        }
+
+        async function loadInvoices() {
+            try {
+                const status = document.getElementById('invoiceStatusFilter').value;
+                let url = `${API_URL}/api/admin/invoices`;
+                if (status) url += `?status=${status}`;
+
+                const response = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) throw new Error('Failed to load invoices');
+
+                const invoices = await response.json();
+                renderInvoicesTable(invoices);
+            } catch (error) {
+                console.error('Error loading invoices:', error);
+                document.getElementById('invoicesTableBody').innerHTML =
+                    '<tr><td colspan="6" class="error">Failed to load invoices</td></tr>';
+            }
+        }
+
+        function renderInvoicesTable(invoices) {
+            const tbody = document.getElementById('invoicesTableBody');
+
+            if (invoices.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align: center; padding: 40px; color: var(--text-muted);">No invoices yet</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = invoices.map(inv => `
+                <tr>
+                    <td><strong>${inv.invoiceNumber}</strong></td>
+                    <td>${inv.customerName || inv.customerId?.name || 'N/A'}</td>
+                    <td>$${(inv.total || 0).toFixed(2)}</td>
+                    <td>
+                        <span class="status-badge status-${inv.status || 'draft'}">${inv.status || 'draft'}</span>
+                        ${inv.paymentStatus === 'paid' ? '<span class="status-badge status-paid">Paid</span>' : ''}
+                    </td>
+                    <td>${new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString()}</td>
+                    <td>
+                        <div class="action-buttons">
+                            ${inv.status !== 'sent' && inv.status !== 'paid' ?
+                                `<button class="btn btn-sm btn-primary" onclick="sendInvoice('${inv._id}', '${inv.customerEmail || inv.customerId?.email}')">Send</button>` : ''}
+                            <button class="btn btn-sm btn-outline" onclick="viewInvoice('${inv._id}')">View</button>
+                        </div>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        async function sendInvoice(invoiceId, email) {
+            if (!confirm(`Send invoice to ${email}?`)) return;
+
+            try {
+                const response = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}/send`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to send invoice');
+                }
+
+                alert('Invoice sent successfully!');
+                loadInvoices();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        function viewInvoice(invoiceId) {
+            // Could open a modal or navigate to detail page
+            window.open(`/admin.html#orders`, '_blank');
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('.product-search-container')) {
+                document.getElementById('productDropdown').style.display = 'none';
+            }
+        });
+
+        function setupLogout() {
+            document.getElementById('logoutBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login.html';
+            });
+        }
+    </script>
+
+    <style>
+        .invoice-page-layout {
+            display: grid;
+            grid-template-columns: 1fr 400px;
+            gap: 24px;
+            margin-top: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .invoice-page-layout {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .card-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px 24px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .card-header h2 {
+            margin: 0;
+            font-size: 1.25rem;
+        }
+
+        .card-body {
+            padding: 24px;
+        }
+
+        .form-section {
+            margin-bottom: 24px;
+        }
+
+        .form-label {
+            display: block;
+            font-weight: 600;
+            margin-bottom: 8px;
+            color: var(--text);
+        }
+
+        .form-control {
+            width: 100%;
+            padding: 12px 16px;
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            font-size: 1rem;
+            font-family: inherit;
+            transition: border-color 0.2s;
+        }
+
+        .form-control:focus {
+            outline: none;
+            border-color: var(--primary);
+        }
+
+        .form-control-sm {
+            padding: 8px 12px;
+            font-size: 0.875rem;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .customer-info-box {
+            margin-top: 12px;
+            padding: 16px;
+            background: var(--surface);
+            border-radius: var(--radius);
+        }
+
+        .customer-info-box p {
+            margin: 4px 0;
+            color: var(--text-light);
+        }
+
+        .product-search-container {
+            position: relative;
+        }
+
+        .product-dropdown {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--white);
+            border: 2px solid var(--border);
+            border-top: none;
+            border-radius: 0 0 var(--radius) var(--radius);
+            max-height: 300px;
+            overflow-y: auto;
+            z-index: 100;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+
+        .product-dropdown .dropdown-item {
+            padding: 12px 16px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .product-dropdown .dropdown-item:hover {
+            background: var(--surface);
+        }
+
+        .product-dropdown .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .product-name {
+            font-weight: 500;
+        }
+
+        .product-details {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .dropdown-empty {
+            padding: 16px;
+            text-align: center;
+            color: var(--text-muted);
+        }
+
+        .invoice-items-list {
+            background: var(--surface);
+            border-radius: var(--radius);
+            padding: 16px;
+            min-height: 100px;
+        }
+
+        .empty-state {
+            color: var(--text-muted);
+            text-align: center;
+            padding: 20px;
+            margin: 0;
+        }
+
+        .invoice-item-row {
+            display: grid;
+            grid-template-columns: 1fr auto auto auto auto;
+            gap: 12px;
+            align-items: center;
+            padding: 12px;
+            background: var(--white);
+            border-radius: var(--radius);
+            margin-bottom: 8px;
+        }
+
+        .invoice-item-row:last-child {
+            margin-bottom: 0;
+        }
+
+        .item-info {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .item-name {
+            font-weight: 500;
+        }
+
+        .item-details {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .item-qty {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .item-qty input {
+            width: 50px;
+            text-align: center;
+            padding: 6px;
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+        }
+
+        .qty-btn {
+            width: 28px;
+            height: 28px;
+            border: 1px solid var(--border);
+            background: var(--white);
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 1rem;
+        }
+
+        .qty-btn:hover {
+            background: var(--surface);
+        }
+
+        .item-price, .item-total {
+            font-weight: 500;
+            white-space: nowrap;
+        }
+
+        .item-total {
+            color: var(--primary);
+        }
+
+        .item-remove {
+            width: 28px;
+            height: 28px;
+            border: none;
+            background: #fee2e2;
+            color: #dc2626;
+            border-radius: var(--radius);
+            cursor: pointer;
+            font-size: 1.25rem;
+            line-height: 1;
+        }
+
+        .item-remove:hover {
+            background: #fecaca;
+        }
+
+        .discount-section {
+            background: var(--surface);
+            padding: 16px;
+            border-radius: var(--radius);
+        }
+
+        .discount-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .discount-row .form-label {
+            margin-bottom: 0;
+        }
+
+        .discount-input-group {
+            display: flex;
+            align-items: center;
+            background: var(--white);
+            border: 2px solid var(--border);
+            border-radius: var(--radius);
+            padding: 0 12px;
+            width: 120px;
+        }
+
+        .discount-input-group .form-control {
+            border: none;
+            padding: 10px 4px;
+            width: 80px;
+        }
+
+        .input-prefix {
+            color: var(--text-muted);
+        }
+
+        /* Preview Panel */
+        .invoice-preview-panel .card {
+            position: sticky;
+            top: 100px;
+        }
+
+        .invoice-preview-content {
+            background: var(--white);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+        }
+
+        .preview-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            margin-bottom: 24px;
+            padding-bottom: 16px;
+            border-bottom: 2px solid var(--primary);
+        }
+
+        .preview-title h3 {
+            margin: 0;
+            color: var(--primary);
+            font-size: 1.5rem;
+        }
+
+        .preview-invoice-number {
+            font-size: 0.875rem;
+            color: var(--text-muted);
+        }
+
+        .preview-bill-to {
+            margin-bottom: 20px;
+            padding: 12px;
+            background: var(--surface);
+            border-radius: var(--radius);
+        }
+
+        .preview-bill-to p {
+            margin: 4px 0;
+            color: var(--text-light);
+        }
+
+        .preview-items {
+            margin-bottom: 20px;
+        }
+
+        .preview-table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 0.875rem;
+        }
+
+        .preview-table th {
+            text-align: left;
+            padding: 8px;
+            border-bottom: 2px solid var(--border);
+            font-weight: 600;
+            color: var(--text-light);
+        }
+
+        .preview-table th:last-child,
+        .preview-table td:last-child {
+            text-align: right;
+        }
+
+        .preview-table td {
+            padding: 8px;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .preview-table .empty-row td {
+            text-align: center;
+            color: var(--text-muted);
+            padding: 20px;
+        }
+
+        .preview-totals {
+            border-top: 2px solid var(--border);
+            padding-top: 16px;
+            margin-top: 16px;
+        }
+
+        .preview-totals .total-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 8px 0;
+        }
+
+        .preview-totals .total-final {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--primary);
+            border-top: 2px solid var(--primary);
+            margin-top: 8px;
+            padding-top: 12px;
+        }
+
+        .preview-due-date {
+            margin-top: 16px;
+            padding: 12px;
+            background: #fef3c7;
+            border-radius: var(--radius);
+            text-align: center;
+        }
+
+        .invoice-actions {
+            margin-top: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .btn-block {
+            width: 100%;
+            justify-content: center;
+        }
+
+        .btn svg {
+            margin-right: 8px;
+        }
+
+        .payment-info-card {
+            margin-top: 16px;
+        }
+
+        .payment-info-card h4 {
+            margin: 0 0 12px 0;
+            color: var(--primary);
+        }
+
+        .payment-info-card ul {
+            margin: 0;
+            padding-left: 20px;
+        }
+
+        .payment-info-card li {
+            margin-bottom: 8px;
+            color: var(--text-light);
+        }
+
+        /* Table Styles */
+        .table-container {
+            overflow-x: auto;
+        }
+
+        .admin-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+
+        .admin-table th,
+        .admin-table td {
+            padding: 12px 16px;
+            text-align: left;
+            border-bottom: 1px solid var(--border);
+        }
+
+        .admin-table th {
+            background: var(--surface);
+            font-weight: 600;
+            font-size: 0.875rem;
+            color: var(--text-light);
+        }
+
+        .admin-table tr:hover {
+            background: var(--surface);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .status-draft { background: #f3f4f6; color: #6b7280; }
+        .status-sent { background: #dbeafe; color: #1e40af; }
+        .status-paid { background: #dcfce7; color: #166534; }
+        .status-overdue { background: #fee2e2; color: #991b1b; }
+
+        .action-buttons {
+            display: flex;
+            gap: 8px;
+        }
+
+        .btn-sm {
+            padding: 6px 12px;
+            font-size: 0.875rem;
+        }
+
+        .header-actions {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+        }
+
+        .loading, .error {
+            text-align: center;
+            padding: 40px;
+            color: var(--text-muted);
+        }
+
+        .error {
+            color: var(--error);
+        }
+
+        .nav-user {
+            font-weight: 500;
+            margin-right: 16px;
+        }
+    </style>
+</body>
+</html>
