@@ -10078,7 +10078,7 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
 // Create manual invoice
 app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { customerId, items, discount, discountReason, notes, dueDate } = req.body;
+        const { customerId, items, discount, discountReason, notes, dueDate, representativeId } = req.body;
 
         const customer = await User.findById(customerId);
         if (!customer) {
@@ -10091,6 +10091,12 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
         const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
         const total = subtotal - (discount || 0);
 
+        // Determine representative: allow superadmin to specify, otherwise use customer's rep or current user
+        let repId = customer.representative || req.user._id;
+        if (req.user.role === 'superadmin' && representativeId) {
+            repId = representativeId;
+        }
+
         const invoice = new Invoice({
             invoiceNumber,
             customerId: customer._id,
@@ -10098,7 +10104,7 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
             customerEmail: customer.email,
             customerPhone: customer.phone,
             customerAddress: customer.address,
-            representativeId: customer.representative || req.user._id,
+            representativeId: repId,
             items: items.map(item => ({
                 ...item,
                 totalPrice: item.quantity * item.unitPrice

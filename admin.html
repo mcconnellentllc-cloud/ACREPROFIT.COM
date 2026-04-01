@@ -56,6 +56,7 @@
                     <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
                     <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
+                    <a href="/distributor-invoices.html" class="admin-tab" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">Invoicing</a>
                     <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
                     <a href="#price-mining" class="admin-tab" data-tab="price-mining" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">⛏️ Price Mining</a>
 
@@ -967,150 +968,7 @@
 
                 <!-- Distributors Grid -->
                 <div class="distributors-grid" id="distributorsGrid">
-                    <div class="distributor-card">
-                        <div class="distributor-header">
-                            <div class="distributor-avatar">D1</div>
-                            <div class="distributor-info">
-                                <h3>Distributor 1</h3>
-                                <span class="distributor-location">Location TBD</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                        <div class="distributor-stats">
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">$0</span>
-                                <span class="dist-stat-label">Inventory</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Orders</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Customers</span>
-                            </div>
-                        </div>
-                        <div class="distributor-actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(1)">View Inventory</button>
-                            <button class="btn btn-sm btn-outline" onclick="editDistributor(1)">Edit</button>
-                        </div>
-                    </div>
-
-                    <div class="distributor-card">
-                        <div class="distributor-header">
-                            <div class="distributor-avatar">D2</div>
-                            <div class="distributor-info">
-                                <h3>Distributor 2</h3>
-                                <span class="distributor-location">Location TBD</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                        <div class="distributor-stats">
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">$0</span>
-                                <span class="dist-stat-label">Inventory</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Orders</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Customers</span>
-                            </div>
-                        </div>
-                        <div class="distributor-actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(2)">View Inventory</button>
-                            <button class="btn btn-sm btn-outline" onclick="editDistributor(2)">Edit</button>
-                        </div>
-                    </div>
-
-                    <div class="distributor-card">
-                        <div class="distributor-header">
-                            <div class="distributor-avatar">D3</div>
-                            <div class="distributor-info">
-                                <h3>Distributor 3</h3>
-                                <span class="distributor-location">Location TBD</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                        <div class="distributor-stats">
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">$0</span>
-                                <span class="dist-stat-label">Inventory</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Orders</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Customers</span>
-                            </div>
-                        </div>
-                        <div class="distributor-actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(3)">View Inventory</button>
-                            <button class="btn btn-sm btn-outline" onclick="editDistributor(3)">Edit</button>
-                        </div>
-                    </div>
-
-                    <div class="distributor-card">
-                        <div class="distributor-header">
-                            <div class="distributor-avatar">D4</div>
-                            <div class="distributor-info">
-                                <h3>Distributor 4</h3>
-                                <span class="distributor-location">Location TBD</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                        <div class="distributor-stats">
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">$0</span>
-                                <span class="dist-stat-label">Inventory</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Orders</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Customers</span>
-                            </div>
-                        </div>
-                        <div class="distributor-actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(4)">View Inventory</button>
-                            <button class="btn btn-sm btn-outline" onclick="editDistributor(4)">Edit</button>
-                        </div>
-                    </div>
-
-                    <div class="distributor-card">
-                        <div class="distributor-header">
-                            <div class="distributor-avatar">D5</div>
-                            <div class="distributor-info">
-                                <h3>Distributor 5</h3>
-                                <span class="distributor-location">Location TBD</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                        <div class="distributor-stats">
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">$0</span>
-                                <span class="dist-stat-label">Inventory</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Orders</span>
-                            </div>
-                            <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
-                                <span class="dist-stat-label">Customers</span>
-                            </div>
-                        </div>
-                        <div class="distributor-actions">
-                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory(5)">View Inventory</button>
-                            <button class="btn btn-sm btn-outline" onclick="editDistributor(5)">Edit</button>
-                        </div>
-                    </div>
+                    <p style="color: #666; grid-column: 1 / -1;">Loading distributors...</p>
                 </div>
 
                 <!-- Suppliers Section -->
@@ -3362,15 +3220,73 @@
             });
         });
 
-        // Placeholder functions for new tabs
-        function loadDistributors() {
-            // Future: Load distributor data from API
-            console.log('Loading distributors...');
+        // Load and render distributors from API
+        async function loadDistributors() {
+            const grid = document.getElementById('distributorsGrid');
+            try {
+                const res = await fetch(`${API_URL}/api/admin/distributors`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load distributors');
+                const distributors = await res.json();
+
+                if (distributors.length === 0) {
+                    grid.innerHTML = '<p style="color: #666; grid-column: 1 / -1;">No distributors found.</p>';
+                    return;
+                }
+
+                grid.innerHTML = distributors.map((d, idx) => {
+                    const initials = d.name ? d.name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase() : 'D';
+                    const roleLabel = d.role === 'superadmin' ? 'Super Admin' : d.role === 'admin' ? 'Admin' : 'Distributor';
+                    return `
+                    <div class="distributor-card">
+                        <div class="distributor-header">
+                            <div class="distributor-avatar">${initials}</div>
+                            <div class="distributor-info">
+                                <h3>${d.name || 'Unknown'}</h3>
+                                <span class="distributor-location">${d.email || ''}</span>
+                            </div>
+                            <span class="status-badge status-active">${roleLabel}</span>
+                        </div>
+                        <div class="distributor-stats">
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">$0</span>
+                                <span class="dist-stat-label">Inventory</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Orders</span>
+                            </div>
+                            <div class="dist-stat">
+                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-label">Customers</span>
+                            </div>
+                        </div>
+                        <div class="distributor-actions">
+                            <button class="btn btn-sm btn-outline" onclick="viewDistributorInventory('${d._id}')">View Inventory</button>
+                            <button class="btn btn-sm btn-outline" onclick="editDistributor('${d._id}')">Edit</button>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                console.error('Error loading distributors:', error);
+                grid.innerHTML = '<p style="color: #dc2626; grid-column: 1 / -1;">Error loading distributors.</p>';
+            }
         }
 
         function loadSuppliers() {
             // Future: Load supplier data from API
             console.log('Loading suppliers...');
+        }
+
+        function viewDistributorInventory(distributorId) {
+            // Future: View distributor inventory
+            alert('View inventory for distributor: ' + distributorId);
+        }
+
+        function editDistributor(distributorId) {
+            // Future: Edit distributor
+            alert('Edit distributor: ' + distributorId);
         }
 
         // Handle browser back/forward buttons
