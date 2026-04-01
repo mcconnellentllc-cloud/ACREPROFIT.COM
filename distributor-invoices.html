@@ -1004,6 +1004,14 @@
         .invoice-preview-panel .card {
             position: sticky;
             top: 100px;
+            max-height: calc(100vh - 120px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .invoice-preview-panel .card-body {
+            flex: 1;
+            overflow-y: auto;
         }
 
         .invoice-preview-content {
@@ -1109,10 +1117,16 @@
         }
 
         .invoice-actions {
+            position: sticky;
+            bottom: 0;
             margin-top: 24px;
+            padding: 16px 0;
+            background: var(--white);
             display: flex;
             flex-direction: column;
             gap: 12px;
+            border-top: 1px solid var(--border);
+            z-index: 10;
         }
 
         .btn-block {
