@@ -299,10 +299,10 @@
 
             // Filter customers for this distributor
             if (selectedDistributor) {
-                customers = allCustomers.filter(c =>
-                    c.representative === distributorId ||
-                    c.representative?._id === distributorId
-                );
+                customers = allCustomers.filter(c => {
+                    const repId = c.representative?._id || c.representative;
+                    return repId?.toString() === distributorId;
+                });
             } else {
                 customers = [];
             }
@@ -404,7 +404,7 @@
                 dropdown.innerHTML = filtered.map(p => `
                     <div class="dropdown-item" onclick="addProduct('${p._id}')">
                         <span class="product-name">${p.productName}</span>
-                        <span class="product-details">${p.packSize} - $${(p.customRetailPrice || p.sellPrice || 0).toFixed(2)}/${p.unit}</span>
+                        <span class="product-details">${p.packSize} - $${(p.effectivePrice || p.baseRetailPrice || 0).toFixed(2)}/${p.unit}</span>
                     </div>
                 `).join('');
             }
@@ -429,8 +429,8 @@
                     packSize: product.packSize,
                     unit: product.unit,
                     quantity: 1,
-                    unitPrice: product.customRetailPrice || product.sellPrice || 0,
-                    total: product.customRetailPrice || product.sellPrice || 0
+                    unitPrice: product.effectivePrice || product.baseRetailPrice || 0,
+                    total: product.effectivePrice || product.baseRetailPrice || 0
                 });
             }
 
@@ -1004,6 +1004,14 @@
         .invoice-preview-panel .card {
             position: sticky;
             top: 100px;
+            max-height: calc(100vh - 120px);
+            display: flex;
+            flex-direction: column;
+        }
+
+        .invoice-preview-panel .card-body {
+            flex: 1;
+            overflow-y: auto;
         }
 
         .invoice-preview-content {
@@ -1109,10 +1117,16 @@
         }
 
         .invoice-actions {
+            position: sticky;
+            bottom: 0;
             margin-top: 24px;
+            padding: 16px 0;
+            background: var(--white);
             display: flex;
             flex-direction: column;
             gap: 12px;
+            border-top: 1px solid var(--border);
+            z-index: 10;
         }
 
         .btn-block {
