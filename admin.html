@@ -1999,53 +1999,89 @@
                 <div class="tab-header">
                     <div>
                         <h2>Preorders</h2>
-                        <p class="tab-subtitle">Customers lock in their quantities - you mine for the best price</p>
+                        <p class="tab-subtitle">Browse available products and manage customer preorder requests</p>
                     </div>
-                    <button class="btn btn-primary" onclick="openCreateQuoteModal()">+ Add Preorder</button>
-                </div>
-
-                <!-- Volume Needs Summary -->
-                <div style="background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); border-radius: 12px; padding: 20px; margin-bottom: 24px; color: white;">
-                    <h3 style="margin: 0 0 12px 0; font-size: 1rem;">Chemical Volume Needs (Pending Orders + Quotes)</h3>
-                    <div id="volumeNeedsSummary" style="display: flex; gap: 20px; flex-wrap: wrap;">
-                        <span>Loading...</span>
+                    <div style="display: flex; gap: 8px;">
+                        <button class="btn btn-outline" onclick="loadVolumeNeeds()">View Volume Needs</button>
+                        <button class="btn btn-primary" onclick="openCreateQuoteModal()">+ Add Preorder</button>
                     </div>
                 </div>
 
-                <!-- Quote Filters -->
-                <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
-                    <select id="quoteStatusFilter" onchange="loadQuoteRequests()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
-                        <option value="">All Status</option>
-                        <option value="submitted">Submitted (New)</option>
-                        <option value="pricing">Pricing In Progress</option>
-                        <option value="quoted">Quote Sent</option>
-                        <option value="accepted">Accepted</option>
-                        <option value="declined">Declined</option>
-                        <option value="converted">Converted to Order</option>
-                    </select>
-                    <button class="btn btn-outline" onclick="loadQuoteRequests()">Refresh</button>
-                    <button class="btn btn-outline" onclick="loadVolumeNeeds()" style="background: #7c3aed; color: white;">View All Volume Needs</button>
+                <!-- Sub-tabs for Products vs Quotes -->
+                <div style="display: flex; gap: 0; margin-bottom: 20px; border-bottom: 2px solid var(--border);">
+                    <button class="preorder-subtab active" id="subtabProducts" onclick="switchPreorderSubtab('products')" style="padding: 12px 24px; border: none; background: none; font-weight: 600; cursor: pointer; border-bottom: 3px solid #7c3aed; color: #7c3aed;">
+                        Available Products
+                    </button>
+                    <button class="preorder-subtab" id="subtabQuotes" onclick="switchPreorderSubtab('quotes')" style="padding: 12px 24px; border: none; background: none; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; color: #666;">
+                        Quote Requests
+                    </button>
                 </div>
 
-                <!-- Quotes Table -->
-                <div class="orders-table-wrapper">
-                    <table class="admin-table">
-                        <thead>
-                            <tr>
-                                <th>Quote #</th>
-                                <th>Customer</th>
-                                <th>Items</th>
-                                <th>Total Qty</th>
-                                <th>Est. Value</th>
-                                <th>Status</th>
-                                <th>Submitted</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="quoteRequestsTableBody">
-                            <tr><td colspan="8" class="loading">Loading quote requests...</td></tr>
-                        </tbody>
-                    </table>
+                <!-- Products Catalog Section -->
+                <div id="preorderProductsSection">
+                    <!-- Search/Filter Bar -->
+                    <div style="display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; align-items: center;">
+                        <input type="text" id="preorderProductSearch" placeholder="Search products..."
+                            style="flex: 1; min-width: 200px; padding: 10px 14px; border: 2px solid var(--border); border-radius: var(--radius);"
+                            onkeyup="filterPreorderProducts()">
+                        <select id="preorderCategoryFilter" onchange="filterPreorderProducts()"
+                            style="padding: 10px 14px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Categories</option>
+                            <option value="herbicide">Herbicides</option>
+                            <option value="fungicide">Fungicides</option>
+                            <option value="insecticide">Insecticides</option>
+                            <option value="adjuvant">Adjuvants</option>
+                            <option value="fertilizer">Fertilizers</option>
+                            <option value="other">Other</option>
+                        </select>
+                        <select id="preorderDistributorFilter" onchange="filterPreorderProducts()"
+                            style="padding: 10px 14px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Distributors</option>
+                        </select>
+                    </div>
+
+                    <!-- Products Grid by Distributor -->
+                    <div id="preorderProductsGrid">
+                        <p style="color: #666;">Loading available products...</p>
+                    </div>
+                </div>
+
+                <!-- Quotes Section (hidden by default) -->
+                <div id="preorderQuotesSection" style="display: none;">
+                    <!-- Quote Filters -->
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
+                        <select id="quoteStatusFilter" onchange="loadQuoteRequests()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Status</option>
+                            <option value="submitted">Submitted (New)</option>
+                            <option value="pricing">Pricing In Progress</option>
+                            <option value="quoted">Quote Sent</option>
+                            <option value="accepted">Accepted</option>
+                            <option value="declined">Declined</option>
+                            <option value="converted">Converted to Order</option>
+                        </select>
+                        <button class="btn btn-outline" onclick="loadQuoteRequests()">Refresh</button>
+                    </div>
+
+                    <!-- Quotes Table -->
+                    <div class="orders-table-wrapper">
+                        <table class="admin-table">
+                            <thead>
+                                <tr>
+                                    <th>Quote #</th>
+                                    <th>Customer</th>
+                                    <th>Items</th>
+                                    <th>Total Qty</th>
+                                    <th>Est. Value</th>
+                                    <th>Status</th>
+                                    <th>Submitted</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="quoteRequestsTableBody">
+                                <tr><td colspan="8" class="loading">Loading quote requests...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
@@ -3162,12 +3198,12 @@
             if (tabName === 'inventory') loadInventory();
             if (tabName === 'distributors') loadDistributors();
             if (tabName === 'suppliers') loadSuppliers();
-            if (tabName === 'quote-requests') loadQuoteRequests();
+            if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
         }
 
-        // Tab navigation - regular tabs
-        document.querySelectorAll('.admin-tab:not(.dropdown-trigger)').forEach(tab => {
+        // Tab navigation - regular tabs (only for tabs with data-tab attribute)
+        document.querySelectorAll('.admin-tab:not(.dropdown-trigger)[data-tab]').forEach(tab => {
             tab.addEventListener('click', function(e) {
                 e.preventDefault();
                 const tabName = this.dataset.tab;
@@ -4916,6 +4952,247 @@
 
         // ===== QUOTE REQUESTS TAB =====
         let quoteRequests = [];
+        let preorderProducts = [];
+        let preorderDistributors = [];
+
+        // Switch between Products and Quotes sub-tabs
+        function switchPreorderSubtab(tab) {
+            const productsSection = document.getElementById('preorderProductsSection');
+            const quotesSection = document.getElementById('preorderQuotesSection');
+            const subtabProducts = document.getElementById('subtabProducts');
+            const subtabQuotes = document.getElementById('subtabQuotes');
+
+            if (tab === 'products') {
+                productsSection.style.display = 'block';
+                quotesSection.style.display = 'none';
+                subtabProducts.style.borderBottom = '3px solid #7c3aed';
+                subtabProducts.style.color = '#7c3aed';
+                subtabQuotes.style.borderBottom = '3px solid transparent';
+                subtabQuotes.style.color = '#666';
+                loadPreorderProducts();
+            } else {
+                productsSection.style.display = 'none';
+                quotesSection.style.display = 'block';
+                subtabProducts.style.borderBottom = '3px solid transparent';
+                subtabProducts.style.color = '#666';
+                subtabQuotes.style.borderBottom = '3px solid #7c3aed';
+                subtabQuotes.style.color = '#7c3aed';
+                loadQuoteRequests();
+            }
+        }
+
+        // Load products for preorder catalog
+        async function loadPreorderProducts() {
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                preorderProducts = await res.json();
+
+                // Extract unique distributors/suppliers
+                preorderDistributors = [...new Set(preorderProducts.map(p => p.sourceSupplier).filter(Boolean))].sort();
+
+                // Populate distributor filter dropdown
+                const distFilter = document.getElementById('preorderDistributorFilter');
+                distFilter.innerHTML = '<option value="">All Distributors</option>' +
+                    preorderDistributors.map(d => `<option value="${d}">${d}</option>`).join('');
+
+                renderPreorderProducts(preorderProducts);
+            } catch (error) {
+                console.error('Error loading preorder products:', error);
+                document.getElementById('preorderProductsGrid').innerHTML =
+                    '<p style="color: #dc2626;">Error loading products. Please try again.</p>';
+            }
+        }
+
+        // Filter products by search, category, distributor
+        function filterPreorderProducts() {
+            const search = document.getElementById('preorderProductSearch').value.toLowerCase();
+            const category = document.getElementById('preorderCategoryFilter').value;
+            const distributor = document.getElementById('preorderDistributorFilter').value;
+
+            const filtered = preorderProducts.filter(p => {
+                const matchSearch = !search ||
+                    (p.productName && p.productName.toLowerCase().includes(search)) ||
+                    (p.sourceSupplier && p.sourceSupplier.toLowerCase().includes(search));
+                const matchCategory = !category || p.category === category;
+                const matchDistributor = !distributor || p.sourceSupplier === distributor;
+                return matchSearch && matchCategory && matchDistributor;
+            });
+
+            renderPreorderProducts(filtered);
+        }
+
+        // Render products grouped by distributor
+        function renderPreorderProducts(products) {
+            const grid = document.getElementById('preorderProductsGrid');
+
+            if (!products.length) {
+                grid.innerHTML = '<p style="color: #666;">No products found matching your criteria.</p>';
+                return;
+            }
+
+            // Group products by distributor
+            const byDistributor = {};
+            products.forEach(p => {
+                const dist = p.sourceSupplier || 'Unassigned';
+                if (!byDistributor[dist]) byDistributor[dist] = [];
+                byDistributor[dist].push(p);
+            });
+
+            // Category colors
+            const categoryColors = {
+                herbicide: '#22c55e',
+                fungicide: '#3b82f6',
+                insecticide: '#ef4444',
+                adjuvant: '#f59e0b',
+                fertilizer: '#8b5cf6',
+                other: '#6b7280'
+            };
+
+            let html = '';
+            Object.keys(byDistributor).sort().forEach(distributor => {
+                const distProducts = byDistributor[distributor];
+                html += `
+                <div style="margin-bottom: 32px;">
+                    <div style="display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding-bottom: 8px; border-bottom: 2px solid var(--border);">
+                        <h3 style="margin: 0; font-size: 1.1rem; color: #374151;">${distributor}</h3>
+                        <span style="background: #e5e7eb; padding: 4px 10px; border-radius: 12px; font-size: 0.75rem; color: #666;">
+                            ${distProducts.length} product${distProducts.length !== 1 ? 's' : ''}
+                        </span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px;">
+                        ${distProducts.map(p => `
+                            <div class="preorder-product-card" style="background: white; border: 2px solid var(--border); border-radius: 10px; padding: 16px; transition: all 0.2s;">
+                                <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px;">
+                                    <span style="font-weight: 600; color: #1f2937; font-size: 0.95rem;">${p.productName || 'Unknown Product'}</span>
+                                    <span style="background: ${categoryColors[p.category] || '#6b7280'}20; color: ${categoryColors[p.category] || '#6b7280'}; padding: 2px 8px; border-radius: 4px; font-size: 0.7rem; text-transform: uppercase;">
+                                        ${p.category || 'other'}
+                                    </span>
+                                </div>
+                                <div style="color: #666; font-size: 0.85rem; margin-bottom: 12px;">
+                                    ${p.packSize ? `<span>${p.packSize}</span>` : ''}
+                                    ${p.unit ? `<span style="margin-left: 8px; color: #999;">per ${p.unit}</span>` : ''}
+                                </div>
+                                <div style="display: flex; justify-content: space-between; align-items: center;">
+                                    <span style="font-size: 1.1rem; font-weight: 700; color: #059669;">
+                                        ${p.sellPrice ? '$' + p.sellPrice.toFixed(2) : 'Contact for price'}
+                                    </span>
+                                    <button class="btn btn-sm btn-primary" onclick="addToPreorderQuote('${p._id}', '${(p.productName || '').replace(/'/g, "\\'")}', '${p.packSize || ''}', '${p.unit || 'unit'}')" style="background: #7c3aed;">
+                                        + Add to Quote
+                                    </button>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>`;
+            });
+
+            grid.innerHTML = html;
+        }
+
+        // Track items being added to a new quote
+        let pendingQuoteItems = [];
+
+        function addToPreorderQuote(productId, productName, packSize, unit) {
+            // Check if already in pending items
+            const existing = pendingQuoteItems.find(i => i.productId === productId);
+            if (existing) {
+                const qty = prompt(`${productName} is already in your quote with ${existing.quantity} ${unit}.\nEnter new quantity (or cancel to keep current):`, existing.quantity);
+                if (qty !== null && !isNaN(parseInt(qty)) && parseInt(qty) > 0) {
+                    existing.quantity = parseInt(qty);
+                    showPendingQuoteBar();
+                }
+                return;
+            }
+
+            const qty = prompt(`How many ${unit} of ${productName} do you need?`, '1');
+            if (qty !== null && !isNaN(parseInt(qty)) && parseInt(qty) > 0) {
+                pendingQuoteItems.push({
+                    productId,
+                    productName,
+                    packSize,
+                    unit,
+                    quantity: parseInt(qty)
+                });
+                showPendingQuoteBar();
+            }
+        }
+
+        function showPendingQuoteBar() {
+            let bar = document.getElementById('pendingQuoteBar');
+            if (!bar) {
+                bar = document.createElement('div');
+                bar.id = 'pendingQuoteBar';
+                bar.style.cssText = 'position: fixed; bottom: 0; left: 0; right: 0; background: linear-gradient(135deg, #7c3aed 0%, #5b21b6 100%); color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; z-index: 1000; box-shadow: 0 -4px 20px rgba(0,0,0,0.15);';
+                document.body.appendChild(bar);
+            }
+
+            const totalItems = pendingQuoteItems.reduce((sum, i) => sum + i.quantity, 0);
+            bar.innerHTML = `
+                <div>
+                    <strong>${pendingQuoteItems.length} product${pendingQuoteItems.length !== 1 ? 's' : ''}</strong>
+                    <span style="opacity: 0.9;">(${totalItems} total units) ready for quote</span>
+                </div>
+                <div style="display: flex; gap: 12px;">
+                    <button onclick="clearPendingQuote()" style="background: rgba(255,255,255,0.2); border: none; color: white; padding: 8px 16px; border-radius: 6px; cursor: pointer;">
+                        Clear
+                    </button>
+                    <button onclick="submitPendingQuote()" style="background: white; border: none; color: #7c3aed; padding: 8px 20px; border-radius: 6px; cursor: pointer; font-weight: 600;">
+                        Submit Quote Request
+                    </button>
+                </div>
+            `;
+            bar.style.display = 'flex';
+        }
+
+        function clearPendingQuote() {
+            pendingQuoteItems = [];
+            const bar = document.getElementById('pendingQuoteBar');
+            if (bar) bar.style.display = 'none';
+        }
+
+        async function submitPendingQuote() {
+            if (!pendingQuoteItems.length) return;
+
+            const customerName = prompt('Enter customer name for this quote:');
+            if (!customerName) return;
+
+            const notes = prompt('Any special notes or delivery requirements? (optional)') || '';
+
+            try {
+                const items = pendingQuoteItems.map(i => ({
+                    productName: i.productName,
+                    chemicalId: i.productId,
+                    packSize: i.packSize,
+                    unit: i.unit,
+                    quantityNeeded: i.quantity
+                }));
+
+                const res = await fetch(`${API_URL}/api/quote-requests`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        customerName,
+                        items,
+                        customerNotes: notes
+                    })
+                });
+
+                if (!res.ok) throw new Error('Failed to create quote');
+
+                const quote = await res.json();
+                alert(`Quote ${quote.quoteNumber} created successfully!`);
+                clearPendingQuote();
+                switchPreorderSubtab('quotes');
+            } catch (error) {
+                console.error('Error creating quote:', error);
+                alert('Error creating quote. Please try again.');
+            }
+        }
 
         async function loadQuoteRequests() {
             try {
@@ -4928,9 +5205,6 @@
                 });
                 quoteRequests = await res.json();
                 renderQuoteRequests(quoteRequests);
-
-                // Also load volume needs summary
-                loadVolumeNeedsSummary();
             } catch (error) {
                 console.error('Error loading quote requests:', error);
             }
