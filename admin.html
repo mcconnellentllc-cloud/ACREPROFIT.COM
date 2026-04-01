@@ -6196,7 +6196,7 @@
                 renderPODocuments();
 
                 // Load distributors for split modal
-                await loadDistributors();
+                await loadDistributorsForSplit();
 
             } catch (error) {
                 console.error('Error loading PO detail:', error);
@@ -6515,7 +6515,7 @@
         }
 
         // Split functions
-        async function loadDistributors() {
+        async function loadDistributorsForSplit() {
             try {
                 const res = await fetch(`${API_URL}/api/admin/distributors`, {
                     headers: { 'Authorization': `Bearer ${token}` }
