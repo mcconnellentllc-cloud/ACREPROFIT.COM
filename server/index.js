@@ -1114,7 +1114,8 @@ const purchaseOrderSchema = new mongoose.Schema({
         pricePerUnit: { type: Number, required: true }, // Cost price from supplier
         totalPrice: Number, // Calculated: quantity * price
 
-        // For tracking splits
+        // For tracking receives and splits
+        quantityReceived: { type: Number, default: 0 }, // Total received so far
         quantityAllocated: { type: Number, default: 0 }, // Total allocated to distributors
         quantityRemaining: Number // Calculated: ordered - allocated
     }],
@@ -9413,7 +9414,7 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
 
         // Get "On Order" quantities from pending POs (not yet received)
         const pendingPOs = await PurchaseOrder.find({
-            status: { $in: ['pending', 'submitted', 'approved', 'ordered'] }
+            status: { $in: ['draft', 'submitted', 'confirmed', 'partial_received'] }
         }).select('items');
 
         // Build map of chemicalId -> quantity on order
@@ -9816,9 +9817,28 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
             });
         }
 
-        // Update PO status
-        po.status = 'received';
-        po.receivedDate = new Date();
+        // Track received quantities on each PO item
+        for (const receiveItem of items) {
+            const poItem = po.items[receiveItem.itemIndex];
+            if (poItem) {
+                const qtyReceived = receiveItem.quantityReceived || poItem.quantityOrdered;
+                poItem.quantityReceived = (poItem.quantityReceived || 0) + qtyReceived;
+            }
+        }
+
+        // Determine PO status based on total received vs ordered
+        const allFullyReceived = po.items.every(item =>
+            (item.quantityReceived || 0) >= item.quantityOrdered
+        );
+        const anyReceived = po.items.some(item => (item.quantityReceived || 0) > 0);
+
+        if (allFullyReceived) {
+            po.status = 'received';
+            po.receivedDate = new Date();
+        } else if (anyReceived) {
+            po.status = 'partial_received';
+        }
+
         po.updatedBy = req.user._id;
         po.updatedAt = new Date();
         if (notes) po.internalNotes = (po.internalNotes || '') + '\n' + notes;
@@ -9826,7 +9846,7 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
         await po.save();
 
         res.json({
-            message: 'Inventory received successfully',
+            message: allFullyReceived ? 'All items received successfully' : 'Partial shipment received',
             purchaseOrder: po,
             inventoryUpdates: results
         });
