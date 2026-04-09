@@ -2730,9 +2730,71 @@
                     </div>
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closePODetailModal()">Close</button>
-                        <button class="btn btn-primary" id="receivePOBtn" onclick="receivePurchaseOrder()" style="background: #059669;">
+                        <button class="btn btn-primary" id="receivePOBtn" onclick="openReceiveShipmentModal()" style="background: #059669;">
                             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 6px;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
                             Receive Inventory
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Receive Shipment Modal -->
+            <div class="modal-overlay" id="receiveShipmentModal" style="display: none;">
+                <div class="modal-content" style="max-width: 900px; max-height: 90vh; overflow-y: auto;">
+                    <button class="modal-close" onclick="closeReceiveShipmentModal()">&times;</button>
+                    <div class="customer-modal-header" style="background: #059669; color: var(--white);">
+                        <div class="customer-modal-avatar" style="background: rgba(255,255,255,0.2);">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg>
+                        </div>
+                        <div class="customer-modal-title">
+                            <h2 style="color: var(--white);" id="receiveShipmentTitle">Receive Shipment</h2>
+                            <p style="color: rgba(255,255,255,0.8);">Enter quantities received and lot numbers</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <!-- Items Table -->
+                        <h4 style="margin-bottom: 12px; color: #059669;">Items to Receive</h4>
+                        <div class="orders-table-wrapper" style="margin-bottom: 20px;">
+                            <table class="admin-table">
+                                <thead>
+                                    <tr>
+                                        <th>Product</th>
+                                        <th>Pack Size</th>
+                                        <th>Ordered Qty</th>
+                                        <th>Qty to Receive</th>
+                                        <th>Lot Number</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="receiveShipmentItemsBody">
+                                </tbody>
+                            </table>
+                        </div>
+
+                        <!-- Location & Notes -->
+                        <div style="display: flex; gap: 16px; margin-bottom: 20px;">
+                            <div style="flex: 1;">
+                                <label style="font-size: 12px; color: #666; display: block; margin-bottom: 4px;">Receiving Location</label>
+                                <select id="receiveShipmentLocation" style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px;">
+                                    <option value="main">Main</option>
+                                    <option value="haxtun">Haxtun</option>
+                                    <option value="otis">Otis</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div style="margin-bottom: 20px;">
+                            <label style="font-size: 12px; color: #666; display: block; margin-bottom: 4px;">Notes</label>
+                            <textarea id="receiveShipmentNotes" rows="3" placeholder="Optional receiving notes..." style="width: 100%; padding: 8px; border: 2px solid var(--border); border-radius: 6px; resize: vertical; font-family: inherit;"></textarea>
+                        </div>
+                    </div>
+                    <div class="customer-modal-actions" style="display: flex; gap: 8px; justify-content: flex-end;">
+                        <button class="btn btn-outline" onclick="closeReceiveShipmentModal()">Cancel</button>
+                        <button class="btn btn-outline" onclick="receiveAllFillQty()" style="color: #059669; border-color: #059669;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
+                            Receive All
+                        </button>
+                        <button class="btn btn-primary" onclick="submitReceiveShipment()" style="background: #059669;">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px;"><path d="M5 12h14"></path><path d="m12 5 7 7-7 7"></path></svg>
+                            Receive Selected
                         </button>
                     </div>
                 </div>
@@ -6483,8 +6545,8 @@
             currentPO = null;
         }
 
-        // Receive Purchase Order - Add items to inventory
-        async function receivePurchaseOrder() {
+        // Open Receive Shipment Modal
+        function openReceiveShipmentModal() {
             if (!currentPO) {
                 alert('No purchase order selected');
                 return;
@@ -6495,16 +6557,71 @@
                 return;
             }
 
-            const confirmed = confirm(`Receive all items from ${currentPO.poNumber}?\n\nThis will add all items to inventory.`);
-            if (!confirmed) return;
+            document.getElementById('receiveShipmentTitle').textContent = 'Receive Shipment - ' + currentPO.poNumber;
+
+            // Populate items table
+            const tbody = document.getElementById('receiveShipmentItemsBody');
+            tbody.innerHTML = currentPO.items.map((item, idx) => `
+                <tr>
+                    <td><strong>${item.productName}</strong></td>
+                    <td>${item.packSize || '-'}</td>
+                    <td>${item.quantityOrdered}</td>
+                    <td>
+                        <input type="number" id="receiveQty_${idx}" min="0" max="${item.quantityOrdered}" value="0"
+                            style="width: 80px; padding: 4px 6px; border: 2px solid var(--border); border-radius: 4px; text-align: center;"
+                            data-ordered="${item.quantityOrdered}">
+                    </td>
+                    <td>
+                        <input type="text" id="receiveLot_${idx}" placeholder="Lot #"
+                            style="width: 120px; padding: 4px 6px; border: 2px solid var(--border); border-radius: 4px;">
+                    </td>
+                </tr>
+            `).join('');
+
+            // Reset location and notes
+            document.getElementById('receiveShipmentLocation').value = 'main';
+            document.getElementById('receiveShipmentNotes').value = '';
+
+            document.getElementById('receiveShipmentModal').style.display = 'flex';
+        }
+
+        function closeReceiveShipmentModal() {
+            document.getElementById('receiveShipmentModal').style.display = 'none';
+        }
+
+        // Fill all qty inputs to ordered qty
+        function receiveAllFillQty() {
+            if (!currentPO) return;
+            currentPO.items.forEach((item, idx) => {
+                const input = document.getElementById('receiveQty_' + idx);
+                if (input) input.value = item.quantityOrdered;
+            });
+        }
+
+        // Submit Receive Shipment
+        async function submitReceiveShipment() {
+            if (!currentPO) return;
+
+            const items = [];
+            currentPO.items.forEach((item, idx) => {
+                const qty = parseInt(document.getElementById('receiveQty_' + idx).value) || 0;
+                const lot = (document.getElementById('receiveLot_' + idx).value || '').trim();
+                if (qty > 0) {
+                    const entry = { itemIndex: idx, quantityReceived: qty };
+                    if (lot) entry.lotNumber = lot;
+                    items.push(entry);
+                }
+            });
+
+            if (items.length === 0) {
+                alert('Please enter a quantity to receive for at least one item.');
+                return;
+            }
+
+            const location = document.getElementById('receiveShipmentLocation').value;
+            const notes = document.getElementById('receiveShipmentNotes').value.trim();
 
             try {
-                // Build items array with all quantities
-                const items = currentPO.items.map((item, index) => ({
-                    itemIndex: index,
-                    quantityReceived: item.quantityOrdered
-                }));
-
                 const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/receive`, {
                     method: 'POST',
                     headers: {
@@ -6513,24 +6630,24 @@
                     },
                     body: JSON.stringify({
                         items,
-                        location: 'main',
-                        notes: `Received via admin panel on ${new Date().toLocaleDateString()}`
+                        location,
+                        notes: notes || `Received via admin panel on ${new Date().toLocaleDateString()}`
                     })
                 });
 
                 if (res.ok) {
                     const result = await res.json();
-                    alert(`✓ Inventory received!\n\n${result.inventoryUpdates.map(u => `${u.productName}: +${u.quantityReceived}`).join('\n')}`);
+                    alert(`Inventory received!\n\n${result.inventoryUpdates.map(u => `${u.productName}: +${u.quantityReceived}`).join('\n')}`);
+                    closeReceiveShipmentModal();
                     closePODetailModal();
                     loadPurchaseOrders();
-                    // Refresh products if that tab is loaded
                     if (allProducts.length > 0) loadProducts();
                 } else {
                     const error = await res.json();
                     alert('Error receiving inventory: ' + (error.error || 'Unknown error'));
                 }
             } catch (error) {
-                console.error('Error receiving PO:', error);
+                console.error('Error receiving shipment:', error);
                 alert('Error receiving inventory. Please try again.');
             }
         }
@@ -7052,6 +7169,9 @@
         });
         document.getElementById('splitLoadModal').addEventListener('click', function(e) {
             if (e.target === this) closeSplitModal();
+        });
+        document.getElementById('receiveShipmentModal').addEventListener('click', function(e) {
+            if (e.target === this) closeReceiveShipmentModal();
         });
 
         // ============ COMPLIANCE DASHBOARD FUNCTIONS ============
@@ -8112,7 +8232,7 @@
         // Load inventory data
         async function loadInventory() {
             try {
-                const res = await fetch(`${API_URL}/api/admin/inventory`, {
+                const res = await fetch(`${API_URL}/api/admin/inventory?includeAll=true`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 if (!res.ok) {
