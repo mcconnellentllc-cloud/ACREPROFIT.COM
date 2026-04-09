@@ -1629,9 +1629,14 @@ const invoiceSchema = new mongoose.Schema({
         description: String,
         packSize: String,
         unit: String,
-        quantity: Number,
-        unitPrice: Number,
-        totalPrice: Number
+        unitsPerPack: Number,
+        quantity: Number,     // Total units (e.g., 265 gal)
+        packQuantity: Number, // Number of packs ordered (e.g., 1 tote)
+        unitPrice: Number,    // Sell price per unit (customer pays)
+        costPrice: Number,    // Cost price per unit (what we paid) - admin only
+        adminPrice: Number,   // Admin price per unit - admin only
+        totalPrice: Number,   // quantity * unitPrice
+        margin: Number        // (unitPrice - costPrice) * quantity - admin only
     }],
 
     // Totals
@@ -2260,6 +2265,12 @@ async function initializeAdmins() {
             password: 'Farm2026!',
             phone: '785-531-0680',
             role: 'distributor'
+        },
+        {
+            name: 'Tyson',
+            email: 'fyeagllc@gmail.com',
+            password: 'Farm2026!',
+            role: 'distributor'
         }
     ];
 
@@ -2269,6 +2280,11 @@ async function initializeAdmins() {
             if (!existing) {
                 await User.create(admin);
                 console.log(`Created admin: ${admin.name}`);
+            } else if (existing.role !== admin.role) {
+                // Ensure role is correct
+                existing.role = admin.role;
+                await existing.save();
+                console.log(`Updated role for: ${admin.name}`);
             }
         } catch (error) {
             console.log(`Admin ${admin.email} may already exist`);
@@ -3201,6 +3217,28 @@ app.post('/api/auth/reset-password', async (req, res) => {
     } catch (error) {
         console.error('Reset password error:', error);
         res.status(500).json({ error: 'Failed to reset password' });
+    }
+});
+
+// Admin: Reset any user's password (superadmin only)
+app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can reset passwords' });
+        }
+        const { newPassword } = req.body;
+        if (!newPassword || newPassword.length < 6) {
+            return res.status(400).json({ error: 'Password must be at least 6 characters' });
+        }
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        user.password = newPassword;
+        await user.save();
+        res.json({ message: `Password reset for ${user.email}` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
     }
 });
 
@@ -5300,26 +5338,44 @@ app.get('/api/chemicals', async (req, res) => {
         const chemicals = await Chemical.find(query)
             .sort({ productName: 1, packSize: 1 });
 
+        // Get inventory levels for all chemicals
+        const inventoryRecords = await Inventory.find({ location: 'main' }).lean();
+        const inventoryMap = {};
+        inventoryRecords.forEach(inv => {
+            const chemId = inv.chemicalId?.toString();
+            if (chemId) {
+                inventoryMap[chemId] = {
+                    quantityAvailable: inv.quantityAvailable || 0,
+                    quantityOnHand: inv.quantityOnHand || 0
+                };
+            }
+        });
+
         // For public view - ONLY show products with valid retail pricing
         // NEVER expose wholesale/cost pricing to public
         const publicChemicals = chemicals
             .filter(c => c.sellPrice > 0) // Only show products with retail price set
-            .map(c => ({
-                _id: c._id,
-                productName: c.productName,
-                category: c.category,
-                crops: c.crops,
-                packSize: c.packSize,
-                unit: c.unit,
-                unitsPerPack: c.unitsPerPack,
-                price: c.sellPrice, // Only the retail price
-                sellPrice: c.sellPrice,
-                defaultRate: c.defaultRate,
-                rateUnit: c.rateUnit,
-                notes: c.notes,
-                isActive: c.isActive,
-                availableForOrder: c.availableForOrder
-            }));
+            .map(c => {
+                const inv = inventoryMap[c._id.toString()] || {};
+                return {
+                    _id: c._id,
+                    productName: c.productName,
+                    category: c.category,
+                    crops: c.crops,
+                    packSize: c.packSize,
+                    unit: c.unit,
+                    unitsPerPack: c.unitsPerPack,
+                    price: c.sellPrice, // Only the retail price
+                    sellPrice: c.sellPrice,
+                    defaultRate: c.defaultRate,
+                    rateUnit: c.rateUnit,
+                    notes: c.notes,
+                    isActive: c.isActive,
+                    availableForOrder: c.availableForOrder,
+                    inStock: (inv.quantityAvailable || 0) > 0,
+                    quantityAvailable: inv.quantityAvailable || 0
+                };
+            });
 
         res.json(publicChemicals);
     } catch (error) {
@@ -10006,16 +10062,35 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
         let orderNumber = '';
 
         if (isChemicalOrder) {
-            // ChemicalOrder has items array
-            invoiceItems = order.items.map(item => ({
-                productName: item.productName,
-                description: `${item.packSize} ${item.unit}`,
-                packSize: item.packSize,
-                unit: item.unit,
-                quantity: item.quantity,
-                unitPrice: item.unitPrice,
-                totalPrice: item.totalPrice
-            }));
+            // ChemicalOrder has items array - enrich with cost/margin data from catalog
+            const chemicalIds = order.items.map(i => i.chemicalId).filter(Boolean);
+            const chemicalsMap = {};
+            if (chemicalIds.length > 0) {
+                const chems = await Chemical.find({ _id: { $in: chemicalIds } }).lean();
+                chems.forEach(c => { chemicalsMap[c._id.toString()] = c; });
+            }
+
+            invoiceItems = order.items.map(item => {
+                const chem = item.chemicalId ? chemicalsMap[item.chemicalId.toString()] : null;
+                const costPrice = chem?.costPrice || 0;
+                const adminPrice = chem?.adminPrice || 0;
+                const unitPrice = item.unitPrice || item.pricePerUnit || chem?.sellPrice || 0;
+                const qty = item.quantity || 0;
+                return {
+                    productName: item.productName,
+                    description: `${item.packSize || ''} ${item.unit || ''}`.trim(),
+                    packSize: item.packSize,
+                    unit: item.unit,
+                    unitsPerPack: chem?.unitsPerPack || 1,
+                    quantity: qty,
+                    packQuantity: item.packQuantity || (chem?.unitsPerPack ? Math.ceil(qty / chem.unitsPerPack) : qty),
+                    unitPrice,
+                    costPrice,
+                    adminPrice,
+                    totalPrice: qty * unitPrice,
+                    margin: (unitPrice - costPrice) * qty
+                };
+            });
             subtotal = order.subtotal;
             total = order.total;
             orderNumber = order.orderNumber;

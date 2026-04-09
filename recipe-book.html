@@ -1,0 +1,742 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Recipe Book - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        .recipe-page { padding: 2rem 0 4rem; min-height: 100vh; background: #f8f9fa; }
+        .page-header { text-align: center; margin-bottom: 2rem; }
+        .page-header h1 { font-size: 2.2rem; margin-bottom: 0.3rem; color: #1a1a2e; }
+        .page-header p { color: #666; font-size: 1rem; }
+
+        /* Tabs */
+        .tab-bar { display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 2rem; }
+        .tab-btn { padding: 0.75rem 1.5rem; border: none; background: none; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; color: #666; font-size: 0.95rem; }
+        .tab-btn.active { color: #2d5a27; border-bottom-color: #2d5a27; }
+        .tab-btn:hover { color: #2d5a27; }
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        /* Filters */
+        .filters { display: flex; gap: 0.75rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .filters select, .filters input { padding: 0.6rem 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 0.9rem; background: white; }
+        .filters input { flex: 1; min-width: 200px; }
+
+        /* Recipe Cards */
+        .recipe-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 1.5rem; }
+        .recipe-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); border: 1px solid #e5e7eb; transition: all 0.2s; cursor: pointer; }
+        .recipe-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.1); transform: translateY(-2px); }
+        .recipe-card-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 0.75rem; }
+        .recipe-card h3 { font-size: 1.1rem; margin: 0; color: #1a1a2e; }
+        .recipe-card-meta { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 0.75rem; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-crop { background: #d1fae5; color: #065f46; }
+        .badge-timing { background: #dbeafe; color: #1e40af; }
+        .recipe-desc { font-size: 0.88rem; color: #666; margin-bottom: 1rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .recipe-stats { display: flex; gap: 1.25rem; font-size: 0.82rem; color: #888; }
+        .recipe-stats span { display: flex; align-items: center; gap: 0.3rem; }
+        .stars { color: #f59e0b; letter-spacing: 1px; }
+        .ingredient-count { font-weight: 600; color: #2d5a27; }
+
+        /* Buttons */
+        .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-outline { background: white; color: #2d5a27; border: 2px solid #2d5a27; }
+        .btn-outline:hover { background: #f0f7ef; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+        .btn-lg { padding: 0.8rem 2rem; font-size: 1rem; }
+
+        /* Modals */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 12px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; border-bottom: 1px solid #eee; }
+        .modal-header h2 { margin: 0; }
+        .modal-body { padding: 1.5rem 2rem; }
+        .modal-footer { padding: 1rem 2rem; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; gap: 1rem; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        /* Detail View */
+        .detail-section { margin-bottom: 1.5rem; }
+        .detail-section h3 { font-size: 1rem; color: #666; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 0.5rem; }
+        .ingredients-table { width: 100%; border-collapse: collapse; }
+        .ingredients-table th { background: #f9fafb; padding: 0.6rem 0.75rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; color: #666; }
+        .ingredients-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f0f0f0; }
+        .ingredients-table .right { text-align: right; }
+
+        /* Create Form */
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; font-weight: 600; margin-bottom: 0.4rem; color: #333; font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
+        .form-group textarea { resize: vertical; min-height: 70px; }
+        .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+        .ingredient-row { display: grid; grid-template-columns: 2fr 80px 100px 40px; gap: 0.5rem; align-items: end; margin-bottom: 0.5rem; }
+        .ingredient-row select, .ingredient-row input { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.88rem; }
+        .remove-btn { padding: 0.5rem; background: #fee2e2; color: #991b1b; border: none; border-radius: 4px; cursor: pointer; font-weight: 700; }
+
+        /* Rating stars */
+        .rating-input { display: flex; gap: 0.25rem; }
+        .rating-star { font-size: 1.5rem; cursor: pointer; color: #d1d5db; transition: color 0.1s; }
+        .rating-star.active, .rating-star:hover { color: #f59e0b; }
+
+        /* Order from recipe */
+        .order-calc { background: #f0f7ef; border-radius: 8px; padding: 1.25rem; margin-top: 1rem; }
+        .order-calc h4 { margin: 0 0 0.75rem; color: #2d5a27; }
+        .order-result-table { width: 100%; border-collapse: collapse; margin-top: 0.75rem; }
+        .order-result-table th { background: #e8f5e4; padding: 0.5rem; text-align: left; font-size: 0.8rem; }
+        .order-result-table td { padding: 0.5rem; border-bottom: 1px solid #d1e7cc; font-size: 0.88rem; }
+        .order-result-table .right { text-align: right; }
+
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #888; }
+        .empty-state h3 { color: #666; margin-bottom: 0.5rem; }
+
+        .pagination { display: flex; justify-content: center; gap: 0.5rem; margin-top: 2rem; }
+        .pagination button { padding: 0.5rem 1rem; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; }
+        .pagination button.active { background: #2d5a27; color: white; border-color: #2d5a27; }
+        .pagination button:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        @media (max-width: 768px) {
+            .recipe-grid { grid-template-columns: 1fr; }
+            .form-row { grid-template-columns: 1fr; }
+            .ingredient-row { grid-template-columns: 1fr 60px 80px 32px; }
+            .filters { flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links" id="navLinks">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/recipe-book.html" class="nav-link active">Recipe Book</a>
+                <a href="/order.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="navUserName">User</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="recipe-page">
+        <div class="container">
+            <div class="page-header">
+                <h1>Recipe Book</h1>
+                <p>Community chemical mix recipes from farmers like you</p>
+            </div>
+
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                <div class="tab-bar" style="margin-bottom: 0; border-bottom: none;">
+                    <button class="tab-btn active" onclick="switchTab('browse')">Browse Recipes</button>
+                    <button class="tab-btn" onclick="switchTab('my')">My Recipes</button>
+                </div>
+                <button class="btn btn-primary" onclick="openCreateModal()">+ Share a Recipe</button>
+            </div>
+
+            <!-- Browse Tab -->
+            <div class="tab-content active" id="browseTab">
+                <div class="filters">
+                    <select id="filterCrop" onchange="loadRecipes()">
+                        <option value="">All Crops</option>
+                        <option value="corn">Corn</option>
+                        <option value="wheat">Wheat</option>
+                        <option value="soybeans">Soybeans</option>
+                        <option value="sorghum">Sorghum</option>
+                        <option value="sunflower">Sunflower</option>
+                        <option value="cotton">Cotton</option>
+                        <option value="fallow">Fallow/CRP</option>
+                    </select>
+                    <select id="filterTiming" onchange="loadRecipes()">
+                        <option value="">All Timings</option>
+                        <option value="burndown">Burndown</option>
+                        <option value="pre-emerge">Pre-Emerge</option>
+                        <option value="post-emerge">Post-Emerge</option>
+                        <option value="v4-v6">V4-V6</option>
+                        <option value="late-season">Late Season</option>
+                        <option value="harvest-aid">Harvest Aid</option>
+                    </select>
+                    <select id="filterSort" onchange="loadRecipes()">
+                        <option value="popular">Most Popular</option>
+                        <option value="rating">Highest Rated</option>
+                        <option value="newest">Newest</option>
+                    </select>
+                    <input type="text" id="filterSearch" placeholder="Search recipes..." onkeyup="if(event.key==='Enter')loadRecipes()">
+                </div>
+
+                <div id="recipesGrid" class="recipe-grid">
+                    <div class="empty-state"><p>Loading recipes...</p></div>
+                </div>
+
+                <div class="pagination" id="pagination"></div>
+            </div>
+
+            <!-- My Recipes Tab -->
+            <div class="tab-content" id="myTab">
+                <div id="myRecipesGrid" class="recipe-grid">
+                    <div class="empty-state"><h3>No recipes yet</h3><p>Share your first chemical mix recipe with the community!</p></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Recipe Detail Modal -->
+    <div class="modal" id="detailModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="detailName">Recipe</h2>
+                <button class="close-btn" onclick="closeDetail()">&times;</button>
+            </div>
+            <div class="modal-body" id="detailBody"></div>
+        </div>
+    </div>
+
+    <!-- Create/Edit Recipe Modal -->
+    <div class="modal" id="createModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="createTitle">Share a Recipe</h2>
+                <button class="close-btn" onclick="closeCreate()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <form id="recipeForm" onsubmit="saveRecipe(event)">
+                    <div class="form-group">
+                        <label>Recipe Name *</label>
+                        <input type="text" id="recipeName" required placeholder="e.g., My Burndown Cocktail">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Crop *</label>
+                            <select id="recipeCrop" required>
+                                <option value="">Select crop...</option>
+                                <option value="corn">Corn</option>
+                                <option value="wheat">Wheat</option>
+                                <option value="soybeans">Soybeans</option>
+                                <option value="sorghum">Sorghum</option>
+                                <option value="sunflower">Sunflower</option>
+                                <option value="cotton">Cotton</option>
+                                <option value="fallow">Fallow/CRP</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Timing *</label>
+                            <select id="recipeTiming" required>
+                                <option value="">Select timing...</option>
+                                <option value="burndown">Burndown</option>
+                                <option value="pre-emerge">Pre-Emerge</option>
+                                <option value="post-emerge">Post-Emerge</option>
+                                <option value="v4-v6">V4-V6</option>
+                                <option value="late-season">Late Season</option>
+                                <option value="harvest-aid">Harvest Aid</option>
+                                <option value="other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <textarea id="recipeDesc" placeholder="What does this mix do? When do you use it?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Gallons per Acre</label>
+                        <input type="number" id="recipeGPA" value="15" step="0.5" min="1">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Ingredients *</label>
+                        <div id="ingredientsContainer"></div>
+                        <button type="button" class="btn btn-outline btn-sm" onclick="addIngredientRow()" style="margin-top: 0.5rem;">+ Add Ingredient</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Tips / Notes</label>
+                        <textarea id="recipeTips" placeholder="Any tips for spraying this mix?"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label><input type="checkbox" id="recipeAnonymous" checked> Post anonymously</label>
+                    </div>
+
+                    <div style="display: flex; gap: 0.75rem; justify-content: flex-end; margin-top: 1rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeCreate()">Cancel</button>
+                        <button type="submit" class="btn btn-primary" name="submitAction" value="draft">Save Draft</button>
+                        <button type="submit" class="btn btn-primary" name="submitAction" value="published" style="background: #059669;">Publish</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('acreprofit_token');
+        const userStr = localStorage.getItem('acreprofit_user');
+        let user = null;
+        let chemicals = [];
+        let currentPage = 1;
+        let submitStatus = 'draft';
+
+        // Auth
+        function checkAuth() {
+            if (!token || !userStr) { window.location.href = '/login.html'; return; }
+            try {
+                user = JSON.parse(userStr);
+                document.getElementById('navUserName').textContent = user.name || user.email;
+            } catch (e) { window.location.href = '/login.html'; }
+        }
+
+        // Tab switching
+        function switchTab(tab) {
+            document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+            if (tab === 'my') {
+                document.querySelectorAll('.tab-btn')[1].classList.add('active');
+                document.getElementById('myTab').classList.add('active');
+                loadMyRecipes();
+            } else {
+                document.querySelectorAll('.tab-btn')[0].classList.add('active');
+                document.getElementById('browseTab').classList.add('active');
+            }
+        }
+
+        // Load recipes
+        async function loadRecipes(page = 1) {
+            currentPage = page;
+            const grid = document.getElementById('recipesGrid');
+            grid.innerHTML = '<div class="empty-state"><p>Loading recipes...</p></div>';
+
+            const crop = document.getElementById('filterCrop').value;
+            const timing = document.getElementById('filterTiming').value;
+            const sort = document.getElementById('filterSort').value;
+            const search = document.getElementById('filterSearch').value;
+
+            const params = new URLSearchParams({ page, limit: 20, sort });
+            if (crop) params.set('crop', crop);
+            if (timing) params.set('timing', timing);
+            if (search) params.set('search', search);
+
+            try {
+                const res = await fetch(`${API_URL}/api/mixes?${params}`);
+                const data = await res.json();
+                const mixes = data.mixes || [];
+
+                if (mixes.length === 0) {
+                    grid.innerHTML = '<div class="empty-state"><h3>No recipes found</h3><p>Be the first to share a recipe! Click "+ Share a Recipe" above.</p></div>';
+                    document.getElementById('pagination').innerHTML = '';
+                    return;
+                }
+
+                grid.innerHTML = mixes.map(m => renderRecipeCard(m)).join('');
+                renderPagination(data.pagination);
+            } catch (error) {
+                console.error('Error loading recipes:', error);
+                grid.innerHTML = '<div class="empty-state"><p>Error loading recipes. Please try again.</p></div>';
+            }
+        }
+
+        async function loadMyRecipes() {
+            const grid = document.getElementById('myRecipesGrid');
+            grid.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+
+            try {
+                const res = await fetch(`${API_URL}/api/my-mixes`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const mixes = await res.json();
+
+                if (mixes.length === 0) {
+                    grid.innerHTML = '<div class="empty-state"><h3>No recipes yet</h3><p>Share your first chemical mix recipe!</p></div>';
+                    return;
+                }
+
+                grid.innerHTML = mixes.map(m => renderRecipeCard(m, true)).join('');
+            } catch (error) {
+                grid.innerHTML = '<div class="empty-state"><p>Error loading your recipes.</p></div>';
+            }
+        }
+
+        function renderRecipeCard(mix, showStatus = false) {
+            const stars = renderStars(mix.averageRating || 0);
+            const timingLabel = (mix.timing || '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+            const cropLabel = (mix.crop || '').replace(/\b\w/g, c => c.toUpperCase());
+            const creator = mix.isAnonymous ? 'Anonymous Farmer' : (mix.createdBy?.name || 'Anonymous Farmer');
+            const statusBadge = showStatus && mix.status !== 'published'
+                ? `<span class="badge" style="background:#fef3c7;color:#92400e;">${mix.status}</span>` : '';
+
+            return `
+                <div class="recipe-card" onclick="openDetail('${mix._id || mix.slug}')">
+                    <div class="recipe-card-header">
+                        <h3>${mix.name}</h3>
+                        ${statusBadge}
+                    </div>
+                    <div class="recipe-card-meta">
+                        <span class="badge badge-crop">${cropLabel}</span>
+                        <span class="badge badge-timing">${timingLabel}</span>
+                    </div>
+                    <div class="recipe-desc">${mix.description || 'No description provided.'}</div>
+                    <div class="recipe-stats">
+                        <span class="stars">${stars}</span>
+                        <span>(${mix.totalRatings || 0})</span>
+                        <span class="ingredient-count">${(mix.ingredients || []).length} ingredients</span>
+                        <span>by ${creator}</span>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderStars(rating) {
+            let s = '';
+            for (let i = 1; i <= 5; i++) {
+                s += i <= Math.round(rating) ? '\u2605' : '\u2606';
+            }
+            return s;
+        }
+
+        function renderPagination(pagination) {
+            if (!pagination || pagination.pages <= 1) {
+                document.getElementById('pagination').innerHTML = '';
+                return;
+            }
+            let html = '';
+            html += `<button ${pagination.page <= 1 ? 'disabled' : ''} onclick="loadRecipes(${pagination.page - 1})">Prev</button>`;
+            for (let i = 1; i <= pagination.pages; i++) {
+                html += `<button class="${i === pagination.page ? 'active' : ''}" onclick="loadRecipes(${i})">${i}</button>`;
+            }
+            html += `<button ${pagination.page >= pagination.pages ? 'disabled' : ''} onclick="loadRecipes(${pagination.page + 1})">Next</button>`;
+            document.getElementById('pagination').innerHTML = html;
+        }
+
+        // Detail View
+        async function openDetail(identifier) {
+            try {
+                const res = await fetch(`${API_URL}/api/mixes/${identifier}`);
+                const mix = await res.json();
+                if (mix.error) throw new Error(mix.error);
+
+                document.getElementById('detailName').textContent = mix.name;
+
+                const timingLabel = (mix.timing || '').replace(/-/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+                const cropLabel = (mix.crop || '').replace(/\b\w/g, c => c.toUpperCase());
+                const creator = mix.isAnonymous ? 'Anonymous Farmer' : (mix.createdBy?.name || 'Anonymous Farmer');
+
+                let html = `
+                    <div class="recipe-card-meta" style="margin-bottom: 1rem;">
+                        <span class="badge badge-crop">${cropLabel}</span>
+                        <span class="badge badge-timing">${timingLabel}</span>
+                        <span style="color:#888; font-size:0.85rem;">by ${creator}</span>
+                        <span style="color:#888; font-size:0.85rem;">${mix.totalViews || 0} views</span>
+                    </div>
+                `;
+
+                if (mix.description) {
+                    html += `<div class="detail-section"><h3>Description</h3><p>${mix.description}</p></div>`;
+                }
+
+                // Ingredients table
+                html += `<div class="detail-section"><h3>Ingredients</h3>
+                    <table class="ingredients-table">
+                        <thead><tr><th>Product</th><th>Category</th><th class="right">Rate</th><th>Unit</th></tr></thead>
+                        <tbody>`;
+
+                (mix.ingredients || []).forEach(ing => {
+                    const chemName = ing.chemicalId?.productName || ing.productName || 'Unknown';
+                    const cat = ing.chemicalId?.category || ing.category || '';
+                    html += `<tr><td><strong>${chemName}</strong></td><td><span class="badge badge-crop">${cat}</span></td><td class="right">${ing.rate}</td><td>${ing.rateUnit}</td></tr>`;
+                });
+
+                html += `</tbody></table>
+                    <p style="margin-top:0.5rem; color:#666; font-size:0.85rem;">Water volume: ${mix.gallonsPerAcre || 15} gal/acre</p>
+                </div>`;
+
+                if (mix.tips) {
+                    html += `<div class="detail-section"><h3>Tips</h3><p>${mix.tips}</p></div>`;
+                }
+
+                // Yield data
+                if (mix.yieldData && mix.yieldData.length > 0) {
+                    html += `<div class="detail-section"><h3>Yield Results</h3>`;
+                    mix.yieldData.forEach(yd => {
+                        html += `<p>${yd.year} - ${yd.crop}: <strong>${yd.yieldPerAcre} ${yd.yieldUnit || 'bu'}/acre</strong> on ${yd.acres} acres${yd.location ? ' (' + yd.location + ')' : ''}</p>`;
+                    });
+                    html += `</div>`;
+                }
+
+                // Order calculator
+                html += `
+                    <div class="order-calc">
+                        <h4>Order Ingredients for This Recipe</h4>
+                        <div style="display: flex; gap: 0.75rem; align-items: end; flex-wrap: wrap;">
+                            <div>
+                                <label style="font-size:0.82rem; color:#666;">How many acres?</label>
+                                <input type="number" id="orderAcres" min="1" value="160" style="padding:0.5rem; border:1px solid #ccc; border-radius:6px; width:120px;">
+                            </div>
+                            <button type="button" class="btn btn-primary" onclick="calculateOrder('${mix._id}')">Calculate Order</button>
+                        </div>
+                        <div id="orderResult"></div>
+                    </div>
+                `;
+
+                // Rating section
+                const stars = renderStars(mix.averageRating || 0);
+                html += `
+                    <div class="detail-section" style="margin-top: 1.5rem;">
+                        <h3>Ratings <span style="font-weight:400; color:#888;">${stars} (${mix.totalRatings || 0} ratings)</span></h3>
+                        <div style="display: flex; align-items: center; gap: 0.75rem; margin-top: 0.75rem;">
+                            <span style="font-size:0.9rem;">Your rating:</span>
+                            <div class="rating-input" id="ratingInput">
+                                ${[1,2,3,4,5].map(i => `<span class="rating-star" data-value="${i}" onclick="setRating(${i})">\u2606</span>`).join('')}
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="submitRating('${mix._id}')">Submit</button>
+                        </div>
+                    </div>
+                `;
+
+                document.getElementById('detailBody').innerHTML = html;
+                document.getElementById('detailModal').classList.add('active');
+            } catch (error) {
+                console.error('Error loading recipe detail:', error);
+                alert('Error loading recipe details.');
+            }
+        }
+
+        function closeDetail() {
+            document.getElementById('detailModal').classList.remove('active');
+        }
+
+        let selectedRating = 0;
+        function setRating(value) {
+            selectedRating = value;
+            document.querySelectorAll('#ratingInput .rating-star').forEach((star, idx) => {
+                star.textContent = idx < value ? '\u2605' : '\u2606';
+                star.classList.toggle('active', idx < value);
+            });
+        }
+
+        async function submitRating(mixId) {
+            if (!selectedRating) { alert('Please select a rating.'); return; }
+            try {
+                const res = await fetch(`${API_URL}/api/mixes/${mixId}/ratings`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ rating: selectedRating })
+                });
+                if (res.ok) {
+                    alert('Rating submitted!');
+                    selectedRating = 0;
+                    loadRecipes(currentPage);
+                } else {
+                    const err = await res.json();
+                    alert(err.error || 'Failed to submit rating.');
+                }
+            } catch (error) {
+                alert('Error submitting rating.');
+            }
+        }
+
+        // Order calculator
+        async function calculateOrder(mixId) {
+            const acres = parseInt(document.getElementById('orderAcres').value) || 0;
+            if (acres <= 0) { alert('Enter a valid number of acres.'); return; }
+
+            const resultDiv = document.getElementById('orderResult');
+            resultDiv.innerHTML = '<p style="color:#666;">Calculating...</p>';
+
+            try {
+                const res = await fetch(`${API_URL}/api/mixes/${mixId}/order`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ acres })
+                });
+
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                let html = `
+                    <table class="order-result-table">
+                        <thead><tr><th>Product</th><th>Pack Size</th><th class="right">Packs Needed</th><th class="right">Total Volume</th><th class="right">Price/Unit</th><th class="right">Line Total</th></tr></thead>
+                        <tbody>`;
+
+                let total = 0;
+                (data.items || []).forEach(item => {
+                    const totalVol = item.packagesNeeded * (item.unitsPerPack || 1);
+                    total += item.lineTotal || 0;
+                    html += `
+                        <tr>
+                            <td><strong>${item.productName}</strong></td>
+                            <td>${item.packSize || ''}</td>
+                            <td class="right"><strong>${item.packagesNeeded}</strong></td>
+                            <td class="right"><strong>${totalVol.toLocaleString()} ${item.unit || ''}</strong></td>
+                            <td class="right">$${(item.pricePerPackage || 0).toFixed(2)}/${item.unit || 'unit'}</td>
+                            <td class="right"><strong>$${(item.lineTotal || 0).toFixed(2)}</strong></td>
+                        </tr>`;
+                });
+
+                html += `</tbody></table>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:1rem;">
+                        <strong style="font-size:1.1rem;">Total: $${total.toFixed(2)} for ${acres} acres</strong>
+                        <a href="/products.html" class="btn btn-primary btn-sm">Go to Products to Order</a>
+                    </div>`;
+
+                resultDiv.innerHTML = html;
+            } catch (error) {
+                resultDiv.innerHTML = `<p style="color:#dc3545;">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Create Recipe
+        async function loadChemicals() {
+            if (chemicals.length > 0) return;
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals`);
+                chemicals = await res.json();
+            } catch (e) {
+                console.warn('Could not load chemicals:', e);
+            }
+        }
+
+        async function openCreateModal() {
+            await loadChemicals();
+            document.getElementById('recipeForm').reset();
+            document.getElementById('ingredientsContainer').innerHTML = '';
+            document.getElementById('recipeAnonymous').checked = true;
+            addIngredientRow();
+            addIngredientRow();
+            document.getElementById('createTitle').textContent = 'Share a Recipe';
+            document.getElementById('createModal').classList.add('active');
+        }
+
+        function closeCreate() {
+            document.getElementById('createModal').classList.remove('active');
+        }
+
+        let ingredientCount = 0;
+        function addIngredientRow() {
+            const container = document.getElementById('ingredientsContainer');
+            const rowId = ingredientCount++;
+
+            const options = chemicals.map(c =>
+                `<option value="${c._id}">${c.productName} (${c.packSize || c.unit || ''})</option>`
+            ).join('');
+
+            const row = document.createElement('div');
+            row.className = 'ingredient-row';
+            row.id = `ing-${rowId}`;
+            row.innerHTML = `
+                <select class="ing-chemical"><option value="">Select product...</option>${options}</select>
+                <input type="number" class="ing-rate" placeholder="Rate" step="0.1" min="0">
+                <select class="ing-unit">
+                    <option value="oz/acre">oz/acre</option>
+                    <option value="pt/acre">pt/acre</option>
+                    <option value="qt/acre">qt/acre</option>
+                    <option value="gal/acre">gal/acre</option>
+                    <option value="lb/acre">lb/acre</option>
+                    <option value="% v/v">% v/v</option>
+                </select>
+                <button type="button" class="remove-btn" onclick="document.getElementById('ing-${rowId}').remove()">X</button>
+            `;
+            container.appendChild(row);
+        }
+
+        // Handle publish vs draft
+        document.querySelectorAll('button[name="submitAction"]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                submitStatus = this.value;
+            });
+        });
+
+        async function saveRecipe(e) {
+            e.preventDefault();
+
+            const name = document.getElementById('recipeName').value.trim();
+            const crop = document.getElementById('recipeCrop').value;
+            const timing = document.getElementById('recipeTiming').value;
+
+            if (!name || !crop || !timing) {
+                alert('Please fill in name, crop, and timing.');
+                return;
+            }
+
+            // Gather ingredients
+            const rows = document.querySelectorAll('.ingredient-row');
+            const ingredients = [];
+            rows.forEach(row => {
+                const chemId = row.querySelector('.ing-chemical')?.value;
+                const rate = parseFloat(row.querySelector('.ing-rate')?.value);
+                const rateUnit = row.querySelector('.ing-unit')?.value;
+                if (chemId && rate > 0) {
+                    ingredients.push({ chemicalId: chemId, rate, rateUnit });
+                }
+            });
+
+            if (ingredients.length === 0) {
+                alert('Please add at least one ingredient with a rate.');
+                return;
+            }
+
+            const data = {
+                name,
+                crop,
+                timing,
+                description: document.getElementById('recipeDesc').value.trim(),
+                gallonsPerAcre: parseFloat(document.getElementById('recipeGPA').value) || 15,
+                ingredients,
+                tips: document.getElementById('recipeTips').value.trim(),
+                isAnonymous: document.getElementById('recipeAnonymous').checked,
+                status: submitStatus || 'draft'
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/api/mixes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to save recipe');
+                }
+
+                closeCreate();
+                alert(submitStatus === 'published' ? 'Recipe published!' : 'Recipe saved as draft!');
+                loadRecipes();
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Close modals on outside click
+        document.getElementById('detailModal').addEventListener('click', e => { if (e.target.id === 'detailModal') closeDetail(); });
+        document.getElementById('createModal').addEventListener('click', e => { if (e.target.id === 'createModal') closeCreate(); });
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+
+        // Mobile menu
+        document.getElementById('mobileMenuBtn').addEventListener('click', () => {
+            document.getElementById('navLinks').classList.toggle('active');
+        });
+
+        // Init
+        checkAuth();
+        loadRecipes();
+    </script>
+</body>
+</html>

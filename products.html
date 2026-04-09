@@ -4,250 +4,101 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="description" content="Acre Profit - Available Products & Pricing">
-    <title>Products - Acre Profit</title>
+    <title>Products & Pricing - Acre Profit</title>
     <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
     <link rel="stylesheet" href="styles.css">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <style>
-        .products-page {
-            padding: 2rem 0 4rem;
-        }
+        .products-page { padding: 2rem 0 4rem; }
+        .products-header { text-align: center; margin-bottom: 2rem; }
+        .products-header h1 { font-size: 2.5rem; margin-bottom: 0.5rem; }
+        .products-header p { color: #666; font-size: 1.1rem; }
 
-        .products-header {
-            text-align: center;
-            margin-bottom: 3rem;
-        }
+        .search-filter { display: flex; gap: 1rem; margin-bottom: 2rem; flex-wrap: wrap; align-items: center; }
+        .search-input { flex: 1; min-width: 250px; padding: 0.75rem 1rem; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; }
+        .search-input:focus { outline: none; border-color: #2d5a27; box-shadow: 0 0 0 3px rgba(45,90,39,0.1); }
+        .filter-buttons { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .filter-btn { padding: 0.6rem 1.1rem; border: 1px solid #ddd; background: white; border-radius: 8px; cursor: pointer; font-weight: 500; transition: all 0.2s; }
+        .filter-btn:hover { border-color: #2d5a27; }
+        .filter-btn.active { background: #2d5a27; color: white; border-color: #2d5a27; }
 
-        .products-header h1 {
-            font-size: 2.5rem;
-            margin-bottom: 0.5rem;
-        }
+        /* Product Table */
+        .products-table-wrap { background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.08); overflow-x: auto; }
+        .products-table { width: 100%; border-collapse: collapse; }
+        .products-table th { background: #1a1a2e; color: white; padding: 0.9rem 1rem; text-align: left; font-weight: 600; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.03em; position: sticky; top: 0; white-space: nowrap; }
+        .products-table td { padding: 0.85rem 1rem; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        .products-table tbody tr:hover { background: #f8faf8; }
+        .products-table th.right, .products-table td.right { text-align: right; }
+        .products-table th.center, .products-table td.center { text-align: center; }
 
-        .products-header p {
-            color: #666;
-            font-size: 1.1rem;
-        }
+        .product-name-cell { font-weight: 600; color: #1a1a2e; }
+        .product-name-cell small { display: block; font-weight: 400; color: #888; font-size: 0.82rem; margin-top: 2px; }
+        .cat-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .cat-herbicide { background: #dbeafe; color: #1e40af; }
+        .cat-adjuvant { background: #d1fae5; color: #065f46; }
+        .cat-fertilizer { background: #fef3c7; color: #92400e; }
+        .cat-insecticide { background: #fce7f3; color: #9d174d; }
+        .cat-fungicide { background: #ede9fe; color: #5b21b6; }
+        .cat-other { background: #f3f4f6; color: #374151; }
 
-        .category-section {
-            margin-bottom: 3rem;
-        }
+        .price-big { font-size: 1.15rem; font-weight: 700; color: #2d5a27; }
+        .price-unit { color: #888; font-size: 0.82rem; }
 
-        .category-header {
-            display: flex;
-            align-items: center;
-            gap: 1rem;
-            margin-bottom: 1.5rem;
-            padding-bottom: 0.75rem;
-            border-bottom: 2px solid #e5e7eb;
-        }
+        .stock-badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .stock-in { background: #d1fae5; color: #065f46; }
+        .stock-low { background: #fef3c7; color: #92400e; }
+        .stock-out { background: #fee2e2; color: #991b1b; }
 
-        .category-header h2 {
-            font-size: 1.5rem;
-            color: #1a1a2e;
-        }
+        .rup-badge { display: inline-block; background: #dc3545; color: white; padding: 0.1rem 0.4rem; border-radius: 3px; font-size: 0.68rem; font-weight: 700; margin-left: 0.4rem; vertical-align: middle; }
 
-        .category-badge {
-            background: #2d5a27;
-            color: white;
-            padding: 0.25rem 0.75rem;
-            border-radius: 20px;
-            font-size: 0.85rem;
-            font-weight: 600;
-        }
+        /* Qty Input in Table */
+        .qty-input { width: 60px; padding: 0.4rem; border: 2px solid #ddd; border-radius: 6px; text-align: center; font-size: 0.95rem; font-weight: 600; }
+        .qty-input:focus { border-color: #2d5a27; outline: none; }
+        .total-uom { font-weight: 600; color: #2d5a27; white-space: nowrap; }
+        .line-total { font-weight: 700; color: #1a1a2e; white-space: nowrap; }
 
-        .products-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
-            gap: 1.5rem;
-        }
+        /* Cart / Order Review */
+        .cart-bar { position: sticky; bottom: 0; background: white; border-top: 2px solid #2d5a27; padding: 1rem 0; z-index: 100; box-shadow: 0 -4px 16px rgba(0,0,0,0.1); display: none; }
+        .cart-bar .container { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .cart-summary { font-size: 1rem; }
+        .cart-summary strong { color: #2d5a27; font-size: 1.2rem; }
+        .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.95rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-outline { background: white; color: #2d5a27; border: 2px solid #2d5a27; }
+        .btn-outline:hover { background: #f0f7ef; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
 
-        .product-card {
-            background: white;
-            border-radius: 12px;
-            padding: 1.5rem;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-            border: 1px solid #e5e7eb;
-            transition: all 0.2s;
-        }
+        /* Order Review Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; border-radius: 12px; max-width: 900px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; padding: 1.5rem 2rem; border-bottom: 1px solid #eee; }
+        .modal-header h2 { margin: 0; }
+        .modal-body { padding: 1.5rem 2rem; }
+        .modal-footer { padding: 1rem 2rem; border-top: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; padding: 0; }
 
-        .product-card:hover {
-            box-shadow: 0 4px 16px rgba(0,0,0,0.12);
-            transform: translateY(-2px);
-        }
+        .review-table { width: 100%; border-collapse: collapse; }
+        .review-table th { background: #f9fafb; padding: 0.75rem; text-align: left; font-size: 0.8rem; text-transform: uppercase; color: #666; border-bottom: 2px solid #e5e7eb; }
+        .review-table td { padding: 0.75rem; border-bottom: 1px solid #f0f0f0; }
+        .review-table .right { text-align: right; }
+        .review-total-row td { font-weight: 700; font-size: 1.1rem; border-top: 2px solid #1a1a2e; }
 
-        .product-name {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: #1a1a2e;
-            margin-bottom: 0.5rem;
-        }
+        .info-banner { background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem 1.25rem; margin-bottom: 1.5rem; display: flex; align-items: center; gap: 0.75rem; color: #1e40af; font-size: 0.9rem; }
+        .info-banner svg { flex-shrink: 0; }
 
-        .product-notes {
-            font-size: 0.9rem;
-            color: #666;
-            margin-bottom: 1rem;
-            min-height: 40px;
-        }
-
-        .product-details {
-            display: flex;
-            justify-content: space-between;
-            align-items: flex-end;
-            margin-top: auto;
-        }
-
-        .product-package {
-            font-size: 0.85rem;
-            color: #888;
-        }
-
-        .product-price {
-            text-align: right;
-        }
-
-        .price-amount {
-            font-size: 1.5rem;
-            font-weight: 800;
-            color: #2d5a27;
-        }
-
-        .price-unit {
-            font-size: 0.85rem;
-            color: #666;
-        }
-
-        .rup-badge {
-            display: inline-block;
-            background: #dc3545;
-            color: white;
-            padding: 0.15rem 0.5rem;
-            border-radius: 4px;
-            font-size: 0.7rem;
-            font-weight: 700;
-            margin-left: 0.5rem;
-            vertical-align: middle;
-        }
-
-        .hydrovant-pricing {
-            background: #f8f9fa;
-            border-radius: 8px;
-            padding: 1rem;
-            margin-top: 1rem;
-        }
-
-        .hydrovant-pricing h4 {
-            font-size: 0.85rem;
-            color: #666;
-            margin-bottom: 0.5rem;
-        }
-
-        .tier-list {
-            display: flex;
-            flex-direction: column;
-            gap: 0.25rem;
-        }
-
-        .tier-item {
-            display: flex;
-            justify-content: space-between;
-            font-size: 0.9rem;
-        }
-
-        .tier-qty {
-            color: #666;
-        }
-
-        .tier-price {
-            font-weight: 600;
-            color: #2d5a27;
-        }
-
-        .search-filter {
-            display: flex;
-            gap: 1rem;
-            margin-bottom: 2rem;
-            flex-wrap: wrap;
-        }
-
-        .search-input {
-            flex: 1;
-            min-width: 250px;
-            padding: 0.75rem 1rem;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 1rem;
-        }
-
-        .search-input:focus {
-            outline: none;
-            border-color: #2d5a27;
-            box-shadow: 0 0 0 3px rgba(45, 90, 39, 0.1);
-        }
-
-        .filter-buttons {
-            display: flex;
-            gap: 0.5rem;
-        }
-
-        .filter-btn {
-            padding: 0.75rem 1.25rem;
-            border: 1px solid #ddd;
-            background: white;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 500;
-            transition: all 0.2s;
-        }
-
-        .filter-btn:hover {
-            border-color: #2d5a27;
-        }
-
-        .filter-btn.active {
-            background: #2d5a27;
-            color: white;
-            border-color: #2d5a27;
-        }
-
-        .availability-note {
-            background: #fff3cd;
-            border: 1px solid #ffc107;
-            border-radius: 8px;
-            padding: 1rem 1.5rem;
-            margin-bottom: 2rem;
-            display: flex;
-            align-items: center;
-            gap: 0.75rem;
-        }
-
-        .availability-note svg {
-            flex-shrink: 0;
-            color: #856404;
-        }
-
-        .availability-note p {
-            color: #856404;
-            margin: 0;
-        }
+        .empty-state { text-align: center; padding: 4rem 2rem; color: #666; }
+        .empty-state h3 { margin-bottom: 0.5rem; color: #333; }
 
         @media (max-width: 768px) {
-            .products-header h1 {
-                font-size: 2rem;
-            }
-
-            .products-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .search-filter {
-                flex-direction: column;
-            }
-
-            .filter-buttons {
-                flex-wrap: wrap;
-            }
+            .products-header h1 { font-size: 1.75rem; }
+            .search-filter { flex-direction: column; }
+            .filter-buttons { overflow-x: auto; }
+            .qty-input { width: 50px; }
         }
     </style>
 </head>
@@ -294,51 +145,104 @@
     <main class="products-page">
         <div class="container">
             <div class="products-header">
-                <h1>Product Availability</h1>
-                <p>Quality ag inputs at competitive buying group prices</p>
+                <h1>Products & Pricing</h1>
+                <p>Quality ag inputs at competitive buying group prices. Add products to your order below.</p>
             </div>
 
-            <div class="availability-note">
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg>
-                <p>Prices shown are retail member prices. Contact us for volume discounts on large orders.</p>
+            <div class="info-banner">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>
+                <span>Enter a quantity for any product and click <strong>Review Order</strong> at the bottom. You can edit everything before submitting.</span>
             </div>
 
             <div class="search-filter">
-                <input type="text" class="search-input" id="searchInput" placeholder="Search products...">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search products by name...">
                 <div class="filter-buttons">
                     <button class="filter-btn active" data-filter="all">All</button>
                     <button class="filter-btn" data-filter="herbicide">Herbicides</button>
                     <button class="filter-btn" data-filter="adjuvant">Adjuvants</button>
                     <button class="filter-btn" data-filter="fertilizer">Fertilizers</button>
+                    <button class="filter-btn" data-filter="insecticide">Insecticides</button>
+                    <button class="filter-btn" data-filter="fungicide">Fungicides</button>
                 </div>
             </div>
 
             <div id="productsContainer">
-                <!-- Products loaded dynamically -->
+                <div class="empty-state"><p>Loading products...</p></div>
             </div>
         </div>
     </main>
+
+    <!-- Sticky Cart Bar -->
+    <div class="cart-bar" id="cartBar">
+        <div class="container">
+            <div class="cart-summary">
+                <span id="cartItemCount">0</span> products selected &mdash; <strong id="cartTotal">$0.00</strong>
+            </div>
+            <div style="display: flex; gap: 0.5rem;">
+                <button class="btn btn-outline" onclick="clearCart()">Clear All</button>
+                <button class="btn btn-primary" onclick="openOrderReview()">Review Order</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Order Review Modal -->
+    <div class="modal" id="orderReviewModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Review Your Order</h2>
+                <button class="close-btn" onclick="closeOrderReview()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p style="margin-bottom: 1rem; color: #666;">Review and adjust quantities before submitting. Changes are saved automatically.</p>
+                <div class="review-table-wrap" style="overflow-x: auto;">
+                    <table class="review-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th>Pack Size</th>
+                                <th class="right">Packs</th>
+                                <th class="right">Total Volume</th>
+                                <th class="right">Price/Unit</th>
+                                <th class="right">Line Total</th>
+                                <th></th>
+                            </tr>
+                        </thead>
+                        <tbody id="reviewTableBody"></tbody>
+                    </table>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <div>
+                    <span style="font-size: 1.1rem;">Order Total: </span>
+                    <strong style="font-size: 1.3rem; color: #2d5a27;" id="reviewTotal">$0.00</strong>
+                </div>
+                <div style="display: flex; gap: 0.5rem;">
+                    <button class="btn btn-outline" onclick="closeOrderReview()">Keep Shopping</button>
+                    <button class="btn btn-primary" onclick="submitOrder()">Submit Order</button>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <script>
         const API_URL = window.location.hostname === 'localhost'
             ? 'http://localhost:3000'
             : 'https://acreprofit-com.onrender.com';
 
-        // Products loaded from API
         let products = [];
         let currentFilter = 'all';
         let searchTerm = '';
+        let token = localStorage.getItem('acreprofit_token');
 
         // Load products from API
         async function loadProducts() {
             const container = document.getElementById('productsContainer');
-            container.innerHTML = '<p style="text-align: center; padding: 3rem; color: #666;">Loading products...</p>';
+            container.innerHTML = '<div class="empty-state"><p>Loading products...</p></div>';
 
             try {
-                const token = localStorage.getItem('token');
                 let response;
 
-                // Use authenticated endpoint with distributor pricing if logged in
+                // Use authenticated endpoint if logged in
                 if (token) {
                     response = await fetch(`${API_URL}/api/chemicals/for-customer`, {
                         headers: { 'Authorization': `Bearer ${token}` }
@@ -353,131 +257,304 @@
                 if (!response.ok) throw new Error('Failed to load products');
 
                 const data = await response.json();
-                // Transform API data to display format (hide cost, show only retail)
                 products = data.map(p => ({
                     id: p._id,
                     name: p.productName,
-                    category: p.category,
-                    package: p.packSize,
-                    unit: p.unit,
-                    retailPrice: p.sellPrice || p.price || 0,
+                    category: p.category || 'other',
+                    packSize: p.packSize || '',
+                    unit: p.unit || '',
+                    unitsPerPack: p.unitsPerPack || 1,
+                    price: p.sellPrice || p.price || 0,
+                    defaultRate: p.defaultRate,
+                    rateUnit: p.rateUnit,
                     notes: p.notes || '',
-                    rup: p.isRestrictedUse
+                    rup: p.isRestrictedUse,
+                    inStock: p.inStock !== false,
+                    quantityAvailable: p.quantityAvailable || 0,
+                    qty: 0 // User-entered quantity
                 }));
 
                 renderProducts();
             } catch (error) {
                 console.error('Error loading products:', error);
-                container.innerHTML = '<p style="text-align: center; padding: 3rem; color: #dc3545;">Unable to load products. Please try again later.</p>';
+                container.innerHTML = '<div class="empty-state"><h3>Unable to load products</h3><p>Please try again later.</p></div>';
             }
         }
 
         function renderProducts() {
             const container = document.getElementById('productsContainer');
 
-            if (products.length === 0) {
-                container.innerHTML = '<p style="text-align: center; padding: 3rem; color: #666;">No products available yet.</p>';
-                return;
-            }
-
-            // Filter products
             let filtered = products.filter(p => {
                 const matchesFilter = currentFilter === 'all' || p.category === currentFilter;
-                const matchesSearch = (p.name || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                     (p.notes || '').toLowerCase().includes(searchTerm.toLowerCase());
+                const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                                     p.notes.toLowerCase().includes(searchTerm.toLowerCase());
                 return matchesFilter && matchesSearch;
             });
 
+            if (filtered.length === 0) {
+                container.innerHTML = '<div class="empty-state"><h3>No products found</h3><p>Try adjusting your search or filters.</p></div>';
+                return;
+            }
+
             // Group by category
-            const categories = {
-                herbicide: { name: 'Herbicides', products: [] },
-                adjuvant: { name: 'Adjuvants', products: [] },
-                fertilizer: { name: 'Fertilizers', products: [] }
+            const categoryOrder = ['herbicide', 'adjuvant', 'fertilizer', 'insecticide', 'fungicide', 'other'];
+            const categoryNames = {
+                herbicide: 'Herbicides', adjuvant: 'Adjuvants', fertilizer: 'Fertilizers',
+                insecticide: 'Insecticides', fungicide: 'Fungicides', other: 'Other Products'
             };
 
+            const grouped = {};
             filtered.forEach(p => {
-                if (categories[p.category]) {
-                    categories[p.category].products.push(p);
-                }
+                const cat = categoryOrder.includes(p.category) ? p.category : 'other';
+                if (!grouped[cat]) grouped[cat] = [];
+                grouped[cat].push(p);
             });
 
             let html = '';
 
-            for (const [key, cat] of Object.entries(categories)) {
-                if (cat.products.length === 0) continue;
+            for (const cat of categoryOrder) {
+                if (!grouped[cat] || grouped[cat].length === 0) continue;
 
                 html += `
-                    <div class="category-section">
-                        <div class="category-header">
-                            <h2>${cat.name}</h2>
-                            <span class="category-badge">${cat.products.length} products</span>
-                        </div>
-                        <div class="products-grid">
-                            ${cat.products.map(p => renderProductCard(p)).join('')}
-                        </div>
+                <div style="margin-bottom: 2.5rem;">
+                    <div style="display: flex; align-items: center; gap: 0.75rem; margin-bottom: 1rem;">
+                        <h2 style="margin: 0; font-size: 1.3rem;">${categoryNames[cat]}</h2>
+                        <span class="cat-badge cat-${cat}">${grouped[cat].length} products</span>
                     </div>
-                `;
-            }
+                    <div class="products-table-wrap">
+                        <table class="products-table">
+                            <thead>
+                                <tr>
+                                    <th>Product</th>
+                                    <th>Pack Size</th>
+                                    <th class="right">Price</th>
+                                    <th class="center">Availability</th>
+                                    <th class="center">Qty (Packs)</th>
+                                    <th class="right">Total Volume</th>
+                                    <th class="right">Line Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>`;
 
-            if (html === '') {
-                html = '<p style="text-align: center; color: #666; padding: 3rem;">No products found matching your search.</p>';
+                for (const p of grouped[cat]) {
+                    const totalVol = p.qty > 0 ? (p.qty * p.unitsPerPack) : 0;
+                    const lineTotal = p.qty > 0 ? (p.qty * p.unitsPerPack * p.price) : 0;
+                    const stockClass = p.quantityAvailable > 20 ? 'stock-in' :
+                                       p.quantityAvailable > 0 ? 'stock-low' : 'stock-out';
+                    const stockText = p.quantityAvailable > 20 ? 'In Stock' :
+                                      p.quantityAvailable > 0 ? `${p.quantityAvailable} ${p.unit} left` : 'Call for Availability';
+                    const rupBadge = p.rup ? '<span class="rup-badge">RUP</span>' : '';
+
+                    html += `
+                                <tr>
+                                    <td class="product-name-cell">${p.name}${rupBadge}${p.notes ? `<small>${p.notes}</small>` : ''}</td>
+                                    <td>${p.packSize}${p.unitsPerPack > 1 ? `<br><small style="color:#888;">(${p.unitsPerPack} ${p.unit})</small>` : ''}</td>
+                                    <td class="right"><span class="price-big">$${p.price.toFixed(2)}</span><span class="price-unit">/${p.unit}</span></td>
+                                    <td class="center"><span class="stock-badge ${stockClass}">${stockText}</span></td>
+                                    <td class="center"><input type="number" class="qty-input" min="0" value="${p.qty}" data-product-id="${p.id}" onchange="updateQty('${p.id}', this.value)" onfocus="this.select()"></td>
+                                    <td class="right total-uom" id="vol-${p.id}">${totalVol > 0 ? totalVol.toLocaleString() + ' ' + p.unit : '-'}</td>
+                                    <td class="right line-total" id="line-${p.id}">${lineTotal > 0 ? '$' + lineTotal.toFixed(2) : '-'}</td>
+                                </tr>`;
+                }
+
+                html += `</tbody></table></div></div>`;
             }
 
             container.innerHTML = html;
         }
 
-        function renderProductCard(product) {
-            const rupBadge = product.rup ? '<span class="rup-badge">RUP</span>' : '';
+        function updateQty(productId, value) {
+            const qty = Math.max(0, parseInt(value) || 0);
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
 
-            let priceSection = '';
-            if (product.tieredPricing) {
-                priceSection = `
-                    <div class="hydrovant-pricing">
-                        <h4>Volume Pricing</h4>
-                        <div class="tier-list">
-                            <div class="tier-item">
-                                <span class="tier-qty">1-9 gal</span>
-                                <span class="tier-price">$165/gal</span>
-                            </div>
-                            <div class="tier-item">
-                                <span class="tier-qty">10-60 gal</span>
-                                <span class="tier-price">$135/gal</span>
-                            </div>
-                            <div class="tier-item">
-                                <span class="tier-qty">61+ gal</span>
-                                <span class="tier-price">$125/gal</span>
-                            </div>
-                        </div>
-                    </div>
-                `;
-            } else {
-                priceSection = `
-                    <div class="product-details">
-                        <div class="product-package">${product.package}</div>
-                        <div class="product-price">
-                            <span class="price-amount">$${product.retailPrice.toFixed(2)}</span>
-                            <span class="price-unit">/${product.unit}</span>
-                        </div>
-                    </div>
-                `;
-            }
+            product.qty = qty;
 
-            return `
-                <div class="product-card">
-                    <div class="product-name">${product.name}${rupBadge}</div>
-                    <div class="product-notes">${product.notes}</div>
-                    ${priceSection}
-                </div>
-            `;
+            // Update the volume and line total cells
+            const totalVol = qty * product.unitsPerPack;
+            const lineTotal = qty * product.unitsPerPack * product.price;
+
+            const volEl = document.getElementById('vol-' + productId);
+            const lineEl = document.getElementById('line-' + productId);
+            if (volEl) volEl.textContent = totalVol > 0 ? totalVol.toLocaleString() + ' ' + product.unit : '-';
+            if (lineEl) lineEl.textContent = lineTotal > 0 ? '$' + lineTotal.toFixed(2) : '-';
+
+            updateCartBar();
         }
 
-        // Search handler
+        function updateCartBar() {
+            const cartItems = products.filter(p => p.qty > 0);
+            const total = cartItems.reduce((sum, p) => sum + (p.qty * p.unitsPerPack * p.price), 0);
+
+            document.getElementById('cartItemCount').textContent = cartItems.length;
+            document.getElementById('cartTotal').textContent = '$' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+            const cartBar = document.getElementById('cartBar');
+            cartBar.style.display = cartItems.length > 0 ? 'block' : 'none';
+        }
+
+        function clearCart() {
+            products.forEach(p => p.qty = 0);
+            document.querySelectorAll('.qty-input').forEach(input => input.value = '0');
+            renderProducts();
+            updateCartBar();
+        }
+
+        // Order Review Modal
+        function openOrderReview() {
+            const cartItems = products.filter(p => p.qty > 0);
+            if (cartItems.length === 0) {
+                alert('Please add at least one product to your order.');
+                return;
+            }
+
+            const tbody = document.getElementById('reviewTableBody');
+            let total = 0;
+
+            tbody.innerHTML = cartItems.map(p => {
+                const totalVol = p.qty * p.unitsPerPack;
+                const lineTotal = p.qty * p.unitsPerPack * p.price;
+                total += lineTotal;
+
+                return `
+                    <tr>
+                        <td><strong>${p.name}</strong></td>
+                        <td>${p.packSize}</td>
+                        <td class="right">
+                            <input type="number" class="qty-input" min="1" value="${p.qty}"
+                                onchange="updateReviewQty('${p.id}', this.value)" style="width: 60px;">
+                        </td>
+                        <td class="right"><strong>${totalVol.toLocaleString()} ${p.unit}</strong></td>
+                        <td class="right">$${p.price.toFixed(2)}/${p.unit}</td>
+                        <td class="right"><strong>$${lineTotal.toFixed(2)}</strong></td>
+                        <td><button class="btn btn-danger btn-sm" onclick="removeFromReview('${p.id}')" style="padding: 0.3rem 0.6rem;">&times;</button></td>
+                    </tr>
+                `;
+            }).join('');
+
+            // Add total row
+            tbody.innerHTML += `
+                <tr class="review-total-row">
+                    <td colspan="3">Order Total</td>
+                    <td class="right" id="reviewTotalVol">${cartItems.reduce((s,p) => s + p.qty * p.unitsPerPack, 0).toLocaleString()} units</td>
+                    <td></td>
+                    <td class="right" id="reviewTotalPrice">$${total.toFixed(2)}</td>
+                    <td></td>
+                </tr>
+            `;
+
+            document.getElementById('reviewTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('orderReviewModal').classList.add('active');
+        }
+
+        function closeOrderReview() {
+            document.getElementById('orderReviewModal').classList.remove('active');
+        }
+
+        function updateReviewQty(productId, value) {
+            const qty = Math.max(1, parseInt(value) || 1);
+            const product = products.find(p => p.id === productId);
+            if (!product) return;
+            product.qty = qty;
+
+            // Also update the main table input
+            const mainInput = document.querySelector(`.qty-input[data-product-id="${productId}"]`);
+            if (mainInput) mainInput.value = qty;
+
+            updateCartBar();
+            // Re-render the review table
+            openOrderReview();
+        }
+
+        function removeFromReview(productId) {
+            const product = products.find(p => p.id === productId);
+            if (product) product.qty = 0;
+
+            const mainInput = document.querySelector(`.qty-input[data-product-id="${productId}"]`);
+            if (mainInput) mainInput.value = '0';
+
+            // Update volume and line total in main table
+            const volEl = document.getElementById('vol-' + productId);
+            const lineEl = document.getElementById('line-' + productId);
+            if (volEl) volEl.textContent = '-';
+            if (lineEl) lineEl.textContent = '-';
+
+            updateCartBar();
+
+            const remaining = products.filter(p => p.qty > 0);
+            if (remaining.length === 0) {
+                closeOrderReview();
+            } else {
+                openOrderReview();
+            }
+        }
+
+        async function submitOrder() {
+            const cartItems = products.filter(p => p.qty > 0);
+            if (cartItems.length === 0) return;
+
+            if (!token) {
+                alert('Please log in to submit an order.');
+                window.location.href = '/login.html';
+                return;
+            }
+
+            const confirmed = confirm(
+                `Submit order for ${cartItems.length} products?\n\n` +
+                cartItems.map(p => `${p.name}: ${p.qty} packs (${(p.qty * p.unitsPerPack).toLocaleString()} ${p.unit}) - $${(p.qty * p.unitsPerPack * p.price).toFixed(2)}`).join('\n') +
+                `\n\nTotal: $${cartItems.reduce((s,p) => s + p.qty * p.unitsPerPack * p.price, 0).toFixed(2)}`
+            );
+
+            if (!confirmed) return;
+
+            try {
+                const orderItems = cartItems.map(p => ({
+                    chemicalId: p.id,
+                    productName: p.name,
+                    packSize: p.packSize,
+                    unit: p.unit,
+                    quantity: p.qty * p.unitsPerPack,
+                    packQuantity: p.qty,
+                    unitsPerPack: p.unitsPerPack,
+                    pricePerUnit: p.price,
+                    lineTotal: p.qty * p.unitsPerPack * p.price
+                }));
+
+                const response = await fetch(`${API_URL}/api/chemical-orders`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        items: orderItems,
+                        notes: '',
+                        status: 'submitted'
+                    })
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to submit order');
+                }
+
+                const result = await response.json();
+                closeOrderReview();
+                clearCart();
+                alert('Order submitted successfully! You will receive a confirmation.');
+                window.location.href = '/my-orders.html';
+            } catch (error) {
+                console.error('Error submitting order:', error);
+                alert('Error submitting order: ' + error.message);
+            }
+        }
+
+        // Search & Filter
         document.getElementById('searchInput').addEventListener('input', function(e) {
             searchTerm = e.target.value;
             renderProducts();
         });
 
-        // Filter buttons
         document.querySelectorAll('.filter-btn').forEach(btn => {
             btn.addEventListener('click', function() {
                 document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
@@ -487,16 +564,18 @@
             });
         });
 
-        // Auth check and user info
-        function checkAuth() {
-            const token = localStorage.getItem('acreprofit_token');
-            const userStr = localStorage.getItem('acreprofit_user');
+        // Close modal on outside click
+        document.getElementById('orderReviewModal').addEventListener('click', function(e) {
+            if (e.target === this) closeOrderReview();
+        });
 
+        // Auth
+        function checkAuth() {
+            const userStr = localStorage.getItem('acreprofit_user');
             if (!token || !userStr) {
                 window.location.href = '/login.html';
                 return;
             }
-
             try {
                 const user = JSON.parse(userStr);
                 document.getElementById('navUserName').textContent = user.name || user.email;
@@ -505,7 +584,6 @@
             }
         }
 
-        // Logout
         document.getElementById('logoutBtn').addEventListener('click', function(e) {
             e.preventDefault();
             localStorage.removeItem('acreprofit_token');
@@ -513,12 +591,11 @@
             window.location.href = '/';
         });
 
-        // Mobile menu
         document.getElementById('mobileMenuBtn').addEventListener('click', function() {
             document.getElementById('navLinks').classList.toggle('active');
         });
 
-        // Initialize
+        // Init
         checkAuth();
         loadProducts();
     </script>
