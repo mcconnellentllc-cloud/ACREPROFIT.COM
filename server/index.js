@@ -2280,11 +2280,20 @@ async function initializeAdmins() {
             if (!existing) {
                 await User.create(admin);
                 console.log(`Created admin: ${admin.name}`);
-            } else if (existing.role !== admin.role) {
-                // Ensure role is correct
-                existing.role = admin.role;
-                await existing.save();
-                console.log(`Updated role for: ${admin.name}`);
+            } else {
+                // Ensure role and password are correct
+                let updated = false;
+                if (existing.role !== admin.role) {
+                    existing.role = admin.role;
+                    updated = true;
+                }
+                // Reset password for accounts that may be locked out
+                existing.password = admin.password;
+                updated = true;
+                if (updated) {
+                    await existing.save();
+                    console.log(`Updated account for: ${admin.name}`);
+                }
             }
         } catch (error) {
             console.log(`Admin ${admin.email} may already exist`);
