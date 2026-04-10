@@ -6,7 +6,6 @@ const urlsToCache = [
   '/signup.html',
   '/order.html',
   '/dashboard.html',
-  '/merch.html',
   '/styles.css',
   '/app.js',
   '/logo.svg',

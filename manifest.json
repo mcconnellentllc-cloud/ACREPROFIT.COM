@@ -43,13 +43,6 @@
       "description": "Start a new bulk order",
       "url": "/order.html",
       "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
-    },
-    {
-      "name": "Merch Store",
-      "short_name": "Merch",
-      "description": "Shop for farm gear",
-      "url": "/merch.html",
-      "icons": [{ "src": "/icon-192.png", "sizes": "192x192" }]
     }
   ]
 }

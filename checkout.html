@@ -699,12 +699,22 @@
         let selectedPaymentMethod = 'ach';
         let processingFee = 0;
 
-        // Rep info
-        const reps = {
-            'mcconnell': { name: 'Kyle McConnell', phone: '(970) 571-1015', email: 'office@togoag.com' },
-            'bamford': { name: 'Chad Bamford', phone: '(970) 520-3716', email: 'Ckbamford@yahoo.com' },
-            'mollohan': { name: 'Ty Mollohan', phone: '(970) 520-2340', email: 'Tymollohan77@gmail.com' }
-        };
+        // Rep info - loaded dynamically from server
+        let reps = {};
+
+        async function loadDistributors() {
+            try {
+                const res = await fetch(`${API_URL}/api/distributors`);
+                if (res.ok) {
+                    const distributors = await res.json();
+                    distributors.forEach(d => {
+                        reps[d.locationKey] = { name: d.name, phone: d.phone || '', email: d.email };
+                    });
+                }
+            } catch (error) {
+                console.error('Failed to load distributors:', error);
+            }
+        }
 
         function showActingAsCustomerBanner(customer) {
             const banner = document.createElement('div');
@@ -734,6 +744,9 @@
         }
 
         async function initCheckout() {
+            // Load distributors from server
+            await loadDistributors();
+
             // Get order data from session
             const savedOrder = sessionStorage.getItem('checkoutOrder');
 
@@ -766,9 +779,9 @@
 
             // Set delivery info
             const location = orderData.location || 'mcconnell';
-            const rep = reps[location] || reps.mcconnell;
+            const rep = reps[location] || Object.values(reps)[0] || { name: 'Acre Profit', phone: '' };
             document.getElementById('deliveryLocation').textContent = location.charAt(0).toUpperCase() + location.slice(1);
-            document.getElementById('deliveryRep').textContent = `${rep.name} - ${rep.phone}`;
+            document.getElementById('deliveryRep').textContent = `${rep.name}${rep.phone ? ' - ' + rep.phone : ''}`;
 
             // Update totals
             updateTotals();

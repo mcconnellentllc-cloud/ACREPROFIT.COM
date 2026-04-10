@@ -9313,27 +9313,13 @@
                     loadInventory();
                     alert(editId ? 'Inventory updated!' : 'Inventory added!');
                     return;
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to save inventory');
                 }
             } catch (error) {
-                console.log('Using local storage for inventory');
+                alert('Error saving inventory: ' + error.message);
             }
-
-            // Fallback to localStorage
-            if (editId) {
-                const idx = allInventory.findIndex(i => (i.id || i._id) === editId);
-                if (idx !== -1) {
-                    allInventory[idx] = { ...allInventory[idx], ...item };
-                }
-            } else {
-                item.createdAt = new Date().toISOString();
-                allInventory.push(item);
-            }
-
-            localStorage.setItem('inventory', JSON.stringify(allInventory));
-            closeAddInventoryModal();
-            renderInventory(allInventory);
-            updateInventoryStats();
-            alert(editId ? 'Inventory updated!' : 'Inventory added!');
         }
 
         // Edit inventory item
@@ -9493,16 +9479,13 @@
                 if (res.ok) {
                     loadInventory();
                     return;
+                } else {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to delete inventory item');
                 }
             } catch (error) {
-                console.log('Using local storage');
+                alert('Error deleting inventory: ' + error.message);
             }
-
-            // Fallback to localStorage
-            allInventory = allInventory.filter(i => (i.id || i._id) !== id);
-            localStorage.setItem('inventory', JSON.stringify(allInventory));
-            renderInventory(allInventory);
-            updateInventoryStats();
         }
 
         // Initialize

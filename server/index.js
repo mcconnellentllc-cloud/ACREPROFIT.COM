@@ -1064,38 +1064,7 @@ const sprayProgramSchema = new mongoose.Schema({
 
 const SprayProgram = mongoose.model('SprayProgram', sprayProgramSchema);
 
-// Merch Order Model
-const merchOrderSchema = new mongoose.Schema({
-    userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-    items: [{
-        productId: String,
-        name: String,
-        size: String,
-        quantity: Number,
-        price: Number
-    }],
-    subtotal: Number,
-    creditApplied: { type: Number, default: 0 },
-    totalDue: Number,
-    shippingAddress: {
-        name: String,
-        address: String,
-        city: String,
-        state: String,
-        zip: String
-    },
-    printifyOrderId: String, // Printify order ID once submitted
-    status: {
-        type: String,
-        enum: ['pending', 'submitted', 'production', 'shipped', 'delivered'],
-        default: 'pending'
-    },
-    trackingNumber: String,
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-const MerchOrder = mongoose.model('MerchOrder', merchOrderSchema);
+// Merch Order Model - REMOVED (Printify integration was never completed)
 
 // Purchase Order Model (Orders FROM suppliers - what Acre Profit buys)
 const purchaseOrderSchema = new mongoose.Schema({
@@ -3685,6 +3654,28 @@ app.get('/api/representatives', async (req, res) => {
     }
 });
 
+// Public endpoint: Get active distributors for checkout/pickup location selection
+app.get('/api/distributors', async (req, res) => {
+    try {
+        const distributors = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin'] } })
+            .select('name email phone')
+            .sort({ name: 1 });
+
+        // Return distributors with derived pickup location key (last name lowercase)
+        const result = distributors.map(d => ({
+            _id: d._id,
+            name: d.name,
+            email: d.email,
+            phone: d.phone,
+            locationKey: d.name.split(' ').pop().toLowerCase()
+        }));
+
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // ---- SPRAY PROGRAM ROUTES ----
 
 app.get('/api/crops', (req, res) => {
@@ -4866,154 +4857,9 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
     }
 });
 
-// ---- MERCH ORDER ROUTES ----
-
-// Printify product mapping (maps our product IDs to Printify blueprint IDs)
-// This would be configured once you set up your Printify store
-const PRINTIFY_PRODUCTS = {
-    'chore-coat': { blueprintId: '6', printProviderId: '99' },
-    'quarter-zip': { blueprintId: '578', printProviderId: '99' },
-    'full-zip-hoodie': { blueprintId: '77', printProviderId: '99' },
-    'pullover-hoodie': { blueprintId: '77', printProviderId: '99' },
-    'trucker-green': { blueprintId: '380', printProviderId: '99' },
-    'trucker-black': { blueprintId: '380', printProviderId: '99' },
-    'trucker-camo': { blueprintId: '380', printProviderId: '99' },
-    'fitted-black': { blueprintId: '381', printProviderId: '99' },
-    'beanie': { blueprintId: '432', printProviderId: '99' },
-    'classic-tee-green': { blueprintId: '5', printProviderId: '99' },
-    'classic-tee-black': { blueprintId: '5', printProviderId: '99' },
-    'farmers-tee': { blueprintId: '5', printProviderId: '99' }
-};
-
-// Submit merch order
-app.post('/api/merch-orders', authMiddleware, async (req, res) => {
-    try {
-        const { items, subtotal, creditApplied, totalDue, shippingAddress } = req.body;
-
-        // Create order in database
-        const merchOrder = new MerchOrder({
-            userId: req.user._id,
-            items,
-            subtotal,
-            creditApplied,
-            totalDue,
-            shippingAddress,
-            status: 'pending'
-        });
-
-        await merchOrder.save();
-
-        // TODO: Integrate with Printify API
-        // When PRINTIFY_API_KEY is configured, this will auto-submit to Printify
-        if (process.env.PRINTIFY_API_KEY && process.env.PRINTIFY_SHOP_ID) {
-            try {
-                // Submit to Printify (example structure)
-                const printifyOrder = await submitToPrintify(merchOrder, req.user);
-                merchOrder.printifyOrderId = printifyOrder.id;
-                merchOrder.status = 'submitted';
-                await merchOrder.save();
-            } catch (printifyError) {
-                console.error('Printify submission failed:', printifyError);
-                // Order saved but not submitted to Printify - manual intervention needed
-            }
-        }
-
-        res.status(201).json({
-            message: 'Order placed successfully',
-            orderId: merchOrder._id,
-            status: merchOrder.status
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Get user's merch orders
-app.get('/api/merch-orders', authMiddleware, async (req, res) => {
-    try {
-        const orders = await MerchOrder.find({ userId: req.user._id })
-            .sort({ createdAt: -1 });
-        res.json(orders);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Admin: Get all merch orders
-app.get('/api/admin/merch-orders', authMiddleware, superAdminMiddleware, async (req, res) => {
-    try {
-        const orders = await MerchOrder.find()
-            .populate('userId', 'name email')
-            .sort({ createdAt: -1 });
-        res.json(orders);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Printify submission helper (implement when API key available)
-async function submitToPrintify(merchOrder, user) {
-    const PRINTIFY_API_KEY = process.env.PRINTIFY_API_KEY;
-    const PRINTIFY_SHOP_ID = process.env.PRINTIFY_SHOP_ID;
-
-    // Build Printify order payload
-    const lineItems = merchOrder.items.map(item => ({
-        product_id: PRINTIFY_PRODUCTS[item.productId]?.blueprintId,
-        variant_id: 1, // Would need to map sizes to variant IDs
-        quantity: item.quantity
-    }));
-
-    const response = await fetch(`https://api.printify.com/v1/shops/${PRINTIFY_SHOP_ID}/orders.json`, {
-        method: 'POST',
-        headers: {
-            'Authorization': `Bearer ${PRINTIFY_API_KEY}`,
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            external_id: merchOrder._id.toString(),
-            line_items: lineItems,
-            shipping_method: 1,
-            address_to: {
-                first_name: user.name.split(' ')[0],
-                last_name: user.name.split(' ').slice(1).join(' ') || '',
-                email: user.email,
-                phone: user.phone || '',
-                country: 'US',
-                region: merchOrder.shippingAddress?.state || '',
-                address1: merchOrder.shippingAddress?.address || '',
-                city: merchOrder.shippingAddress?.city || '',
-                zip: merchOrder.shippingAddress?.zip || ''
-            }
-        })
-    });
-
-    if (!response.ok) {
-        throw new Error('Printify API error');
-    }
-
-    return response.json();
-}
-
-// Printify webhook for order updates
-app.post('/api/webhooks/printify', async (req, res) => {
-    try {
-        const { type, resource } = req.body;
-
-        if (type === 'order:shipment:created') {
-            const merchOrder = await MerchOrder.findOne({ printifyOrderId: resource.id });
-            if (merchOrder) {
-                merchOrder.status = 'shipped';
-                merchOrder.trackingNumber = resource.shipments?.[0]?.tracking_number;
-                merchOrder.updatedAt = new Date();
-                await merchOrder.save();
-            }
-        }
-
-        res.json({ received: true });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
+// ---- MERCH ORDER ROUTES REMOVED ----
+// Printify/merch integration was never completed and has been removed.
+// merch.html still exists as a static page but has no backend routes.
 
 // ---- STRIPE PAYMENT ROUTES ----
 
@@ -5372,21 +5218,25 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
     try {
         const { orderId, checkNumber } = req.body;
 
-        const order = await Order.findById(orderId);
+        // Try ChemicalOrder first (active system), then fall back to Order
+        let order = await ChemicalOrder.findById(orderId);
+        if (!order) {
+            order = await Order.findById(orderId);
+        }
         if (!order) {
             return res.status(404).json({ error: 'Order not found' });
         }
 
         // Verify the rep owns this order (unless superadmin)
         if (req.user.role !== 'superadmin' &&
-            order.representativeId.toString() !== req.user._id.toString()) {
+            order.representativeId && order.representativeId.toString() !== req.user._id.toString()) {
             return res.status(403).json({ error: 'Not authorized' });
         }
 
         order.paymentMethod = 'check';
         order.paymentStatus = 'paid';
-        order.checkNumber = checkNumber;
-        order.checkReceivedDate = new Date();
+        if (order.checkNumber !== undefined) order.checkNumber = checkNumber;
+        if (order.checkReceivedDate !== undefined) order.checkReceivedDate = new Date();
         order.paidAt = new Date();
         order.status = 'confirmed';
         order.updatedAt = new Date();
@@ -7753,21 +7603,50 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             }
         }
 
-        // Build order items
-        const orderItems = items.map(item => ({
-            productName: item.productName || item.name,
-            packSize: item.packSize || '',
-            unit: item.unit || 'pack',
-            quantity: item.qty || item.quantity || 1,
-            unitPrice: item.price || 0,
-            totalPrice: item.total || 0,
-            timing: item.timing || '',
-            isCustom: item.isCustom || false
-        }));
+        // Build order items with server-side price verification
+        // Look up all chemicals once for price validation
+        const allChemicals = await Chemical.find({ isActive: true }).lean();
 
-        // Calculate totals if not provided
-        const calculatedSubtotal = subtotal || items.reduce((sum, item) => sum + (item.total || 0), 0);
-        const calculatedTotal = total || calculatedSubtotal + (processingFee || 0);
+        const orderItems = [];
+        let verifiedSubtotal = 0;
+
+        for (const item of items) {
+            const productName = item.productName || item.name;
+            const qty = item.qty || item.quantity || 1;
+            let unitPrice = item.price || 0;
+            let isCustom = item.isCustom || false;
+
+            // Server-side price verification: look up the chemical's sellPrice
+            if (!isCustom && productName) {
+                const chemical = allChemicals.find(c =>
+                    c.productName === productName ||
+                    c.productName.toLowerCase() === productName.toLowerCase()
+                );
+                if (chemical && chemical.sellPrice) {
+                    // Use server-side sellPrice as the authoritative price
+                    unitPrice = chemical.sellPrice;
+                }
+            }
+
+            const totalPrice = Math.round(qty * unitPrice * 100) / 100;
+            verifiedSubtotal += totalPrice;
+
+            orderItems.push({
+                productName,
+                packSize: item.packSize || '',
+                unit: item.unit || 'pack',
+                quantity: qty,
+                unitPrice,
+                totalPrice,
+                timing: item.timing || '',
+                isCustom
+            });
+        }
+
+        // Server calculates the final totals (never trust frontend totals)
+        const calculatedSubtotal = Math.round(verifiedSubtotal * 100) / 100;
+        const calculatedFee = paymentMethod === 'ach' ? Math.min(calculatedSubtotal * 0.008, 5) : 0;
+        const calculatedTotal = Math.round((calculatedSubtotal + calculatedFee) * 100) / 100;
 
         // Create the order
         const order = new ChemicalOrder({
@@ -7777,7 +7656,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             items: orderItems,
             totalAcres: 0,
             subtotal: calculatedSubtotal,
-            processingFee: processingFee || 0,
+            processingFee: calculatedFee,
             total: calculatedTotal,
             customerNotes: notes,
             status: 'submitted',
