@@ -133,6 +133,7 @@
             <div style="display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.5rem;">
                 <button class="step active" onclick="showView('builder')" id="builderTab">Build New Program</button>
                 <button class="step" onclick="showView('programs')" id="programsTab">My Submissions</button>
+                <button class="step" onclick="showView('recipes')" id="recipesTab">Community Recipes</button>
             </div>
 
             <!-- ===== BUILDER VIEW ===== -->
@@ -278,6 +279,59 @@
                     <div class="empty-state"><p>Loading your submissions...</p></div>
                 </div>
             </div>
+
+            <!-- ===== COMMUNITY RECIPES VIEW ===== -->
+            <div id="recipesView" style="display: none;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; flex-wrap: wrap; gap: 0.5rem;">
+                    <p style="color: #666; margin: 0;">Community spray mixes shared by farmers. Save a recipe or share your own.</p>
+                    <button class="btn btn-primary" onclick="openShareRecipeModal()">+ Share Your Recipe</button>
+                </div>
+                <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                    <select id="recFilterCrop" onchange="loadCommunityRecipes()" style="padding:0.5rem 0.75rem; border:1px solid #ddd; border-radius:6px;">
+                        <option value="">All Crops</option>
+                        <option value="corn">Corn</option><option value="wheat">Wheat</option><option value="soybeans">Soybeans</option>
+                        <option value="sorghum">Sorghum</option><option value="fallow">Fallow</option><option value="sunflower">Sunflower</option>
+                    </select>
+                    <select id="recFilterTiming" onchange="loadCommunityRecipes()" style="padding:0.5rem 0.75rem; border:1px solid #ddd; border-radius:6px;">
+                        <option value="">All Timings</option>
+                        <option value="burndown">Burndown</option><option value="pre-emerge">Pre-Emerge</option>
+                        <option value="post-emerge">Post-Emerge</option><option value="fall">Fall</option>
+                    </select>
+                    <input type="text" id="recFilterSearch" placeholder="Search recipes..." onkeyup="if(event.key==='Enter')loadCommunityRecipes()" style="padding:0.5rem 0.75rem; border:1px solid #ddd; border-radius:6px; flex:1; min-width:150px;">
+                </div>
+                <div id="recipesGrid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 1rem;">
+                    <div class="empty-state"><p>Loading recipes...</p></div>
+                </div>
+            </div>
+
+            <!-- Share Recipe Modal -->
+            <div id="shareRecipeModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:white; border-radius:12px; max-width:600px; width:95%; max-height:90vh; overflow-y:auto;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; padding:1.5rem 2rem; border-bottom:1px solid #eee;">
+                        <h2 style="margin:0;">Share Your Recipe</h2>
+                        <button onclick="closeShareRecipe()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                    </div>
+                    <div style="padding:1.5rem 2rem;">
+                        <div style="margin-bottom:1rem;"><label style="font-weight:600; display:block; margin-bottom:0.3rem;">Recipe Name *</label><input type="text" id="shareName" placeholder="e.g., Kyle's Burndown Cocktail" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;"></div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                            <div><label style="font-weight:600; display:block; margin-bottom:0.3rem;">Crop *</label><select id="shareCrop" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;"><option value="">Select...</option><option value="corn">Corn</option><option value="wheat">Wheat</option><option value="soybeans">Soybeans</option><option value="sorghum">Milo/Sorghum</option><option value="fallow">Fallow</option><option value="sunflower">Sunflower</option><option value="other">Other</option></select></div>
+                            <div><label style="font-weight:600; display:block; margin-bottom:0.3rem;">Timing *</label><select id="shareTiming" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;"><option value="">Select...</option><option value="burndown">Burndown</option><option value="pre-emerge">Pre-Emerge</option><option value="post-emerge">Post-Emerge</option><option value="fall">Fall</option><option value="late-season">Late Season</option><option value="other">Other</option></select></div>
+                        </div>
+                        <div style="margin-bottom:1rem;"><label style="font-weight:600; display:block; margin-bottom:0.3rem;">Description</label><textarea id="shareDesc" rows="2" placeholder="What does this mix do?" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;"></textarea></div>
+                        <div style="margin-bottom:1rem;">
+                            <label style="font-weight:600; display:block; margin-bottom:0.3rem;">Ingredients</label>
+                            <div id="shareIngredientsContainer"></div>
+                            <button class="btn btn-outline btn-sm" onclick="addShareIngRow()" style="margin-top:0.5rem;">+ Add Ingredient</button>
+                        </div>
+                        <div style="margin-bottom:1rem;"><label style="font-weight:600; display:block; margin-bottom:0.3rem;">Tips</label><textarea id="shareTips" rows="2" placeholder="Application tips..." style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;"></textarea></div>
+                        <div style="margin-bottom:1rem;"><label><input type="checkbox" id="shareAnonymous" checked> Post anonymously</label></div>
+                        <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                            <button class="btn btn-secondary" onclick="closeShareRecipe()">Cancel</button>
+                            <button class="btn btn-primary" onclick="submitSharedRecipe()">Publish Recipe</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </main>
 
@@ -326,9 +380,12 @@
         function showView(view) {
             document.getElementById('builderView').style.display = view === 'builder' ? 'block' : 'none';
             document.getElementById('programsView').style.display = view === 'programs' ? 'block' : 'none';
+            document.getElementById('recipesView').style.display = view === 'recipes' ? 'block' : 'none';
             document.getElementById('builderTab').classList.toggle('active', view === 'builder');
             document.getElementById('programsTab').classList.toggle('active', view === 'programs');
+            document.getElementById('recipesTab').classList.toggle('active', view === 'recipes');
             if (view === 'programs') loadMyPrograms();
+            if (view === 'recipes') loadCommunityRecipes();
         }
 
         // Step navigation
@@ -613,6 +670,105 @@
                 container.innerHTML = '<div class="empty-state"><p>Error loading programs.</p></div>';
             }
         }
+
+        // ===== COMMUNITY RECIPES =====
+        async function loadCommunityRecipes() {
+            const grid = document.getElementById('recipesGrid');
+            grid.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+            const crop = document.getElementById('recFilterCrop').value;
+            const timing = document.getElementById('recFilterTiming').value;
+            const search = document.getElementById('recFilterSearch').value;
+            const params = new URLSearchParams({ sort: 'popular', limit: 30 });
+            if (crop) params.set('crop', crop);
+            if (timing) params.set('timing', timing);
+            if (search) params.set('search', search);
+            try {
+                const res = await fetch(`${API_URL}/api/mixes?${params}`);
+                const data = await res.json();
+                const mixes = data.mixes || [];
+                if (mixes.length === 0) {
+                    grid.innerHTML = '<div class="empty-state"><h3>No recipes yet</h3><p>Be the first! Click "+ Share Your Recipe" above.</p></div>';
+                    return;
+                }
+                grid.innerHTML = mixes.map(m => {
+                    const stars = [1,2,3,4,5].map(i => i <= Math.round(m.averageRating||0) ? '\u2605' : '\u2606').join('');
+                    const cropL = (m.crop||'').replace(/\b\w/g,c=>c.toUpperCase());
+                    const timingL = (m.timing||'').replace(/-/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+                    const creator = m.isAnonymous ? 'Anonymous Farmer' : (m.createdBy?.name || 'Anonymous Farmer');
+                    return `<div style="background:white; border-radius:10px; padding:1.25rem; box-shadow:0 2px 6px rgba(0,0,0,0.06); border:1px solid #e5e7eb;">
+                        <h3 style="margin:0 0 0.5rem;">${m.name}</h3>
+                        <div style="display:flex; gap:0.4rem; margin-bottom:0.5rem; flex-wrap:wrap;">
+                            <span class="badge badge-crop">${cropL}</span>
+                            <span class="badge badge-timing">${timingL}</span>
+                        </div>
+                        <p style="color:#666; font-size:0.85rem; margin:0 0 0.75rem;">${m.description || 'No description'}</p>
+                        <div style="display:flex; gap:1rem; font-size:0.82rem; color:#888;">
+                            <span style="color:#f59e0b;">${stars}</span>
+                            <span>${(m.ingredients||[]).length} ingredients</span>
+                            <span>by ${creator}</span>
+                        </div>
+                    </div>`;
+                }).join('');
+            } catch(e) { grid.innerHTML = '<div class="empty-state"><p>Error loading recipes.</p></div>'; }
+        }
+
+        let shareIngCount = 0;
+        function openShareRecipeModal() {
+            loadChemicals().then(() => {
+                document.getElementById('shareIngredientsContainer').innerHTML = '';
+                shareIngCount = 0;
+                addShareIngRow(); addShareIngRow();
+                document.getElementById('shareName').value = '';
+                document.getElementById('shareCrop').value = '';
+                document.getElementById('shareTiming').value = '';
+                document.getElementById('shareDesc').value = '';
+                document.getElementById('shareTips').value = '';
+                document.getElementById('shareAnonymous').checked = true;
+                document.getElementById('shareRecipeModal').style.display = 'flex';
+            });
+        }
+        function closeShareRecipe() { document.getElementById('shareRecipeModal').style.display = 'none'; }
+
+        function addShareIngRow() {
+            const id = shareIngCount++;
+            const opts = chemicals.map(c => `<option value="${c._id}">${c.productName}</option>`).join('');
+            const row = document.createElement('div');
+            row.id = `shareIng${id}`;
+            row.style.cssText = 'display:grid; grid-template-columns:2fr 70px 90px 30px; gap:0.4rem; margin-bottom:0.4rem; align-items:end;';
+            row.innerHTML = `<select class="si-chem" style="padding:0.4rem; border:1px solid #ddd; border-radius:4px;"><option value="">Select...</option>${opts}</select>
+                <input type="number" class="si-rate" step="0.1" placeholder="Rate" style="padding:0.4rem; border:1px solid #ddd; border-radius:4px;">
+                <select class="si-unit" style="padding:0.4rem; border:1px solid #ddd; border-radius:4px;"><option value="oz/acre">oz/acre</option><option value="pt/acre">pt/acre</option><option value="qt/acre">qt/acre</option><option value="gal/acre">gal/acre</option><option value="lb/acre">lb/acre</option><option value="% v/v">% v/v</option></select>
+                <button class="remove-row" onclick="document.getElementById('shareIng${id}').remove()">X</button>`;
+            document.getElementById('shareIngredientsContainer').appendChild(row);
+        }
+
+        async function submitSharedRecipe() {
+            const name = document.getElementById('shareName').value.trim();
+            const crop = document.getElementById('shareCrop').value;
+            const timing = document.getElementById('shareTiming').value;
+            if (!name || !crop || !timing) { alert('Name, crop, and timing are required.'); return; }
+            const ingredients = [];
+            document.querySelectorAll('#shareIngredientsContainer > div').forEach(row => {
+                const chemId = row.querySelector('.si-chem')?.value;
+                const rate = parseFloat(row.querySelector('.si-rate')?.value);
+                const rateUnit = row.querySelector('.si-unit')?.value;
+                if (chemId && rate > 0) ingredients.push({ chemicalId: chemId, rate, rateUnit });
+            });
+            if (ingredients.length === 0) { alert('Add at least one ingredient.'); return; }
+            try {
+                const res = await fetch(`${API_URL}/api/mixes`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ name, crop, timing, ingredients, description: document.getElementById('shareDesc').value.trim(), tips: document.getElementById('shareTips').value.trim(), isAnonymous: document.getElementById('shareAnonymous').checked, status: 'published' })
+                });
+                if (!res.ok) { const e = await res.json(); throw new Error(e.error); }
+                closeShareRecipe();
+                alert('Recipe published!');
+                loadCommunityRecipes();
+            } catch(e) { alert('Error: ' + e.message); }
+        }
+
+        document.getElementById('shareRecipeModal')?.addEventListener('click', e => { if (e.target.id === 'shareRecipeModal') closeShareRecipe(); });
 
         // Nav
         document.getElementById('logoutBtn').addEventListener('click', e => {

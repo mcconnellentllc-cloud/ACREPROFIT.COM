@@ -5357,9 +5357,16 @@
 
             tbody.innerHTML = quotes.map(q => {
                 const totalQty = q.items.reduce((sum, i) => sum + (i.quantityNeeded || 0), 0);
+                const cropLabel = q.crop ? q.crop.replace(/\b\w/g, c => c.toUpperCase()).replace(/-/g, ' ') : '';
+                const timingLabel = q.timing ? q.timing.replace(/\b\w/g, c => c.toUpperCase()).replace(/-/g, ' ') : '';
+                const programBadges = (cropLabel || timingLabel) ?
+                    `<br><span style="background:#d1fae5;color:#065f46;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.7rem;font-weight:600;">${cropLabel}</span>` +
+                    (timingLabel ? ` <span style="background:#dbeafe;color:#1e40af;padding:0.1rem 0.4rem;border-radius:3px;font-size:0.7rem;font-weight:600;">${timingLabel}</span>` : '') +
+                    (q.acres ? ` <span style="color:#888;font-size:0.75rem;">${q.acres} ac</span>` : '')
+                    : '';
                 return `
                 <tr>
-                    <td><strong>${q.quoteNumber}</strong></td>
+                    <td><strong>${q.quoteNumber}</strong>${programBadges}</td>
                     <td>${q.customerId?.name || q.customerName || 'Unknown'}</td>
                     <td>${q.items.length} items</td>
                     <td>${totalQty.toLocaleString()}</td>
