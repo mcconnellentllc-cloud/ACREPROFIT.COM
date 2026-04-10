@@ -2017,6 +2017,41 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
 
     await transaction.save();
 
+    // Auto-update product cost when new batch arrives at a different price
+    // Margins stay the same - sell price recalculates automatically
+    try {
+        const chemical = await Chemical.findById(chemicalId);
+        if (chemical && unitCost !== chemical.costPrice) {
+            const oldCost = chemical.costPrice;
+            chemical.costPrice = unitCost;
+            chemical.adminPrice = Math.round((unitCost + (chemical.adminMarginDollars || 0)) * 100) / 100;
+            chemical.sellPrice = Math.round((chemical.adminPrice + (chemical.marginDollars || 0)) * 100) / 100;
+            chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
+            chemical.priceDate = new Date();
+            chemical.updatedAt = new Date();
+            await chemical.save();
+
+            // Log price change
+            await ChemicalPriceHistory.create({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                sourceSupplier: chemical.sourceSupplier,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                costPrice: unitCost,
+                previousCostPrice: oldCost,
+                adminPrice: chemical.adminPrice,
+                sellPrice: chemical.sellPrice,
+                priceVersion: `PO-${poNumber || 'manual'}`,
+                notes: `Cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)} via ${poNumber || 'receive'}. Margins unchanged.`
+            });
+
+            console.log(`Price auto-updated: ${productName} cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)}, sell $${chemical.sellPrice.toFixed(2)} (margins unchanged)`);
+        }
+    } catch (priceErr) {
+        console.error('Error auto-updating product cost:', priceErr.message);
+    }
+
     return { inventory, transaction, batch };
 }
 
