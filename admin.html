@@ -1997,6 +1997,7 @@
                         <thead>
                             <tr>
                                 <th>Product Name</th>
+                                <th>Held By</th>
                                 <th>Category</th>
                                 <th style="text-align: center;" title="Physical stock in warehouse">On Hand</th>
                                 <th style="text-align: center;" title="Allocated to customer orders">Reserved</th>
@@ -8427,7 +8428,7 @@
             const currentUserId = userData._id || userData.id;
 
             if (!items || items.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="11" class="empty">No inventory items. Click "+ Add Inventory" to add products.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="empty">No inventory items. Click "+ Add Inventory" to add products.</td></tr>';
                 return;
             }
 
@@ -8459,9 +8460,13 @@
                     statusText = 'In Stock';
                 }
 
+                const distributorName = item.distributorId?.name || 'Unassigned';
+                const distributorColor = distributorName === 'Unassigned' ? '#999' : distributorName.includes('Kyle') || distributorName.includes('kyle') ? '#2563eb' : '#7c3aed';
+
                 return `
                     <tr>
                         <td><strong>${item.productName}</strong>${item.packSize ? `<br><span style="color: var(--text-muted); font-size: 0.8rem;">${item.packSize}</span>` : ''}</td>
+                        <td><span style="color: ${distributorColor}; font-weight: 600; font-size: 0.85rem;">${distributorName.split(' ')[0]}</span></td>
                         <td><span class="order-status" style="background: #f3f4f6; color: #374151;">${category}</span></td>
                         <td style="text-align: center;"><strong>${onHand.toLocaleString()}</strong></td>
                         <td style="text-align: center; color: ${reserved > 0 ? '#dc2626' : '#666'};">${reserved.toLocaleString()}</td>

@@ -2844,14 +2844,14 @@ async function backfillInventoryFromPOs() {
                             representativeId: rep._id,
                             description: `PO ${po.poNumber} - ${po.supplier?.name || 'Supplier'} (${po.items.length} items)`,
                             amount: po.totalCost || po.subtotal || 0,
-                            type: 'debit',
+                            type: 'credit',
                             category: 'supplier_payment',
                             referenceType: 'PurchaseOrder',
                             referenceId: po._id,
-                            notes: `Inventory purchased from ${po.supplier?.name}. ${billedTo}`
+                            notes: `${personName} paid supplier for inventory. AP owes ${personName}. ${billedTo}`
                         });
                         ledgerEntriesCreated++;
-                        console.log(`  Ledger: ${personName} debited $${po.totalCost} for PO ${po.poNumber}`);
+                        console.log(`  Ledger: AP owes ${personName} $${po.totalCost} for PO ${po.poNumber}`);
                     }
                 }
             }
@@ -2938,14 +2938,14 @@ async function seedHydrovantInventory() {
             if (!existingLedger) {
                 await createLedgerEntry({
                     representativeId: kyle._id,
-                    description: 'Hydrovant - 360 gal at $75.00/gal (direct purchase)',
+                    description: 'Hydrovant fA - 360 gal at $75.00/gal (direct purchase)',
                     amount: 27000.00,
-                    type: 'debit',
+                    type: 'credit',
                     category: 'supplier_payment',
                     referenceType: 'Manual',
-                    notes: 'Hydrovant 360 gal purchased by Kyle McConnell at $75/gal'
+                    notes: 'Kyle paid $27,000 for Hydrovant fA. AP owes Kyle.'
                 });
-                console.log('Ledger: Kyle McConnell debited $27,000 for Hydrovant');
+                console.log('Ledger: AP owes Kyle $27,000 for Hydrovant fA');
             }
         } else {
             console.log('Warning: Could not find Kyle McConnell account for ledger entry');
@@ -2997,14 +2997,14 @@ async function seedPOLedgerEntries() {
                 representativeId: rep._id,
                 description: `PO ${poNumber} - ${po.supplier?.name || 'Supplier'}`,
                 amount: total,
-                type: 'debit',
+                type: 'credit',
                 category: 'supplier_payment',
                 referenceType: 'PurchaseOrder',
                 referenceId: po._id,
-                notes: `Paid by ${billing.name}. Items: ${itemSummary}`
+                notes: `${billing.name} paid supplier. AP owes ${billing.name}. Items: ${itemSummary}`
             });
 
-            console.log(`Ledger: ${billing.name} debited $${total.toLocaleString()} for PO ${poNumber}`);
+            console.log(`Ledger: AP owes ${billing.name} $${total.toLocaleString()} for PO ${poNumber}`);
         }
     } catch (error) {
         console.error('Error seeding PO ledger entries:', error.message);
@@ -10458,8 +10458,15 @@ app.post('/api/admin/inventory/transfer', authMiddleware, adminMiddleware, async
         destInv.quantityOnHand += quantity;
         destInv.quantityAvailable = destInv.quantityOnHand - destInv.quantityReserved;
         destInv.averageCost = destInv.averageCost || sourceInv.averageCost;
+        if (toRepId) destInv.distributorId = toRepId;
         destInv.updatedAt = new Date();
         await destInv.save();
+
+        // Update source distributorId if transferring to a different rep
+        if (fromRepId) {
+            sourceInv.distributorId = fromRepId;
+            await sourceInv.save();
+        }
 
         // Audit trail - source
         await new InventoryTransaction({
@@ -13732,6 +13739,66 @@ connectDB().then(async () => {
             console.log('Added Rancor 4F inventory: 180 gal @ $45.50/gal ($8,190)');
         }
     } catch (e) { console.error('Rancor 4F setup error:', e.message); }
+
+    // Fix ledger direction: supplier_payment entries should be CREDIT (AP owes Kyle/Ty), not DEBIT
+    try {
+        const fixed = await LedgerEntry.updateMany(
+            { category: 'supplier_payment', type: 'debit' },
+            { $set: { type: 'credit', updatedAt: new Date() } }
+        );
+        if (fixed.modifiedCount > 0) {
+            console.log(`Fixed ${fixed.modifiedCount} ledger entries: supplier_payment debit → credit (AP owes them)`);
+        }
+    } catch (e) { console.error('Ledger fix error:', e.message); }
+
+    // Assign inventory ownership: JABCO products → Kyle, Sims products → Ty
+    try {
+        const kyle = await User.findOne({ email: 'office@togoag.com' });
+        const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
+
+        if (kyle && ty) {
+            // JABCO products belong to Kyle
+            const jabcoChemicals = await Chemical.find({
+                sourceSupplier: { $in: ['JABCO', 'Jabco', 'CPD', 'Crop Protect Direct'] }
+            });
+            for (const chem of jabcoChemicals) {
+                await Inventory.updateMany(
+                    { chemicalId: chem._id, distributorId: { $exists: false } },
+                    { $set: { distributorId: kyle._id, updatedAt: new Date() } }
+                );
+                await Inventory.updateMany(
+                    { chemicalId: chem._id, distributorId: null },
+                    { $set: { distributorId: kyle._id, updatedAt: new Date() } }
+                );
+            }
+
+            // Sims products belong to Ty
+            const simsChemicals = await Chemical.find({
+                sourceSupplier: { $in: ['Sims Fertilizer & Chemical', 'Sims', 'sims'] }
+            });
+            for (const chem of simsChemicals) {
+                await Inventory.updateMany(
+                    { chemicalId: chem._id, distributorId: { $exists: false } },
+                    { $set: { distributorId: ty._id, updatedAt: new Date() } }
+                );
+                await Inventory.updateMany(
+                    { chemicalId: chem._id, distributorId: null },
+                    { $set: { distributorId: ty._id, updatedAt: new Date() } }
+                );
+            }
+
+            // Hydrovant fA → Kyle (direct purchase)
+            const hydrovant = await Chemical.findOne({ productName: /hydrovant/i });
+            if (hydrovant) {
+                await Inventory.updateMany(
+                    { chemicalId: hydrovant._id, distributorId: null },
+                    { $set: { distributorId: kyle._id, updatedAt: new Date() } }
+                );
+            }
+
+            console.log('Inventory ownership assigned: JABCO/CPD → Kyle, Sims → Ty');
+        }
+    } catch (e) { console.error('Inventory ownership assignment error:', e.message); }
 
     app.listen(PORT, () => {
         console.log(`Acre Profit API running on port ${PORT}`);
