@@ -5747,7 +5747,96 @@ app.get('/api/chemicals/for-customer', authMiddleware, async (req, res) => {
     }
 });
 
-// Get all chemicals with FULL pricing (admin only)
+// Customer: Get available products with inventory status and sell price ONLY
+// Only shows products we have on hand or on order - no cost/admin pricing exposed
+app.get('/api/chemicals/available', async (req, res) => {
+    try {
+        const { category } = req.query;
+
+        // Get all inventory with stock or on order
+        const inventory = await Inventory.find({
+            location: 'main',
+            $or: [
+                { quantityOnHand: { $gt: 0 } },
+                { quantityAvailable: { $gt: 0 } }
+            ]
+        }).lean();
+
+        // Get chemicals on pending POs (on order but not yet received)
+        const pendingPOs = await PurchaseOrder.find({
+            status: { $in: ['draft', 'submitted', 'confirmed', 'partial_received'] }
+        }).select('items').lean();
+
+        const onOrderChemIds = new Set();
+        const onOrderQty = {};
+        for (const po of pendingPOs) {
+            for (const item of po.items || []) {
+                if (item.chemicalId) {
+                    const key = item.chemicalId.toString();
+                    onOrderChemIds.add(key);
+                    onOrderQty[key] = (onOrderQty[key] || 0) + (item.quantityOrdered || 0);
+                }
+            }
+        }
+
+        // Combine: chemicals that have inventory OR are on order
+        const inStockChemIds = new Set(inventory.map(i => i.chemicalId?.toString()).filter(Boolean));
+        const allAvailableIds = new Set([...inStockChemIds, ...onOrderChemIds]);
+
+        if (allAvailableIds.size === 0) {
+            return res.json([]);
+        }
+
+        // Fetch chemical details
+        const query = { _id: { $in: Array.from(allAvailableIds) }, sellPrice: { $gt: 0 } };
+        if (category) query.category = category;
+
+        const chemicals = await Chemical.find(query)
+            .sort({ category: 1, productName: 1 })
+            .lean();
+
+        // Build inventory map
+        const invMap = {};
+        inventory.forEach(inv => {
+            const key = inv.chemicalId?.toString();
+            if (key) invMap[key] = inv;
+        });
+
+        // Return ONLY customer-safe data - NO cost, NO admin price, NO margins
+        const available = chemicals.map(c => {
+            const inv = invMap[c._id.toString()];
+            const onHand = inv?.quantityOnHand || 0;
+            const onOrder = onOrderQty[c._id.toString()] || 0;
+
+            let availability;
+            if (onHand > 0) {
+                availability = 'in_stock';
+            } else if (onOrder > 0) {
+                availability = 'on_order';
+            } else {
+                availability = 'limited';
+            }
+
+            return {
+                _id: c._id,
+                productName: c.productName,
+                category: c.category,
+                packSize: c.packSize,
+                unit: c.unit,
+                unitsPerPack: c.unitsPerPack,
+                sellPrice: c.sellPrice,
+                defaultRate: c.defaultRate,
+                rateUnit: c.rateUnit,
+                availability,
+                isRestrictedUse: c.isRestrictedUse
+            };
+        });
+
+        res.json(available);
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 app.get('/api/chemicals/admin', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { sourceSupplier, productName, category } = req.query;
