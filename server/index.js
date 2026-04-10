@@ -401,6 +401,7 @@ const chemicalSchema = new mongoose.Schema({
     // Product info
     productName: { type: String, required: true }, // e.g., "Dicamba DMA", "LV 6"
     sourceSupplier: { type: String, required: true }, // Where we buy from: "CPD", "Agri-Star"
+    manufacturer: { type: String }, // Who makes it (from label): "Red Eagle", "ADAMA Essentials"
     supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Link to supplier user account
 
     // Category and crop info
@@ -2474,7 +2475,7 @@ async function seedMarch2026PurchaseOrders() {
             // Find or create products for JABCO order
             const jabcoProducts = [
                 {
-                    productName: 'CPD Mesotrione',
+                    productName: 'Meso 4SC',
                     packSize: '2x2.5 GL Case',
                     unit: 'gal',
                     unitsPerPack: 5,
@@ -2484,7 +2485,7 @@ async function seedMarch2026PurchaseOrders() {
                     category: 'herbicide'
                 },
                 {
-                    productName: 'Flumioxazin 51%',
+                    productName: 'Flumioxazin 51% WDG',
                     packSize: '4x5 Lb Case',
                     unit: 'lb',
                     unitsPerPack: 20,
@@ -2494,7 +2495,7 @@ async function seedMarch2026PurchaseOrders() {
                     category: 'herbicide'
                 },
                 {
-                    productName: 'Sulfentrazone 4SC',
+                    productName: 'Sulfentrazone 39.6% SC',
                     packSize: '2x2.5 Gl Case',
                     unit: 'gal',
                     unitsPerPack: 5,
@@ -2504,7 +2505,7 @@ async function seedMarch2026PurchaseOrders() {
                     category: 'herbicide'
                 },
                 {
-                    productName: 'Dicamba DMA',
+                    productName: 'Dicamba 49.8% SL',
                     packSize: '2x2.5 Gl Case',
                     unit: 'gal',
                     unitsPerPack: 5,
@@ -2514,7 +2515,7 @@ async function seedMarch2026PurchaseOrders() {
                     category: 'herbicide'
                 },
                 {
-                    productName: '2,4-D LV6',
+                    productName: 'Defy LV-6',
                     packSize: '2x2.5 Gl Case',
                     unit: 'gal',
                     unitsPerPack: 5,
@@ -2881,7 +2882,7 @@ async function seedHydrovantInventory() {
 
         if (!hydrovant) {
             hydrovant = await Chemical.create({
-                productName: 'Hydrovant',
+                productName: 'Hydrovant fA',
                 packSize: '2x2.5 gal',
                 unit: 'gal',
                 unitsPerPack: 5,
@@ -2911,7 +2912,7 @@ async function seedHydrovantInventory() {
         // Add to inventory
         await receiveInventory({
             chemicalId: hydrovant._id,
-            productName: 'Hydrovant',
+            productName: 'Hydrovant fA',
             packSize: hydrovant.packSize || '2x2.5 gal',
             unit: 'gal',
             quantity: 360,
@@ -5561,8 +5562,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
         // sellPrice set to 0 initially - update in Pricing tab
         const cpdProducts = [
             // Dicamba products
-            { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 30.25, sellPrice: 0, category: 'herbicide' },
-            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 28.25, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Dicamba 49.8% SL', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 30.25, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Dicamba 49.8% SL', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 28.25, sellPrice: 0, category: 'herbicide' },
             { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 30.57, sellPrice: 0, category: 'herbicide' },
 
             // LV 6 (2,4-D)
@@ -5613,8 +5614,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'AMS x5', packSize: '24', unit: 'lb', unitsPerPack: 120, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - 5 bag bundle' },
 
             // Hydrovant
-            { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
-            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
+            { productName: 'Hydrovant fA', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
+            { productName: 'Hydrovant fA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
         ];
 
         const results = { created: [], existing: [] };
@@ -6200,8 +6201,8 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
 // Update chemical price (admin only)
 app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { costPrice, adminPrice, sellPrice, adminMarginDollars, marginDollars, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
-                category, crops, defaultRate, rateUnit, unitsPerPack } = req.body;
+        const { productName, sourceSupplier, manufacturer, costPrice, adminPrice, sellPrice, adminMarginDollars, marginDollars, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
+                category, crops, defaultRate, rateUnit, unitsPerPack, packSize, unit, epaRegistrationNumber, signalWord } = req.body;
 
         const chemical = await Chemical.findById(req.params.id);
         if (!chemical) {
@@ -6247,11 +6248,18 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
         if (equivalentProduct !== undefined) chemical.equivalentProduct = equivalentProduct;
         if (isActive !== undefined) chemical.isActive = isActive;
         if (availableForOrder !== undefined) chemical.availableForOrder = availableForOrder;
+        if (productName !== undefined) chemical.productName = productName;
+        if (sourceSupplier !== undefined) chemical.sourceSupplier = sourceSupplier;
+        if (manufacturer !== undefined) chemical.manufacturer = manufacturer;
         if (category !== undefined) chemical.category = category;
         if (crops !== undefined) chemical.crops = crops;
         if (defaultRate !== undefined) chemical.defaultRate = defaultRate;
         if (rateUnit !== undefined) chemical.rateUnit = rateUnit;
         if (unitsPerPack !== undefined) chemical.unitsPerPack = unitsPerPack;
+        if (packSize !== undefined) chemical.packSize = packSize;
+        if (unit !== undefined) chemical.unit = unit;
+        if (epaRegistrationNumber !== undefined) chemical.epaRegistrationNumber = epaRegistrationNumber;
+        if (signalWord !== undefined) chemical.signalWord = signalWord;
 
         chemical.updatedAt = new Date();
         await chemical.save();
@@ -13621,7 +13629,33 @@ connectDB().then(async () => {
         }
     } catch (e) { console.error('Shuttle fix error:', e.message); }
 
-    // Ensure Flumioxazin 51% has inventory (from JABCO-SO2129: 1440 lb)
+    // Rename products to match actual label names
+    try {
+        const renames = [
+            { old: 'Dicamba DMA', new: 'Dicamba 49.8% SL', manufacturer: 'Red Eagle Agricultural Chemicals' },
+            { old: 'CPD Mesotrione', new: 'Meso 4SC', manufacturer: 'JABCO LLC (Crop Protect Direct)' },
+            { old: '2,4-D LV6', new: 'Defy LV-6', manufacturer: 'ADAMA Essentials' },
+            { old: 'Flumioxazin 51%', new: 'Flumioxazin 51% WDG', manufacturer: 'Red Eagle Agricultural Chemicals' },
+            { old: 'Sulfentrazone 4SC', new: 'Sulfentrazone 39.6% SC', manufacturer: '' },
+            { old: 'Sulfentrazone', new: 'Sulfentrazone 39.6% SC', manufacturer: '' },
+            { old: 'Hydrovant', new: 'Hydrovant fA', manufacturer: 'Corbet Scientific, LLC' },
+        ];
+
+        for (const r of renames) {
+            const updated = await Chemical.updateMany(
+                { productName: r.old },
+                { $set: { productName: r.new, ...(r.manufacturer ? { manufacturer: r.manufacturer } : {}), updatedAt: new Date() } }
+            );
+            if (updated.modifiedCount > 0) {
+                console.log(`Renamed "${r.old}" → "${r.new}" (${updated.modifiedCount} records)`);
+                // Also update inventory records
+                await Inventory.updateMany({ productName: r.old }, { $set: { productName: r.new, updatedAt: new Date() } });
+                await InventoryBatch.updateMany({ productName: r.old }, { $set: { productName: r.new } });
+            }
+        }
+    } catch (e) { console.error('Product rename error:', e.message); }
+
+    // Ensure Flumioxazin 51% WDG has inventory (from JABCO-SO2129: 1440 lb)
     try {
         const flumi = await Chemical.findOne({ productName: /flumioxazin/i });
         if (flumi) {

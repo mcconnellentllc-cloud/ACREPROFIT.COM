@@ -1540,11 +1540,31 @@
             <div class="modal-overlay" id="editProductModal" style="display: none;">
                 <div class="modal-content" style="max-width: 500px;">
                     <button class="modal-close" onclick="closeEditProductModal()">&times;</button>
-                    <h2 style="margin-bottom: 20px;">Edit Product Margins</h2>
+                    <h2 style="margin-bottom: 20px;">Edit Product</h2>
                     <input type="hidden" id="editProductId">
-                    <div style="background: #f8fafc; padding: 16px; border-radius: 8px; margin-bottom: 20px;">
-                        <div style="font-weight: 700; font-size: 1.1rem;" id="editProductName"></div>
-                        <div style="color: var(--text-muted);" id="editProductDetails"></div>
+                    <div style="margin-bottom: 16px;">
+                        <label style="display: block; margin-bottom: 6px; font-weight: 600;">Product Name (as on label)</label>
+                        <input type="text" id="editProductNameInput" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius); font-weight: 700; font-size: 1.05rem;">
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600;">Supplier</label>
+                            <input type="text" id="editProductSupplier" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600;">Manufacturer</label>
+                            <input type="text" id="editProductManufacturer" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);" placeholder="From label">
+                        </div>
+                    </div>
+                    <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                        <div style="flex: 1;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600;">EPA Reg. No.</label>
+                            <input type="text" id="editProductEpaReg" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);" placeholder="e.g., 101458-3">
+                        </div>
+                        <div style="flex: 1;">
+                            <label style="display: block; margin-bottom: 6px; font-weight: 600;">Pack Size</label>
+                            <input type="text" id="editProductPackSize" style="width: 100%; padding: 10px; border: 2px solid var(--border); border-radius: var(--radius);">
+                        </div>
                     </div>
                     <div class="form-group" style="margin-bottom: 16px;">
                         <label style="display: block; margin-bottom: 6px; font-weight: 600;">Cost Price</label>
@@ -4805,8 +4825,11 @@
         function openEditProductModal(product) {
             document.getElementById('editProductModal').style.display = 'flex';
             document.getElementById('editProductId').value = product._id;
-            document.getElementById('editProductName').textContent = product.productName;
-            document.getElementById('editProductDetails').textContent = `${product.sourceSupplier} | ${product.packSize} (${product.unit})`;
+            document.getElementById('editProductNameInput').value = product.productName || '';
+            document.getElementById('editProductSupplier').value = product.sourceSupplier || '';
+            document.getElementById('editProductManufacturer').value = product.manufacturer || '';
+            document.getElementById('editProductEpaReg').value = product.epaRegistrationNumber || '';
+            document.getElementById('editProductPackSize').value = product.packSize || '';
 
             const cost = product.costPrice || 0;
             const adminPrice = product.adminPrice || cost;
@@ -4842,6 +4865,11 @@
 
         async function saveProductMargins() {
             const productId = document.getElementById('editProductId').value;
+            const productName = document.getElementById('editProductNameInput').value.trim();
+            const sourceSupplier = document.getElementById('editProductSupplier').value.trim();
+            const manufacturer = document.getElementById('editProductManufacturer').value.trim();
+            const epaRegistrationNumber = document.getElementById('editProductEpaReg').value.trim();
+            const packSize = document.getElementById('editProductPackSize').value.trim();
             const costPrice = parseFloat(document.getElementById('editProductCost').value) || 0;
             const adminMarginDollars = parseFloat(document.getElementById('editProductAdminMargin').value) || 0;
             const marginDollars = parseFloat(document.getElementById('editProductMargin').value) || 0;
@@ -4857,6 +4885,11 @@
                         'Authorization': `Bearer ${token}`
                     },
                     body: JSON.stringify({
+                        productName,
+                        sourceSupplier,
+                        manufacturer,
+                        epaRegistrationNumber,
+                        packSize,
                         costPrice,
                         adminMarginDollars,
                         marginDollars,
