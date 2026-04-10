@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Spray Programs - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        * { box-sizing: border-box; }
+        .sp-page { padding: 1.5rem 0 4rem; min-height: 100vh; background: #f8f9fa; }
+        .sp-header { margin-bottom: 1.5rem; }
+        .sp-header h1 { font-size: 2rem; margin: 0 0 0.25rem; color: #1a1a2e; }
+        .sp-header p { color: #666; margin: 0; }
+
+        /* Step Wizard */
+        .steps { display: flex; gap: 0; margin-bottom: 2rem; border-bottom: 2px solid #e5e7eb; }
+        .step { padding: 0.75rem 1.5rem; font-weight: 600; color: #999; cursor: pointer; border-bottom: 3px solid transparent; font-size: 0.9rem; white-space: nowrap; }
+        .step.active { color: #2d5a27; border-bottom-color: #2d5a27; }
+        .step.done { color: #059669; }
+        .step-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 50%; background: #e5e7eb; color: #666; font-size: 0.75rem; margin-right: 0.5rem; }
+        .step.active .step-num { background: #2d5a27; color: white; }
+        .step.done .step-num { background: #059669; color: white; }
+        .step-content { display: none; }
+        .step-content.active { display: block; }
+
+        /* Cards */
+        .crop-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 1rem; }
+        .crop-card { background: white; border: 2px solid #e5e7eb; border-radius: 12px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; }
+        .crop-card:hover { border-color: #2d5a27; box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .crop-card.selected { border-color: #2d5a27; background: #f0f7ef; }
+        .crop-card h3 { margin: 0.5rem 0 0; font-size: 1rem; }
+        .crop-icon { font-size: 2.5rem; }
+
+        .timing-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 1rem; }
+        .timing-card { background: white; border: 2px solid #e5e7eb; border-radius: 10px; padding: 1.25rem; cursor: pointer; transition: all 0.2s; }
+        .timing-card:hover { border-color: #2d5a27; }
+        .timing-card.selected { border-color: #2d5a27; background: #f0f7ef; }
+        .timing-card h3 { margin: 0 0 0.25rem; font-size: 0.95rem; }
+        .timing-card p { margin: 0; color: #888; font-size: 0.82rem; }
+
+        /* Mix Builder */
+        .mix-section { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1.5rem; }
+        .mix-section h2 { margin: 0 0 1rem; font-size: 1.1rem; }
+        .acres-input { display: flex; align-items: center; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; }
+        .acres-input label { font-weight: 600; }
+        .acres-input input { padding: 0.6rem; border: 2px solid #ddd; border-radius: 8px; width: 120px; font-size: 1rem; font-weight: 600; text-align: center; }
+        .acres-input input:focus { border-color: #2d5a27; outline: none; }
+
+        /* Chemical rows */
+        .chem-table { width: 100%; border-collapse: collapse; }
+        .chem-table th { background: #f9fafb; padding: 0.6rem 0.75rem; text-align: left; font-size: 0.78rem; text-transform: uppercase; color: #666; border-bottom: 2px solid #e5e7eb; }
+        .chem-table td { padding: 0.6rem 0.75rem; border-bottom: 1px solid #f0f0f0; vertical-align: middle; }
+        .chem-table .right { text-align: right; }
+        .chem-table .center { text-align: center; }
+        .chem-table select { padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; font-size: 0.88rem; width: 100%; }
+        .chem-table input[type="number"] { padding: 0.4rem; border: 1px solid #ddd; border-radius: 4px; width: 80px; text-align: center; font-size: 0.88rem; }
+        .remove-row { background: #fee2e2; color: #991b1b; border: none; border-radius: 4px; padding: 0.3rem 0.6rem; cursor: pointer; font-weight: 700; }
+
+        /* Totals */
+        .totals-row td { font-weight: 700; background: #f9fafb; border-top: 2px solid #1a1a2e; }
+        .package-note { font-size: 0.78rem; color: #888; }
+
+        /* Review */
+        .review-card { background: white; border-radius: 12px; padding: 1.5rem; box-shadow: 0 2px 8px rgba(0,0,0,0.06); margin-bottom: 1rem; }
+        .review-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem; }
+        .badge { display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .badge-crop { background: #d1fae5; color: #065f46; }
+        .badge-timing { background: #dbeafe; color: #1e40af; }
+
+        /* Buttons */
+        .btn { padding: 0.6rem 1.2rem; border: none; border-radius: 8px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-outline { background: white; color: #2d5a27; border: 2px solid #2d5a27; }
+        .btn-secondary { background: #6b7280; color: white; }
+        .btn-lg { padding: 0.8rem 2rem; font-size: 1rem; }
+        .btn-sm { padding: 0.4rem 0.8rem; font-size: 0.85rem; }
+        .step-nav { display: flex; justify-content: space-between; margin-top: 2rem; }
+
+        /* My Programs */
+        .program-list { display: grid; gap: 1rem; }
+        .program-card { background: white; border-radius: 10px; padding: 1.25rem; box-shadow: 0 2px 6px rgba(0,0,0,0.06); display: flex; justify-content: space-between; align-items: center; }
+        .program-info h3 { margin: 0 0 0.25rem; }
+        .program-meta { display: flex; gap: 0.5rem; align-items: center; }
+        .status-badge { padding: 0.2rem 0.6rem; border-radius: 12px; font-size: 0.78rem; font-weight: 600; }
+        .status-submitted { background: #fef3c7; color: #92400e; }
+        .status-pricing { background: #dbeafe; color: #1e40af; }
+        .status-quoted { background: #d1fae5; color: #065f46; }
+        .status-accepted { background: #059669; color: white; }
+
+        .empty-state { text-align: center; padding: 3rem; color: #888; }
+
+        @media (max-width: 768px) {
+            .crop-grid { grid-template-columns: repeat(2, 1fr); }
+            .timing-grid { grid-template-columns: 1fr; }
+            .steps { overflow-x: auto; }
+            .chem-table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links" id="navLinks">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/products.html" class="nav-link">Products</a>
+                <a href="/spray-programs.html" class="nav-link active">Spray Programs</a>
+                <a href="/my-orders.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="navUserName">User</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+            <button class="mobile-menu-btn" id="mobileMenuBtn" aria-label="Toggle menu">
+                <span></span><span></span><span></span>
+            </button>
+        </div>
+    </nav>
+
+    <main class="sp-page">
+        <div class="container">
+            <div class="sp-header">
+                <h1>Spray Programs</h1>
+                <p>Build your spray program by crop and timing. Submit for pricing and we'll get you the best deal.</p>
+            </div>
+
+            <!-- Tab Toggle -->
+            <div style="display: flex; gap: 0; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.5rem;">
+                <button class="step active" onclick="showView('builder')" id="builderTab">Build New Program</button>
+                <button class="step" onclick="showView('programs')" id="programsTab">My Submissions</button>
+            </div>
+
+            <!-- ===== BUILDER VIEW ===== -->
+            <div id="builderView">
+                <div class="steps" id="stepBar">
+                    <div class="step active" data-step="1"><span class="step-num">1</span>Crop</div>
+                    <div class="step" data-step="2"><span class="step-num">2</span>Timing</div>
+                    <div class="step" data-step="3"><span class="step-num">3</span>Build Mix</div>
+                    <div class="step" data-step="4"><span class="step-num">4</span>Review & Submit</div>
+                </div>
+
+                <!-- Step 1: Crop -->
+                <div class="step-content active" id="step1">
+                    <h2 style="margin-bottom: 1rem;">What crop are you spraying?</h2>
+                    <div class="crop-grid" id="cropGrid">
+                        <div class="crop-card" onclick="selectCrop('fallow')" data-crop="fallow">
+                            <div class="crop-icon">🌾</div><h3>Summerfallow</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('dryland-corn')" data-crop="dryland-corn">
+                            <div class="crop-icon">🌽</div><h3>Dryland Corn</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('irrigated-corn')" data-crop="irrigated-corn">
+                            <div class="crop-icon">💧🌽</div><h3>Irrigated Corn</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('wheat')" data-crop="wheat">
+                            <div class="crop-icon">🌾</div><h3>Wheat</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('sorghum')" data-crop="sorghum">
+                            <div class="crop-icon">🌿</div><h3>Milo / Sorghum</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('soybeans')" data-crop="soybeans">
+                            <div class="crop-icon">🫘</div><h3>Soybeans</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('sunflower')" data-crop="sunflower">
+                            <div class="crop-icon">🌻</div><h3>Sunflower</h3>
+                        </div>
+                        <div class="crop-card" onclick="selectCrop('crp')" data-crop="crp">
+                            <div class="crop-icon">🏞️</div><h3>CRP / Pasture</h3>
+                        </div>
+                    </div>
+                    <div class="step-nav"><div></div><button class="btn btn-primary" onclick="goStep(2)" id="step1Next" disabled>Next: Choose Timing →</button></div>
+                </div>
+
+                <!-- Step 2: Timing -->
+                <div class="step-content" id="step2">
+                    <h2 style="margin-bottom: 1rem;">When is this application? <span id="step2Crop" class="badge badge-crop"></span></h2>
+                    <div class="timing-grid" id="timingGrid">
+                        <div class="timing-card" onclick="selectTiming('fall')" data-timing="fall">
+                            <h3>Fall Application</h3><p>Post-harvest burndown, fall pre-emerge</p>
+                        </div>
+                        <div class="timing-card" onclick="selectTiming('early-spring')" data-timing="early-spring">
+                            <h3>Early Spring / Burndown</h3><p>Pre-plant burndown, early weed control</p>
+                        </div>
+                        <div class="timing-card" onclick="selectTiming('pre-emerge')" data-timing="pre-emerge">
+                            <h3>Pre-Emerge</h3><p>At or after planting, before crop emerges</p>
+                        </div>
+                        <div class="timing-card" onclick="selectTiming('post-emerge')" data-timing="post-emerge">
+                            <h3>Post-Emerge</h3><p>In-crop application, V2-V6+</p>
+                        </div>
+                        <div class="timing-card" onclick="selectTiming('late-season')" data-timing="late-season">
+                            <h3>Late Season</h3><p>Layby, late-post, pre-tassel</p>
+                        </div>
+                        <div class="timing-card" onclick="selectTiming('post-harvest')" data-timing="post-harvest">
+                            <h3>Post-Harvest</h3><p>Harvest aid, desiccant, fall cleanup</p>
+                        </div>
+                    </div>
+                    <div class="step-nav">
+                        <button class="btn btn-outline" onclick="goStep(1)">← Back</button>
+                        <button class="btn btn-primary" onclick="goStep(3)" id="step2Next" disabled>Next: Build Your Mix →</button>
+                    </div>
+                </div>
+
+                <!-- Step 3: Build Mix -->
+                <div class="step-content" id="step3">
+                    <div class="mix-section">
+                        <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem;">
+                            <h2 style="margin: 0;">Build Your Mix <span id="step3Crop" class="badge badge-crop"></span> <span id="step3Timing" class="badge badge-timing"></span></h2>
+                        </div>
+
+                        <div class="acres-input" style="margin-top: 1rem;">
+                            <label>Total Acres:</label>
+                            <input type="number" id="acresInput" min="1" value="160" oninput="recalcMix()">
+                            <label style="margin-left: 1rem;">Gal/Acre:</label>
+                            <input type="number" id="gpaInput" min="1" value="15" step="0.5" oninput="recalcMix()" style="width: 80px;">
+                        </div>
+
+                        <div style="overflow-x: auto;">
+                            <table class="chem-table">
+                                <thead>
+                                    <tr>
+                                        <th style="min-width: 220px;">Chemical</th>
+                                        <th>Rate</th>
+                                        <th>Unit</th>
+                                        <th class="right">Total Needed</th>
+                                        <th class="right">Packages</th>
+                                        <th class="right">Total Volume</th>
+                                        <th class="center"></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="mixBody"></tbody>
+                            </table>
+                        </div>
+                        <button class="btn btn-outline btn-sm" onclick="addChemRow()" style="margin-top: 0.75rem;">+ Add Chemical</button>
+                    </div>
+
+                    <div class="step-nav">
+                        <button class="btn btn-outline" onclick="goStep(2)">← Back</button>
+                        <button class="btn btn-primary btn-lg" onclick="goStep(4)" id="step3Next">Review & Submit for Pricing →</button>
+                    </div>
+                </div>
+
+                <!-- Step 4: Review & Submit -->
+                <div class="step-content" id="step4">
+                    <div class="review-card">
+                        <div class="review-header">
+                            <h2 style="margin:0;">Review Your Program</h2>
+                            <button class="btn btn-outline btn-sm" onclick="goStep(3)">Edit Mix</button>
+                        </div>
+                        <div style="display: flex; gap: 1rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                            <span id="rev4Crop" class="badge badge-crop"></span>
+                            <span id="rev4Timing" class="badge badge-timing"></span>
+                            <span id="rev4Acres" style="color: #666;"></span>
+                        </div>
+                        <div style="overflow-x: auto;" id="reviewTable"></div>
+                        <div style="margin-top: 1rem;">
+                            <label style="font-weight: 600; display: block; margin-bottom: 0.3rem;">Notes for your distributor (optional)</label>
+                            <textarea id="submitNotes" rows="2" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;" placeholder="Special instructions, preferred brands, delivery notes..."></textarea>
+                        </div>
+                    </div>
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 1rem; margin-bottom: 1rem; font-size: 0.9rem; color: #1e40af;">
+                        <strong>What happens next?</strong> Your program will be submitted to your distributor. They'll aggregate all customer programs, bid it out to suppliers for the best price, then get back to you with confirmed pricing. No commitment until you approve the price.
+                    </div>
+                    <div class="step-nav">
+                        <button class="btn btn-outline" onclick="goStep(3)">← Edit Mix</button>
+                        <button class="btn btn-primary btn-lg" onclick="submitProgram()">Submit for Pricing</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ===== MY PROGRAMS VIEW ===== -->
+            <div id="programsView" style="display: none;">
+                <div id="myProgramsList" class="program-list">
+                    <div class="empty-state"><p>Loading your submissions...</p></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('acreprofit_token');
+        const userStr = localStorage.getItem('acreprofit_user');
+        let user = null;
+        let chemicals = [];
+        let selectedCrop = '';
+        let selectedTiming = '';
+        let chemRowCount = 0;
+
+        const cropLabels = {
+            'fallow': 'Summerfallow', 'dryland-corn': 'Dryland Corn', 'irrigated-corn': 'Irrigated Corn',
+            'wheat': 'Wheat', 'sorghum': 'Milo / Sorghum', 'soybeans': 'Soybeans',
+            'sunflower': 'Sunflower', 'crp': 'CRP / Pasture'
+        };
+        const timingLabels = {
+            'fall': 'Fall Application', 'early-spring': 'Early Spring / Burndown', 'pre-emerge': 'Pre-Emerge',
+            'post-emerge': 'Post-Emerge', 'late-season': 'Late Season', 'post-harvest': 'Post-Harvest'
+        };
+
+        // Auth
+        (function() {
+            if (!token || !userStr) { window.location.href = '/login.html'; return; }
+            try { user = JSON.parse(userStr); document.getElementById('navUserName').textContent = user.name || user.email; }
+            catch(e) { window.location.href = '/login.html'; }
+        })();
+
+        // Load chemicals
+        async function loadChemicals() {
+            if (chemicals.length > 0) return;
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/available`);
+                if (res.ok) chemicals = await res.json();
+                // Fallback to full catalog
+                if (chemicals.length === 0) {
+                    const res2 = await fetch(`${API_URL}/api/chemicals`);
+                    if (res2.ok) chemicals = await res2.json();
+                }
+            } catch(e) { console.warn('Could not load chemicals', e); }
+        }
+
+        // View toggle
+        function showView(view) {
+            document.getElementById('builderView').style.display = view === 'builder' ? 'block' : 'none';
+            document.getElementById('programsView').style.display = view === 'programs' ? 'block' : 'none';
+            document.getElementById('builderTab').classList.toggle('active', view === 'builder');
+            document.getElementById('programsTab').classList.toggle('active', view === 'programs');
+            if (view === 'programs') loadMyPrograms();
+        }
+
+        // Step navigation
+        function goStep(num) {
+            document.querySelectorAll('.step-content').forEach(c => c.classList.remove('active'));
+            document.getElementById('step' + num).classList.add('active');
+            document.querySelectorAll('#stepBar .step').forEach((s, i) => {
+                s.classList.remove('active');
+                if (i < num - 1) s.classList.add('done');
+                else s.classList.remove('done');
+                if (i === num - 1) s.classList.add('active');
+            });
+            if (num === 3) { loadChemicals().then(() => { if (document.getElementById('mixBody').children.length === 0) { addChemRow(); addChemRow(); } }); }
+            if (num === 4) buildReview();
+        }
+
+        // Step 1: Crop
+        function selectCrop(crop) {
+            selectedCrop = crop;
+            document.querySelectorAll('.crop-card').forEach(c => c.classList.toggle('selected', c.dataset.crop === crop));
+            document.getElementById('step1Next').disabled = false;
+            document.getElementById('step2Crop').textContent = cropLabels[crop] || crop;
+            document.getElementById('step3Crop').textContent = cropLabels[crop] || crop;
+        }
+
+        // Step 2: Timing
+        function selectTiming(timing) {
+            selectedTiming = timing;
+            document.querySelectorAll('.timing-card').forEach(c => c.classList.toggle('selected', c.dataset.timing === timing));
+            document.getElementById('step2Next').disabled = false;
+            document.getElementById('step3Timing').textContent = timingLabels[timing] || timing;
+        }
+
+        // Step 3: Build mix
+        function addChemRow() {
+            const tbody = document.getElementById('mixBody');
+            const rowId = chemRowCount++;
+            const options = chemicals.map(c =>
+                `<option value="${c._id}" data-name="${c.productName}" data-pack="${c.packSize||''}" data-unit="${c.unit||''}" data-upp="${c.unitsPerPack||1}" data-cat="${c.category||''}">${c.productName}</option>`
+            ).join('');
+
+            const tr = document.createElement('tr');
+            tr.id = `chemRow${rowId}`;
+            tr.innerHTML = `
+                <td><select onchange="onChemSelect(${rowId})"><option value="">Select chemical...</option>${options}</select></td>
+                <td><input type="number" class="chem-rate" step="0.1" min="0" placeholder="0" oninput="recalcMix()"></td>
+                <td>
+                    <select class="chem-rate-unit" onchange="recalcMix()">
+                        <option value="oz/acre">oz/acre</option>
+                        <option value="pt/acre">pt/acre</option>
+                        <option value="qt/acre">qt/acre</option>
+                        <option value="gal/acre">gal/acre</option>
+                        <option value="lb/acre">lb/acre</option>
+                        <option value="% v/v">% v/v</option>
+                    </select>
+                </td>
+                <td class="right chem-total-needed">-</td>
+                <td class="right chem-packages">-</td>
+                <td class="right chem-total-vol">-</td>
+                <td class="center"><button class="remove-row" onclick="removeChemRow(${rowId})">X</button></td>
+            `;
+            tbody.appendChild(tr);
+        }
+
+        function onChemSelect(rowId) {
+            const row = document.getElementById(`chemRow${rowId}`);
+            const select = row.querySelector('select');
+            const opt = select.options[select.selectedIndex];
+            if (opt.dataset.unit) {
+                // Auto-set rate unit based on product unit
+                const unit = opt.dataset.unit;
+                const rateUnit = row.querySelector('.chem-rate-unit');
+                if (unit === 'gal') rateUnit.value = 'oz/acre';
+                else if (unit === 'lb') rateUnit.value = 'lb/acre';
+                else if (unit === 'oz') rateUnit.value = 'oz/acre';
+            }
+            recalcMix();
+        }
+
+        function removeChemRow(rowId) {
+            document.getElementById(`chemRow${rowId}`)?.remove();
+            recalcMix();
+        }
+
+        function recalcMix() {
+            const acres = parseFloat(document.getElementById('acresInput').value) || 0;
+            const gpa = parseFloat(document.getElementById('gpaInput').value) || 15;
+
+            document.querySelectorAll('#mixBody tr').forEach(row => {
+                const select = row.querySelector('select');
+                const opt = select?.options[select.selectedIndex];
+                const rate = parseFloat(row.querySelector('.chem-rate')?.value) || 0;
+                const rateUnit = row.querySelector('.chem-rate-unit')?.value || 'oz/acre';
+                const unitsPerPack = parseFloat(opt?.dataset?.upp) || 1;
+                const unit = opt?.dataset?.unit || '';
+
+                if (!opt?.value || rate === 0 || acres === 0) {
+                    row.querySelector('.chem-total-needed').textContent = '-';
+                    row.querySelector('.chem-packages').textContent = '-';
+                    row.querySelector('.chem-total-vol').textContent = '-';
+                    return;
+                }
+
+                // Convert rate to product units
+                let totalNeeded = rate * acres;
+
+                // Handle % v/v (percentage of spray volume)
+                if (rateUnit === '% v/v') {
+                    totalNeeded = (rate / 100) * gpa * acres;
+                }
+                // Convert oz to gal if product is in gal
+                else if (rateUnit === 'oz/acre' && unit === 'gal') {
+                    totalNeeded = (rate * acres) / 128; // 128 oz per gal
+                } else if (rateUnit === 'pt/acre' && unit === 'gal') {
+                    totalNeeded = (rate * acres) / 8;
+                } else if (rateUnit === 'qt/acre' && unit === 'gal') {
+                    totalNeeded = (rate * acres) / 4;
+                }
+
+                const packages = Math.ceil(totalNeeded / unitsPerPack);
+                const totalVol = packages * unitsPerPack;
+
+                row.querySelector('.chem-total-needed').textContent = totalNeeded.toFixed(1) + ' ' + unit;
+                row.querySelector('.chem-packages').innerHTML = `<strong>${packages}</strong><br><span class="package-note">${opt.dataset.pack || ''}</span>`;
+                row.querySelector('.chem-total-vol').innerHTML = `<strong>${totalVol.toLocaleString()} ${unit}</strong>`;
+            });
+        }
+
+        // Step 4: Review
+        function buildReview() {
+            const acres = parseFloat(document.getElementById('acresInput').value) || 0;
+            const gpa = parseFloat(document.getElementById('gpaInput').value) || 15;
+            document.getElementById('rev4Crop').textContent = cropLabels[selectedCrop] || selectedCrop;
+            document.getElementById('rev4Timing').textContent = timingLabels[selectedTiming] || selectedTiming;
+            document.getElementById('rev4Acres').textContent = acres + ' acres @ ' + gpa + ' gal/acre';
+
+            let html = `<table class="chem-table"><thead><tr><th>Chemical</th><th>Rate</th><th class="right">Total Needed</th><th class="right">Packages to Order</th><th class="right">Total Volume</th></tr></thead><tbody>`;
+
+            const items = getMixItems();
+            items.forEach(item => {
+                html += `<tr>
+                    <td><strong>${item.productName}</strong></td>
+                    <td>${item.rate} ${item.rateUnit}</td>
+                    <td class="right">${item.totalNeeded.toFixed(1)} ${item.unit}</td>
+                    <td class="right"><strong>${item.packages}</strong> (${item.packSize})</td>
+                    <td class="right"><strong>${item.totalVolume.toLocaleString()} ${item.unit}</strong></td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('reviewTable').innerHTML = html;
+        }
+
+        function getMixItems() {
+            const acres = parseFloat(document.getElementById('acresInput').value) || 0;
+            const gpa = parseFloat(document.getElementById('gpaInput').value) || 15;
+            const items = [];
+
+            document.querySelectorAll('#mixBody tr').forEach(row => {
+                const select = row.querySelector('select');
+                const opt = select?.options[select.selectedIndex];
+                const rate = parseFloat(row.querySelector('.chem-rate')?.value) || 0;
+                const rateUnit = row.querySelector('.chem-rate-unit')?.value || 'oz/acre';
+
+                if (!opt?.value || rate === 0) return;
+
+                const unitsPerPack = parseFloat(opt.dataset.upp) || 1;
+                const unit = opt.dataset.unit || '';
+
+                let totalNeeded = rate * acres;
+                if (rateUnit === '% v/v') totalNeeded = (rate / 100) * gpa * acres;
+                else if (rateUnit === 'oz/acre' && unit === 'gal') totalNeeded = (rate * acres) / 128;
+                else if (rateUnit === 'pt/acre' && unit === 'gal') totalNeeded = (rate * acres) / 8;
+                else if (rateUnit === 'qt/acre' && unit === 'gal') totalNeeded = (rate * acres) / 4;
+
+                const packages = Math.ceil(totalNeeded / unitsPerPack);
+
+                items.push({
+                    chemicalId: opt.value,
+                    productName: opt.dataset.name,
+                    category: opt.dataset.cat,
+                    packSize: opt.dataset.pack,
+                    unit,
+                    unitsPerPack,
+                    rate,
+                    rateUnit,
+                    totalNeeded,
+                    packages,
+                    totalVolume: packages * unitsPerPack,
+                    quantityNeeded: packages * unitsPerPack
+                });
+            });
+            return items;
+        }
+
+        // Submit
+        async function submitProgram() {
+            const items = getMixItems();
+            if (items.length === 0) { alert('Add at least one chemical to your mix.'); return; }
+            if (!selectedCrop) { alert('Please select a crop.'); return; }
+            if (!selectedTiming) { alert('Please select a timing.'); return; }
+
+            const acres = parseFloat(document.getElementById('acresInput').value) || 0;
+            if (acres <= 0) { alert('Enter your total acres.'); return; }
+
+            const data = {
+                crop: selectedCrop,
+                timing: selectedTiming,
+                acres,
+                gallonsPerAcre: parseFloat(document.getElementById('gpaInput').value) || 15,
+                items: items.map(i => ({
+                    productName: i.productName,
+                    chemicalId: i.chemicalId,
+                    category: i.category,
+                    packSize: i.packSize,
+                    unit: i.unit,
+                    quantityNeeded: i.quantityNeeded
+                })),
+                customerNotes: document.getElementById('submitNotes').value.trim()
+            };
+
+            try {
+                const res = await fetch(`${API_URL}/api/quote-requests`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(data)
+                });
+                if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed'); }
+                const result = await res.json();
+                alert('Program submitted! Your distributor will review and get back to you with pricing. Quote #: ' + result.quoteNumber);
+                // Reset
+                selectedCrop = ''; selectedTiming = '';
+                document.querySelectorAll('.crop-card, .timing-card').forEach(c => c.classList.remove('selected'));
+                document.getElementById('mixBody').innerHTML = '';
+                chemRowCount = 0;
+                goStep(1);
+                showView('programs');
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // My Programs
+        async function loadMyPrograms() {
+            const container = document.getElementById('myProgramsList');
+            container.innerHTML = '<div class="empty-state"><p>Loading...</p></div>';
+            try {
+                const res = await fetch(`${API_URL}/api/quote-requests`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const quotes = Array.isArray(data) ? data : (data.quoteRequests || []);
+
+                if (quotes.length === 0) {
+                    container.innerHTML = '<div class="empty-state"><h3>No programs submitted yet</h3><p>Build your first spray program above!</p></div>';
+                    return;
+                }
+
+                container.innerHTML = quotes.map(q => {
+                    const statusClass = 'status-' + (q.status || 'submitted');
+                    const statusLabel = { submitted: 'Awaiting Pricing', pricing: 'Being Priced', quoted: 'Price Ready', accepted: 'Accepted', converted: 'Ordered' }[q.status] || q.status;
+                    const cropLabel = cropLabels[q.crop] || q.crop || 'General';
+                    const timingLabel = timingLabels[q.timing] || q.timing || '';
+                    const itemCount = q.items?.length || 0;
+                    const date = q.submittedAt ? new Date(q.submittedAt).toLocaleDateString() : '';
+
+                    return `<div class="program-card">
+                        <div class="program-info">
+                            <h3>${q.quoteNumber} - ${cropLabel}${timingLabel ? ' / ' + timingLabel : ''}</h3>
+                            <div class="program-meta">
+                                <span class="badge badge-crop">${cropLabel}</span>
+                                ${timingLabel ? `<span class="badge badge-timing">${timingLabel}</span>` : ''}
+                                <span style="color:#888; font-size:0.82rem;">${itemCount} chemicals</span>
+                                <span style="color:#888; font-size:0.82rem;">${q.acres || ''} acres</span>
+                                <span style="color:#888; font-size:0.82rem;">${date}</span>
+                            </div>
+                        </div>
+                        <div><span class="status-badge ${statusClass}">${statusLabel}</span></div>
+                    </div>`;
+                }).join('');
+            } catch (error) {
+                container.innerHTML = '<div class="empty-state"><p>Error loading programs.</p></div>';
+            }
+        }
+
+        // Nav
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token'); localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+        document.getElementById('mobileMenuBtn')?.addEventListener('click', () => {
+            document.getElementById('navLinks').classList.toggle('active');
+        });
+    </script>
+</body>
+</html>
