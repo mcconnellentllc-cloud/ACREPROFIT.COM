@@ -55,6 +55,8 @@ const connectDB = async () => {
             await seedJabcoInventory();
             // Seed March 2026 purchase orders
             await seedMarch2026PurchaseOrders();
+            // Backfill inventory from any received POs missing inventory records
+            await backfillInventoryFromPOs();
         } else {
             console.log('No MongoDB URI provided, running without database');
         }
@@ -962,7 +964,7 @@ const ledgerEntrySchema = new mongoose.Schema({
         enum: ['order', 'payment', 'supplier_payment', 'commission', 'adjustment', 'refund'],
         default: 'adjustment'
     },
-    referenceType: { type: String, enum: ['ChemicalOrder', 'Order', 'Manual'], default: 'Manual' },
+    referenceType: { type: String, enum: ['ChemicalOrder', 'Order', 'PurchaseOrder', 'Manual'], default: 'Manual' },
     referenceId: { type: mongoose.Schema.Types.ObjectId },
     // Positive = rep owes Acre Profit, Negative = Acre Profit owes rep
     runningBalance: { type: Number, default: 0 },
@@ -2685,6 +2687,128 @@ async function seedMarch2026PurchaseOrders() {
         console.log('March 2026 purchase orders seeded successfully. Total: $223,062.00');
     } catch (error) {
         console.error('Error seeding March 2026 purchase orders:', error.message);
+    }
+}
+
+// Backfill inventory from all received POs that don't have inventory records yet
+async function backfillInventoryFromPOs() {
+    try {
+        // Find all POs that are received or partially received
+        const receivedPOs = await PurchaseOrder.find({
+            status: { $in: ['received', 'partial_received'] }
+        });
+
+        if (receivedPOs.length === 0) {
+            console.log('No received POs to backfill');
+            return;
+        }
+
+        let totalBackfilled = 0;
+        let ledgerEntriesCreated = 0;
+
+        for (const po of receivedPOs) {
+            // Check if this PO already has inventory batches
+            const existingBatches = await InventoryBatch.find({ poId: po._id });
+            if (existingBatches.length > 0) {
+                continue; // Already has inventory records
+            }
+
+            // Also check by PO number
+            const batchByNumber = await InventoryBatch.findOne({ poNumber: po.poNumber });
+            if (batchByNumber) {
+                continue;
+            }
+
+            console.log(`Backfilling inventory for PO ${po.poNumber}...`);
+
+            for (const item of po.items) {
+                let chemicalId = item.chemicalId;
+
+                // Try to find chemical if not linked
+                if (!chemicalId && item.productName) {
+                    const chemical = await Chemical.findOne({
+                        productName: { $regex: new RegExp(`^${item.productName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}$`, 'i') }
+                    });
+                    if (chemical) {
+                        chemicalId = chemical._id;
+                        item.chemicalId = chemicalId;
+                    }
+                }
+
+                if (!chemicalId) {
+                    console.warn(`  Skipping item "${item.productName}" - no chemical ID found`);
+                    continue;
+                }
+
+                const quantity = item.quantityOrdered;
+
+                await receiveInventory({
+                    chemicalId,
+                    productName: item.productName,
+                    packSize: item.packSize,
+                    unit: item.unit,
+                    quantity,
+                    unitCost: item.pricePerUnit,
+                    location: 'main',
+                    purchaseOrderId: po._id,
+                    poNumber: po.poNumber,
+                    lotNumber: `backfill-${po.poNumber}`,
+                    supplierName: po.supplier?.name || '',
+                    userId: po.createdBy
+                });
+
+                totalBackfilled++;
+                console.log(`  + ${item.productName}: ${quantity} ${item.unit}`);
+            }
+
+            // Update PO items with quantityReceived
+            for (const item of po.items) {
+                item.quantityReceived = item.quantityOrdered;
+            }
+            po.receivedDate = po.receivedDate || po.updatedAt || new Date();
+            await po.save();
+
+            // Create ledger entry for PO payment - figure out who paid
+            const billedTo = po.notes || '';
+            const billedToMatch = billedTo.match(/billed\s*to:\s*(.+)/i);
+            if (billedToMatch) {
+                const personName = billedToMatch[1].trim();
+                // Find the rep by name
+                const rep = await User.findOne({
+                    name: { $regex: new RegExp(personName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i') },
+                    role: { $in: ['distributor', 'admin', 'superadmin'] }
+                });
+
+                if (rep) {
+                    // Check if ledger entry already exists for this PO
+                    const existingLedger = await LedgerEntry.findOne({
+                        referenceType: 'PurchaseOrder',
+                        referenceId: po._id
+                    });
+
+                    if (!existingLedger) {
+                        await createLedgerEntry({
+                            representativeId: rep._id,
+                            description: `PO ${po.poNumber} - ${po.supplier?.name || 'Supplier'} (${po.items.length} items)`,
+                            amount: po.totalCost || po.subtotal || 0,
+                            type: 'debit',
+                            category: 'supplier_payment',
+                            referenceType: 'PurchaseOrder',
+                            referenceId: po._id,
+                            notes: `Inventory purchased from ${po.supplier?.name}. ${billedTo}`
+                        });
+                        ledgerEntriesCreated++;
+                        console.log(`  Ledger: ${personName} debited $${po.totalCost} for PO ${po.poNumber}`);
+                    }
+                }
+            }
+        }
+
+        if (totalBackfilled > 0) {
+            console.log(`Inventory backfill complete: ${totalBackfilled} items, ${ledgerEntriesCreated} ledger entries`);
+        }
+    } catch (error) {
+        console.error('Error backfilling inventory:', error.message);
     }
 }
 
@@ -9807,6 +9931,115 @@ app.patch('/api/admin/inventory/batches/:id', authMiddleware, adminMiddleware, a
 
         await batch.save();
         res.json(batch);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Admin: Backfill inventory from received POs (manual trigger)
+app.post('/api/admin/inventory/backfill', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        await backfillInventoryFromPOs();
+        res.json({ message: 'Inventory backfill completed. Check server logs for details.' });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Transfer inventory between locations
+app.post('/api/admin/inventory/transfer', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { chemicalId, quantity, fromLocation, toLocation, notes } = req.body;
+
+        if (!chemicalId || !quantity || !fromLocation || !toLocation) {
+            return res.status(400).json({ error: 'chemicalId, quantity, fromLocation, and toLocation are required' });
+        }
+        if (fromLocation === toLocation) {
+            return res.status(400).json({ error: 'From and to locations must be different' });
+        }
+        if (quantity <= 0) {
+            return res.status(400).json({ error: 'Quantity must be positive' });
+        }
+
+        // Deduct from source
+        const sourceInv = await Inventory.findOne({ chemicalId, location: fromLocation });
+        if (!sourceInv) {
+            return res.status(400).json({ error: `No inventory at ${fromLocation}` });
+        }
+        if (sourceInv.quantityAvailable < quantity) {
+            return res.status(400).json({ error: `Insufficient stock at ${fromLocation}. Available: ${sourceInv.quantityAvailable}` });
+        }
+
+        sourceInv.quantityOnHand -= quantity;
+        sourceInv.quantityAvailable = sourceInv.quantityOnHand - sourceInv.quantityReserved;
+        sourceInv.updatedAt = new Date();
+        await sourceInv.save();
+
+        // Add to destination
+        let destInv = await Inventory.findOne({ chemicalId, location: toLocation });
+        if (!destInv) {
+            destInv = new Inventory({
+                chemicalId,
+                productName: sourceInv.productName,
+                packSize: sourceInv.packSize,
+                unit: sourceInv.unit,
+                location: toLocation,
+                quantityOnHand: 0,
+                quantityReserved: 0,
+                quantityAvailable: 0,
+                averageCost: sourceInv.averageCost,
+                lastCost: sourceInv.lastCost
+            });
+        }
+        destInv.quantityOnHand += quantity;
+        destInv.quantityAvailable = destInv.quantityOnHand - destInv.quantityReserved;
+        destInv.averageCost = destInv.averageCost || sourceInv.averageCost;
+        destInv.updatedAt = new Date();
+        await destInv.save();
+
+        // Audit trail - source
+        await new InventoryTransaction({
+            inventoryId: sourceInv._id,
+            chemicalId,
+            productName: sourceInv.productName,
+            type: 'transfer',
+            quantityChange: -quantity,
+            previousQuantity: sourceInv.quantityOnHand + quantity,
+            newQuantity: sourceInv.quantityOnHand,
+            unitCost: sourceInv.averageCost,
+            totalCost: quantity * sourceInv.averageCost,
+            referenceType: 'Transfer',
+            location: fromLocation,
+            fromLocation,
+            toLocation,
+            notes: notes || `Transfer to ${toLocation}`,
+            createdBy: req.user._id
+        }).save();
+
+        // Audit trail - destination
+        await new InventoryTransaction({
+            inventoryId: destInv._id,
+            chemicalId,
+            productName: destInv.productName,
+            type: 'transfer',
+            quantityChange: quantity,
+            previousQuantity: destInv.quantityOnHand - quantity,
+            newQuantity: destInv.quantityOnHand,
+            unitCost: sourceInv.averageCost,
+            totalCost: quantity * sourceInv.averageCost,
+            referenceType: 'Transfer',
+            location: toLocation,
+            fromLocation,
+            toLocation,
+            notes: notes || `Transfer from ${fromLocation}`,
+            createdBy: req.user._id
+        }).save();
+
+        res.json({
+            message: `Transferred ${quantity} ${sourceInv.unit} of ${sourceInv.productName} from ${fromLocation} to ${toLocation}`,
+            source: sourceInv,
+            destination: destInv
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
