@@ -1337,6 +1337,13 @@
                             <option value="fertilizer">Fertilizer</option>
                             <option value="other">Other</option>
                         </select>
+                        <select id="productStockFilter" onchange="filterProducts()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Stock</option>
+                            <option value="in_stock">In Stock</option>
+                            <option value="out_of_stock">Out of Stock</option>
+                            <option value="needs_pricing">Needs Pricing</option>
+                            <option value="ready_to_sell">Ready to Sell</option>
+                        </select>
                     </div>
                 </div>
                 <div class="orders-table-wrapper">
@@ -4751,13 +4758,13 @@
         function filterProducts() {
             const search = document.getElementById('productSearch').value.toLowerCase().trim();
             const category = document.getElementById('productCategoryFilter').value;
+            const stockFilter = document.getElementById('productStockFilter')?.value || '';
 
             let filtered = allProducts;
             if (search) {
                 filtered = filtered.filter(p => {
                     const nameMatch = p.productName.toLowerCase().includes(search);
                     const supplierMatch = p.sourceSupplier.toLowerCase().includes(search);
-                    // Search active ingredients too
                     const aiMatch = p.activeIngredients && p.activeIngredients.some(
                         ai => ai.name && ai.name.toLowerCase().includes(search)
                     );
@@ -4766,6 +4773,21 @@
             }
             if (category) {
                 filtered = filtered.filter(p => p.category === category);
+            }
+            if (stockFilter) {
+                filtered = filtered.filter(p => {
+                    const inv = p.quantityOnHand || 0;
+                    const cost = p.costPrice || 0;
+                    const sell = p.sellPrice || 0;
+                    const hasMargins = sell > cost && cost > 0;
+                    switch (stockFilter) {
+                        case 'in_stock': return inv > 0;
+                        case 'out_of_stock': return inv === 0;
+                        case 'needs_pricing': return inv > 0 && !hasMargins;
+                        case 'ready_to_sell': return inv > 0 && hasMargins;
+                        default: return true;
+                    }
+                });
             }
             renderProducts(filtered);
         }
