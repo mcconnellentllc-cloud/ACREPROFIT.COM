@@ -1222,6 +1222,12 @@ const quoteRequestSchema = new mongoose.Schema({
     // Representative (if any)
     representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
+    // Spray program context
+    crop: String,              // corn, wheat, soybeans, sorghum, fallow, etc.
+    timing: String,            // fall, early-spring, pre-emerge, post-emerge, post-harvest
+    acres: Number,             // How many acres for this program
+    gallonsPerAcre: { type: Number, default: 15 },
+
     // Items requested - customer specifies product and quantity needed
     items: [{
         productName: { type: String, required: true },
@@ -11890,7 +11896,7 @@ app.get('/api/admin/distributor-pricing', authMiddleware, adminMiddleware, async
 // Submit a quote request (customer or admin on behalf of customer)
 app.post('/api/quote-requests', authMiddleware, async (req, res) => {
     try {
-        const { items, customerNotes, deliveryLocation, preferredDeliveryDate, customerId } = req.body;
+        const { items, customerNotes, deliveryLocation, preferredDeliveryDate, customerId, crop, timing, acres, gallonsPerAcre } = req.body;
 
         if (!items || items.length === 0) {
             return res.status(400).json({ error: 'At least one item is required' });
@@ -11919,6 +11925,10 @@ app.post('/api/quote-requests', authMiddleware, async (req, res) => {
             customerEmail,
             customerPhone,
             representativeId: req.user.role === 'customer' ? req.user.representativeId : req.user._id,
+            crop,
+            timing,
+            acres,
+            gallonsPerAcre: gallonsPerAcre || 15,
             items: items.map(item => ({
                 productName: item.productName,
                 chemicalId: item.chemicalId,
