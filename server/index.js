@@ -5862,8 +5862,12 @@ app.get('/api/chemicals/available', async (req, res) => {
             return res.json([]);
         }
 
-        // Fetch chemical details
-        const query = { _id: { $in: Array.from(allAvailableIds) }, sellPrice: { $gt: 0 } };
+        // Fetch chemical details - only products with sell price set above cost (margins configured)
+        const query = {
+            _id: { $in: Array.from(allAvailableIds) },
+            sellPrice: { $gt: 0 },
+            $expr: { $gt: ['$sellPrice', '$costPrice'] }
+        };
         if (category) query.category = category;
 
         const chemicals = await Chemical.find(query)
@@ -7797,6 +7801,75 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
         if (customerPhone && !req.user.phone) {
             req.user.phone = customerPhone;
             await req.user.save();
+        }
+
+        // Send order confirmation email
+        try {
+            const transporter = createEmailTransporter();
+            const toEmail = customerEmail || req.user.email;
+            if (transporter && toEmail) {
+                const locationNames = {
+                    mcconnell: 'McConnell Farm - Haxtun, CO',
+                    bamford: 'Bamford Farm - Kirk, CO',
+                    mollohan: 'Mollohan Farm - Otis, CO'
+                };
+                const paymentLabels = {
+                    check: 'Check',
+                    stripe: 'Credit Card',
+                    stripe_ach: 'ACH Bank Transfer',
+                    cash: 'Cash'
+                };
+                const pickupName = locationNames[location] || location || 'TBD';
+                const paymentLabel = paymentLabels[paymentMethod] || paymentMethod;
+
+                const itemsHtml = order.items.map(item =>
+                    `<tr>
+                        <td style="padding: 8px 12px; border-bottom: 1px solid #eee;">${item.productName}</td>
+                        <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: center;">${item.quantity} ${item.unit || 'units'}</td>
+                        <td style="padding: 8px 12px; border-bottom: 1px solid #eee; text-align: right;">$${(item.totalPrice || 0).toFixed(2)}</td>
+                    </tr>`
+                ).join('');
+
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.GMAIL_USER,
+                    to: toEmail,
+                    subject: `Order Confirmation - ${order.orderNumber} - Acre Profit`,
+                    html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                        <h2 style="color: #2d5a27;">Order Confirmed!</h2>
+                        <p>Hi ${customerName || req.user.name || 'Farmer'},</p>
+                        <p>Thank you for your order. Here are your order details:</p>
+                        <table style="width: 100%; margin: 16px 0; font-size: 0.95em;">
+                            <tr><td style="padding: 4px 0; color: #666;">Order Number:</td><td style="font-weight: 600;">${order.orderNumber}</td></tr>
+                            <tr><td style="padding: 4px 0; color: #666;">Payment Method:</td><td>${paymentLabel}</td></tr>
+                            <tr><td style="padding: 4px 0; color: #666;">Pickup Location:</td><td>${pickupName}</td></tr>
+                        </table>
+                        <h3 style="color: #1a1a2e; margin-top: 24px;">Order Items</h3>
+                        <table style="width: 100%; border-collapse: collapse;">
+                            <thead>
+                                <tr style="background: #f9fafb;">
+                                    <th style="padding: 8px 12px; text-align: left; font-size: 0.85em; color: #666;">Product</th>
+                                    <th style="padding: 8px 12px; text-align: center; font-size: 0.85em; color: #666;">Quantity</th>
+                                    <th style="padding: 8px 12px; text-align: right; font-size: 0.85em; color: #666;">Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${itemsHtml}
+                                <tr style="border-top: 2px solid #1a1a2e;">
+                                    <td colspan="2" style="padding: 10px 12px; font-weight: 700;">Order Total</td>
+                                    <td style="padding: 10px 12px; text-align: right; font-weight: 700; color: #2d5a27; font-size: 1.1em;">$${order.total.toFixed(2)}</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                        <hr style="border: none; border-top: 1px solid #eee; margin: 24px 0;">
+                        <p style="color: #888; font-size: 0.9em;">We'll notify you when your products are ready for pickup.<br>Questions? Contact your local representative.</p>
+                        <p style="color: #888; font-size: 0.85em;">Thank you for choosing Acre Profit.</p>
+                    </div>`
+                });
+                console.log(`Order confirmation email sent to ${toEmail} for order ${order.orderNumber}`);
+            }
+        } catch (emailError) {
+            console.error('Failed to send order confirmation email:', emailError);
+            // Don't fail the order if email fails
         }
 
         res.status(201).json({

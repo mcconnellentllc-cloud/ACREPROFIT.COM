@@ -240,39 +240,38 @@
             container.innerHTML = '<div class="empty-state"><p>Loading products...</p></div>';
 
             try {
-                let response;
-
-                // Use authenticated endpoint if logged in
-                if (token) {
-                    response = await fetch(`${API_URL}/api/chemicals/for-customer`, {
-                        headers: { 'Authorization': `Bearer ${token}` }
-                    });
-                }
-
-                // Fall back to public endpoint
-                if (!response || !response.ok) {
-                    response = await fetch(`${API_URL}/api/chemicals?availableOnly=true`);
-                }
+                // Use /api/chemicals/available - returns only products with inventory and sell price
+                const response = await fetch(`${API_URL}/api/chemicals/available`);
 
                 if (!response.ok) throw new Error('Failed to load products');
 
                 const data = await response.json();
-                products = data.map(p => ({
-                    id: p._id,
-                    name: p.productName,
-                    category: p.category || 'other',
-                    packSize: p.packSize || '',
-                    unit: p.unit || '',
-                    unitsPerPack: p.unitsPerPack || 1,
-                    price: p.sellPrice || p.price || 0,
-                    defaultRate: p.defaultRate,
-                    rateUnit: p.rateUnit,
-                    notes: p.notes || '',
-                    rup: p.isRestrictedUse,
-                    inStock: p.inStock !== false,
-                    quantityAvailable: p.quantityAvailable || 0,
-                    qty: 0 // User-entered quantity
-                }));
+                products = data
+                    .filter(p => {
+                        // Only show products that are actually in stock (quantityOnHand > 0)
+                        if (p.availability !== 'in_stock') return false;
+                        // Must have a sell price set (server already filters sellPrice > costPrice)
+                        const price = p.sellPrice || 0;
+                        if (price <= 0) return false;
+                        return true;
+                    })
+                    .map(p => ({
+                        id: p._id,
+                        name: p.productName,
+                        category: p.category || 'other',
+                        packSize: p.packSize || '',
+                        unit: p.unit || '',
+                        unitsPerPack: p.unitsPerPack || 1,
+                        price: p.sellPrice || 0,
+                        defaultRate: p.defaultRate,
+                        rateUnit: p.rateUnit,
+                        notes: p.notes || '',
+                        rup: p.isRestrictedUse,
+                        inStock: true,
+                        quantityAvailable: 100,
+                        availability: p.availability,
+                        qty: 0 // User-entered quantity
+                    }));
 
                 renderProducts();
             } catch (error) {
