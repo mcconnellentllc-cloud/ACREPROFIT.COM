@@ -5562,18 +5562,18 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
         const cpdProducts = [
             // Dicamba products
             { productName: 'Dicamba DMA', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 30.25, sellPrice: 0, category: 'herbicide' },
-            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 28.25, sellPrice: 0, category: 'herbicide' },
-            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 30.57, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Dicamba DMA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 28.25, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Dicamba HD', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 30.57, sellPrice: 0, category: 'herbicide' },
 
             // LV 6 (2,4-D)
             { productName: 'LV 6', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 29.90, sellPrice: 0, category: 'herbicide' },
-            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 27.90, sellPrice: 0, category: 'herbicide' },
+            { productName: 'LV 6', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 27.90, sellPrice: 0, category: 'herbicide' },
 
             // Glyphosate - AgSaver is CPD equiv for RT3/Glystar Supreme
-            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.32, sellPrice: 0, category: 'herbicide', equivalentProduct: 'RT3, Glystar Supreme', notes: 'Glyphosate' },
+            { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 13.32, sellPrice: 0, category: 'herbicide', equivalentProduct: 'RT3, Glystar Supreme', notes: 'Glyphosate' },
 
             // Glyphosate 5.4 lb - from JABCO/CPD
-            { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 250, costPrice: 13.25, adminMarginDollars: 0.07, adminPrice: 13.32, marginDollars: 0.77, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
+            { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminMarginDollars: 0.07, adminPrice: 13.32, marginDollars: 0.77, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
 
             // XSATE Glyphosate 53.8% - Xingfa USA via Jabco (EPA 89343-5) - $13.25/gal cost, $16/gal retail
             { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
@@ -5581,19 +5581,19 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
 
             // Atrazine
-            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
 
             // Agri-Star is CPD equiv for Level Best Pro
             { productName: 'Agri-Star', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 39.25, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
-            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 38.13, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
+            { productName: 'Agri-Star', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 38.13, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Level Best Pro' },
 
             // Agri-Star Tapran is CPD equiv for Tapran
             { productName: 'Agri-Star Tapran', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 19.00, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Tapran' },
-            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 18.00, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Tapran' },
+            { productName: 'Agri-Star Tapran', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 18.00, sellPrice: 0, category: 'herbicide', equivalentProduct: 'Tapran' },
 
             // Aggrestrol
             { productName: 'Aggrestrol', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 21.00, sellPrice: 0, category: 'herbicide' },
-            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 20.00, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Aggrestrol', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 20.00, sellPrice: 0, category: 'herbicide' },
 
             // Sulfentrazone
             { productName: 'Sulfentrazone', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 70.50, sellPrice: 0, category: 'herbicide' },
@@ -5602,8 +5602,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'Valor SX', packSize: '4x5', unit: 'lb', unitsPerPack: 20, costPrice: 14.25, sellPrice: 0, category: 'herbicide' },
 
             // CPD-only products
-            { productName: 'Glufosinate', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 16.00, sellPrice: 0, category: 'herbicide' },
-            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 15.25, sellPrice: 0, category: 'herbicide', isRUP: true, notes: 'Restricted Use Pesticide - requires certification' },
+            { productName: 'Glufosinate', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 16.00, sellPrice: 0, category: 'herbicide' },
+            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 15.25, sellPrice: 0, category: 'herbicide', isRUP: true, notes: 'Restricted Use Pesticide - requires certification' },
             { productName: 'Mesotrione', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 48.25, sellPrice: 0, category: 'herbicide' },
             { productName: 'Clethodim', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 33.50, sellPrice: 0, category: 'herbicide' },
             { productName: 'Clethodim', packSize: '135', unit: 'gal', unitsPerPack: 135, costPrice: 33.00, sellPrice: 0, category: 'herbicide' },
@@ -5614,7 +5614,7 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
 
             // Hydrovant
             { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
-            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
+            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
         ];
 
         const results = { created: [], existing: [] };
@@ -13609,6 +13609,47 @@ async function migrateCustomerRepresentatives() {
 connectDB().then(async () => {
     // Run migrations
     await migrateCustomerRepresentatives();
+
+    // Fix Shuttle/Tote unitsPerPack: 250 → 265
+    try {
+        const fixed = await Chemical.updateMany(
+            { packSize: { $in: ['Shuttle', 'Tote'] }, unit: 'gal', unitsPerPack: 250 },
+            { $set: { unitsPerPack: 265, updatedAt: new Date() } }
+        );
+        if (fixed.modifiedCount > 0) {
+            console.log(`Fixed ${fixed.modifiedCount} Shuttle/Tote products: unitsPerPack 250 → 265`);
+        }
+    } catch (e) { console.error('Shuttle fix error:', e.message); }
+
+    // Ensure Flumioxazin 51% has inventory (from JABCO-SO2129: 1440 lb)
+    try {
+        const flumi = await Chemical.findOne({ productName: /flumioxazin/i });
+        if (flumi) {
+            const inv = await Inventory.findOne({ chemicalId: flumi._id, location: 'main' });
+            if (!inv) {
+                await receiveInventory({
+                    chemicalId: flumi._id,
+                    productName: flumi.productName,
+                    packSize: flumi.packSize,
+                    unit: flumi.unit || 'lb',
+                    quantity: 1440,
+                    unitCost: 14.00,
+                    location: 'main',
+                    poNumber: 'JABCO-SO2129',
+                    lotNumber: 'jabco-so2129-flumi',
+                    supplierName: 'JABCO',
+                    userId: null
+                });
+                console.log('Created Flumioxazin 51% inventory: 1,440 lb @ $14.00/lb');
+            }
+            // Ensure it's available for order
+            if (!flumi.availableForOrder) {
+                flumi.availableForOrder = true;
+                flumi.isActive = true;
+                await flumi.save();
+            }
+        }
+    } catch (e) { console.error('Flumioxazin inventory fix error:', e.message); }
 
     app.listen(PORT, () => {
         console.log(`Acre Profit API running on port ${PORT}`);
