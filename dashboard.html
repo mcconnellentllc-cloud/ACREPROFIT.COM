@@ -99,6 +99,26 @@
                     </div>
                 </div>
 
+                <!-- Available Products - FIRST THING CUSTOMER SEES -->
+                <div class="dashboard-section">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                        <h2 class="section-title" style="margin-bottom: 0;">What's Available</h2>
+                        <a href="/products.html" class="btn btn-primary btn-sm" style="padding: 0.5rem 1rem; background: #2d5a27; color: white; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.85rem;">Place an Order →</a>
+                    </div>
+                    <p style="color: #666; margin-bottom: 1rem; font-size: 0.9rem;">Current inventory and pricing. Only products we have on hand or on order are shown with confirmed prices.</p>
+
+                    <div style="display: flex; gap: 0.5rem; margin-bottom: 1rem; flex-wrap: wrap;">
+                        <button class="filter-btn active" data-cat="all" onclick="filterAvailable('all', this)" style="padding: 0.4rem 0.9rem; border: 1px solid #ddd; background: #2d5a27; color: white; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;">All</button>
+                        <button class="filter-btn" data-cat="herbicide" onclick="filterAvailable('herbicide', this)" style="padding: 0.4rem 0.9rem; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;">Herbicides</button>
+                        <button class="filter-btn" data-cat="adjuvant" onclick="filterAvailable('adjuvant', this)" style="padding: 0.4rem 0.9rem; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;">Adjuvants</button>
+                        <button class="filter-btn" data-cat="fertilizer" onclick="filterAvailable('fertilizer', this)" style="padding: 0.4rem 0.9rem; border: 1px solid #ddd; background: white; border-radius: 6px; cursor: pointer; font-weight: 500; font-size: 0.85rem;">Fertilizers</button>
+                    </div>
+
+                    <div id="availableProductsTable" style="background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06); overflow-x: auto;">
+                        <p style="padding: 2rem; text-align: center; color: #888;">Loading available products...</p>
+                    </div>
+                </div>
+
                 <!-- Shop Section -->
                 <div class="dashboard-section">
                     <h2 class="section-title">Shop</h2>
@@ -577,12 +597,94 @@
             }
         }
 
+        let availableProducts = [];
+
         async function loadCustomerData() {
             // Load rep info
             if (userData.rep) {
                 document.getElementById('repName').textContent = userData.rep.name || '-';
                 document.getElementById('repLocation').textContent = userData.rep.pickupLocation || '-';
             }
+            // Load available products
+            await loadAvailableProducts();
+        }
+
+        async function loadAvailableProducts() {
+            const container = document.getElementById('availableProductsTable');
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/available`);
+                if (!res.ok) throw new Error('Failed to load');
+                availableProducts = await res.json();
+                renderAvailableProducts(availableProducts);
+            } catch (error) {
+                container.innerHTML = '<p style="padding: 2rem; text-align: center; color: #dc3545;">Unable to load products. Please try again.</p>';
+            }
+        }
+
+        function filterAvailable(cat, btn) {
+            document.querySelectorAll('[data-cat]').forEach(b => {
+                b.style.background = 'white'; b.style.color = '#333';
+            });
+            btn.style.background = '#2d5a27'; btn.style.color = 'white';
+
+            if (cat === 'all') {
+                renderAvailableProducts(availableProducts);
+            } else {
+                renderAvailableProducts(availableProducts.filter(p => p.category === cat));
+            }
+        }
+
+        function renderAvailableProducts(products) {
+            const container = document.getElementById('availableProductsTable');
+            if (!products || products.length === 0) {
+                container.innerHTML = '<p style="padding: 2rem; text-align: center; color: #888;">No products currently available. Check back soon or contact your rep for pricing.</p>';
+                return;
+            }
+
+            const catColors = {
+                herbicide: { bg: '#dbeafe', color: '#1e40af' },
+                adjuvant: { bg: '#d1fae5', color: '#065f46' },
+                fertilizer: { bg: '#fef3c7', color: '#92400e' },
+                insecticide: { bg: '#fce7f3', color: '#9d174d' },
+                fungicide: { bg: '#ede9fe', color: '#5b21b6' }
+            };
+
+            let html = `<table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr style="background: #1a1a2e; color: white;">
+                        <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.82rem; text-transform: uppercase;">Product</th>
+                        <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.82rem; text-transform: uppercase;">Category</th>
+                        <th style="padding: 0.75rem 1rem; text-align: left; font-size: 0.82rem; text-transform: uppercase;">Pack Size</th>
+                        <th style="padding: 0.75rem 1rem; text-align: right; font-size: 0.82rem; text-transform: uppercase;">Price</th>
+                        <th style="padding: 0.75rem 1rem; text-align: center; font-size: 0.82rem; text-transform: uppercase;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            products.forEach(p => {
+                const catStyle = catColors[p.category] || { bg: '#f3f4f6', color: '#374151' };
+                const rup = p.isRestrictedUse ? ' <span style="background:#dc3545;color:white;padding:0.1rem 0.3rem;border-radius:3px;font-size:0.65rem;font-weight:700;">RUP</span>' : '';
+
+                let statusBadge;
+                if (p.availability === 'in_stock') {
+                    statusBadge = '<span style="background:#d1fae5;color:#065f46;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.78rem;font-weight:600;">In Stock</span>';
+                } else if (p.availability === 'on_order') {
+                    statusBadge = '<span style="background:#dbeafe;color:#1e40af;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.78rem;font-weight:600;">On Order</span>';
+                } else {
+                    statusBadge = '<span style="background:#fef3c7;color:#92400e;padding:0.2rem 0.6rem;border-radius:12px;font-size:0.78rem;font-weight:600;">Limited</span>';
+                }
+
+                html += `<tr style="border-bottom: 1px solid #f0f0f0;">
+                    <td style="padding: 0.75rem 1rem;"><strong>${p.productName}</strong>${rup}</td>
+                    <td style="padding: 0.75rem 1rem;"><span style="background:${catStyle.bg};color:${catStyle.color};padding:0.15rem 0.5rem;border-radius:4px;font-size:0.75rem;font-weight:600;text-transform:uppercase;">${p.category}</span></td>
+                    <td style="padding: 0.75rem 1rem; color: #666;">${p.packSize || ''}${p.unitsPerPack > 1 ? ' (' + p.unitsPerPack + ' ' + p.unit + ')' : ''}</td>
+                    <td style="padding: 0.75rem 1rem; text-align: right;"><strong style="color: #2d5a27; font-size: 1.05rem;">$${p.sellPrice.toFixed(2)}</strong><span style="color:#888;font-size:0.8rem;">/${p.unit}</span></td>
+                    <td style="padding: 0.75rem 1rem; text-align: center;">${statusBadge}</td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            container.innerHTML = html;
         }
 
         // Update navigation links based on role
