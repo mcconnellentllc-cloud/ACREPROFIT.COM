@@ -59,6 +59,8 @@ const connectDB = async () => {
             await backfillInventoryFromPOs();
             // Seed Hydrovant inventory (360 gal, paid by Kyle)
             await seedHydrovantInventory();
+            // Sync product catalog with inventory records
+            await syncCatalogToInventory();
         } else {
             console.log('No MongoDB URI provided, running without database');
         }
@@ -5875,6 +5877,21 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
             changedBy: req.user._id
         });
 
+        // Auto-create inventory record for new product
+        const existingInv = await Inventory.findOne({ chemicalId: chemical._id, location: 'main' });
+        if (!existingInv) {
+            await new Inventory({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                location: 'main',
+                quantityOnHand: 0, quantityReserved: 0, quantityAvailable: 0,
+                averageCost: chemical.costPrice || 0,
+                lastCost: chemical.costPrice || 0
+            }).save();
+        }
+
         res.status(201).json(chemical);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -5939,6 +5956,28 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
 
         chemical.updatedAt = new Date();
         await chemical.save();
+
+        // Keep inventory record in sync with product catalog
+        const inv = await Inventory.findOne({ chemicalId: chemical._id, location: 'main' });
+        if (inv) {
+            inv.productName = chemical.productName;
+            inv.packSize = chemical.packSize;
+            inv.unit = chemical.unit;
+            inv.updatedAt = new Date();
+            await inv.save();
+        } else {
+            // Create inventory record if missing
+            await new Inventory({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                location: 'main',
+                quantityOnHand: 0, quantityReserved: 0, quantityAvailable: 0,
+                averageCost: chemical.costPrice || 0,
+                lastCost: chemical.costPrice || 0
+            }).save().catch(() => {}); // Ignore duplicate errors
+        }
 
         res.json(chemical);
     } catch (error) {
@@ -9753,38 +9792,59 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
 // Sync all products to inventory - creates inventory records for products that don't have one
 app.post('/api/admin/inventory/sync', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { location = 'main' } = req.body;
+        const result = await syncCatalogToInventory();
+        res.json(result);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
 
-        // Get all chemicals (active products)
-        const chemicals = await Chemical.find({ isActive: { $ne: false } });
+// Shared sync function - keeps product catalog and inventory in sync
+async function syncCatalogToInventory(location = 'main') {
+    const chemicals = await Chemical.find({ isActive: { $ne: false } });
+    const existingInventory = await Inventory.find({ location });
 
-        // Get existing inventory records for this location
-        const existingInventory = await Inventory.find({ location });
+    // Build map of existing inventory by chemicalId
+    const invByChemId = {};
+    existingInventory.forEach(inv => {
+        const key = inv.chemicalId?.toString();
+        if (key) invByChemId[key] = inv;
+    });
 
-        // Build sets for matching - by chemicalId AND by productName+packSize
-        const existingChemicalIds = new Set(existingInventory.map(i => i.chemicalId?.toString()).filter(Boolean));
-        const existingProductKeys = new Set(existingInventory.map(i => `${i.productName?.toLowerCase()}_${i.packSize?.toLowerCase()}`));
+    const created = [];
+    const updated = [];
+    const errors = [];
 
-        const created = [];
-        const skipped = [];
-        const errors = [];
+    for (const chem of chemicals) {
+        const chemIdStr = chem._id.toString();
+        const existing = invByChemId[chemIdStr];
 
-        for (const chem of chemicals) {
-            const chemIdStr = chem._id.toString();
-            const productKey = `${chem.productName?.toLowerCase()}_${chem.packSize?.toLowerCase()}`;
+        if (existing) {
+            // Update existing inventory record if product info changed
+            let needsSave = false;
 
-            // Skip if already exists by chemicalId OR by product name + pack size
-            if (existingChemicalIds.has(chemIdStr)) {
-                skipped.push({ name: chem.productName, packSize: chem.packSize, reason: 'chemicalId exists' });
-                continue;
+            if (existing.productName !== chem.productName) {
+                existing.productName = chem.productName;
+                needsSave = true;
             }
-            if (existingProductKeys.has(productKey)) {
-                skipped.push({ name: chem.productName, packSize: chem.packSize, reason: 'name+packSize exists' });
-                continue;
+            if (existing.packSize !== chem.packSize) {
+                existing.packSize = chem.packSize;
+                needsSave = true;
+            }
+            if (existing.unit !== chem.unit) {
+                existing.unit = chem.unit;
+                needsSave = true;
             }
 
+            if (needsSave) {
+                existing.updatedAt = new Date();
+                await existing.save();
+                updated.push(`${chem.productName} (${chem.packSize})`);
+            }
+        } else {
+            // Create new inventory record
             try {
-                const inventory = new Inventory({
+                await new Inventory({
                     chemicalId: chem._id,
                     productName: chem.productName,
                     packSize: chem.packSize,
@@ -9797,28 +9857,30 @@ app.post('/api/admin/inventory/sync', authMiddleware, adminMiddleware, async (re
                     lastCost: chem.costPrice || 0,
                     reorderPoint: 0,
                     reorderQuantity: 0
-                });
-
-                await inventory.save();
+                }).save();
                 created.push(`${chem.productName} (${chem.packSize})`);
             } catch (err) {
-                errors.push({ name: chem.productName, packSize: chem.packSize, error: err.message });
+                // Might be a duplicate - skip
+                if (err.code !== 11000) {
+                    errors.push({ name: chem.productName, error: err.message });
+                }
             }
         }
-
-        res.json({
-            success: true,
-            message: `Synced ${created.length} products to inventory`,
-            created,
-            skipped: skipped.length,
-            skippedDetails: skipped,
-            errors: errors.length > 0 ? errors : undefined,
-            totalProducts: chemicals.length
-        });
-    } catch (error) {
-        res.status(400).json({ error: error.message });
     }
-});
+
+    if (created.length > 0 || updated.length > 0) {
+        console.log(`Catalog sync: ${created.length} created, ${updated.length} updated`);
+    }
+
+    return {
+        success: true,
+        message: `Synced ${created.length} new, updated ${updated.length} existing`,
+        created,
+        updated,
+        errors: errors.length > 0 ? errors : undefined,
+        totalProducts: chemicals.length
+    };
+}
 
 // Add inventory for a specific chemical
 app.post('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res) => {
