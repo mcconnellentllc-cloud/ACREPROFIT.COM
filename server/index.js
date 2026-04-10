@@ -5615,7 +5615,10 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
 
             // Hydrovant
             { productName: 'Hydrovant fA', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
-            { productName: 'Hydrovant fA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
+            { productName: 'Hydrovant fA', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
+
+            // Rancor 4F (Metribuzin) - JABCO SO# 2131
+            { productName: 'Rancor 4F', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, costPrice: 45.50, sellPrice: 0, category: 'herbicide', notes: 'Metribuzin 4F herbicide' }
         ];
 
         const results = { created: [], existing: [] };
@@ -13684,6 +13687,51 @@ connectDB().then(async () => {
             }
         }
     } catch (e) { console.error('Flumioxazin inventory fix error:', e.message); }
+
+    // Add Rancor 4F (Metribuzin 4F) - JABCO Invoice 1622, SO# 2131: 180 gal @ $45.50
+    try {
+        let rancor = await Chemical.findOne({ productName: /rancor/i });
+        if (!rancor) {
+            rancor = await Chemical.create({
+                productName: 'Rancor 4F',
+                packSize: '2x2.5 gal',
+                unit: 'gal',
+                unitsPerPack: 5,
+                costPrice: 45.50,
+                adminMarginDollars: 0,
+                adminPrice: 45.50,
+                marginDollars: 0,
+                sellPrice: 45.50,
+                category: 'herbicide',
+                sourceSupplier: 'JABCO',
+                manufacturer: 'Crop Protect Direct',
+                signalWord: 'CAUTION',
+                notes: 'Metribuzin 4F herbicide',
+                activeIngredients: [{ name: 'Metribuzin', percentage: 39.6 }],
+                isActive: true,
+                availableForOrder: true
+            });
+            console.log('Created Rancor 4F product');
+        }
+
+        const rancorInv = await Inventory.findOne({ chemicalId: rancor._id, location: 'main' });
+        if (!rancorInv) {
+            await receiveInventory({
+                chemicalId: rancor._id,
+                productName: 'Rancor 4F',
+                packSize: '2x2.5 gal',
+                unit: 'gal',
+                quantity: 180,
+                unitCost: 45.50,
+                location: 'main',
+                poNumber: 'JABCO-SO2131',
+                lotNumber: 'jabco-so2131-rancor',
+                supplierName: 'JABCO',
+                userId: null
+            });
+            console.log('Added Rancor 4F inventory: 180 gal @ $45.50/gal ($8,190)');
+        }
+    } catch (e) { console.error('Rancor 4F setup error:', e.message); }
 
     app.listen(PORT, () => {
         console.log(`Acre Profit API running on port ${PORT}`);
