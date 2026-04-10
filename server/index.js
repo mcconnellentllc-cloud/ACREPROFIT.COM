@@ -57,6 +57,8 @@ const connectDB = async () => {
             await seedMarch2026PurchaseOrders();
             // Backfill inventory from any received POs missing inventory records
             await backfillInventoryFromPOs();
+            // Seed Hydrovant inventory (360 gal, paid by Kyle)
+            await seedHydrovantInventory();
         } else {
             console.log('No MongoDB URI provided, running without database');
         }
@@ -2809,6 +2811,96 @@ async function backfillInventoryFromPOs() {
         }
     } catch (error) {
         console.error('Error backfilling inventory:', error.message);
+    }
+}
+
+// Seed Hydrovant inventory - 360 gal at $75/gal cost, paid by Kyle
+async function seedHydrovantInventory() {
+    try {
+        // Check if already seeded
+        const existingBatch = await InventoryBatch.findOne({ lotNumber: 'hydrovant-kyle-360' });
+        if (existingBatch) {
+            console.log('Hydrovant inventory already seeded');
+            return;
+        }
+
+        // Find or create Hydrovant product
+        let hydrovant = await Chemical.findOne({
+            productName: { $regex: /^hydrovant$/i }
+        });
+
+        if (!hydrovant) {
+            hydrovant = await Chemical.create({
+                productName: 'Hydrovant',
+                packSize: '2x2.5 gal',
+                unit: 'gal',
+                unitsPerPack: 5,
+                costPrice: 75.00,
+                adminPrice: 95.00,
+                sellPrice: 145.00,
+                category: 'adjuvant',
+                sourceSupplier: 'CPD',
+                signalWord: 'CAUTION',
+                notes: 'Premium NIS, water conditioner & drift control',
+                defaultRate: 0.1,
+                rateUnit: '% v/v',
+                availableForOrder: true
+            });
+            console.log('Created Hydrovant product');
+        } else {
+            // Update cost price if needed
+            if (hydrovant.costPrice !== 75.00) {
+                hydrovant.costPrice = 75.00;
+                hydrovant.adminPrice = hydrovant.adminPrice || 95.00;
+                hydrovant.sellPrice = hydrovant.sellPrice || 145.00;
+                await hydrovant.save();
+                console.log('Updated Hydrovant pricing');
+            }
+        }
+
+        // Add to inventory
+        await receiveInventory({
+            chemicalId: hydrovant._id,
+            productName: 'Hydrovant',
+            packSize: hydrovant.packSize || '2x2.5 gal',
+            unit: 'gal',
+            quantity: 360,
+            unitCost: 75.00,
+            location: 'main',
+            purchaseOrderId: null,
+            poNumber: 'DIRECT-HYDROVANT',
+            lotNumber: 'hydrovant-kyle-360',
+            supplierName: 'CPD',
+            userId: null
+        });
+
+        console.log('Added Hydrovant inventory: 360 gal at $75/gal ($27,000 total)');
+
+        // Create ledger entry for Kyle
+        const kyle = await User.findOne({ email: 'office@togoag.com' });
+        if (kyle) {
+            const existingLedger = await LedgerEntry.findOne({
+                referenceType: 'Manual',
+                notes: { $regex: /hydrovant.*360/i }
+            });
+
+            if (!existingLedger) {
+                await createLedgerEntry({
+                    representativeId: kyle._id,
+                    description: 'Hydrovant - 360 gal at $75.00/gal (direct purchase)',
+                    amount: 27000.00,
+                    type: 'debit',
+                    category: 'supplier_payment',
+                    referenceType: 'Manual',
+                    notes: 'Hydrovant 360 gal purchased by Kyle McConnell at $75/gal'
+                });
+                console.log('Ledger: Kyle McConnell debited $27,000 for Hydrovant');
+            }
+        } else {
+            console.log('Warning: Could not find Kyle McConnell account for ledger entry');
+        }
+    } catch (error) {
+        console.error('Error seeding Hydrovant inventory:', error.message);
     }
 }
 
