@@ -1613,6 +1613,7 @@
                     <h2>Who Owes Who</h2>
                     <div class="tab-header-actions">
                         <button class="btn btn-primary" onclick="openAddLedgerModal()">+ Add Entry</button>
+                        <button class="btn btn-outline" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Payment to Distributor</button>
                         <select id="ledgerRepFilter" style="display:none; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
                             <option value="">All Reps</option>
                         </select>
@@ -2646,6 +2647,44 @@
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closeAddLedgerModal()">Cancel</button>
                         <button class="btn btn-primary" onclick="addLedgerEntry()">Add Entry</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Record Payment to Distributor Modal -->
+            <div class="modal-overlay" id="recordPaymentModal" style="display: none;">
+                <div class="modal-content" style="max-width: 500px;">
+                    <button class="modal-close" onclick="closeRecordPaymentModal()">&times;</button>
+                    <div class="customer-modal-header" style="background: #059669; color: var(--white);">
+                        <div class="customer-modal-avatar" style="background: rgba(255,255,255,0.2);">$</div>
+                        <div class="customer-modal-title">
+                            <h2 style="color: var(--white);">Record Payment to Distributor</h2>
+                            <p style="color: rgba(255,255,255,0.8);">Record a check or payment sent to a distributor</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="recordPaymentForm" class="edit-customer-form">
+                            <div class="form-group">
+                                <label>Distributor *</label>
+                                <select id="paymentDistributor" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Amount ($) *</label>
+                                <input type="number" id="paymentAmount" step="0.01" min="0.01" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Check Number</label>
+                                <input type="text" id="paymentCheckNumber" placeholder="Optional">
+                            </div>
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <input type="text" id="paymentNotes" placeholder="Optional notes">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeRecordPaymentModal()">Cancel</button>
+                        <button class="btn btn-primary" style="background: #059669;" onclick="submitRecordPayment()">Record Payment</button>
                     </div>
                 </div>
             </div>
@@ -6271,6 +6310,90 @@
                 alert('Error adding entry. Please try again.');
             }
         }
+
+        // ============ RECORD PAYMENT TO DISTRIBUTOR ============
+        let paymentRepsLoaded = false;
+
+        async function openRecordPaymentModal() {
+            document.getElementById('recordPaymentModal').style.display = 'flex';
+            document.getElementById('recordPaymentForm').reset();
+
+            if (!paymentRepsLoaded) {
+                try {
+                    const res = await fetch(`${API_URL}/api/representatives`);
+                    const reps = await res.json();
+                    const select = document.getElementById('paymentDistributor');
+                    select.innerHTML = '<option value="">-- Select Distributor --</option>';
+                    reps.forEach(rep => {
+                        const opt = document.createElement('option');
+                        opt.value = rep._id;
+                        opt.textContent = rep.name;
+                        select.appendChild(opt);
+                    });
+                    paymentRepsLoaded = true;
+                } catch (error) {
+                    console.error('Error loading reps for payment modal:', error);
+                }
+            }
+        }
+
+        function closeRecordPaymentModal() {
+            document.getElementById('recordPaymentModal').style.display = 'none';
+        }
+
+        async function submitRecordPayment() {
+            const representativeId = document.getElementById('paymentDistributor').value;
+            const amount = parseFloat(document.getElementById('paymentAmount').value);
+            const checkNumber = document.getElementById('paymentCheckNumber').value.trim();
+            const notes = document.getElementById('paymentNotes').value.trim();
+
+            if (!representativeId) {
+                alert('Please select a distributor');
+                return;
+            }
+            if (isNaN(amount) || amount <= 0) {
+                alert('Please enter a valid amount');
+                return;
+            }
+
+            const distName = document.getElementById('paymentDistributor').selectedOptions[0].textContent;
+            const checkPart = checkNumber ? ` - Check #${checkNumber}` : '';
+            const description = `Check payment to ${distName}${checkPart}`;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ledger`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        representativeId,
+                        description,
+                        amount,
+                        type: 'debit',
+                        category: 'payment',
+                        notes
+                    })
+                });
+
+                if (res.ok) {
+                    closeRecordPaymentModal();
+                    loadLedger();
+                    alert(`Payment of $${amount.toFixed(2)} to ${distName} recorded successfully!`);
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to record payment');
+                }
+            } catch (error) {
+                console.error('Error recording payment:', error);
+                alert('Error recording payment. Please try again.');
+            }
+        }
+
+        document.getElementById('recordPaymentModal').addEventListener('click', function(e) {
+            if (e.target === this) closeRecordPaymentModal();
+        });
 
         // ============ PURCHASE ORDER FUNCTIONS ============
 
