@@ -5417,6 +5417,31 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 order.updatedAt = new Date();
                 await order.save();
                 console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
+
+                // Send payment confirmation email to customer
+                try {
+                    const customer = await User.findById(order.userId);
+                    const transporter = createTransporter();
+                    if (transporter && customer?.email) {
+                        const amount = (paymentIntent.amount / 100).toFixed(2);
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+                            to: customer.email,
+                            subject: `Payment Confirmed - Acre Profit`,
+                            html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                                <h2 style="color: #2d5a27;">Payment Confirmed</h2>
+                                <p>Hi ${customer.name || 'Farmer'},</p>
+                                <p>Your payment of <strong>$${amount}</strong> has been received via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
+                                <p>Your order is now being processed. We'll notify you when your products are ready for pickup.</p>
+                                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                                <p style="color: #888; font-size: 0.9em;">Thank you for choosing Acre Profit.<br>Questions? Contact your local representative.</p>
+                            </div>`
+                        });
+                        console.log(`Payment confirmation email sent to ${customer.email}`);
+                    }
+                } catch (emailErr) {
+                    console.error('Failed to send payment confirmation email:', emailErr.message);
+                }
             }
         }
     }
@@ -5855,7 +5880,20 @@ app.get('/api/chemicals/admin', authMiddleware, adminMiddleware, async (req, res
         const chemicals = await Chemical.find(query)
             .sort({ productName: 1, packSize: 1 });
 
-        res.json(chemicals);
+        // Superadmin sees everything including cost
+        if (req.user.role === 'superadmin') {
+            return res.json(chemicals);
+        }
+
+        // Distributors see admin price + their margin, but NOT cost price
+        const filtered = chemicals.map(c => {
+            const obj = c.toObject();
+            delete obj.costPrice;
+            delete obj.adminMarginDollars;
+            return obj;
+        });
+
+        res.json(filtered);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -5923,6 +5961,76 @@ app.get('/api/chemicals/search', authMiddleware, async (req, res) => {
         });
 
         res.json(results);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Get unique suppliers list
+app.get('/api/chemicals/suppliers', async (req, res) => {
+
+// Distributor: Update distributor margin on a product (any distributor can do this, changes for all)
+app.put('/api/chemicals/:id/distributor-margin', authMiddleware, async (req, res) => {
+    try {
+        // Any distributor, admin, or superadmin can set distributor margin
+        if (!['distributor', 'admin', 'superadmin'].includes(req.user.role)) {
+            return res.status(403).json({ error: 'Only distributors and admins can set distributor margin' });
+        }
+
+        const { marginDollars } = req.body;
+        if (marginDollars === undefined || marginDollars < 0) {
+            return res.status(400).json({ error: 'marginDollars is required and must be >= 0' });
+        }
+
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) return res.status(404).json({ error: 'Product not found' });
+
+        chemical.marginDollars = marginDollars;
+        chemical.sellPrice = Math.round((chemical.adminPrice + marginDollars) * 100) / 100;
+        chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
+        chemical.updatedAt = new Date();
+        await chemical.save();
+
+        // Sync inventory record
+        const inv = await Inventory.findOne({ chemicalId: chemical._id, location: 'main' });
+        if (inv) { inv.productName = chemical.productName; inv.updatedAt = new Date(); await inv.save(); }
+
+        res.json({
+            _id: chemical._id,
+            productName: chemical.productName,
+            adminPrice: chemical.adminPrice,
+            marginDollars: chemical.marginDollars,
+            sellPrice: chemical.sellPrice,
+            margin: chemical.margin
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Superadmin: Update admin margin on a product (recalculates admin price and sell price)
+app.put('/api/chemicals/:id/admin-margin', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can set admin margin' });
+        }
+
+        const { adminMarginDollars, costPrice } = req.body;
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) return res.status(404).json({ error: 'Product not found' });
+
+        if (costPrice !== undefined) chemical.costPrice = costPrice;
+        if (adminMarginDollars !== undefined) chemical.adminMarginDollars = adminMarginDollars;
+
+        // Recalculate prices
+        chemical.adminPrice = Math.round((chemical.costPrice + chemical.adminMarginDollars) * 100) / 100;
+        chemical.sellPrice = Math.round((chemical.adminPrice + (chemical.marginDollars || 0)) * 100) / 100;
+        chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
+        chemical.updatedAt = new Date();
+
+        await chemical.save();
+
+        res.json(chemical);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
