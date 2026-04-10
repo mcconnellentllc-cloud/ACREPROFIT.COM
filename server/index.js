@@ -5880,20 +5880,8 @@ app.get('/api/chemicals/admin', authMiddleware, adminMiddleware, async (req, res
         const chemicals = await Chemical.find(query)
             .sort({ productName: 1, packSize: 1 });
 
-        // Superadmin sees everything including cost
-        if (req.user.role === 'superadmin') {
-            return res.json(chemicals);
-        }
-
-        // Distributors see admin price + their margin, but NOT cost price
-        const filtered = chemicals.map(c => {
-            const obj = c.toObject();
-            delete obj.costPrice;
-            delete obj.adminMarginDollars;
-            return obj;
-        });
-
-        res.json(filtered);
+        // Superadmin and distributors see everything including cost
+        res.json(chemicals);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
