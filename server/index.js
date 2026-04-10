@@ -59,6 +59,8 @@ const connectDB = async () => {
             await backfillInventoryFromPOs();
             // Seed Hydrovant inventory (360 gal, paid by Kyle)
             await seedHydrovantInventory();
+            // Ensure correct ledger entries for all PO purchases
+            await seedPOLedgerEntries();
             // Sync product catalog with inventory records
             await syncCatalogToInventory();
         } else {
@@ -2531,7 +2533,7 @@ async function seedMarch2026PurchaseOrders() {
                 totalCost: 76617.00,
                 status: 'confirmed',
                 orderDate: new Date('2026-03-30'),
-                notes: 'Billed to: Acre Profit LLC'
+                notes: 'Billed to: Kyle McConnell'
             });
 
             console.log('Created JABCO SO2129 - $76,617.00 (5 products)');
@@ -2903,6 +2905,62 @@ async function seedHydrovantInventory() {
         }
     } catch (error) {
         console.error('Error seeding Hydrovant inventory:', error.message);
+    }
+}
+
+// Ensure correct ledger entries for all PO purchases
+async function seedPOLedgerEntries() {
+    try {
+        // Map of PO numbers to who paid
+        const poBilling = {
+            'JABCO-SO2129': { email: 'office@togoag.com', name: 'Kyle McConnell' },
+            'SIMS-103850': { email: 'tymollohan77@gmail.com', name: 'Ty Mollohan' },
+            'SIMS-103849': { email: 'tymollohan77@gmail.com', name: 'Ty Mollohan' }
+        };
+
+        for (const [poNumber, billing] of Object.entries(poBilling)) {
+            // Check if ledger entry already exists for this PO
+            const existing = await LedgerEntry.findOne({
+                description: { $regex: new RegExp(poNumber) }
+            });
+            if (existing) continue;
+
+            const po = await PurchaseOrder.findOne({ poNumber });
+            if (!po) continue;
+
+            const rep = await User.findOne({ email: billing.email });
+            if (!rep) {
+                console.log(`Could not find ${billing.name} for PO ${poNumber} ledger entry`);
+                continue;
+            }
+
+            // Also check if there's a PurchaseOrder reference entry from backfill
+            const existingPORef = await LedgerEntry.findOne({
+                referenceType: 'PurchaseOrder',
+                referenceId: po._id
+            });
+            if (existingPORef) continue;
+
+            const total = po.totalCost || po.subtotal || 0;
+            if (total <= 0) continue;
+
+            const itemSummary = po.items.map(i => `${i.productName} (${i.quantityOrdered} ${i.unit || ''})`).join(', ');
+
+            await createLedgerEntry({
+                representativeId: rep._id,
+                description: `PO ${poNumber} - ${po.supplier?.name || 'Supplier'}`,
+                amount: total,
+                type: 'debit',
+                category: 'supplier_payment',
+                referenceType: 'PurchaseOrder',
+                referenceId: po._id,
+                notes: `Paid by ${billing.name}. Items: ${itemSummary}`
+            });
+
+            console.log(`Ledger: ${billing.name} debited $${total.toLocaleString()} for PO ${poNumber}`);
+        }
+    } catch (error) {
+        console.error('Error seeding PO ledger entries:', error.message);
     }
 }
 
@@ -3448,6 +3506,19 @@ app.post('/api/auth/reset-password', async (req, res) => {
 });
 
 // Admin: Reset any user's password (superadmin only)
+// Get users by role (for rep/distributor dropdowns)
+app.get('/api/admin/users', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { role } = req.query;
+        const query = {};
+        if (role) query.role = role;
+        const users = await User.find(query).select('name email role phone').sort({ name: 1 });
+        res.json(users);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res) => {
     try {
         if (req.user.role !== 'superadmin') {
@@ -10103,7 +10174,7 @@ app.post('/api/admin/inventory/backfill', authMiddleware, adminMiddleware, async
 // Transfer inventory between locations
 app.post('/api/admin/inventory/transfer', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { chemicalId, quantity, fromLocation, toLocation, notes } = req.body;
+        const { chemicalId, quantity, fromLocation, toLocation, notes, fromRepId, toRepId } = req.body;
 
         if (!chemicalId || !quantity || !fromLocation || !toLocation) {
             return res.status(400).json({ error: 'chemicalId, quantity, fromLocation, and toLocation are required' });
@@ -10189,8 +10260,41 @@ app.post('/api/admin/inventory/transfer', authMiddleware, adminMiddleware, async
             createdBy: req.user._id
         }).save();
 
+        // Create ledger entries for transfer between reps
+        const transferValue = Math.round(quantity * (sourceInv.averageCost || 0) * 100) / 100;
+        const productLabel = `${sourceInv.productName} (${quantity} ${sourceInv.unit})`;
+
+        if (fromRepId && transferValue > 0) {
+            // Credit the sender - they gave product, reducing what they owe
+            await createLedgerEntry({
+                representativeId: fromRepId,
+                description: `Transfer OUT: ${productLabel} to ${toLocation}`,
+                amount: transferValue,
+                type: 'credit',
+                category: 'adjustment',
+                referenceType: 'Manual',
+                createdBy: req.user._id,
+                notes: notes || `Inventory transferred from ${fromLocation} to ${toLocation}`
+            });
+        }
+
+        if (toRepId && transferValue > 0) {
+            // Debit the receiver - they got product, increasing what they owe
+            await createLedgerEntry({
+                representativeId: toRepId,
+                description: `Transfer IN: ${productLabel} from ${fromLocation}`,
+                amount: transferValue,
+                type: 'debit',
+                category: 'adjustment',
+                referenceType: 'Manual',
+                createdBy: req.user._id,
+                notes: notes || `Inventory received from ${fromLocation} to ${toLocation}`
+            });
+        }
+
         res.json({
             message: `Transferred ${quantity} ${sourceInv.unit} of ${sourceInv.productName} from ${fromLocation} to ${toLocation}`,
+            transferValue,
             source: sourceInv,
             destination: destInv
         });

@@ -2031,6 +2031,23 @@
                         <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Quantity</label>
                         <input type="number" id="transferQty" min="1" placeholder="Units to transfer" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
                     </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Paid For By (Sending)</label>
+                            <select id="transferFromRep" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                                <option value="">N/A - No ledger entry</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Receiving Rep (Owes)</label>
+                            <select id="transferToRep" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                                <option value="">N/A - No ledger entry</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="transferValuePreview" style="background:#f0f7ef; padding:0.75rem; border-radius:6px; margin-bottom:1rem; display:none;">
+                        <strong>Transfer Value:</strong> <span id="transferValueAmount">$0.00</span> at cost
+                    </div>
                     <div style="margin-bottom:1rem;">
                         <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Notes (optional)</label>
                         <input type="text" id="transferNotes" placeholder="Reason for transfer" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
@@ -8690,15 +8707,73 @@
         }
 
         // Transfer modal functions
-        function openTransferModal() {
+        let transferDistributors = [];
+
+        async function openTransferModal() {
             const select = document.getElementById('transferProduct');
             select.innerHTML = '<option value="">Select product...</option>' +
                 allInventory.filter(i => (i.quantityOnHand || 0) > 0).map(i =>
-                    `<option value="${i.chemicalId?._id || i.chemicalId}" data-avail="${i.quantityAvailable || 0}" data-unit="${i.unit || ''}">${i.productName} (${i.quantityAvailable || 0} ${i.unit || ''} available)</option>`
+                    `<option value="${i.chemicalId?._id || i.chemicalId}" data-avail="${i.quantityAvailable || 0}" data-cost="${i.averageCost || 0}" data-unit="${i.unit || ''}">${i.productName} (${i.quantityAvailable || 0} ${i.unit || ''} available)</option>`
                 ).join('');
+
+            // Load distributors for rep selection
+            if (transferDistributors.length === 0) {
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/customers?role=distributor`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (res.ok) transferDistributors = await res.json();
+                } catch(e) {}
+                // Fallback: use known reps
+                if (transferDistributors.length === 0) {
+                    transferDistributors = [
+                        { _id: 'kyle', name: 'Kyle McConnell' },
+                        { _id: 'ty', name: 'Ty Mollohan' },
+                        { _id: 'chad', name: 'Chad Bamford' },
+                        { _id: 'seth', name: 'Seth Rolfs' },
+                        { _id: 'tyson', name: 'Tyson' }
+                    ];
+                    // Try to get real IDs
+                    try {
+                        const res2 = await fetch(`${API_URL}/api/admin/users?role=distributor`, {
+                            headers: { 'Authorization': `Bearer ${token}` }
+                        });
+                        if (res2.ok) {
+                            const users = await res2.json();
+                            if (users.length > 0) transferDistributors = users;
+                        }
+                    } catch(e) {}
+                }
+            }
+
+            const repOptions = '<option value="">N/A - No ledger entry</option>' +
+                transferDistributors.map(d => `<option value="${d._id}">${d.name}</option>`).join('');
+            document.getElementById('transferFromRep').innerHTML = repOptions;
+            document.getElementById('transferToRep').innerHTML = repOptions;
+
             document.getElementById('transferQty').value = '';
             document.getElementById('transferNotes').value = '';
+            document.getElementById('transferValuePreview').style.display = 'none';
             document.getElementById('transferModal').style.display = 'flex';
+
+            // Update value preview when qty changes
+            document.getElementById('transferQty').oninput = updateTransferValue;
+            document.getElementById('transferProduct').onchange = updateTransferValue;
+        }
+
+        function updateTransferValue() {
+            const select = document.getElementById('transferProduct');
+            const option = select.options[select.selectedIndex];
+            const cost = parseFloat(option?.dataset?.cost) || 0;
+            const qty = parseInt(document.getElementById('transferQty').value) || 0;
+            const value = qty * cost;
+            const preview = document.getElementById('transferValuePreview');
+            if (qty > 0 && cost > 0) {
+                document.getElementById('transferValueAmount').textContent = '$' + value.toLocaleString(undefined, {minimumFractionDigits: 2});
+                preview.style.display = 'block';
+            } else {
+                preview.style.display = 'none';
+            }
         }
 
         function closeTransferModal() {
@@ -8710,6 +8785,8 @@
             const quantity = parseInt(document.getElementById('transferQty').value) || 0;
             const fromLocation = document.getElementById('transferFrom').value;
             const toLocation = document.getElementById('transferTo').value;
+            const fromRepId = document.getElementById('transferFromRep').value || undefined;
+            const toRepId = document.getElementById('transferToRep').value || undefined;
             const notes = document.getElementById('transferNotes').value;
 
             if (!chemicalId) { alert('Please select a product'); return; }
@@ -8720,11 +8797,13 @@
                 const res = await fetch(`${API_URL}/api/admin/inventory/transfer`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
-                    body: JSON.stringify({ chemicalId, quantity, fromLocation, toLocation, notes })
+                    body: JSON.stringify({ chemicalId, quantity, fromLocation, toLocation, fromRepId, toRepId, notes })
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(data.message);
+                    let msg = data.message;
+                    if (data.transferValue > 0) msg += `\nLedger value: $${data.transferValue.toFixed(2)}`;
+                    alert(msg);
                     closeTransferModal();
                     loadInventory();
                 } else {
