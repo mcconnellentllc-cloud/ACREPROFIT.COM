@@ -2338,8 +2338,10 @@ async function seedJabcoInventory() {
                 unit: 'gal',
                 unitsPerPack: 265,
                 costPrice: 13.25,
-                adminPrice: 14.50,
-                sellPrice: 16.00,
+                adminMarginDollars: 0,
+                adminPrice: 13.25,
+                marginDollars: 0,
+                sellPrice: 13.25,
                 category: 'herbicide',
                 sourceSupplier: 'Jabco',
                 epaRegistrationNumber: '89343-5',
@@ -2348,12 +2350,9 @@ async function seedJabcoInventory() {
                 activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }]
             });
             console.log('Created XSATE Glyphosate 53.8% product');
-        } else if (product.sellPrice === 0) {
-            // Update prices if not set
-            product.adminPrice = 14.50;
-            product.sellPrice = 16.00;
-            await product.save();
-            console.log('Updated XSATE Glyphosate prices');
+        } else {
+            // Don't overwrite prices - set them in admin panel
+            console.log('XSATE Glyphosate already exists - set margins in admin panel');
         }
 
         // Create inventory record
@@ -2506,8 +2505,10 @@ async function seedMarch2026PurchaseOrders() {
                         unit: prod.unit,
                         unitsPerPack: prod.unitsPerPack,
                         costPrice: prod.unitPrice,
-                        adminPrice: prod.unitPrice * 1.05, // 5% admin margin
-                        sellPrice: prod.unitPrice * 1.15, // 15% retail margin
+                        adminMarginDollars: 0,
+                        marginDollars: 0,
+                        adminPrice: prod.unitPrice, // No margin until set by admin
+                        sellPrice: prod.unitPrice, // No margin until set by admin
                         category: prod.category,
                         sourceSupplier: 'JABCO',
                         signalWord: 'CAUTION'
@@ -2604,8 +2605,10 @@ async function seedMarch2026PurchaseOrders() {
                         unit: prod.unit,
                         unitsPerPack: prod.unitsPerPack,
                         costPrice: prod.unitPrice,
-                        adminPrice: prod.unitPrice * 1.05,
-                        sellPrice: prod.unitPrice * 1.15,
+                        adminMarginDollars: 0,
+                        marginDollars: 0,
+                        adminPrice: prod.unitPrice, // No margin until set by admin
+                        sellPrice: prod.unitPrice, // No margin until set by admin
                         category: prod.category,
                         sourceSupplier: 'Sims Fertilizer & Chemical',
                         signalWord: 'CAUTION'
@@ -2658,8 +2661,10 @@ async function seedMarch2026PurchaseOrders() {
                     unit: 'gal',
                     unitsPerPack: 265, // Standard tote size
                     costPrice: 12.50,
-                    adminPrice: 13.00,
-                    sellPrice: 14.50,
+                    adminMarginDollars: 0,
+                    adminPrice: 12.50,
+                    marginDollars: 0,
+                    sellPrice: 12.50,
                     category: 'herbicide',
                     sourceSupplier: 'Sims Fertilizer & Chemical',
                     signalWord: 'CAUTION',
@@ -2846,8 +2851,10 @@ async function seedHydrovantInventory() {
                 unit: 'gal',
                 unitsPerPack: 5,
                 costPrice: 75.00,
-                adminPrice: 95.00,
-                sellPrice: 145.00,
+                adminMarginDollars: 0,
+                adminPrice: 75.00,
+                marginDollars: 0,
+                sellPrice: 75.00,
                 category: 'adjuvant',
                 sourceSupplier: 'CPD',
                 signalWord: 'CAUTION',
@@ -2858,13 +2865,11 @@ async function seedHydrovantInventory() {
             });
             console.log('Created Hydrovant product');
         } else {
-            // Update cost price if needed
+            // Update cost price if needed, but don't overwrite margins
             if (hydrovant.costPrice !== 75.00) {
                 hydrovant.costPrice = 75.00;
-                hydrovant.adminPrice = hydrovant.adminPrice || 95.00;
-                hydrovant.sellPrice = hydrovant.sellPrice || 145.00;
                 await hydrovant.save();
-                console.log('Updated Hydrovant pricing');
+                console.log('Updated Hydrovant cost price');
             }
         }
 
@@ -5533,12 +5538,12 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'AgSaver', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.32, sellPrice: 0, category: 'herbicide', equivalentProduct: 'RT3, Glystar Supreme', notes: 'Glyphosate' },
 
             // Glyphosate 5.4 lb - from JABCO/CPD
-            { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 250, costPrice: 13.25, adminPrice: 13.32, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
+            { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 250, costPrice: 13.25, adminMarginDollars: 0.07, adminPrice: 13.32, marginDollars: 0.77, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
 
             // XSATE Glyphosate 53.8% - Xingfa USA via Jabco (EPA 89343-5) - $13.25/gal cost, $16/gal retail
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminPrice: 14.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 13.25, adminPrice: 14.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminPrice: 14.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
 
             // Atrazine
             { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
@@ -5573,8 +5578,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'AMS x5', packSize: '24', unit: 'lb', unitsPerPack: 120, costPrice: 1.45, sellPrice: 0, category: 'adjuvant', notes: 'Ammonium Sulfate - 5 bag bundle' },
 
             // Hydrovant
-            { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 145.00, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
-            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 95.00, sellPrice: 145.00, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
+            { productName: 'Hydrovant', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' },
+            { productName: 'Hydrovant', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 250, costPrice: 95.00, sellPrice: 0, category: 'adjuvant', notes: 'Drift reduction/deposition aid adjuvant' }
         ];
 
         const results = { created: [], existing: [] };
@@ -5588,10 +5593,10 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             });
 
             if (!existing) {
-                // Calculate prices with margins if not set
+                // Use explicit prices if set, otherwise default to cost (no auto-margin - set on site)
                 const cost = chem.costPrice || 0;
-                const admin = chem.adminPrice || cost * 1.10; // 10% Acre Profit margin
-                const sell = chem.sellPrice || admin * 1.15; // 15% rep margin on top
+                const admin = chem.adminPrice || cost;
+                const sell = chem.sellPrice || admin;
 
                 const newChem = await Chemical.create({
                     ...chem,
@@ -5621,8 +5626,8 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                 // Update existing product if prices are 0
                 if (existing.costPrice === 0 || existing.sellPrice === 0) {
                     const cost = chem.costPrice || existing.costPrice || 0;
-                    const admin = chem.adminPrice || cost * 1.10;
-                    const sell = chem.sellPrice || admin * 1.15;
+                    const admin = chem.adminPrice || cost;
+                    const sell = chem.sellPrice || admin;
 
                     existing.costPrice = cost;
                     existing.adminPrice = admin;

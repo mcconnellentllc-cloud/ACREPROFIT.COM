@@ -2059,6 +2059,73 @@
                 </div>
             </div>
 
+            <!-- Adjust Inventory Modal -->
+            <div id="adjustInventoryModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:white; border-radius:12px; padding:2rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                        <h2 style="margin:0;">Adjust Inventory</h2>
+                        <button onclick="closeAdjustModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                    </div>
+                    <div style="background:#f8f9fa; padding:12px 16px; border-radius:8px; margin-bottom:1.5rem;">
+                        <strong id="adjustProductName" style="font-size:1.1rem;"></strong>
+                        <div style="display:flex; gap:1.5rem; margin-top:6px; color:#666;">
+                            <span>On Hand: <strong id="adjustCurrentQty" style="color:#111;"></strong></span>
+                            <span>Reserved: <strong id="adjustReservedQty" style="color:#dc2626;"></strong></span>
+                            <span>Available: <strong id="adjustAvailableQty" style="color:#059669;"></strong></span>
+                        </div>
+                    </div>
+                    <input type="hidden" id="adjustChemicalId">
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Type</label>
+                        <div style="display:flex; gap:0.5rem;">
+                            <button id="adjustTypeAdd" class="btn btn-primary" onclick="setAdjustType('add')" style="flex:1; background:#059669;">+ Add Stock</button>
+                            <button id="adjustTypeSubtract" class="btn btn-outline" onclick="setAdjustType('subtract')" style="flex:1;">- Remove Stock</button>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Quantity</label>
+                        <input type="number" id="adjustQuantity" min="0" step="0.01" placeholder="Enter quantity" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px; font-size:1.1rem;" oninput="updateAdjustPreview()">
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Reason</label>
+                        <select id="adjustReason" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;" onchange="toggleAdjustNotes()">
+                            <option value="">Select reason...</option>
+                            <optgroup label="Add Stock">
+                                <option value="received_po">Received from PO</option>
+                                <option value="return">Customer Return</option>
+                                <option value="found">Found / Count Correction (+)</option>
+                                <option value="transfer_in">Transfer In</option>
+                            </optgroup>
+                            <optgroup label="Remove Stock">
+                                <option value="sold_square">Sold on Square</option>
+                                <option value="sold_direct">Sold Direct / Cash</option>
+                                <option value="damaged">Damaged / Expired</option>
+                                <option value="shrinkage">Shrinkage / Count Correction (-)</option>
+                                <option value="transfer_out">Transfer Out</option>
+                                <option value="sample">Sample / Demo</option>
+                            </optgroup>
+                            <optgroup label="Other">
+                                <option value="other">Other (explain in notes)</option>
+                            </optgroup>
+                        </select>
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Notes</label>
+                        <input type="text" id="adjustNotes" placeholder="e.g., Square transaction #1234, customer name" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <div id="adjustPreview" style="background:#f0fdf4; padding:12px 16px; border-radius:8px; margin-bottom:1.5rem; display:none;">
+                        <div style="display:flex; justify-content:space-between;">
+                            <span>New Quantity:</span>
+                            <strong id="adjustNewQty" style="font-size:1.1rem;"></strong>
+                        </div>
+                    </div>
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button class="btn btn-outline" onclick="closeAdjustModal()">Cancel</button>
+                        <button class="btn btn-primary" id="adjustSubmitBtn" onclick="submitAdjustment()">Save Adjustment</button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Quote Requests / Preorders Tab -->
             <div id="quote-requestsTab" class="tab-content">
                 <div class="tab-header">
@@ -4676,6 +4743,7 @@
 
                 const inventory = p.quantityOnHand || 0;
                 const inventoryColor = inventory === 0 ? '#dc2626' : inventory < 10 ? '#d97706' : '#059669';
+                const needsPricing = (adminMarginDollars === 0 && marginDollars === 0) || sellPrice <= costPrice;
 
                 // Format active ingredients for display
                 const activeIngredientsDisplay = p.activeIngredients && p.activeIngredients.length
@@ -4683,10 +4751,11 @@
                     : '';
 
                 return `
-                <tr ${isPriceStale ? 'style="background: #fef3c7;"' : ''}>
+                <tr style="${needsPricing && inventory > 0 ? 'background: #fef2f2; border-left: 4px solid #dc2626;' : isPriceStale ? 'background: #fef3c7;' : ''}">
                     <td>
                         <strong>${p.productName}</strong>
-                        ${isPriceStale ? '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;" title="Price may be outdated">STALE</span>' : ''}
+                        ${needsPricing && inventory > 0 ? '<span style="background: #dc2626; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;" title="Set margins to enable sales">NEEDS PRICING</span>' : ''}
+                        ${isPriceStale && !needsPricing ? '<span style="background: #f59e0b; color: white; padding: 2px 6px; border-radius: 4px; font-size: 0.7rem; margin-left: 6px;" title="Price may be outdated">STALE</span>' : ''}
                         ${activeIngredientsDisplay ? `<br><small style="color:var(--text-muted)">${activeIngredientsDisplay}</small>` : ''}
                         <br><small style="color:var(--text-muted); font-style:italic;">${p.category || ''}</small>
                     </td>
@@ -4712,8 +4781,8 @@
                     <td>${p.unitsSold || 0}</td>
                     <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
                     <td>
-                        <button class="btn btn-sm btn-outline" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins">
-                            Edit
+                        <button class="btn btn-sm ${needsPricing && inventory > 0 ? 'btn-primary' : 'btn-outline'}" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins" ${needsPricing && inventory > 0 ? 'style="background:#dc2626; border-color:#dc2626; animation: pulse 2s infinite;"' : ''}>
+                            ${needsPricing && inventory > 0 ? 'Set Price' : 'Edit'}
                         </button>
                     </td>
                 </tr>
@@ -9113,26 +9182,120 @@
         }
 
         // Adjust inventory quantity
+        let adjustType = 'add';
+        let adjustInventoryItem = null;
+
         function adjustInventory(id) {
-            const item = allInventory.find(i => (i.id || i._id) === id);
-            if (!item) return;
+            adjustInventoryItem = allInventory.find(i => (i.id || i._id) === id);
+            if (!adjustInventoryItem) return;
 
-            const adjustment = prompt(`Adjust quantity for "${item.productName}"\nCurrent: ${item.quantity} ${item.unit}\n\nEnter adjustment (+10 to add, -5 to subtract):`);
-            if (adjustment === null) return;
+            const onHand = adjustInventoryItem.quantityOnHand || adjustInventoryItem.quantity || 0;
+            const reserved = adjustInventoryItem.quantityReserved || 0;
+            const available = adjustInventoryItem.quantityAvailable || (onHand - reserved);
 
-            const adjustNum = parseFloat(adjustment);
-            if (isNaN(adjustNum)) {
-                alert('Please enter a valid number');
-                return;
+            document.getElementById('adjustProductName').textContent = `${adjustInventoryItem.productName} (${adjustInventoryItem.packSize || ''} ${adjustInventoryItem.unit || ''})`;
+            document.getElementById('adjustCurrentQty').textContent = onHand.toLocaleString();
+            document.getElementById('adjustReservedQty').textContent = reserved.toLocaleString();
+            document.getElementById('adjustAvailableQty').textContent = available.toLocaleString();
+            document.getElementById('adjustChemicalId').value = adjustInventoryItem.chemicalId?._id || adjustInventoryItem.chemicalId || '';
+            document.getElementById('adjustQuantity').value = '';
+            document.getElementById('adjustReason').value = '';
+            document.getElementById('adjustNotes').value = '';
+            document.getElementById('adjustPreview').style.display = 'none';
+
+            setAdjustType('add');
+            document.getElementById('adjustInventoryModal').style.display = 'flex';
+        }
+
+        function closeAdjustModal() {
+            document.getElementById('adjustInventoryModal').style.display = 'none';
+            adjustInventoryItem = null;
+        }
+
+        function setAdjustType(type) {
+            adjustType = type;
+            const addBtn = document.getElementById('adjustTypeAdd');
+            const subBtn = document.getElementById('adjustTypeSubtract');
+            if (type === 'add') {
+                addBtn.style.background = '#059669'; addBtn.style.color = 'white'; addBtn.style.borderColor = '#059669';
+                subBtn.style.background = 'white'; subBtn.style.color = '#333'; subBtn.style.borderColor = '#ddd';
+            } else {
+                subBtn.style.background = '#dc2626'; subBtn.style.color = 'white'; subBtn.style.borderColor = '#dc2626';
+                addBtn.style.background = 'white'; addBtn.style.color = '#333'; addBtn.style.borderColor = '#ddd';
             }
+            updateAdjustPreview();
+        }
 
-            item.quantity = Math.max(0, (item.quantity || 0) + adjustNum);
-            item.updatedAt = new Date().toISOString();
+        function toggleAdjustNotes() {
+            // Auto-set type based on reason
+            const reason = document.getElementById('adjustReason').value;
+            const addReasons = ['received_po', 'return', 'found', 'transfer_in'];
+            const subReasons = ['sold_square', 'sold_direct', 'damaged', 'shrinkage', 'transfer_out', 'sample'];
+            if (addReasons.includes(reason)) setAdjustType('add');
+            else if (subReasons.includes(reason)) setAdjustType('subtract');
+        }
 
-            localStorage.setItem('inventory', JSON.stringify(allInventory));
-            renderInventory(allInventory);
-            updateInventoryStats();
-            alert(`Quantity adjusted by ${adjustNum >= 0 ? '+' : ''}${adjustNum}. New quantity: ${item.quantity} ${item.unit}`);
+        function updateAdjustPreview() {
+            const qty = parseFloat(document.getElementById('adjustQuantity').value) || 0;
+            const preview = document.getElementById('adjustPreview');
+            if (qty > 0 && adjustInventoryItem) {
+                const onHand = adjustInventoryItem.quantityOnHand || adjustInventoryItem.quantity || 0;
+                const change = adjustType === 'add' ? qty : -qty;
+                const newQty = onHand + change;
+                document.getElementById('adjustNewQty').textContent = newQty.toLocaleString();
+                document.getElementById('adjustNewQty').style.color = newQty < 0 ? '#dc2626' : '#059669';
+                preview.style.display = 'block';
+                preview.style.background = newQty < 0 ? '#fef2f2' : '#f0fdf4';
+            } else {
+                preview.style.display = 'none';
+            }
+        }
+
+        async function submitAdjustment() {
+            const chemicalId = document.getElementById('adjustChemicalId').value;
+            const qty = parseFloat(document.getElementById('adjustQuantity').value) || 0;
+            const reason = document.getElementById('adjustReason').value;
+            const notes = document.getElementById('adjustNotes').value.trim();
+
+            if (!qty || qty <= 0) { alert('Enter a quantity greater than 0'); return; }
+            if (!reason) { alert('Select a reason for this adjustment'); return; }
+
+            const quantityChange = adjustType === 'add' ? qty : -qty;
+
+            const btn = document.getElementById('adjustSubmitBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/adjust`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        chemicalId,
+                        location: 'main',
+                        quantityChange,
+                        reason,
+                        notes: notes || `${reason}: ${adjustType === 'add' ? '+' : '-'}${qty}`
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to adjust inventory');
+                }
+
+                closeAdjustModal();
+                loadInventory();
+                alert(`Inventory ${adjustType === 'add' ? 'added' : 'removed'}: ${qty} units (${reason})`);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save Adjustment';
+            }
         }
 
         // Delete inventory item
