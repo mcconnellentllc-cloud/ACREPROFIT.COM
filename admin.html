@@ -1870,6 +1870,8 @@
                 <div class="tab-header">
                     <h2>Current Inventory</h2>
                     <div class="tab-header-actions">
+                        <button class="btn btn-outline" onclick="backfillInventory()" title="Populate inventory from all received POs">Backfill from POs</button>
+                        <button class="btn btn-outline" onclick="openTransferModal()">Transfer Stock</button>
                         <button class="btn btn-outline" onclick="syncProductsToInventory()">Sync All Products</button>
                         <button class="btn btn-primary" onclick="openAddInventoryModal()">+ Add Inventory</button>
                         <div class="search-box">
@@ -1991,6 +1993,52 @@
                             <tr><td colspan="11" class="loading">Loading inventory...</td></tr>
                         </tbody>
                     </table>
+                </div>
+            </div>
+
+            <!-- Transfer Stock Modal -->
+            <div id="transferModal" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+                <div style="background:white; border-radius:12px; padding:2rem; max-width:500px; width:90%; max-height:90vh; overflow-y:auto;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:1.5rem;">
+                        <h2 style="margin:0;">Transfer Inventory</h2>
+                        <button onclick="closeTransferModal()" style="background:none; border:none; font-size:1.5rem; cursor:pointer;">&times;</button>
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Product</label>
+                        <select id="transferProduct" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                            <option value="">Select product...</option>
+                        </select>
+                    </div>
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:1rem; margin-bottom:1rem;">
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:0.3rem;">From Location</label>
+                            <select id="transferFrom" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                                <option value="main">Main Warehouse</option>
+                                <option value="haxtun">Haxtun</option>
+                                <option value="otis">Otis</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label style="display:block; font-weight:600; margin-bottom:0.3rem;">To Location</label>
+                            <select id="transferTo" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                                <option value="haxtun">Haxtun</option>
+                                <option value="otis">Otis</option>
+                                <option value="main">Main Warehouse</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Quantity</label>
+                        <input type="number" id="transferQty" min="1" placeholder="Units to transfer" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <div style="margin-bottom:1rem;">
+                        <label style="display:block; font-weight:600; margin-bottom:0.3rem;">Notes (optional)</label>
+                        <input type="text" id="transferNotes" placeholder="Reason for transfer" style="width:100%; padding:0.6rem; border:1px solid #ddd; border-radius:6px;">
+                    </div>
+                    <div style="display:flex; gap:0.5rem; justify-content:flex-end;">
+                        <button class="btn btn-outline" onclick="closeTransferModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="submitTransfer()">Transfer</button>
+                    </div>
                 </div>
             </div>
 
@@ -8621,6 +8669,77 @@
         }
 
         // Filter inventory
+        // Backfill inventory from received POs
+        async function backfillInventory() {
+            if (!confirm('This will populate inventory from all received Purchase Orders that are missing inventory records. Continue?')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/backfill`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message || 'Backfill completed!');
+                    loadInventory();
+                } else {
+                    alert('Error: ' + (data.error || 'Unknown error'));
+                }
+            } catch (error) {
+                alert('Error running backfill: ' + error.message);
+            }
+        }
+
+        // Transfer modal functions
+        function openTransferModal() {
+            const select = document.getElementById('transferProduct');
+            select.innerHTML = '<option value="">Select product...</option>' +
+                allInventory.filter(i => (i.quantityOnHand || 0) > 0).map(i =>
+                    `<option value="${i.chemicalId?._id || i.chemicalId}" data-avail="${i.quantityAvailable || 0}" data-unit="${i.unit || ''}">${i.productName} (${i.quantityAvailable || 0} ${i.unit || ''} available)</option>`
+                ).join('');
+            document.getElementById('transferQty').value = '';
+            document.getElementById('transferNotes').value = '';
+            document.getElementById('transferModal').style.display = 'flex';
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferModal').style.display = 'none';
+        }
+
+        async function submitTransfer() {
+            const chemicalId = document.getElementById('transferProduct').value;
+            const quantity = parseInt(document.getElementById('transferQty').value) || 0;
+            const fromLocation = document.getElementById('transferFrom').value;
+            const toLocation = document.getElementById('transferTo').value;
+            const notes = document.getElementById('transferNotes').value;
+
+            if (!chemicalId) { alert('Please select a product'); return; }
+            if (quantity <= 0) { alert('Enter a valid quantity'); return; }
+            if (fromLocation === toLocation) { alert('From and To locations must be different'); return; }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory/transfer`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ chemicalId, quantity, fromLocation, toLocation, notes })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(data.message);
+                    closeTransferModal();
+                    loadInventory();
+                } else {
+                    alert('Error: ' + (data.error || 'Transfer failed'));
+                }
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
+        }
+
+        // Click outside transfer modal to close
+        document.getElementById('transferModal').addEventListener('click', function(e) {
+            if (e.target === this) closeTransferModal();
+        });
+
         function filterInventory() {
             const searchTerm = document.getElementById('inventorySearch').value.toLowerCase();
             const categoryFilter = document.getElementById('inventoryCategoryFilter').value;
