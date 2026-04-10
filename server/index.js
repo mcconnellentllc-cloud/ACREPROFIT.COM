@@ -5959,9 +5959,6 @@ app.get('/api/chemicals/search', authMiddleware, async (req, res) => {
     }
 });
 
-// Get unique suppliers list
-app.get('/api/chemicals/suppliers', async (req, res) => {
-
 // Distributor: Update distributor margin on a product (any distributor can do this, changes for all)
 app.put('/api/chemicals/:id/distributor-margin', authMiddleware, async (req, res) => {
     try {
