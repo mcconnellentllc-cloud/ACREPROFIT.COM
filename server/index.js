@@ -14163,17 +14163,6 @@ connectDB().then(async () => {
         }
     } catch (e) { console.error('Rancor 4F setup error:', e.message); }
 
-    // Fix ledger direction: supplier_payment entries should be CREDIT (AP owes Kyle/Ty), not DEBIT
-    try {
-        const fixed = await LedgerEntry.updateMany(
-            { category: 'supplier_payment', type: 'debit' },
-            { $set: { type: 'credit', updatedAt: new Date() } }
-        );
-        if (fixed.modifiedCount > 0) {
-            console.log(`Fixed ${fixed.modifiedCount} ledger entries: supplier_payment debit → credit (AP owes them)`);
-        }
-    } catch (e) { console.error('Ledger fix error:', e.message); }
-
     // Rename CPD → JABCO in all existing records
     try {
         const chemFixed = await Chemical.updateMany(
@@ -14183,51 +14172,83 @@ connectDB().then(async () => {
         if (chemFixed.modifiedCount > 0) console.log(`Renamed ${chemFixed.modifiedCount} products: CPD → JABCO`);
     } catch (e) { console.error('CPD rename error:', e.message); }
 
-    // Ledger: Ty took JABCO products to sell - Ty owes AP $41,123.70
-    // Per handwritten accounting:
-    //   Ty took: Rancor 4F $8,190 + Meso 4SC $16,470 + Flumi $10,080 + Sulfentrazone $12,870 + Hydrovant 180gal $13,500 = $61,110
-    //   AP owes Ty for Atrazine: $19,986.30
-    //   Net: Ty owes AP $41,123.70
+    // CLEAN LEDGER: Wipe old confusing entries and create simple loan entries
+    // Kyle loaned AP $167,987 to buy JABCO + Hydrovant inventory
+    // Ty loaned AP $146,445 to buy Sims inventory
+    // AP owns all inventory. AP pays them back as customers pay.
     try {
+        const kyle = await User.findOne({ email: 'office@togoag.com' });
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
-        if (ty) {
-            const existingTransfer = await LedgerEntry.findOne({
-                representativeId: ty._id,
-                description: { $regex: /JABCO products.*Ty/i }
-            });
-            if (!existingTransfer) {
-                // Ty received JABCO products worth $61,110 - this is a debit (he owes AP)
-                await createLedgerEntry({
-                    representativeId: ty._id,
-                    description: 'JABCO products transferred to Ty for distribution',
-                    amount: 61110.00,
-                    type: 'debit',
-                    category: 'adjustment',
-                    referenceType: 'Manual',
-                    notes: 'Rancor 4F $8,190 + Meso 4SC 360gal $16,470 + Flumi WDG $10,080 + Sulfentrazone $12,870 + Hydrovant fA 180gal $13,500 = $61,110'
-                });
-                console.log('Ledger: Ty debited $61,110 for JABCO products received');
-            }
 
-            // AP owes Ty for 6 shuttles Atrazine @ $12.57/gal = $19,986.30
-            const existingAtrazine = await LedgerEntry.findOne({
-                representativeId: ty._id,
-                description: { $regex: /6 shuttles Atrazine/i }
-            });
-            if (!existingAtrazine) {
+        if (kyle && ty) {
+            // Check if clean ledger already set up
+            const cleanMarker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO inventory' });
+            if (!cleanMarker) {
+                // Wipe all old seed ledger entries
+                await LedgerEntry.deleteMany({});
+                console.log('Cleared old ledger entries');
+
+                // Kyle's loan to AP: $167,987
+                // JABCO-2119 XSATE: $56,180
                 await createLedgerEntry({
-                    representativeId: ty._id,
-                    description: '6 Shuttles Atrazine 4L @ $12.57/gal (1,590 gal)',
-                    amount: 19986.30,
+                    representativeId: kyle._id,
+                    description: 'Loan: Kyle McConnell funded JABCO inventory',
+                    amount: 56180.00,
                     type: 'credit',
                     category: 'supplier_payment',
                     referenceType: 'Manual',
-                    notes: 'Ty paid for 6 shuttles (1,590 gal) Atrazine 4L. AP owes Ty.'
+                    notes: 'JABCO-2119: XSATE Glyphosate 53.8% - 4,240 gal @ $13.25/gal'
                 });
-                console.log('Ledger: AP owes Ty $19,986.30 for Atrazine');
+
+                // JABCO Invoice 1622: $84,807
+                await createLedgerEntry({
+                    representativeId: kyle._id,
+                    description: 'Loan: Kyle McConnell funded JABCO Invoice 1622',
+                    amount: 84807.00,
+                    type: 'credit',
+                    category: 'supplier_payment',
+                    referenceType: 'Manual',
+                    notes: 'Meso 4SC 720gal $32,940 + Flumi WDG 1,440lb $20,160 + Sulfentrazone 180gal $12,870 + Dicamba 180gal $5,445 + Defy LV-6 180gal $5,202 + Rancor 4F 180gal $8,190'
+                });
+
+                // Hydrovant: $27,000
+                await createLedgerEntry({
+                    representativeId: kyle._id,
+                    description: 'Loan: Kyle McConnell funded Hydrovant fA purchase',
+                    amount: 27000.00,
+                    type: 'credit',
+                    category: 'supplier_payment',
+                    referenceType: 'Manual',
+                    notes: 'Hydrovant fA - 360 gal @ $75.00/gal (direct purchase)'
+                });
+
+                // Ty's loan to AP: $146,445
+                // Sims #103850: $93,445
+                await createLedgerEntry({
+                    representativeId: ty._id,
+                    description: 'Loan: Ty Mollohan funded Sims #103850',
+                    amount: 93445.00,
+                    type: 'credit',
+                    category: 'supplier_payment',
+                    referenceType: 'Manual',
+                    notes: 'Dicamba Tigris 1,060gal $27,030 + LV6 De-Ester 1,060gal $24,115 + Anthem NXT 90gal $38,700 + Mivum 1,600oz $3,600'
+                });
+
+                // Sims #103849: $53,000
+                await createLedgerEntry({
+                    representativeId: ty._id,
+                    description: 'Loan: Ty Mollohan funded Sims #103849',
+                    amount: 53000.00,
+                    type: 'credit',
+                    category: 'supplier_payment',
+                    referenceType: 'Manual',
+                    notes: 'Atrazine 4L - 4,240 gal @ $12.50/gal'
+                });
+
+                console.log('Clean ledger created: Kyle loaned $167,987, Ty loaned $146,445');
             }
         }
-    } catch (e) { console.error('Ty ledger setup error:', e.message); }
+    } catch (e) { console.error('Clean ledger setup error:', e.message); }
 
     // Correct inventory quantities to match physical count
     // Kyle has: Meso 180, XSATE 4240, Dicamba 180, Defy LV-6 180, Hydrovant 180, Flumi 720
