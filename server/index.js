@@ -13681,6 +13681,61 @@ connectDB().then(async () => {
         }
     } catch (e) { console.error('Shuttle fix error:', e.message); }
 
+    // Set label and SDS links for all products
+    try {
+        const labelData = [
+            { name: /meso 4sc/i, epa: '101458-3',
+              labelUrl: 'https://www3.epa.gov/pesticides/chem_search/ppls/101458-00003-20230608.pdf',
+              sdsUrl: 'https://cropprotectdirect.com/products/meso-4sc/' },
+            { name: /xsate.*glyphosate/i, epa: '88343-5',
+              labelUrl: 'https://s3-us-west-1.amazonaws.com/agrian-cg-fs1-production/pdfs/XSATE_GLYPHOSATE_53.8_Label.pdf',
+              sdsUrl: 'https://s3-us-west-1.amazonaws.com/agrian-cg-fs1-production/pdfs/XSATE_GLYPHOSATE_53.8_MSDS.pdf' },
+            { name: /dicamba 49/i, epa: '85678-46',
+              labelUrl: 'https://www.redeagleinternational.com/wp-content/uploads/2018/10/Dicamba-48.6-SL-EM-30Oct18.pdf',
+              sdsUrl: 'https://www.redeagleinternational.com/wp-content/uploads/2018/12/Dicamba_49.8_SL-SDS-20Nov18.pdf' },
+            { name: /flumioxazin/i, epa: '85678-34',
+              labelUrl: 'https://s3-us-west-1.amazonaws.com/agrian-cg-fs1-production/pdfs/Flumioxazin_51_WDG_Label.pdf',
+              sdsUrl: 'https://assets.greenbook.net/18-40-26-28-05-2019-Ms_384_RedEagle_Flumioxazin_51__WDG.pdf' },
+            { name: /defy lv/i, epa: '66222-220',
+              labelUrl: 'https://s3-us-west-1.amazonaws.com/agrian-cg-fs1-production/pdfs/Defy_LV-6_Label1g.pdf',
+              sdsUrl: 'https://www.adama.com/us/en/products/herbicide/defy-lv-6' },
+            { name: /sulfentrazone/i, epa: '85678-59',
+              labelUrl: 'https://www.redeagleinternational.com/wp-content/uploads/2018/10/Sulfentrazone-39.6-SC-EM15Aug18.pdf',
+              sdsUrl: 'https://www.redeagleinternational.com/wp-content/uploads/2021/04/SDS_Sulfentrazone_39.6_SC.pdf' },
+            { name: /atrazine 4l/i, epa: '35915-4',
+              labelUrl: 'https://www.sipcam.com/downloads/10890/2648/ATRIZINE_4L_bilingual.pdf',
+              sdsUrl: 'https://www.sipcam.com/us/en/agriculture/agrochemicals/atrazine-4l' },
+            { name: /rancor/i, epa: '91234-73',
+              labelUrl: 'https://atticusllc.com/wp-content/uploads/2020/08/Rancor-4-F-Specimen.pdf',
+              sdsUrl: 'https://atticusllc.com/wp-content/uploads/2020/08/Rancor-4-F-SDS-v1.1.pdf' },
+            { name: /hydrovant/i, epa: '',
+              labelUrl: 'https://hydrovant.com/wp-content/uploads/sites/2/2021/08/Hydrovant-fA-English-Specimen-Label-082021.pdf',
+              sdsUrl: 'https://hydrovant.com/wp-content/uploads/sites/2/2021/08/HYDROVANT-fA-SDS-ENGLISH-082021.pdf' },
+            { name: /dicamba.*tigris/i, epa: '',
+              labelUrl: '', sdsUrl: '' },
+            { name: /lv6 de-ester/i, epa: '',
+              labelUrl: '', sdsUrl: '' },
+            { name: /anthem nxt/i, epa: '',
+              labelUrl: '', sdsUrl: '' },
+            { name: /mivum/i, epa: '',
+              labelUrl: '', sdsUrl: '' },
+        ];
+
+        let labelCount = 0;
+        for (const ld of labelData) {
+            if (!ld.labelUrl && !ld.sdsUrl && !ld.epa) continue;
+            const chems = await Chemical.find({ productName: ld.name });
+            for (const chem of chems) {
+                let changed = false;
+                if (ld.labelUrl && !chem.labelUrl) { chem.labelUrl = ld.labelUrl; changed = true; }
+                if (ld.sdsUrl && !chem.sdsUrl) { chem.sdsUrl = ld.sdsUrl; changed = true; }
+                if (ld.epa && !chem.epaRegistrationNumber) { chem.epaRegistrationNumber = ld.epa; changed = true; }
+                if (changed) { await chem.save(); labelCount++; }
+            }
+        }
+        if (labelCount > 0) console.log(`Set label/SDS links on ${labelCount} products`);
+    } catch (e) { console.error('Label link error:', e.message); }
+
     // Rename products to match actual label names
     try {
         const renames = [
