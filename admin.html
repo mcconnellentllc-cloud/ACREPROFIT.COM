@@ -3628,15 +3628,15 @@
                         </div>
                         <div class="distributor-stats">
                             <div class="dist-stat">
-                                <span class="dist-stat-value">$0</span>
-                                <span class="dist-stat-label">Inventory</span>
+                                <span class="dist-stat-value">$${(d.inventoryValue || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
+                                <span class="dist-stat-label">Inventory (${d.inventoryItems || 0} items)</span>
                             </div>
                             <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-value">${d.orderCount || 0}</span>
                                 <span class="dist-stat-label">Orders</span>
                             </div>
                             <div class="dist-stat">
-                                <span class="dist-stat-value">0</span>
+                                <span class="dist-stat-value">${d.customerCount || 0}</span>
                                 <span class="dist-stat-label">Customers</span>
                             </div>
                         </div>
@@ -3658,8 +3658,18 @@
         }
 
         function viewDistributorInventory(distributorId) {
-            // Future: View distributor inventory
-            alert('View inventory for distributor: ' + distributorId);
+            // Switch to inventory tab and filter by this distributor
+            switchTab('inventory');
+            // Wait for inventory to load, then filter
+            setTimeout(() => {
+                const search = document.getElementById('inventorySearch');
+                if (search) {
+                    // Find the distributor name from the grid
+                    const cards = document.querySelectorAll('.distributor-card');
+                    // Just show all inventory for now - the Held By column shows who has what
+                    loadInventory();
+                }
+            }, 300);
         }
 
         function editDistributor(distributorId) {

@@ -9294,7 +9294,35 @@ app.get('/api/admin/distributors', authMiddleware, adminMiddleware, async (req, 
             role: { $in: ['admin', 'superadmin', 'distributor'] }
         }).select('name email role').sort({ name: 1 });
 
-        res.json(distributors);
+        // Enrich with inventory value, order count, customer count
+        const enriched = await Promise.all(distributors.map(async (d) => {
+            const dObj = d.toObject();
+
+            // Inventory value: sum of (quantityOnHand * averageCost) for this distributor
+            const inventory = await Inventory.find({ distributorId: d._id });
+            dObj.inventoryValue = inventory.reduce((sum, inv) => {
+                return sum + ((inv.quantityOnHand || 0) * (inv.averageCost || inv.lastCost || 0));
+            }, 0);
+            dObj.inventoryItems = inventory.filter(i => (i.quantityOnHand || 0) > 0).length;
+
+            // Orders: count orders where representativeId = this distributor
+            const orderCount = await Order.countDocuments({ representativeId: d._id });
+            const chemOrderCount = await ChemicalOrder.countDocuments({ representativeId: d._id });
+            dObj.orderCount = orderCount + chemOrderCount;
+
+            // Customers: count users with this distributor as representative
+            dObj.customerCount = await User.countDocuments({
+                role: 'customer',
+                $or: [
+                    { representative: d._id },
+                    { representativeId: d._id }
+                ]
+            });
+
+            return dObj;
+        }));
+
+        res.json(enriched);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
