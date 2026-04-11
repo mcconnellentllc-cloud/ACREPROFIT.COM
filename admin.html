@@ -4910,7 +4910,7 @@
 
                 // Format active ingredients for display
                 const activeIngredientsDisplay = p.activeIngredients && p.activeIngredients.length
-                    ? p.activeIngredients.map(ai => ai.name).join(', ')
+                    ? p.activeIngredients.map(ai => `${ai.name}${ai.percentage ? ' ' + ai.percentage + '%' : ''}`).join(', ')
                     : '';
 
                 return `

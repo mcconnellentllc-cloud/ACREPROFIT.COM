@@ -258,6 +258,7 @@
                     .map(p => ({
                         id: p._id,
                         name: p.productName,
+                        activeIngredients: (p.activeIngredients || []).map(ai => `${ai.name}${ai.percentage ? ' ' + ai.percentage + '%' : ''}`).join(', '),
                         category: p.category || 'other',
                         packSize: p.packSize || '',
                         unit: p.unit || '',
@@ -265,13 +266,15 @@
                         price: p.sellPrice || 0,
                         defaultRate: p.defaultRate,
                         rateUnit: p.rateUnit,
-                        notes: p.notes || '',
+                        labelUrl: p.labelUrl || '',
+                        sdsUrl: p.sdsUrl || '',
+                        epaReg: p.epaRegistrationNumber || '',
                         rup: p.isRestrictedUse,
                         inStock: true,
                         quantityAvailable: 100,
                         availability: p.availability,
                         locations: p.locations || [],
-                        qty: 0 // User-entered quantity
+                        qty: 0
                     }));
 
                 renderProducts();
@@ -287,7 +290,7 @@
             let filtered = products.filter(p => {
                 const matchesFilter = currentFilter === 'all' || p.category === currentFilter;
                 const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-                                     p.notes.toLowerCase().includes(searchTerm.toLowerCase());
+                                     (p.activeIngredients || '').toLowerCase().includes(searchTerm.toLowerCase());
                 return matchesFilter && matchesSearch;
             });
 
@@ -351,7 +354,16 @@
 
                     html += `
                                 <tr>
-                                    <td class="product-name-cell">${p.name}${rupBadge}${p.notes ? `<small>${p.notes}</small>` : ''}${locationText ? `<small style="color:#2d5a27;">Available at: ${locationText}</small>` : ''}</td>
+                                    <td class="product-name-cell">
+                                        <strong>${p.name}</strong>${rupBadge}
+                                        ${p.activeIngredients ? `<small style="color:#555;">${p.activeIngredients}</small>` : ''}
+                                        ${p.epaReg ? `<small style="color:#999;">EPA Reg. ${p.epaReg}</small>` : ''}
+                                        <div style="display:flex; gap:6px; margin-top:4px;">
+                                            ${p.labelUrl ? `<a href="${p.labelUrl}" target="_blank" style="font-size:0.75rem; color:#2d5a27; text-decoration:none; border:1px solid #2d5a27; padding:1px 6px; border-radius:3px;">Label</a>` : ''}
+                                            ${p.sdsUrl ? `<a href="${p.sdsUrl}" target="_blank" style="font-size:0.75rem; color:#666; text-decoration:none; border:1px solid #ccc; padding:1px 6px; border-radius:3px;">SDS</a>` : ''}
+                                        </div>
+                                        ${locationText ? `<small style="color:#2d5a27;">Available at: ${locationText}</small>` : ''}
+                                    </td>
                                     <td>${p.packSize}${p.unitsPerPack > 1 ? `<br><small style="color:#888;">(${p.unitsPerPack} ${p.unit})</small>` : ''}</td>
                                     <td class="right"><span class="price-big">$${p.price.toFixed(2)}</span><span class="price-unit">/${p.unit}</span></td>
                                     <td class="center"><span class="stock-badge ${stockClass}">${stockText}</span></td>

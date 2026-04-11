@@ -5763,6 +5763,10 @@ app.get('/api/chemicals/available', async (req, res) => {
             return {
                 _id: c._id,
                 productName: c.productName,
+                activeIngredients: (c.activeIngredients || []).map(ai => ({
+                    name: ai.name,
+                    percentage: ai.percentage
+                })),
                 category: c.category,
                 packSize: c.packSize,
                 unit: c.unit,
@@ -5770,6 +5774,10 @@ app.get('/api/chemicals/available', async (req, res) => {
                 sellPrice: c.sellPrice,
                 defaultRate: c.defaultRate,
                 rateUnit: c.rateUnit,
+                signalWord: c.signalWord,
+                epaRegistrationNumber: c.epaRegistrationNumber,
+                labelUrl: c.labelUrl,
+                sdsUrl: c.sdsUrl,
                 availability,
                 isRestrictedUse: c.isRestrictedUse,
                 locations: invData?.locations || []
