@@ -2861,7 +2861,7 @@ async function seedHydrovantInventory() {
                 marginDollars: 0,
                 sellPrice: 75.00,
                 category: 'adjuvant',
-                sourceSupplier: 'CPD',
+                sourceSupplier: 'JABCO',
                 signalWord: 'CAUTION',
                 notes: 'Premium NIS, water conditioner & drift control',
                 defaultRate: 0.1,
@@ -2890,7 +2890,7 @@ async function seedHydrovantInventory() {
             purchaseOrderId: null,
             poNumber: 'DIRECT-HYDROVANT',
             lotNumber: 'hydrovant-kyle-360',
-            supplierName: 'CPD',
+            supplierName: 'JABCO',
             userId: null
         });
 
@@ -5477,7 +5477,7 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
         for (const chem of cpdProducts) {
             const existing = await Chemical.findOne({
                 productName: chem.productName,
-                sourceSupplier: 'CPD',
+                sourceSupplier: 'JABCO',
                 packSize: chem.packSize
             });
 
@@ -5493,7 +5493,7 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                     adminPrice: admin,
                     sellPrice: sell,
                     margin: sell > 0 ? Math.round(((sell - cost) / sell) * 100) : 0,
-                    sourceSupplier: 'CPD',
+                    sourceSupplier: 'JABCO',
                     priceVersion,
                     isActive: true,
                     availableForOrder: true,
@@ -5502,7 +5502,7 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
                 await ChemicalPriceHistory.create({
                     chemicalId: newChem._id,
                     productName: chem.productName,
-                    sourceSupplier: 'CPD',
+                    sourceSupplier: 'JABCO',
                     packSize: chem.packSize,
                     unit: chem.unit,
                     costPrice: chem.costPrice,
@@ -11392,7 +11392,7 @@ async function syncPricesFromExcel(fileBuffer, userId) {
             const packSize = row['Pack Size'] || row['Size'] || row['Package'];
             const costPrice = parseFloat(row['Cost Price'] || row['Cost'] || row['Wholesale'] || 0);
             const sellPrice = parseFloat(row['Sell Price'] || row['Price'] || row['Retail'] || 0);
-            const supplier = row['Supplier'] || row['Source'] || 'CPD';
+            const supplier = row['Supplier'] || row['Source'] || 'JABCO';
 
             if (!productName) {
                 log.productsSkipped++;
@@ -13702,6 +13702,61 @@ connectDB().then(async () => {
             console.log(`Fixed ${fixed.modifiedCount} ledger entries: supplier_payment debit → credit (AP owes them)`);
         }
     } catch (e) { console.error('Ledger fix error:', e.message); }
+
+    // Rename CPD → JABCO in all existing records
+    try {
+        const chemFixed = await Chemical.updateMany(
+            { sourceSupplier: { $in: ['CPD', 'Crop Protect Direct'] } },
+            { $set: { sourceSupplier: 'JABCO' } }
+        );
+        if (chemFixed.modifiedCount > 0) console.log(`Renamed ${chemFixed.modifiedCount} products: CPD → JABCO`);
+    } catch (e) { console.error('CPD rename error:', e.message); }
+
+    // Ledger: Ty took JABCO products to sell - Ty owes AP $41,123.70
+    // Per handwritten accounting:
+    //   Ty took: Rancor 4F $8,190 + Meso 4SC $16,470 + Flumi $10,080 + Sulfentrazone $12,870 + Hydrovant 180gal $13,500 = $61,110
+    //   AP owes Ty for Atrazine: $19,986.30
+    //   Net: Ty owes AP $41,123.70
+    try {
+        const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
+        if (ty) {
+            const existingTransfer = await LedgerEntry.findOne({
+                representativeId: ty._id,
+                description: { $regex: /JABCO products.*Ty/i }
+            });
+            if (!existingTransfer) {
+                // Ty received JABCO products worth $61,110 - this is a debit (he owes AP)
+                await createLedgerEntry({
+                    representativeId: ty._id,
+                    description: 'JABCO products transferred to Ty for distribution',
+                    amount: 61110.00,
+                    type: 'debit',
+                    category: 'adjustment',
+                    referenceType: 'Manual',
+                    notes: 'Rancor 4F $8,190 + Meso 4SC $16,470 + Flumi WDG $10,080 + Sulfentrazone $12,870 + Hydrovant fA 180gal $13,500 = $61,110'
+                });
+                console.log('Ledger: Ty debited $61,110 for JABCO products received');
+            }
+
+            // AP owes Ty for 6 shuttles Atrazine @ $12.57/gal = $19,986.30
+            const existingAtrazine = await LedgerEntry.findOne({
+                representativeId: ty._id,
+                description: { $regex: /6 shuttles Atrazine/i }
+            });
+            if (!existingAtrazine) {
+                await createLedgerEntry({
+                    representativeId: ty._id,
+                    description: '6 Shuttles Atrazine 4L @ $12.57/gal (1,590 gal)',
+                    amount: 19986.30,
+                    type: 'credit',
+                    category: 'supplier_payment',
+                    referenceType: 'Manual',
+                    notes: 'Ty paid for 6 shuttles (1,590 gal) Atrazine 4L. AP owes Ty.'
+                });
+                console.log('Ledger: AP owes Ty $19,986.30 for Atrazine');
+            }
+        }
+    } catch (e) { console.error('Ty ledger setup error:', e.message); }
 
     // Assign inventory ownership: JABCO products → Kyle, Sims products → Ty
     try {
