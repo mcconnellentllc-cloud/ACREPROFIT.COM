@@ -80,7 +80,15 @@
                             <!-- Discount -->
                             <div class="form-section discount-section">
                                 <div class="discount-row">
-                                    <label class="form-label">Discount</label>
+                                    <label class="form-label">Discount Code</label>
+                                    <div style="display:flex; gap:8px; align-items:center; margin-bottom:8px;">
+                                        <input type="text" id="discountCode" class="form-control" placeholder="NoDistMarg or AtcostAP" style="flex:1;" onchange="applyDiscountCode()">
+                                        <button class="btn btn-sm btn-outline" onclick="applyDiscountCode()" style="white-space:nowrap;">Apply</button>
+                                    </div>
+                                    <div id="discountCodeStatus" style="font-size:0.85rem; margin-bottom:8px;"></div>
+                                </div>
+                                <div class="discount-row">
+                                    <label class="form-label">Manual Discount</label>
                                     <div class="discount-input-group">
                                         <span class="input-prefix">$</span>
                                         <input type="number" id="discountAmount" class="form-control" value="0" min="0" step="0.01" onchange="updateTotals()">
@@ -495,6 +503,54 @@
             renderInvoiceItems();
             updateTotals();
             updateActionButtons();
+        }
+
+        function applyDiscountCode() {
+            const code = (document.getElementById('discountCode').value || '').trim().toUpperCase();
+            const statusEl = document.getElementById('discountCodeStatus');
+
+            if (!code) {
+                statusEl.textContent = '';
+                // Reset prices to sellPrice
+                invoiceItems.forEach(item => {
+                    const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
+                    if (prod) {
+                        item.unitPrice = prod.sellPrice || prod.price || item.unitPrice;
+                        item.total = item.quantity * item.unitPrice;
+                    }
+                });
+                renderInvoiceItems();
+                updateTotals();
+                return;
+            }
+
+            if (code === 'NODISTMARG') {
+                statusEl.innerHTML = '<span style="color:#059669; font-weight:600;">Applied: No distributor margin (admin price)</span>';
+                invoiceItems.forEach(item => {
+                    const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
+                    if (prod && prod.adminPrice) {
+                        item.unitPrice = prod.adminPrice;
+                        item.total = item.quantity * item.unitPrice;
+                    }
+                });
+                document.getElementById('discountReason').value = 'No distributor margin (admin price)';
+            } else if (code === 'ATCOSTAP') {
+                statusEl.innerHTML = '<span style="color:#059669; font-weight:600;">Applied: At cost (no markup)</span>';
+                invoiceItems.forEach(item => {
+                    const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
+                    if (prod && prod.costPrice) {
+                        item.unitPrice = prod.costPrice;
+                        item.total = item.quantity * item.unitPrice;
+                    }
+                });
+                document.getElementById('discountReason').value = 'At cost (no markup)';
+            } else {
+                statusEl.innerHTML = '<span style="color:#dc2626;">Invalid code</span>';
+                return;
+            }
+
+            renderInvoiceItems();
+            updateTotals();
         }
 
         function updateTotals() {

@@ -4354,7 +4354,7 @@ app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddlewa
 // Create order on behalf of a customer (admin only)
 app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { customerId, crop, programId, acres, gpa, year, chemicals, seeds, pivotBio, totalPrice, status, notes } = req.body;
+        const { customerId, crop, programId, acres, gpa, year, chemicals, seeds, pivotBio, totalPrice, status, notes, discountCode } = req.body;
 
         // Validate customer exists and admin has access
         const customer = await User.findById(customerId);
@@ -4368,19 +4368,65 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             return res.status(403).json({ error: 'Access denied - not your customer' });
         }
 
+        // Validate discount code
+        let discountType = null;
+        let discountDescription = '';
+        if (discountCode) {
+            const code = discountCode.trim().toUpperCase();
+            if (code === 'NODISTMARG') {
+                discountType = 'no_dist_margin';
+                discountDescription = 'No distributor margin (admin price)';
+            } else if (code === 'ATCOSTAP') {
+                discountType = 'at_cost';
+                discountDescription = 'At cost (no markup)';
+            }
+        }
+
+        // Look up chemical pricing for discount code application
+        const allChemicals = discountType ? await Chemical.find({ isActive: true }).lean() : [];
+
         const costPerAcre = acres > 0 ? Math.round((totalPrice / acres) * 100) / 100 : 0;
 
-        // Normalize chemicals array to use consistent field names
-        const normalizedChemicals = (chemicals || []).map(c => ({
-            name: c.name || c.productName,
-            qty: c.qty || c.quantity || 0,
-            unit: c.unit || 'gal',
-            pricePerUnit: c.pricePerUnit || c.price || 0,
-            totalPrice: c.totalPrice || c.total || (c.qty || c.quantity || 0) * (c.pricePerUnit || c.price || 0),
-            chemicalId: c.chemicalId,
-            packSize: c.packSize,
-            sourceSupplier: c.sourceSupplier
-        }));
+        // Normalize chemicals array and apply discount code pricing
+        let totalDiscount = 0;
+        const normalizedChemicals = (chemicals || []).map(c => {
+            const name = c.name || c.productName;
+            const qty = c.qty || c.quantity || 0;
+            let pricePerUnit = c.pricePerUnit || c.price || 0;
+
+            // Apply discount code pricing from server-side chemical data
+            if (discountType && name) {
+                const chem = allChemicals.find(ch =>
+                    ch.productName === name || ch.productName.toLowerCase() === name.toLowerCase()
+                );
+                if (chem) {
+                    const fullPrice = chem.sellPrice || pricePerUnit;
+                    if (discountType === 'at_cost') {
+                        pricePerUnit = chem.costPrice || fullPrice;
+                    } else if (discountType === 'no_dist_margin') {
+                        pricePerUnit = chem.adminPrice || fullPrice;
+                    }
+                    totalDiscount += (fullPrice - pricePerUnit) * qty;
+                }
+            }
+
+            return {
+                name,
+                qty,
+                unit: c.unit || 'gal',
+                pricePerUnit,
+                totalPrice: Math.round(qty * pricePerUnit * 100) / 100,
+                chemicalId: c.chemicalId,
+                packSize: c.packSize,
+                sourceSupplier: c.sourceSupplier
+            };
+        });
+
+        // Recalculate total from adjusted line items if discount applied
+        const adjustedTotal = discountType
+            ? normalizedChemicals.reduce((sum, c) => sum + (c.totalPrice || 0), 0)
+            : totalPrice;
+        const adjustedCostPerAcre = acres > 0 ? Math.round((adjustedTotal / acres) * 100) / 100 : 0;
 
         const order = new Order({
             userId: customerId,
@@ -4393,8 +4439,10 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             chemicals: normalizedChemicals,
             seeds,
             pivotBio,
-            totalCost: totalPrice,
-            costPerAcre,
+            totalCost: adjustedTotal,
+            costPerAcre: adjustedCostPerAcre,
+            discount: Math.round(totalDiscount * 100) / 100,
+            discountReason: discountDescription || undefined,
             status: status || 'draft',
             notes,
             createdBy: req.user._id // Track who created this order
@@ -12279,7 +12327,7 @@ app.get('/api/distributor/products', authMiddleware, adminMiddleware, async (req
         }
 
         const chemicals = await Chemical.find({ isActive: true })
-            .select('productName sourceSupplier category packSize unit sellPrice') // NO costPrice for distributors
+            .select('productName sourceSupplier category packSize unit costPrice adminPrice sellPrice adminMarginDollars marginDollars')
             .sort({ productName: 1 });
 
         // Get this distributor's custom pricing
@@ -12299,12 +12347,10 @@ app.get('/api/distributor/products', authMiddleware, adminMiddleware, async (req
                 category: c.category,
                 packSize: c.packSize,
                 unit: c.unit,
-                // Base retail price (set by super admin)
-                baseRetailPrice: c.sellPrice,
-                // Distributor's custom retail price (if set)
-                myRetailPrice: customPrice?.retailPrice || null,
-                // Effective price (custom or base)
-                effectivePrice: customPrice?.retailPrice || c.sellPrice,
+                costPrice: c.costPrice,
+                adminPrice: c.adminPrice,
+                sellPrice: c.sellPrice,
+                price: customPrice?.retailPrice || c.sellPrice,
                 isAvailable: customPrice?.isAvailable !== false,
                 notes: customPrice?.notes || ''
             };
