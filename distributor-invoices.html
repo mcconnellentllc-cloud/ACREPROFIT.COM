@@ -297,14 +297,18 @@
             const distributorId = document.getElementById('distributorSelect').value;
             selectedDistributor = distributors.find(d => d._id === distributorId);
 
-            // Filter customers for this distributor
+            // Filter customers for this distributor (or show all if no distributor selected)
             if (selectedDistributor) {
                 customers = allCustomers.filter(c => {
-                    const repId = c.representative?._id || c.representative;
+                    const repId = c.representative?._id || c.representative || c.representativeId?._id || c.representativeId;
                     return repId?.toString() === distributorId;
                 });
+                // If no assigned customers found, show all customers (they may not be assigned yet)
+                if (customers.length === 0) {
+                    customers = allCustomers;
+                }
             } else {
-                customers = [];
+                customers = allCustomers;
             }
 
             // Update customer dropdown
@@ -330,9 +334,8 @@
                 const data = await response.json();
 
                 if (user.role === 'superadmin') {
-                    // Store all customers for filtering
                     allCustomers = data;
-                    customers = []; // Will be populated when distributor is selected
+                    customers = data; // Show all customers, filter when distributor selected
                 } else {
                     // For distributors, the API already filters to their customers
                     customers = data;
