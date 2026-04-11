@@ -527,6 +527,8 @@
                 console.error('Error loading programs:', error);
                 programs = getDemoPrograms();
             }
+            // Auto-generate restrictions for any programs missing them
+            applyAutoRestrictions(programs);
             renderPrograms();
         }
 
@@ -582,6 +584,175 @@
                 { _id: '28', productName: '32-0-0 (UAN)', category: 'fertilizer', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 2.32, defaultRate: 8, rateUnit: 'gal/acre', notes: 'Urea Ammonium Nitrate - $435/ton (~187.6 gal/ton)' },
                 { _id: '29', productName: '12-0-0-26 (Thiosol)', category: 'fertilizer', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 2.99, defaultRate: 2, rateUnit: 'gal/acre', notes: 'Ammonium Thiosulfate - $550/ton (~184 gal/ton)' }
             ];
+        }
+
+        // ============ AUTO-GENERATE RESTRICTIONS ============
+        // Client-side chemical restriction lookup (mirrors server-side chemicalRestrictions)
+        const clientChemicalRestrictions = {
+            'glyphosate': {
+                rotation: 'No crop rotation restrictions',
+                grazing: 'Do not graze treated areas for 7 days',
+                groundNotes: 'Non-selective - kills all green vegetation on contact'
+            },
+            'flumioxazin': {
+                rotation: 'Wheat: 4 months. Soybeans: 12 months. Sorghum: 18 months at rates above 2 oz/acre',
+                grazing: 'Do not graze or harvest forage for 30 days',
+                groundNotes: 'Pre-emerge residual broadleaf control. Works best on medium-textured soils'
+            },
+            'dicamba': {
+                rotation: 'Soybeans/sensitive broadleaf crops: 30 days minimum',
+                grazing: 'Do not graze treated areas for 7 days',
+                groundNotes: 'Broadleaf systemic herbicide. Watch for drift to sensitive crops'
+            },
+            'atrazine': {
+                rotation: 'Soybeans: 12 months. Small grains: next season OK if under 1 lb ai/acre',
+                grazing: 'Do not graze sorghum forage for 60 days. Corn silage: 21 days',
+                groundNotes: 'Corn/sorghum residual. Restricted Use Pesticide (ground/surface water)'
+            },
+            'mesotrione': {
+                rotation: 'Wheat: 10 months. Soybeans: 18 months. Sorghum: 18 months',
+                grazing: 'Do not graze treated areas for 45 days',
+                groundNotes: 'Group 27 bleaching herbicide for corn. Post-emerge broadleaf and grass control'
+            },
+            'sulfentrazone': {
+                rotation: 'Wheat: 4 months. Corn: 18 months. Sorghum: 18 months. Soybeans: 12 months',
+                grazing: 'Do not graze treated areas for 28 days',
+                groundNotes: 'Pre-emerge residual. Avoid sandy soils or pH above 7.5'
+            },
+            'metribuzin': {
+                rotation: 'Sorghum/oats: 12 months. Follow label for specific crops',
+                grazing: 'Do not graze or harvest within 28 days',
+                groundNotes: 'Group 5 herbicide. Effective on broadleaf weeds and some grasses'
+            },
+            '2,4-d': {
+                rotation: 'No crop rotation restrictions',
+                grazing: 'Do not graze dairy cattle for 7 days. Meat animals: no restriction after 3 days',
+                groundNotes: 'Post-emerge broadleaf herbicide for wheat, corn, sorghum, pasture'
+            },
+            'metsulfuron': {
+                rotation: 'Corn, sorghum, grass crops: 60 days. Wheat: no restriction',
+                grazing: 'Do not graze or cut for hay within 28 days',
+                groundNotes: 'Low-rate broadleaf control for wheat and pasture'
+            },
+            'pyroxasulfone': {
+                rotation: 'Check label for specific crops. Generally 12-18 months for non-labeled crops',
+                grazing: 'Do not graze treated areas for 30 days',
+                groundNotes: 'Group 15 residual grass herbicide. Extended pre-emerge control'
+            },
+            'hydrovant': {
+                rotation: 'No restrictions (adjuvant)',
+                grazing: 'No restrictions (adjuvant)',
+                groundNotes: 'Activator-sticker adjuvant - improves coverage and uptake'
+            }
+        };
+
+        function matchClientChemical(productName) {
+            if (!productName) return null;
+            const name = productName.toLowerCase();
+            if (name.includes('glyphosate') || name.includes('xsate') || name.includes('glystar')) return 'glyphosate';
+            if (name.includes('flumioxazin') || name.includes('valor')) return 'flumioxazin';
+            if (name.includes('dicamba')) return 'dicamba';
+            if (name.includes('atrazine')) return 'atrazine';
+            if (name.includes('mesotrione') || name.includes('meso 4sc') || name.includes('meso ')) return 'mesotrione';
+            if (name.includes('sulfentrazone')) return 'sulfentrazone';
+            if (name.includes('metribuzin') || name.includes('rancor')) return 'metribuzin';
+            if (name.includes('2,4-d') || name.includes('2,4d') || name.includes('lv 6') || name.includes('lv-6') || name.includes('defy lv')) return '2,4-d';
+            if (name.includes('metsulfuron') || name.includes('mivum')) return 'metsulfuron';
+            if (name.includes('pyroxasulfone') || name.includes('anthem')) return 'pyroxasulfone';
+            if (name.includes('hydrovant')) return 'hydrovant';
+            return null;
+        }
+
+        function autoGenerateRestrictions(chemicals) {
+            if (!chemicals || chemicals.length === 0) {
+                return { groundType: null, rotationRestrictions: null, grazingRestrictions: null };
+            }
+
+            const rotationParts = [];
+            const grazingEntries = [];
+            const groundNotes = [];
+            const seen = new Set();
+
+            for (const chem of chemicals) {
+                const productName = chem.productName || chem.name || '';
+                const key = matchClientChemical(productName);
+                if (!key || seen.has(key)) continue;
+                seen.add(key);
+
+                const data = clientChemicalRestrictions[key];
+                if (!data) continue;
+
+                const isAdjuvant = key === 'hydrovant';
+
+                if (!isAdjuvant && data.rotation && !data.rotation.toLowerCase().includes('no crop rotation restrictions') && !data.rotation.toLowerCase().includes('no restrictions')) {
+                    rotationParts.push(productName + ': ' + data.rotation);
+                }
+
+                if (!isAdjuvant && data.grazing && !data.grazing.toLowerCase().includes('no restrictions')) {
+                    const dayMatch = data.grazing.match(/(\d+)\s*days?/gi);
+                    let maxDays = 0;
+                    if (dayMatch) {
+                        for (const m of dayMatch) {
+                            const num = parseInt(m);
+                            if (num > maxDays) maxDays = num;
+                        }
+                    }
+                    grazingEntries.push({ text: data.grazing, days: maxDays, productName: productName });
+                }
+
+                if (data.groundNotes && !isAdjuvant) {
+                    groundNotes.push(data.groundNotes);
+                }
+            }
+
+            const rotationRestrictions = rotationParts.length > 0
+                ? rotationParts.join('. ')
+                : 'No specific crop rotation restrictions for this mix';
+
+            let grazingRestrictions;
+            if (grazingEntries.length > 0) {
+                grazingEntries.sort((a, b) => b.days - a.days);
+                const mostRestrictive = grazingEntries[0];
+                if (grazingEntries.length === 1) {
+                    grazingRestrictions = mostRestrictive.text;
+                } else {
+                    const otherNotes = grazingEntries.slice(1)
+                        .filter(e => e.days > 0 && e.days !== mostRestrictive.days)
+                        .map(e => e.productName + ': ' + e.days + ' days');
+                    grazingRestrictions = mostRestrictive.text;
+                    if (otherNotes.length > 0) {
+                        grazingRestrictions += '. Other components: ' + otherNotes.join('; ');
+                    }
+                }
+            } else {
+                grazingRestrictions = 'No specific grazing restrictions for this mix';
+            }
+
+            const groundType = groundNotes.length > 0 ? groundNotes.join('. ') : null;
+
+            return { groundType, rotationRestrictions, grazingRestrictions };
+        }
+
+        // Apply auto-generated restrictions to programs that don't have them
+        function applyAutoRestrictions(programList) {
+            for (const prog of programList) {
+                if (!prog.groundType || !prog.rotationRestrictions || !prog.grazingRestrictions) {
+                    // Collect all chemicals from all applications
+                    const allChemicals = [];
+                    if (prog.applications) {
+                        for (const app of prog.applications) {
+                            for (const chem of (app.chemicals || [])) {
+                                allChemicals.push(chem);
+                            }
+                        }
+                    }
+                    const generated = autoGenerateRestrictions(allChemicals);
+                    if (!prog.groundType) prog.groundType = generated.groundType;
+                    if (!prog.rotationRestrictions) prog.rotationRestrictions = generated.rotationRestrictions;
+                    if (!prog.grazingRestrictions) prog.grazingRestrictions = generated.grazingRestrictions;
+                }
+            }
+            return programList;
         }
 
         function getDemoPrograms() {

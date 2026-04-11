@@ -1051,6 +1051,11 @@ const sprayProgramSchema = new mongoose.Schema({
     // Cost estimate per acre (calculated)
     estimatedCostPerAcre: Number,
 
+    // Auto-generated restriction fields
+    groundType: String, // Description of best ground/soil conditions for this program
+    rotationRestrictions: String, // Combined crop rotation restrictions from all chemicals
+    grazingRestrictions: String, // Combined grazing/forage restrictions from all chemicals
+
     // Status
     isActive: { type: Boolean, default: true },
 
@@ -1063,6 +1068,172 @@ const sprayProgramSchema = new mongoose.Schema({
 });
 
 const SprayProgram = mongoose.model('SprayProgram', sprayProgramSchema);
+
+// ============ CHEMICAL RESTRICTION DATA ============
+// Maps active ingredients/product names to their known restrictions
+const chemicalRestrictions = {
+    'glyphosate': {
+        rotation: 'No crop rotation restrictions',
+        grazing: 'Do not graze treated areas for 7 days',
+        groundNotes: 'Non-selective - kills all green vegetation on contact'
+    },
+    'flumioxazin': {
+        rotation: 'Wheat: 4 months. Soybeans: 12 months. Sorghum: 18 months at rates above 2 oz/acre',
+        grazing: 'Do not graze or harvest forage for 30 days',
+        groundNotes: 'Pre-emerge residual broadleaf control. Works best on medium-textured soils'
+    },
+    'dicamba': {
+        rotation: 'Soybeans/sensitive broadleaf crops: 30 days minimum',
+        grazing: 'Do not graze treated areas for 7 days',
+        groundNotes: 'Broadleaf systemic herbicide. Watch for drift to sensitive crops'
+    },
+    'atrazine': {
+        rotation: 'Soybeans: 12 months. Small grains: next season OK if under 1 lb ai/acre',
+        grazing: 'Do not graze sorghum forage for 60 days. Corn silage: 21 days',
+        groundNotes: 'Corn/sorghum residual. Restricted Use Pesticide (ground/surface water)'
+    },
+    'mesotrione': {
+        rotation: 'Wheat: 10 months. Soybeans: 18 months. Sorghum: 18 months',
+        grazing: 'Do not graze treated areas for 45 days',
+        groundNotes: 'Group 27 bleaching herbicide for corn. Post-emerge broadleaf and grass control'
+    },
+    'sulfentrazone': {
+        rotation: 'Wheat: 4 months. Corn: 18 months. Sorghum: 18 months. Soybeans: 12 months',
+        grazing: 'Do not graze treated areas for 28 days',
+        groundNotes: 'Pre-emerge residual. Avoid sandy soils or pH above 7.5'
+    },
+    'metribuzin': {
+        rotation: 'Sorghum/oats: 12 months. Follow label for specific crops',
+        grazing: 'Do not graze or harvest within 28 days',
+        groundNotes: 'Group 5 herbicide. Effective on broadleaf weeds and some grasses'
+    },
+    '2,4-d': {
+        rotation: 'No crop rotation restrictions',
+        grazing: 'Do not graze dairy cattle for 7 days. Meat animals: no restriction after 3 days',
+        groundNotes: 'Post-emerge broadleaf herbicide for wheat, corn, sorghum, pasture'
+    },
+    'metsulfuron': {
+        rotation: 'Corn, sorghum, grass crops: 60 days. Wheat: no restriction',
+        grazing: 'Do not graze or cut for hay within 28 days',
+        groundNotes: 'Low-rate broadleaf control for wheat and pasture'
+    },
+    'pyroxasulfone': {
+        rotation: 'Check label for specific crops. Generally 12-18 months for non-labeled crops',
+        grazing: 'Do not graze treated areas for 30 days',
+        groundNotes: 'Group 15 residual grass herbicide. Extended pre-emerge control'
+    },
+    'hydrovant': {
+        rotation: 'No restrictions (adjuvant)',
+        grazing: 'No restrictions (adjuvant)',
+        groundNotes: 'Activator-sticker adjuvant - improves coverage and uptake'
+    }
+};
+
+// Map product names to their active ingredient keys in chemicalRestrictions
+function matchChemicalToRestriction(productName) {
+    if (!productName) return null;
+    const name = productName.toLowerCase();
+
+    // Direct active ingredient matches
+    if (name.includes('glyphosate') || name.includes('xsate') || name.includes('glystar')) return 'glyphosate';
+    if (name.includes('flumioxazin') || name.includes('valor')) return 'flumioxazin';
+    if (name.includes('dicamba')) return 'dicamba';
+    if (name.includes('atrazine')) return 'atrazine';
+    if (name.includes('mesotrione') || name.includes('meso 4sc') || name.includes('meso ')) return 'mesotrione';
+    if (name.includes('sulfentrazone')) return 'sulfentrazone';
+    if (name.includes('metribuzin') || name.includes('rancor')) return 'metribuzin';
+    if (name.includes('2,4-d') || name.includes('2,4d') || name.includes('lv 6') || name.includes('lv-6') || name.includes('defy lv')) return '2,4-d';
+    if (name.includes('metsulfuron') || name.includes('mivum')) return 'metsulfuron';
+    if (name.includes('pyroxasulfone') || name.includes('anthem')) return 'pyroxasulfone';
+    if (name.includes('hydrovant')) return 'hydrovant';
+
+    return null;
+}
+
+// Extract the numeric day count from a grazing restriction string
+function extractGrazingDays(grazingStr) {
+    if (!grazingStr) return 0;
+    const matches = grazingStr.match(/(\d+)\s*days?/gi);
+    if (!matches) return 0;
+    let maxDays = 0;
+    for (const m of matches) {
+        const num = parseInt(m);
+        if (num > maxDays) maxDays = num;
+    }
+    return maxDays;
+}
+
+// Auto-generate restrictions from a list of chemicals
+// chemicals: array of objects with productName (or name) field
+function generateRecipeRestrictions(chemicals) {
+    if (!chemicals || chemicals.length === 0) {
+        return { groundType: null, rotationRestrictions: null, grazingRestrictions: null };
+    }
+
+    const rotationParts = [];
+    const grazingEntries = [];
+    const groundNotes = [];
+    const seen = new Set();
+
+    for (const chem of chemicals) {
+        const productName = chem.productName || chem.name || '';
+        const key = matchChemicalToRestriction(productName);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+
+        const data = chemicalRestrictions[key];
+        if (!data) continue;
+
+        // Skip adjuvants for rotation/grazing (they have no real restrictions)
+        const isAdjuvant = key === 'hydrovant';
+
+        if (!isAdjuvant && data.rotation && !data.rotation.toLowerCase().includes('no crop rotation restrictions') && !data.rotation.toLowerCase().includes('no restrictions')) {
+            rotationParts.push(`${productName}: ${data.rotation}`);
+        }
+
+        if (!isAdjuvant && data.grazing && !data.grazing.toLowerCase().includes('no restrictions')) {
+            grazingEntries.push({ text: data.grazing, days: extractGrazingDays(data.grazing), productName });
+        }
+
+        if (data.groundNotes && !isAdjuvant) {
+            groundNotes.push(data.groundNotes);
+        }
+    }
+
+    // Build rotation restrictions - combine all
+    const rotationRestrictions = rotationParts.length > 0
+        ? rotationParts.join('. ')
+        : 'No specific crop rotation restrictions for this mix';
+
+    // Build grazing restrictions - use the most restrictive (longest wait)
+    let grazingRestrictions;
+    if (grazingEntries.length > 0) {
+        // Sort by days descending to get the most restrictive first
+        grazingEntries.sort((a, b) => b.days - a.days);
+        const mostRestrictive = grazingEntries[0];
+        if (grazingEntries.length === 1) {
+            grazingRestrictions = mostRestrictive.text;
+        } else {
+            // Show the most restrictive, then note other restrictions
+            const otherNotes = grazingEntries.slice(1)
+                .filter(e => e.days > 0 && e.days !== mostRestrictive.days)
+                .map(e => `${e.productName}: ${e.days} days`);
+            grazingRestrictions = mostRestrictive.text;
+            if (otherNotes.length > 0) {
+                grazingRestrictions += '. Other components: ' + otherNotes.join('; ');
+            }
+        }
+    } else {
+        grazingRestrictions = 'No specific grazing restrictions for this mix';
+    }
+
+    // Build ground type description from combined notes
+    const groundType = groundNotes.length > 0
+        ? groundNotes.join('. ')
+        : null;
+
+    return { groundType, rotationRestrictions, grazingRestrictions };
+}
 
 // Merch Order Model - REMOVED (Printify integration was never completed)
 
@@ -1774,6 +1945,11 @@ const chemicalMixSchema = new mongoose.Schema({
         warnings: [String], // Any warnings or cautions
         fullAnalysis: String // Complete analysis text
     },
+
+    // Auto-generated restriction fields
+    groundType: String, // Description of best ground/soil conditions for this mix
+    rotationRestrictions: String, // Combined crop rotation restrictions from all chemicals
+    grazingRestrictions: String, // Combined grazing/forage restrictions from all chemicals
 
     // Ratings and popularity
     totalRatings: { type: Number, default: 0 },
@@ -9299,6 +9475,19 @@ const convertHardcodedToPrograms = () => {
     const programs = [];
     for (const [cropKey, cropPrograms] of Object.entries(sprayPrograms)) {
         for (const [programKey, programData] of Object.entries(cropPrograms)) {
+            // Build chemicals list for restriction generation
+            const chemList = programData.chemicals.map(chem => ({
+                productName: chem.name,
+                suggestedRate: chem.defaultRate,
+                rateUnit: chem.rateUnit,
+                packSize: chem.packageSize,
+                unit: chem.packageUnit,
+                isAdjuvant: chem.isAdjuvant || false
+            }));
+
+            // Auto-generate restrictions from the chemicals in this template
+            const generated = generateRecipeRestrictions(chemList);
+
             programs.push({
                 _id: `template-${cropKey}-${programKey}`,
                 name: programData.name,
@@ -9307,16 +9496,12 @@ const convertHardcodedToPrograms = () => {
                 type: 'template',
                 isPublic: true,
                 isTemplate: true,
+                groundType: generated.groundType,
+                rotationRestrictions: generated.rotationRestrictions,
+                grazingRestrictions: generated.grazingRestrictions,
                 applications: [{
                     name: programData.name,
-                    chemicals: programData.chemicals.map(chem => ({
-                        productName: chem.name,
-                        suggestedRate: chem.defaultRate,
-                        rateUnit: chem.rateUnit,
-                        packSize: chem.packageSize,
-                        unit: chem.packageUnit,
-                        isAdjuvant: chem.isAdjuvant || false
-                    }))
+                    chemicals: chemList
                 }]
             });
         }
@@ -9434,7 +9619,7 @@ app.get('/api/spray-programs/:id', authMiddleware, async (req, res) => {
 // Auth: all logged-in roles
 app.post('/api/spray-programs', authMiddleware, async (req, res) => {
     try {
-        const { name, description, crop, applications, isPublic } = req.body;
+        const { name, description, crop, applications, isPublic, groundType, rotationRestrictions, grazingRestrictions } = req.body;
 
         // Validate required fields
         if (!name || !crop) {
@@ -9447,6 +9632,25 @@ app.post('/api/spray-programs', authMiddleware, async (req, res) => {
         // Only admins can create public programs
         const publicFlag = isAdmin ? (isPublic || false) : false;
 
+        // Auto-generate restrictions if not provided
+        let autoGroundType = groundType || null;
+        let autoRotation = rotationRestrictions || null;
+        let autoGrazing = grazingRestrictions || null;
+
+        if ((!autoGroundType || !autoRotation || !autoGrazing) && applications && applications.length > 0) {
+            // Collect all chemicals from all applications
+            const allChemicals = [];
+            for (const app of applications) {
+                for (const chem of app.chemicals || []) {
+                    allChemicals.push(chem);
+                }
+            }
+            const generated = generateRecipeRestrictions(allChemicals);
+            if (!autoGroundType) autoGroundType = generated.groundType;
+            if (!autoRotation) autoRotation = generated.rotationRestrictions;
+            if (!autoGrazing) autoGrazing = generated.grazingRestrictions;
+        }
+
         const program = new SprayProgram({
             name,
             description,
@@ -9454,7 +9658,10 @@ app.post('/api/spray-programs', authMiddleware, async (req, res) => {
             applications: applications || [],
             type: programType,
             isPublic: publicFlag,
-            createdBy: req.user._id
+            createdBy: req.user._id,
+            groundType: autoGroundType,
+            rotationRestrictions: autoRotation,
+            grazingRestrictions: autoGrazing
         });
 
         // Calculate estimated cost per acre if applications provided
@@ -13083,7 +13290,10 @@ app.post('/api/mixes', authMiddleware, async (req, res) => {
             tags,
             isAnonymous,
             creatorDisplayName,
-            status
+            status,
+            groundType,
+            rotationRestrictions,
+            grazingRestrictions
         } = req.body;
 
         if (!name || !crop || !timing || !ingredients || ingredients.length === 0) {
@@ -13107,6 +13317,18 @@ app.post('/api/mixes', authMiddleware, async (req, res) => {
             })
         );
 
+        // Auto-generate restrictions if not provided by the user
+        let autoGroundType = groundType || null;
+        let autoRotation = rotationRestrictions || null;
+        let autoGrazing = grazingRestrictions || null;
+
+        if (!autoGroundType || !autoRotation || !autoGrazing) {
+            const generated = generateRecipeRestrictions(populatedIngredients);
+            if (!autoGroundType) autoGroundType = generated.groundType;
+            if (!autoRotation) autoRotation = generated.rotationRestrictions;
+            if (!autoGrazing) autoGrazing = generated.grazingRestrictions;
+        }
+
         const mix = new ChemicalMix({
             name,
             crop,
@@ -13122,7 +13344,10 @@ app.post('/api/mixes', authMiddleware, async (req, res) => {
             creatorDisplayName,
             createdBy: req.user._id,
             status: status || 'draft',
-            publishedAt: status === 'published' ? new Date() : null
+            publishedAt: status === 'published' ? new Date() : null,
+            groundType: autoGroundType,
+            rotationRestrictions: autoRotation,
+            grazingRestrictions: autoGrazing
         });
 
         await mix.save();
