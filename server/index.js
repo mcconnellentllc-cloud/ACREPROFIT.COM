@@ -13767,6 +13767,7 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
         if (kyle && ty) {
             // Kyle's JABCO inventory - correct quantities
+            // Kyle's inventory (JABCO products + 6 totes Atrazine from Sims)
             const kyleProducts = [
                 { name: /meso 4sc/i, qty: 360, owner: kyle._id },
                 { name: /xsate/i, qty: 4240, owner: kyle._id },
@@ -13774,6 +13775,7 @@ connectDB().then(async () => {
                 { name: /defy lv/i, qty: 180, owner: kyle._id },
                 { name: /hydrovant/i, qty: 180, owner: kyle._id },
                 { name: /flumioxazin/i, qty: 720, owner: kyle._id },
+                { name: /atrazine 4l/i, qty: 1590, owner: kyle._id },
             ];
             // Ty's JABCO products (transferred from Kyle)
             const tyJabcoProducts = [
@@ -13782,6 +13784,14 @@ connectDB().then(async () => {
                 { name: /flumioxazin/i, qty: 720, owner: ty._id },
                 { name: /sulfentrazone/i, qty: 180, owner: ty._id },
                 { name: /hydrovant/i, qty: 180, owner: ty._id },
+            ];
+            // Ty's Sims products (Ty paid for all of these)
+            const tySimsProducts = [
+                { name: /atrazine 4l/i, qty: 2650, owner: ty._id },
+                { name: /dicamba.*tigris/i, qty: 1060, owner: ty._id },
+                { name: /lv6 de-ester/i, qty: 1060, owner: ty._id },
+                { name: /anthem nxt/i, qty: 90, owner: ty._id },
+                { name: /mivum/i, qty: 1600, owner: ty._id },
             ];
 
             // Set Kyle's quantities
@@ -13819,6 +13829,47 @@ connectDB().then(async () => {
                             lastCost: chem.costPrice
                         });
                         await inv.save();
+                    } else {
+                        inv.quantityOnHand = p.qty;
+                        inv.quantityAvailable = p.qty - inv.quantityReserved;
+                        inv.distributorId = p.owner;
+                        inv.updatedAt = new Date();
+                        await inv.save();
+                    }
+                }
+            }
+
+            // Set Ty's Sims inventory
+            for (const p of tySimsProducts) {
+                const chem = await Chemical.findOne({ productName: p.name });
+                if (chem) {
+                    let inv = await Inventory.findOne({ chemicalId: chem._id, location: 'ty' });
+                    if (!inv) {
+                        // Check if there's a 'main' record and reassign it
+                        inv = await Inventory.findOne({ chemicalId: chem._id, location: 'main' });
+                        if (inv) {
+                            inv.location = 'ty';
+                            inv.quantityOnHand = p.qty;
+                            inv.quantityAvailable = p.qty - inv.quantityReserved;
+                            inv.distributorId = p.owner;
+                            inv.updatedAt = new Date();
+                            await inv.save();
+                        } else {
+                            inv = new Inventory({
+                                chemicalId: chem._id,
+                                productName: chem.productName,
+                                packSize: chem.packSize,
+                                unit: chem.unit,
+                                location: 'ty',
+                                quantityOnHand: p.qty,
+                                quantityReserved: 0,
+                                quantityAvailable: p.qty,
+                                distributorId: p.owner,
+                                averageCost: chem.costPrice,
+                                lastCost: chem.costPrice
+                            });
+                            await inv.save();
+                        }
                     } else {
                         inv.quantityOnHand = p.qty;
                         inv.quantityAvailable = p.qty - inv.quantityReserved;
