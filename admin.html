@@ -6154,7 +6154,6 @@
                 if (isSuperAdmin) {
                     document.getElementById('ledgerRepFilter').style.display = '';
                     document.getElementById('ledgerRepCol').style.display = '';
-                    document.getElementById('ledgerRepSelect').style.display = '';
 
                     if (!ledgerRepsLoaded) {
                         await loadLedgerReps();
@@ -6213,20 +6212,22 @@
         }
 
         function renderLedgerSummary(summaries) {
-            document.getElementById('ledgerSummary').innerHTML = summaries.map(s => {
+            // Only show reps that have ledger entries
+            const activeSummaries = summaries.filter(s => s.totalCredits > 0 || s.totalDebits > 0);
+            document.getElementById('ledgerSummary').innerHTML = activeSummaries.map(s => {
                 const balance = s.balance;
-                const isOwed = balance > 0;
-                const color = isOwed ? '#ea580c' : '#059669';
-                const label = isOwed
-                    ? `${s.rep.name} owes Acre Profit`
-                    : balance < 0 ? `Acre Profit owes ${s.rep.name}` : `${s.rep.name} - Even`;
+                const apOwes = balance < 0;
+                const color = apOwes ? '#dc2626' : balance > 0 ? '#059669' : '#666';
+                const label = apOwes
+                    ? `AP owes ${s.rep.name.split(' ')[0]}`
+                    : balance > 0 ? `${s.rep.name.split(' ')[0]} owes AP` : `${s.rep.name.split(' ')[0]} - Even`;
 
                 return `
-                <div class="stat-card">
-                    <div class="stat-icon" style="background: ${isOwed ? '#fed7aa' : '#d1fae5'}; color: ${color};">$</div>
+                <div class="stat-card" style="border-left: 4px solid ${color};">
                     <div class="stat-content">
-                        <span class="stat-value" style="color: ${color};">$${Math.abs(balance).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                        <span class="stat-label">${label}</span>
+                        <span class="stat-value" style="color: ${color}; font-size: 1.4rem;">$${Math.abs(balance).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                        <span class="stat-label" style="font-weight: 600; color: ${color};">${label}</span>
+                        <small style="color: var(--text-muted);">Invested: $${(s.totalCredits || 0).toLocaleString('en-US', {minimumFractionDigits: 2})} | Paid back: $${(s.totalDebits || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</small>
                     </div>
                 </div>
                 `;
@@ -6253,24 +6254,24 @@
 
                 return `
                 <tr>
-                    <td>${new Date(e.date).toLocaleDateString()}</td>
-                    ${isSuperAdmin ? `<td>${e.representativeId?.name || '-'}</td>` : ''}
+                    <td style="white-space:nowrap;">${new Date(e.date).toLocaleDateString()}</td>
+                    ${isSuperAdmin ? `<td style="font-weight:600;">${e.representativeId?.name?.split(' ')[0] || '-'}</td>` : ''}
                     <td>
-                        ${e.description}
-                        ${e.notes ? `<br><small style="color:var(--text-muted)">${e.notes}</small>` : ''}
+                        <strong>${e.description}</strong>
                         <span class="order-status ledger-cat-${e.category}" style="margin-left: 8px; font-size: 0.65rem;">${categoryLabels[e.category] || e.category}</span>
+                        ${e.notes ? `<br><small style="color:var(--text-muted); line-height: 1.6;">${e.notes}</small>` : ''}
                     </td>
                     <td>
-                        <span style="color: ${isDebit ? '#dc2626' : '#059669'}; font-weight: 600;">
-                            ${isDebit ? 'DEBIT' : 'CREDIT'}
+                        <span style="background: ${isDebit ? '#fef2f2' : '#f0fdf4'}; color: ${isDebit ? '#dc2626' : '#059669'}; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">
+                            ${isDebit ? 'PAID OUT' : 'OWED'}
                         </span>
                     </td>
-                    <td style="font-weight: 600; color: ${isDebit ? '#dc2626' : '#059669'};">
-                        ${isDebit ? '+' : '-'}$${e.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    <td style="font-weight: 700; color: ${isDebit ? '#dc2626' : '#059669'}; font-size: 1.05rem;">
+                        ${isDebit ? '-' : '+'}$${e.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}
                     </td>
-                    <td style="font-weight: 700; color: ${balanceColor};">
+                    <td style="font-weight: 700; color: ${balanceColor}; font-size: 1.05rem;">
                         $${Math.abs(e.runningBalance).toLocaleString('en-US', {minimumFractionDigits: 2})}
-                        <small style="color: var(--text-muted)">${e.runningBalance > 0 ? '(owes AP)' : e.runningBalance < 0 ? '(AP owes)' : ''}</small>
+                        <br><small style="color: ${balanceColor}; font-weight: 600;">${e.runningBalance > 0 ? 'owes AP' : e.runningBalance < 0 ? 'AP owes' : 'even'}</small>
                     </td>
                     <td style="font-size:0.8rem;">${e.createdBy?.name || 'System'}</td>
                 </tr>
