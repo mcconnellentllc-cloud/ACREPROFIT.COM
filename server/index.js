@@ -13758,6 +13758,80 @@ connectDB().then(async () => {
         }
     } catch (e) { console.error('Ty ledger setup error:', e.message); }
 
+    // Correct inventory quantities to match physical count
+    // Kyle has: Meso 180, XSATE 4240, Dicamba 180, Defy LV-6 180, Hydrovant 180, Flumi 720
+    // Ty has: Rancor 180, Meso 360, Flumi 720, Sulfentrazone 180, Hydrovant 180
+    // Plus Ty's Sims: Atrazine, Dicamba Tigris, LV6 Drexel, Anthem NXT, Mivum
+    try {
+        const kyle = await User.findOne({ email: 'office@togoag.com' });
+        const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
+        if (kyle && ty) {
+            // Kyle's JABCO inventory - correct quantities
+            const kyleProducts = [
+                { name: /meso 4sc/i, qty: 180, owner: kyle._id },
+                { name: /xsate/i, qty: 4240, owner: kyle._id },
+                { name: /dicamba 49/i, qty: 180, owner: kyle._id },
+                { name: /defy lv/i, qty: 180, owner: kyle._id },
+                { name: /hydrovant/i, qty: 180, owner: kyle._id },
+                { name: /flumioxazin/i, qty: 720, owner: kyle._id },
+            ];
+            // Ty's JABCO products (transferred from Kyle)
+            const tyJabcoProducts = [
+                { name: /rancor/i, qty: 180, owner: ty._id },
+                { name: /meso 4sc/i, qty: 360, owner: ty._id },
+                { name: /flumioxazin/i, qty: 720, owner: ty._id },
+                { name: /sulfentrazone/i, qty: 180, owner: ty._id },
+                { name: /hydrovant/i, qty: 180, owner: ty._id },
+            ];
+
+            // Set Kyle's quantities
+            for (const p of kyleProducts) {
+                const chem = await Chemical.findOne({ productName: p.name });
+                if (chem) {
+                    const inv = await Inventory.findOne({ chemicalId: chem._id, location: 'main' });
+                    if (inv) {
+                        inv.quantityOnHand = p.qty;
+                        inv.quantityAvailable = p.qty - inv.quantityReserved;
+                        inv.distributorId = p.owner;
+                        inv.updatedAt = new Date();
+                        await inv.save();
+                    }
+                }
+            }
+
+            // Create separate inventory records for Ty's JABCO products
+            for (const p of tyJabcoProducts) {
+                const chem = await Chemical.findOne({ productName: p.name });
+                if (chem) {
+                    let inv = await Inventory.findOne({ chemicalId: chem._id, location: 'ty' });
+                    if (!inv) {
+                        inv = new Inventory({
+                            chemicalId: chem._id,
+                            productName: chem.productName,
+                            packSize: chem.packSize,
+                            unit: chem.unit,
+                            location: 'ty',
+                            quantityOnHand: p.qty,
+                            quantityReserved: 0,
+                            quantityAvailable: p.qty,
+                            distributorId: p.owner,
+                            averageCost: chem.costPrice,
+                            lastCost: chem.costPrice
+                        });
+                        await inv.save();
+                    } else {
+                        inv.quantityOnHand = p.qty;
+                        inv.quantityAvailable = p.qty - inv.quantityReserved;
+                        inv.distributorId = p.owner;
+                        inv.updatedAt = new Date();
+                        await inv.save();
+                    }
+                }
+            }
+            console.log('Inventory quantities corrected to match physical count');
+        }
+    } catch (e) { console.error('Inventory correction error:', e.message); }
+
     // Assign inventory ownership: JABCO products → Kyle, Sims products → Ty
     try {
         const kyle = await User.findOne({ email: 'office@togoag.com' });
