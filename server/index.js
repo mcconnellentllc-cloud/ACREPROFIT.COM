@@ -4943,6 +4943,67 @@ app.delete('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async 
     }
 });
 
+// Send payment request email to customer for an existing order
+app.post('/api/admin/orders/:orderId/send-payment-request', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        // Try both Order and ChemicalOrder
+        let order = await Order.findById(req.params.orderId).populate('userId');
+        let isChemOrder = false;
+        if (!order) {
+            order = await ChemicalOrder.findById(req.params.orderId).populate('userId');
+            isChemOrder = true;
+        }
+        if (!order) return res.status(404).json({ error: 'Order not found' });
+
+        const customer = order.userId;
+        if (!customer?.email) return res.status(400).json({ error: 'Customer has no email address' });
+
+        const transporter = createEmailTransporter();
+        if (!transporter) return res.status(500).json({ error: 'Email not configured' });
+
+        const total = order.totalCost || order.total || 0;
+        const items = (order.chemicals || order.items || []).map(c =>
+            `<li>${c.name || c.productName} - ${c.qty || c.quantity || 0} ${c.unit || 'units'} - $${((c.totalPrice || c.total || 0)).toFixed(2)}</li>`
+        ).join('');
+
+        const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+
+        await transporter.sendMail({
+            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+            to: customer.email,
+            subject: `Payment Request - $${total.toLocaleString(undefined, {minimumFractionDigits: 2})} - Acre Profit`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                    <div style="background: #2d5a27; color: white; padding: 20px; text-align: center;">
+                        <h1 style="margin: 0;">Acre Profit</h1>
+                    </div>
+                    <div style="padding: 20px; background: #f9f9f9;">
+                        <h2>Payment Request</h2>
+                        <p>Hi ${customer.name},</p>
+                        <p>Your order is ready. Please review and submit payment at your convenience.</p>
+                        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                            <h3 style="margin-top: 0;">Order Summary</h3>
+                            ${items ? `<ul>${items}</ul>` : ''}
+                            <p style="font-size: 1.2rem; font-weight: 700; color: #2d5a27;">Total: $${total.toLocaleString(undefined, {minimumFractionDigits: 2})}</p>
+                        </div>
+                        <div style="background: #d1fae5; padding: 15px; border-radius: 5px; margin: 15px 0; border-left: 4px solid #10b981;">
+                            <h4 style="margin-top: 0; color: #065f46;">Payment Options</h4>
+                            <p style="color: #065f46;"><strong>Option 1 - ACH Bank Transfer (Preferred)</strong><br>Pay securely online. Fast processing, low fees.</p>
+                            <a href="${frontendUrl}/my-orders.html" style="background: #10b981; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: 600;">Pay Now - ACH Bank Transfer</a>
+                            <p style="margin-top: 12px; color: #065f46;"><strong>Option 2 - Check</strong><br>Make check payable to: <strong>Acre Profit LLC</strong><br>Mail to: 34549 Highway 59, Haxtun, CO 80731<br>Include your name and order number on the memo line.</p>
+                        </div>
+                        <p>Questions? Reply to this email or contact your representative.</p>
+                    </div>
+                </div>
+            `
+        });
+
+        res.json({ message: `Payment request sent to ${customer.email}` });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Get order stats (admin only)
 app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
     try {
