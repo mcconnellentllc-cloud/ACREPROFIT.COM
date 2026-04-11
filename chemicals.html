@@ -746,20 +746,37 @@
                 // WHEAT PROGRAMS
                 {
                     _id: 'wheat-1',
-                    name: 'Wheat - Single Application',
-                    description: 'Spring broadleaf + fertilizer application for winter wheat',
+                    name: 'Wheat - Herbicide Only',
+                    description: 'Broadleaf weed control for winter wheat',
                     crop: 'wheat',
                     type: 'recommended',
                     applications: [
                         {
-                            name: 'Single Application',
+                            name: 'Herbicide Application',
                             timing: 'March - Early April (tillering to jointing)',
                             truckRouteDate: 'Mid-Late February',
                             chemicals: [
-                                { productName: 'Ally XP', rate: 0.1, rateUnit: 'oz/acre', packSize: '10x1 oz', unit: 'oz', unitsPerPack: 10, price: 8.00 },
-                                { productName: '32-0-0 (UAN)', rate: 8, rateUnit: 'gal/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 2.32 },
-                                { productName: '12-0-0-26 (Thiosol)', rate: 2, rateUnit: 'gal/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 2.99 },
-                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 110.00 }
+                                { productName: 'Mivum', rate: 0.1, rateUnit: 'oz/acre', packSize: '8x16 oz', unit: 'oz', unitsPerPack: 128, price: 0 },
+                                { productName: 'Defy LV-6', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    _id: 'wheat-2',
+                    name: 'Wheat - Herbicide + Fungicide',
+                    description: 'Broadleaf weed control + disease prevention for winter wheat',
+                    crop: 'wheat',
+                    type: 'recommended',
+                    applications: [
+                        {
+                            name: 'Herbicide + Fungicide Application',
+                            timing: 'March - Early April (tillering to jointing)',
+                            truckRouteDate: 'Mid-Late February',
+                            chemicals: [
+                                { productName: 'Mivum', rate: 0.1, rateUnit: 'oz/acre', packSize: '8x16 oz', unit: 'oz', unitsPerPack: 128, price: 0 },
+                                { productName: 'Defy LV-6', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'AzoxyProp', rate: 10.5, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
                     ]
