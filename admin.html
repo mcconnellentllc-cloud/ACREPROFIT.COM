@@ -1617,21 +1617,19 @@
             <!-- Ledger Tab -->
             <div id="ledgerTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>Who Owes Who</h2>
+                    <h2>Distributor Ledger</h2>
                     <div class="tab-header-actions">
                         <button class="btn btn-primary superadmin-only-ledger" onclick="openAddLedgerModal()">+ Add Entry</button>
-                        <button class="btn btn-outline superadmin-only-ledger" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Payment to Distributor</button>
+                        <button class="btn btn-outline superadmin-only-ledger" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Check to Distributor</button>
                         <select id="ledgerRepFilter" style="display:none; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
-                            <option value="">All Reps</option>
+                            <option value="">All</option>
                         </select>
                         <select id="ledgerCategoryFilter" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
-                            <option value="">All Types</option>
-                            <option value="order">Orders</option>
-                            <option value="payment">Payments</option>
-                            <option value="supplier_payment">Supplier Payments</option>
+                            <option value="">All Entries</option>
+                            <option value="supplier_payment">Inventory Purchased</option>
+                            <option value="payment">Checks Written</option>
+                            <option value="adjustment">Transfers / Adjustments</option>
                             <option value="commission">Commissions</option>
-                            <option value="adjustment">Adjustments</option>
-                            <option value="refund">Refunds</option>
                         </select>
                     </div>
                 </div>
@@ -1641,17 +1639,16 @@
 
                 <!-- Ledger Table -->
                 <div class="orders-table-wrapper">
-                    <table class="admin-table">
+                    <table class="admin-table" style="font-size: 0.9rem;">
                         <thead>
                             <tr>
-                                <th>Date</th>
-                                <th id="ledgerRepCol" style="display:none;">Rep</th>
-                                <th>Description</th>
-                                <th>Type</th>
-                                <th>Amount</th>
-                                <th>Balance</th>
-                                <th>By</th>
-                                <th>Actions</th>
+                                <th style="width:90px;">Date</th>
+                                <th id="ledgerRepCol" style="display:none; width:80px;">Who</th>
+                                <th>What</th>
+                                <th style="width:110px; text-align:right;">Money In</th>
+                                <th style="width:110px; text-align:right;">Money Out</th>
+                                <th style="width:130px; text-align:right;">Balance</th>
+                                <th style="width:70px;">Actions</th>
                             </tr>
                         </thead>
                         <tbody id="ledgerTableBody">
@@ -6303,22 +6300,31 @@
         }
 
         function renderLedgerSummary(summaries) {
-            // Only show reps that have ledger entries
             const activeSummaries = summaries.filter(s => s.totalCredits > 0 || s.totalDebits > 0);
             document.getElementById('ledgerSummary').innerHTML = activeSummaries.map(s => {
                 const balance = s.balance;
+                // Credits = money they put in (AP owes them)
+                // Debits = money paid back or product they took (reduces what AP owes)
+                const moneyIn = s.totalCredits || 0;  // Total invested
+                const moneyOut = s.totalDebits || 0;  // Total paid back / taken
+                const firstName = s.rep.name.split(' ')[0];
+
+                // Negative balance = AP owes them, Positive = they owe AP
                 const apOwes = balance < 0;
-                const color = apOwes ? '#dc2626' : balance > 0 ? '#059669' : '#666';
-                const label = apOwes
-                    ? `AP owes ${s.rep.name.split(' ')[0]}`
-                    : balance > 0 ? `${s.rep.name.split(' ')[0]} owes AP` : `${s.rep.name.split(' ')[0]} - Even`;
+                const owing = Math.abs(balance);
 
                 return `
-                <div class="stat-card" style="border-left: 4px solid ${color};">
-                    <div class="stat-content">
-                        <span class="stat-value" style="color: ${color}; font-size: 1.4rem;">$${Math.abs(balance).toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                        <span class="stat-label" style="font-weight: 600; color: ${color};">${label}</span>
-                        <small style="color: var(--text-muted);">Invested: $${(s.totalCredits || 0).toLocaleString('en-US', {minimumFractionDigits: 2})} | Paid back: $${(s.totalDebits || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</small>
+                <div class="stat-card" style="border-left: 4px solid ${apOwes ? '#dc2626' : '#059669'}; padding: 16px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                        <strong style="font-size:1.1rem;">${firstName}</strong>
+                        <span style="font-size:1.3rem; font-weight:800; color: ${apOwes ? '#dc2626' : '#059669'};">$${owing.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                    </div>
+                    <div style="color: ${apOwes ? '#dc2626' : '#059669'}; font-weight:600; margin-bottom:8px;">
+                        ${apOwes ? 'AP owes ' + firstName : firstName + ' owes AP'}
+                    </div>
+                    <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#666;">
+                        <span>Put in: $${moneyIn.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                        <span>Paid back: $${moneyOut.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
                     </div>
                 </div>
                 `;
@@ -6328,58 +6334,54 @@
         function renderLedgerEntries(entries) {
             const isSuperAdmin = userData.role === 'superadmin';
             const tbody = document.getElementById('ledgerTableBody');
-            const colSpan = isSuperAdmin ? 8 : 7;
+            const colSpan = isSuperAdmin ? 7 : 6;
 
-            // Hide superadmin-only buttons for non-superadmin
             document.querySelectorAll('.superadmin-only-ledger').forEach(el => {
                 el.style.display = isSuperAdmin ? '' : 'none';
             });
 
             if (!entries.length) {
-                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">No ledger entries yet. Entries are auto-created when orders are delivered, or add manually.</td></tr>`;
+                tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">No entries yet.</td></tr>`;
                 return;
             }
 
             tbody.innerHTML = entries.map(e => {
-                const isDebit = e.type === 'debit';
-                const balanceColor = e.runningBalance > 0 ? '#ea580c' : e.runningBalance < 0 ? '#059669' : 'inherit';
-                const categoryLabels = {
-                    order: 'Order', payment: 'Payment', supplier_payment: 'Supplier',
-                    commission: 'Commission', adjustment: 'Adjustment', refund: 'Refund'
-                };
+                // credit = money in (they invested, AP owes them more)
+                // debit = money out (AP paid them back, or they took product)
+                const isCredit = e.type === 'credit';
+                const moneyIn = isCredit ? e.amount : 0;
+                const moneyOut = !isCredit ? e.amount : 0;
+                const balanceColor = e.runningBalance < 0 ? '#dc2626' : e.runningBalance > 0 ? '#059669' : '#666';
+                const balanceLabel = e.runningBalance < 0 ? 'AP owes' : e.runningBalance > 0 ? 'owes AP' : 'even';
 
                 const escapedNotes = (e.notes || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
                 const escapedDesc = (e.description || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
 
                 let actionsHtml = '';
                 if (isSuperAdmin) {
-                    actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditLedgerModal('${e._id}', '${escapedDesc}', ${e.amount}, '${e.type}', '${e.category}', '${escapedNotes}')" style="font-size:0.7rem; padding: 3px 8px;">Edit</button>`;
+                    actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditLedgerModal('${e._id}', '${escapedDesc}', ${e.amount}, '${e.type}', '${e.category}', '${escapedNotes}')" style="font-size:0.75rem; padding: 3px 8px;">Edit</button>`;
                 } else {
-                    actionsHtml = `<a href="#" onclick="openLedgerNoteModal('${e._id}', '${escapedNotes}'); return false;" style="font-size:0.75rem; color: var(--primary);">Add Note</a>`;
+                    actionsHtml = `<a href="#" onclick="openLedgerNoteModal('${e._id}', '${escapedNotes}'); return false;" style="font-size:0.75rem;">Note</a>`;
                 }
 
                 return `
                 <tr>
-                    <td style="white-space:nowrap;">${new Date(e.date).toLocaleDateString()}</td>
+                    <td style="white-space:nowrap; font-size:0.85rem;">${new Date(e.date).toLocaleDateString()}</td>
                     ${isSuperAdmin ? `<td style="font-weight:600;">${e.representativeId?.name?.split(' ')[0] || '-'}</td>` : ''}
                     <td>
-                        <strong>${e.description}</strong>
-                        <span class="order-status ledger-cat-${e.category}" style="margin-left: 8px; font-size: 0.65rem;">${categoryLabels[e.category] || e.category}</span>
-                        ${e.notes ? `<br><small style="color:var(--text-muted); line-height: 1.6;">${e.notes}</small>` : ''}
+                        ${e.description}
+                        ${e.notes ? `<br><small style="color:#999;">${e.notes}</small>` : ''}
                     </td>
-                    <td>
-                        <span style="background: ${isDebit ? '#fef2f2' : '#f0fdf4'}; color: ${isDebit ? '#dc2626' : '#059669'}; font-weight: 700; padding: 3px 8px; border-radius: 4px; font-size: 0.8rem;">
-                            ${isDebit ? 'PAID OUT' : 'OWED'}
-                        </span>
+                    <td style="text-align:right; color: #059669; font-weight:${moneyIn > 0 ? '700' : '400'};">
+                        ${moneyIn > 0 ? '$' + moneyIn.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}
                     </td>
-                    <td style="font-weight: 700; color: ${isDebit ? '#dc2626' : '#059669'}; font-size: 1.05rem;">
-                        ${isDebit ? '-' : '+'}$${e.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}
+                    <td style="text-align:right; color: #dc2626; font-weight:${moneyOut > 0 ? '700' : '400'};">
+                        ${moneyOut > 0 ? '$' + moneyOut.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}
                     </td>
-                    <td style="font-weight: 700; color: ${balanceColor}; font-size: 1.05rem;">
+                    <td style="text-align:right; font-weight:700; color: ${balanceColor};">
                         $${Math.abs(e.runningBalance).toLocaleString('en-US', {minimumFractionDigits: 2})}
-                        <br><small style="color: ${balanceColor}; font-weight: 600;">${e.runningBalance > 0 ? 'owes AP' : e.runningBalance < 0 ? 'AP owes' : 'even'}</small>
+                        <br><small style="font-weight:600;">${balanceLabel}</small>
                     </td>
-                    <td style="font-size:0.8rem;">${e.createdBy?.name || 'System'}</td>
                     <td>${actionsHtml}</td>
                 </tr>
                 `;
