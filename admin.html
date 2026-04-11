@@ -1619,8 +1619,8 @@
                 <div class="tab-header">
                     <h2>Who Owes Who</h2>
                     <div class="tab-header-actions">
-                        <button class="btn btn-primary" onclick="openAddLedgerModal()">+ Add Entry</button>
-                        <button class="btn btn-outline" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Payment to Distributor</button>
+                        <button class="btn btn-primary superadmin-only-ledger" onclick="openAddLedgerModal()">+ Add Entry</button>
+                        <button class="btn btn-outline superadmin-only-ledger" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Payment to Distributor</button>
                         <select id="ledgerRepFilter" style="display:none; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
                             <option value="">All Reps</option>
                         </select>
@@ -1651,6 +1651,7 @@
                                 <th>Amount</th>
                                 <th>Balance</th>
                                 <th>By</th>
+                                <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="ledgerTableBody">
@@ -2692,6 +2693,86 @@
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closeRecordPaymentModal()">Cancel</button>
                         <button class="btn btn-primary" style="background: #059669;" onclick="submitRecordPayment()">Record Payment</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Edit Ledger Entry Modal (superadmin) -->
+            <div class="modal-overlay" id="editLedgerModal" style="display: none;">
+                <div class="modal-content" style="max-width: 500px;">
+                    <button class="modal-close" onclick="closeEditLedgerModal()">&times;</button>
+                    <div class="customer-modal-header" style="background: #1a1a2e; color: var(--white);">
+                        <div class="customer-modal-avatar" style="background: rgba(255,255,255,0.2);">&#9998;</div>
+                        <div class="customer-modal-title">
+                            <h2 style="color: var(--white);">Edit Ledger Entry</h2>
+                            <p style="color: rgba(255,255,255,0.8);">Update entry details (superadmin only)</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="editLedgerForm" class="edit-customer-form">
+                            <input type="hidden" id="editLedgerEntryId">
+                            <div class="form-group">
+                                <label>Description *</label>
+                                <input type="text" id="editLedgerDesc" required>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Amount ($) *</label>
+                                    <input type="number" id="editLedgerAmount" step="0.01" min="0.01" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Type *</label>
+                                    <select id="editLedgerType">
+                                        <option value="credit">Credit (Payment In)</option>
+                                        <option value="debit">Debit (Cost/Charge)</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Category</label>
+                                <select id="editLedgerCategory">
+                                    <option value="order">Order</option>
+                                    <option value="payment">Payment Received</option>
+                                    <option value="supplier_payment">Supplier Payment</option>
+                                    <option value="commission">Commission</option>
+                                    <option value="adjustment">Adjustment</option>
+                                    <option value="refund">Refund</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <textarea id="editLedgerNotes" rows="3" style="width:100%; padding:8px; border:2px solid var(--border); border-radius:var(--radius);"></textarea>
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeEditLedgerModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveEditLedgerEntry()">Save Changes</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Ledger Note Modal (distributor) -->
+            <div class="modal-overlay" id="ledgerNoteModal" style="display: none;">
+                <div class="modal-content" style="max-width: 420px;">
+                    <button class="modal-close" onclick="closeLedgerNoteModal()">&times;</button>
+                    <div class="customer-modal-header" style="background: var(--primary); color: var(--white);">
+                        <div class="customer-modal-avatar" style="background: rgba(255,255,255,0.2);">&#128221;</div>
+                        <div class="customer-modal-title">
+                            <h2 style="color: var(--white);">Add / Edit Note</h2>
+                            <p style="color: rgba(255,255,255,0.8);">Update the note on this ledger entry</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <input type="hidden" id="ledgerNoteEntryId">
+                        <div class="form-group">
+                            <label>Notes</label>
+                            <textarea id="ledgerNoteText" rows="4" style="width:100%; padding:8px; border:2px solid var(--border); border-radius:var(--radius);" placeholder="Add a note..."></textarea>
+                        </div>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeLedgerNoteModal()">Cancel</button>
+                        <button class="btn btn-primary" onclick="saveLedgerNote()">Save Note</button>
                     </div>
                 </div>
             </div>
@@ -6237,7 +6318,12 @@
         function renderLedgerEntries(entries) {
             const isSuperAdmin = userData.role === 'superadmin';
             const tbody = document.getElementById('ledgerTableBody');
-            const colSpan = isSuperAdmin ? 7 : 6;
+            const colSpan = isSuperAdmin ? 8 : 7;
+
+            // Hide superadmin-only buttons for non-superadmin
+            document.querySelectorAll('.superadmin-only-ledger').forEach(el => {
+                el.style.display = isSuperAdmin ? '' : 'none';
+            });
 
             if (!entries.length) {
                 tbody.innerHTML = `<tr><td colspan="${colSpan}" class="empty">No ledger entries yet. Entries are auto-created when orders are delivered, or add manually.</td></tr>`;
@@ -6251,6 +6337,16 @@
                     order: 'Order', payment: 'Payment', supplier_payment: 'Supplier',
                     commission: 'Commission', adjustment: 'Adjustment', refund: 'Refund'
                 };
+
+                const escapedNotes = (e.notes || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+                const escapedDesc = (e.description || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+
+                let actionsHtml = '';
+                if (isSuperAdmin) {
+                    actionsHtml = `<button class="btn btn-outline btn-sm" onclick="openEditLedgerModal('${e._id}', '${escapedDesc}', ${e.amount}, '${e.type}', '${e.category}', '${escapedNotes}')" style="font-size:0.7rem; padding: 3px 8px;">Edit</button>`;
+                } else {
+                    actionsHtml = `<a href="#" onclick="openLedgerNoteModal('${e._id}', '${escapedNotes}'); return false;" style="font-size:0.75rem; color: var(--primary);">Add Note</a>`;
+                }
 
                 return `
                 <tr>
@@ -6274,6 +6370,7 @@
                         <br><small style="color: ${balanceColor}; font-weight: 600;">${e.runningBalance > 0 ? 'owes AP' : e.runningBalance < 0 ? 'AP owes' : 'even'}</small>
                     </td>
                     <td style="font-size:0.8rem;">${e.createdBy?.name || 'System'}</td>
+                    <td>${actionsHtml}</td>
                 </tr>
                 `;
             }).join('');
@@ -6331,6 +6428,97 @@
             } catch (error) {
                 console.error('Error adding ledger entry:', error);
                 alert('Error adding entry. Please try again.');
+            }
+        }
+
+        // ============ EDIT LEDGER ENTRY (SUPERADMIN) ============
+        function openEditLedgerModal(id, desc, amount, type, category, notes) {
+            document.getElementById('editLedgerEntryId').value = id;
+            document.getElementById('editLedgerDesc').value = desc;
+            document.getElementById('editLedgerAmount').value = amount;
+            document.getElementById('editLedgerType').value = type;
+            document.getElementById('editLedgerCategory').value = category;
+            document.getElementById('editLedgerNotes').value = notes;
+            document.getElementById('editLedgerModal').style.display = 'flex';
+        }
+
+        function closeEditLedgerModal() {
+            document.getElementById('editLedgerModal').style.display = 'none';
+        }
+
+        async function saveEditLedgerEntry() {
+            const id = document.getElementById('editLedgerEntryId').value;
+            const description = document.getElementById('editLedgerDesc').value.trim();
+            const amount = parseFloat(document.getElementById('editLedgerAmount').value);
+            const type = document.getElementById('editLedgerType').value;
+            const category = document.getElementById('editLedgerCategory').value;
+            const notes = document.getElementById('editLedgerNotes').value.trim();
+
+            if (!description || isNaN(amount) || amount <= 0) {
+                alert('Please fill in description and a positive amount');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ledger/${id}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ description, amount, type, category, notes })
+                });
+
+                if (res.ok) {
+                    closeEditLedgerModal();
+                    loadLedger();
+                    alert('Ledger entry updated!');
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to update entry');
+                }
+            } catch (error) {
+                console.error('Error updating ledger entry:', error);
+                alert('Error updating entry. Please try again.');
+            }
+        }
+
+        // ============ LEDGER NOTE (DISTRIBUTOR) ============
+        function openLedgerNoteModal(id, notes) {
+            document.getElementById('ledgerNoteEntryId').value = id;
+            document.getElementById('ledgerNoteText').value = notes;
+            document.getElementById('ledgerNoteModal').style.display = 'flex';
+        }
+
+        function closeLedgerNoteModal() {
+            document.getElementById('ledgerNoteModal').style.display = 'none';
+        }
+
+        async function saveLedgerNote() {
+            const id = document.getElementById('ledgerNoteEntryId').value;
+            const notes = document.getElementById('ledgerNoteText').value.trim();
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ledger/${id}/note`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ notes })
+                });
+
+                if (res.ok) {
+                    closeLedgerNoteModal();
+                    loadLedger();
+                    alert('Note saved!');
+                } else {
+                    const error = await res.json();
+                    alert(error.error || 'Failed to save note');
+                }
+            } catch (error) {
+                console.error('Error saving note:', error);
+                alert('Error saving note. Please try again.');
             }
         }
 

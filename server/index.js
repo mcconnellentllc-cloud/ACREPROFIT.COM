@@ -5678,14 +5678,13 @@ app.get('/api/chemicals/available', async (req, res) => {
     try {
         const { category } = req.query;
 
-        // Get all inventory with stock or on order
+        // Get all inventory with stock or on order (across ALL locations, not just 'main')
         const inventory = await Inventory.find({
-            location: 'main',
             $or: [
                 { quantityOnHand: { $gt: 0 } },
                 { quantityAvailable: { $gt: 0 } }
             ]
-        }).lean();
+        }).populate('distributorId', 'name').lean();
 
         // Get chemicals on pending POs (on order but not yet received)
         const pendingPOs = await PurchaseOrder.find({
@@ -5724,17 +5723,32 @@ app.get('/api/chemicals/available', async (req, res) => {
             .sort({ category: 1, productName: 1 })
             .lean();
 
-        // Build inventory map
-        const invMap = {};
+        // Build inventory map: aggregate across all locations per chemical
+        const invMap = {}; // chemicalId -> { totalOnHand, locations: [{name, location, qty}] }
         inventory.forEach(inv => {
             const key = inv.chemicalId?.toString();
-            if (key) invMap[key] = inv;
+            if (!key) return;
+            if (!invMap[key]) {
+                invMap[key] = { totalOnHand: 0, locations: [] };
+            }
+            invMap[key].totalOnHand += (inv.quantityOnHand || 0);
+            // Build location info: distributor first name + location name
+            const distributorName = inv.distributorId?.name?.split(' ')[0] || '';
+            const locName = inv.location && inv.location !== 'main'
+                ? inv.location.charAt(0).toUpperCase() + inv.location.slice(1)
+                : '';
+            const label = distributorName && locName
+                ? `${distributorName} - ${locName}`
+                : distributorName || locName || 'Main';
+            if (inv.quantityOnHand > 0) {
+                invMap[key].locations.push({ name: label, qty: inv.quantityOnHand });
+            }
         });
 
         // Return ONLY customer-safe data - NO cost, NO admin price, NO margins
         const available = chemicals.map(c => {
-            const inv = invMap[c._id.toString()];
-            const onHand = inv?.quantityOnHand || 0;
+            const invData = invMap[c._id.toString()];
+            const onHand = invData?.totalOnHand || 0;
             const onOrder = onOrderQty[c._id.toString()] || 0;
 
             let availability;
@@ -5757,7 +5771,8 @@ app.get('/api/chemicals/available', async (req, res) => {
                 defaultRate: c.defaultRate,
                 rateUnit: c.rateUnit,
                 availability,
-                isRestrictedUse: c.isRestrictedUse
+                isRestrictedUse: c.isRestrictedUse,
+                locations: invData?.locations || []
             };
         });
 
@@ -8536,10 +8551,15 @@ app.get('/api/admin/ledger/summary', authMiddleware, adminMiddleware, async (req
     }
 });
 
-// Create manual ledger entry
+// Create manual ledger entry (superadmin only for financial entries)
 app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { representativeId, description, amount, type, category, notes } = req.body;
+
+        // Non-superadmin users cannot create ledger entries that change amounts
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can create ledger entries. Use the note endpoint to add notes.' });
+        }
 
         if (!description || !amount || !type) {
             return res.status(400).json({ error: 'Description, amount, and type are required' });
@@ -8570,6 +8590,76 @@ app.post('/api/admin/ledger', authMiddleware, adminMiddleware, async (req, res) 
             .populate('createdBy', 'name');
 
         res.status(201).json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update ledger entry note only (any admin/distributor)
+app.put('/api/admin/ledger/:id/note', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { notes } = req.body;
+
+        const entry = await LedgerEntry.findById(req.params.id);
+        if (!entry) {
+            return res.status(404).json({ error: 'Ledger entry not found' });
+        }
+
+        // Only update the notes field - no financial data changes allowed
+        entry.notes = notes || '';
+        await entry.save();
+
+        const populated = await LedgerEntry.findById(entry._id)
+            .populate('representativeId', 'name email')
+            .populate('createdBy', 'name');
+
+        res.json(populated);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update ledger entry fully (superadmin only) - can change amount, type, description, notes, category
+app.put('/api/admin/ledger/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can edit ledger entries' });
+        }
+
+        const { description, amount, type, category, notes } = req.body;
+        const entry = await LedgerEntry.findById(req.params.id);
+        if (!entry) {
+            return res.status(404).json({ error: 'Ledger entry not found' });
+        }
+
+        // Update fields
+        if (description !== undefined) entry.description = description;
+        if (amount !== undefined) entry.amount = Math.abs(amount);
+        if (type !== undefined) entry.type = type;
+        if (category !== undefined) entry.category = category;
+        if (notes !== undefined) entry.notes = notes;
+
+        await entry.save();
+
+        // Recalculate running balances for all entries for this rep from this entry forward
+        const allEntries = await LedgerEntry.find({ representativeId: entry.representativeId })
+            .sort({ date: 1, createdAt: 1 });
+
+        let runningBalance = 0;
+        for (const e of allEntries) {
+            const balanceChange = e.type === 'debit' ? e.amount : -e.amount;
+            runningBalance = Math.round((runningBalance + balanceChange) * 100) / 100;
+            if (e.runningBalance !== runningBalance) {
+                e.runningBalance = runningBalance;
+                await e.save();
+            }
+        }
+
+        const populated = await LedgerEntry.findById(entry._id)
+            .populate('representativeId', 'name email')
+            .populate('createdBy', 'name');
+
+        res.json(populated);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

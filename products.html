@@ -270,6 +270,7 @@
                         inStock: true,
                         quantityAvailable: 100,
                         availability: p.availability,
+                        locations: p.locations || [],
                         qty: 0 // User-entered quantity
                     }));
 
@@ -344,9 +345,13 @@
                                       p.quantityAvailable > 0 ? `${p.quantityAvailable} ${p.unit} left` : 'Call for Availability';
                     const rupBadge = p.rup ? '<span class="rup-badge">RUP</span>' : '';
 
+                    const locationText = p.locations.length > 0
+                        ? p.locations.map(l => l.name).join(', ')
+                        : '';
+
                     html += `
                                 <tr>
-                                    <td class="product-name-cell">${p.name}${rupBadge}${p.notes ? `<small>${p.notes}</small>` : ''}</td>
+                                    <td class="product-name-cell">${p.name}${rupBadge}${p.notes ? `<small>${p.notes}</small>` : ''}${locationText ? `<small style="color:#2d5a27;">Available at: ${locationText}</small>` : ''}</td>
                                     <td>${p.packSize}${p.unitsPerPack > 1 ? `<br><small style="color:#888;">(${p.unitsPerPack} ${p.unit})</small>` : ''}</td>
                                     <td class="right"><span class="price-big">$${p.price.toFixed(2)}</span><span class="price-unit">/${p.unit}</span></td>
                                     <td class="center"><span class="stock-badge ${stockClass}">${stockText}</span></td>
