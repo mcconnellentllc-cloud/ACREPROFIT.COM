@@ -593,6 +593,9 @@
                     description: 'Burndown application with residual (End March - April)',
                     crop: 'corn',
                     type: 'recommended',
+                    groundType: 'Dryland or irrigated corn ground. Apply to wheat stubble or clean-tilled ground 30+ days before planting. Flumioxazin provides residual broadleaf control through emergence.',
+                    rotationRestrictions: 'Wheat: 4 months after flumioxazin application. Soybeans: 12 months. Sorghum: 18 months at rates above 2 oz/acre.',
+                    grazingRestrictions: 'Do not graze or harvest forage from treated areas for 30 days.',
                     truckRoute: { timing: 'Mid March', weeksBeforeSpray: 2 },
                     applications: [
                         {
@@ -612,9 +615,12 @@
                 {
                     _id: 'corn-2',
                     name: 'Corn - 2-Pass Program',
-                    description: 'Burndown + First Post-emerge (End March through Mid May)',
+                    description: 'Burndown + Pre-emerge (End March through Mid May)',
                     crop: 'corn',
                     type: 'recommended',
+                    groundType: 'Dryland or irrigated corn. Two applications for season-long weed control. Anthem NXT provides extended residual grass and broadleaf control through the canopy.',
+                    rotationRestrictions: 'Wheat: 4 months after last application. Soybeans: 12 months. Sorghum: 18 months. Anthem NXT adds Group 15 restriction - check label for specific rotational crops.',
+                    grazingRestrictions: 'Do not graze or harvest forage from treated areas for 30 days.',
                     applications: [
                         {
                             name: 'Burndown',
@@ -646,8 +652,11 @@
                 {
                     _id: 'corn-3',
                     name: 'Corn - Full 3-Pass Program',
-                    description: 'Complete season: Burndown + First Post + 2nd/3rd Post',
+                    description: 'Complete season: Burndown + Pre-Emerge + Late Post',
                     crop: 'corn',
+                    groundType: 'Heavy weed pressure corn fields, irrigated or dryland. Three applications for complete season-long control including late-season escapes.',
+                    rotationRestrictions: 'Wheat: 4 months after last application. Soybeans: 12 months. Sorghum: 18 months. Multiple residual chemistries applied - allow full rotation intervals.',
+                    grazingRestrictions: 'Do not graze or harvest forage from treated areas for 30 days after any application.',
                     type: 'recommended',
                     applications: [
                         {
@@ -696,6 +705,9 @@
                     description: '30-day minimum pre-plant burndown for grain sorghum',
                     crop: 'milo',
                     type: 'recommended',
+                    groundType: 'Dryland grain sorghum. Must apply at least 30 days before planting. Flumioxazin provides pre-emerge residual. Good for wheat stubble rotation.',
+                    rotationRestrictions: 'Wheat: 4 months. Corn: no restriction if atrazine rate is under 1 lb ai/acre. Soybeans: 12 months after atrazine.',
+                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine application.',
                     applications: [
                         {
                             name: '30d Minimum Pre-Plant',
@@ -717,6 +729,9 @@
                     description: 'Complete pre-plant + at-planting sorghum program',
                     crop: 'milo',
                     type: 'recommended',
+                    groundType: 'Dryland grain sorghum with higher weed pressure. Two-pass program provides burndown residual plus at-planting protection.',
+                    rotationRestrictions: 'Wheat: 4 months. Corn: no restriction if atrazine under 1 lb ai/acre. Soybeans: 12 months after atrazine.',
+                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine application.',
                     applications: [
                         {
                             name: '30d Minimum Pre-Plant',
@@ -750,6 +765,9 @@
                     description: 'Broadleaf weed control for winter wheat',
                     crop: 'wheat',
                     type: 'recommended',
+                    groundType: 'Winter wheat - spring application during active tillering to jointing. For fields with broadleaf weed pressure (kochia, mustard, etc.) but no disease concerns.',
+                    rotationRestrictions: 'Mivum (metsulfuron): Do not plant corn, sorghum, or other grass crops for 60 days. Soybeans: no restriction. Wheat: no restriction.',
+                    grazingRestrictions: 'Do not graze or cut treated wheat for hay within 28 days of Defy LV-6 application.',
                     applications: [
                         {
                             name: 'Herbicide Application',
@@ -768,6 +786,9 @@
                     description: 'Broadleaf weed control + disease prevention for winter wheat',
                     crop: 'wheat',
                     type: 'recommended',
+                    groundType: 'Winter wheat with disease history or high-yield potential fields. AzoxyProp provides preventative protection against stripe rust, leaf rust, and Septoria. Apply at tillering to flag leaf.',
+                    rotationRestrictions: 'Mivum (metsulfuron): Do not plant corn, sorghum, or other grass crops for 60 days. AzoxyProp: no rotational restrictions.',
+                    grazingRestrictions: 'Do not graze or cut treated wheat for hay within 28 days of Defy LV-6 application. AzoxyProp: 45-day pre-harvest interval for grain.',
                     applications: [
                         {
                             name: 'Herbicide + Fungicide Application',
@@ -788,6 +809,9 @@
                     description: 'Clean burndown for fallow ground',
                     crop: 'fallow',
                     type: 'recommended',
+                    groundType: 'Any fallow ground - wheat stubble, failed crop, or planned fallow. Standard burndown with systemic + broadleaf control. No residual - weeds will regerminate.',
+                    rotationRestrictions: 'Dicamba: Do not plant soybeans or other sensitive broadleaf crops for 30 days. Wheat, corn, sorghum: no restriction.',
+                    grazingRestrictions: 'Do not graze treated areas for 7 days after glyphosate application.',
                     applications: [
                         {
                             name: 'Burndown',
@@ -806,6 +830,9 @@
                     description: 'Quick contact burndown with Paraquat',
                     crop: 'fallow',
                     type: 'recommended',
+                    groundType: 'Fallow ground with heavy green weed canopy. Paraquat is a fast contact killer - works in hours, not days. Best when weeds are small (under 6 inches).',
+                    rotationRestrictions: 'No crop rotation restrictions from Paraquat - it deactivates on contact with soil.',
+                    grazingRestrictions: 'RESTRICTED USE PESTICIDE. Do not graze treated areas. Paraquat is highly toxic - certified applicator required.',
                     applications: [
                         {
                             name: 'Burndown',
@@ -824,6 +851,9 @@
                     description: 'Two burndown applications for season-long fallow',
                     crop: 'fallow',
                     type: 'recommended',
+                    groundType: 'Season-long fallow. First pass systemic burndown in spring, second pass contact kill mid-summer for regrowth. Good moisture conservation program.',
+                    rotationRestrictions: 'Dicamba (first pass): 30 days before planting sensitive broadleaf crops. Paraquat (second pass): no restriction.',
+                    grazingRestrictions: 'RESTRICTED USE PESTICIDE (Paraquat). Do not graze treated areas after Paraquat application.',
                     applications: [
                         {
                             name: 'First Burndown',
@@ -844,6 +874,28 @@
                         }
                     ]
                 },
+                {
+                    _id: 'fallow-4',
+                    name: 'Summer Fallow - Residual (Sulfentrazone + Metribuzin)',
+                    description: 'Extended residual burndown for clean fallow with long-lasting weed suppression',
+                    crop: 'fallow',
+                    type: 'recommended',
+                    groundType: 'Best on medium to heavy textured soils (clay loam, silty clay). Avoid sandy soils or soils with pH above 7.5 - sulfentrazone binds less in high pH soils causing potential crop injury on rotation. Ideal for fields going to wheat the following fall.',
+                    rotationRestrictions: 'Wheat: 4 months. Corn: 18 months. Sorghum: 18 months. Soybeans: 12 months. Sunflower: 18 months. Do NOT plant any crop not on the label for 18 months.',
+                    grazingRestrictions: 'Do not graze treated areas or harvest forage for 28 days after application.',
+                    applications: [
+                        {
+                            name: 'Residual Burndown',
+                            timing: 'Early spring (March-April)',
+                            chemicals: [
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Sulfentrazone 39.6% SC', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Rancor 4F', rate: 10, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                            ]
+                        }
+                    ]
+                },
                 // MILLET PROGRAMS
                 {
                     _id: 'millet-1',
@@ -851,6 +903,9 @@
                     description: 'Pre-plant burndown for proso millet',
                     crop: 'millet',
                     type: 'recommended',
+                    groundType: 'Pre-plant burndown for proso millet. Apply 7-14 days before planting. Low dicamba rate to avoid carryover issues with the millet crop.',
+                    rotationRestrictions: 'Wheat: no restriction. Corn: no restriction. Soybeans: 30 days after dicamba.',
+                    grazingRestrictions: 'Do not graze millet forage for 7 days after application.',
                     applications: [
                         {
                             name: 'Burndown',
@@ -869,6 +924,9 @@
                     description: 'Burndown with grass weed control for millet',
                     crop: 'millet',
                     type: 'recommended',
+                    groundType: 'Millet ground with volunteer wheat or grass weed pressure. Clethodim provides grass-specific control without crop injury to millet.',
+                    rotationRestrictions: 'Wheat: no restriction. Corn: no restriction. Soybeans: 30 days after dicamba.',
+                    grazingRestrictions: 'Do not graze millet forage for 7 days after application.',
                     applications: [
                         {
                             name: 'Burndown',
@@ -1171,6 +1229,7 @@
                         <span class="program-crop-badge">${prog.crop}</span>
                     </div>
                     <p class="program-desc">${prog.description}</p>
+                    ${prog.groundType ? `<div style="background:#f0f7ef; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.88rem; color:#2d5a27; border-left:3px solid #2d5a27;"><strong>Best For:</strong> ${prog.groundType}</div>` : ''}
                     <div class="program-applications">
                         ${prog.applications.map(app => `
                             <div class="program-pass">
@@ -1182,6 +1241,11 @@
                             </div>
                         `).join('')}
                     </div>
+                    ${prog.rotationRestrictions || prog.grazingRestrictions ? `
+                    <div style="background:#fef3c7; padding:10px 14px; border-radius:6px; margin:12px 0; font-size:0.82rem; border-left:3px solid #f59e0b;">
+                        ${prog.rotationRestrictions ? `<div style="margin-bottom:6px;"><strong>Rotation:</strong> ${prog.rotationRestrictions}</div>` : ''}
+                        ${prog.grazingRestrictions ? `<div><strong>Grazing:</strong> ${prog.grazingRestrictions}</div>` : ''}
+                    </div>` : ''}
                     <button class="btn btn-secondary select-program-btn" data-program-id="${prog._id}">
                         Select This Program
                     </button>
