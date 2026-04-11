@@ -7828,7 +7828,8 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             customerEmail,
             customerPhone,
             customerFarm,
-            notes
+            notes,
+            discountCode
         } = req.body;
 
         // Validate required fields
@@ -7863,12 +7864,26 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             }
         }
 
+        // Validate discount code
+        let discountType = null;
+        let discountDescription = '';
+        if (discountCode) {
+            const code = discountCode.trim().toUpperCase();
+            if (code === 'NODISTMARG') {
+                discountType = 'no_dist_margin';
+                discountDescription = 'No distributor margin (admin price)';
+            } else if (code === 'ATCOSTAP') {
+                discountType = 'at_cost';
+                discountDescription = 'At cost (no markup)';
+            }
+        }
+
         // Build order items with server-side price verification
-        // Look up all chemicals once for price validation
         const allChemicals = await Chemical.find({ isActive: true }).lean();
 
         const orderItems = [];
         let verifiedSubtotal = 0;
+        let totalDiscount = 0;
 
         for (const item of items) {
             const productName = item.productName || item.name;
@@ -7876,15 +7891,24 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             let unitPrice = item.price || 0;
             let isCustom = item.isCustom || false;
 
-            // Server-side price verification: look up the chemical's sellPrice
+            // Server-side price verification: look up the chemical's pricing
             if (!isCustom && productName) {
                 const chemical = allChemicals.find(c =>
                     c.productName === productName ||
                     c.productName.toLowerCase() === productName.toLowerCase()
                 );
-                if (chemical && chemical.sellPrice) {
-                    // Use server-side sellPrice as the authoritative price
-                    unitPrice = chemical.sellPrice;
+                if (chemical) {
+                    if (discountType === 'at_cost') {
+                        unitPrice = chemical.costPrice || chemical.sellPrice;
+                    } else if (discountType === 'no_dist_margin') {
+                        unitPrice = chemical.adminPrice || chemical.sellPrice;
+                    } else {
+                        unitPrice = chemical.sellPrice;
+                    }
+                    // Track the discount amount
+                    if (discountType && chemical.sellPrice) {
+                        totalDiscount += (chemical.sellPrice - unitPrice) * qty;
+                    }
                 }
             }
 
@@ -7919,6 +7943,8 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             processingFee: calculatedFee,
             total: calculatedTotal,
             customerNotes: notes,
+            discount: Math.round(totalDiscount * 100) / 100,
+            discountReason: discountDescription || undefined,
             status: 'submitted',
             paymentMethod: paymentMethod,
             paymentStatus: paymentMethod === 'check' ? 'pending' : 'processing',

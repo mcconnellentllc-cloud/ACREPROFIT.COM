@@ -620,6 +620,12 @@
                         </div>
                     </div>
 
+                    <!-- Discount Code -->
+                    <div class="notes-section" style="margin-bottom: 16px;">
+                        <h3 class="section-title">Discount Code</h3>
+                        <input type="text" id="discountCode" placeholder="Enter code if applicable" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1rem;">
+                    </div>
+
                     <!-- Order Notes -->
                     <div class="notes-section">
                         <h3 class="section-title">Order Notes (optional)</h3>
@@ -958,7 +964,8 @@
                     customerEmail: email,
                     customerPhone: phone,
                     customerFarm: document.getElementById('customerFarm').value.trim(),
-                    notes: document.getElementById('orderNotes').value.trim()
+                    notes: document.getElementById('orderNotes').value.trim(),
+                    discountCode: document.getElementById('discountCode').value.trim()
                 };
 
                 // Include acting as customer data if admin is placing order for customer
