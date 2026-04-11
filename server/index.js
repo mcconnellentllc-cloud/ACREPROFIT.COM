@@ -2352,7 +2352,7 @@ async function seedJabcoInventory() {
                 epaRegistrationNumber: '89343-5',
                 signalWord: 'CAUTION',
                 notes: '5.4 lb/gal glyphosate - Xingfa USA',
-                activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }]
+                activeIngredients: [{ name: 'XSATE Glyphosate 53.8%', percentage: 53.8, poundsPerGallon: 5.4 }]
             });
             console.log('Created XSATE Glyphosate 53.8% product');
         } else {
@@ -2988,7 +2988,7 @@ const sprayPrograms = {
             name: '2-Pass Corn Program',
             description: 'Pre-emergent + Post-emergent application',
             chemicals: [
-                { name: 'Glyphosate', defaultRate: 32, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'XSATE Glyphosate 53.8%', defaultRate: 32, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: 'Atrazine 4L', defaultRate: 1.5, rateUnit: 'qt/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: 'Metolachlor', defaultRate: 1.3, rateUnit: 'pt/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 }
             ]
@@ -2997,7 +2997,7 @@ const sprayPrograms = {
             name: '3-Pass Corn Program',
             description: 'Burndown + Pre-emergent + Post-emergent application',
             chemicals: [
-                { name: 'Glyphosate', defaultRate: 32, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'XSATE Glyphosate 53.8%', defaultRate: 32, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: 'Atrazine 4L', defaultRate: 2, rateUnit: 'qt/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: 'Metolachlor', defaultRate: 1.5, rateUnit: 'pt/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: '2,4-D Amine', defaultRate: 1, rateUnit: 'pt/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 }
@@ -3009,7 +3009,7 @@ const sprayPrograms = {
             name: '2-Pass Soybean Program',
             description: 'Pre-emergent + Post-emergent application',
             chemicals: [
-                { name: 'Glyphosate', defaultRate: 32, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'XSATE Glyphosate 53.8%', defaultRate: 32, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: 'Metribuzin', defaultRate: 0.5, rateUnit: 'lb/acre', packageSize: 50, packageUnit: 'lb', pricePerPackage: 0 }
             ]
         }
@@ -3019,21 +3019,21 @@ const sprayPrograms = {
             name: 'Option 1 - Corn Preplant',
             description: '30 days pre-plant - wheat stubble with atrazine & valor',
             chemicals: [
-                { name: 'Glyphosate', defaultRate: 22, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
-                { name: 'Valor SX', defaultRate: 3, rateUnit: 'oz/acre', packageSize: 5, packageUnit: 'lb', pricePerPackage: 0 },
+                { name: 'XSATE Glyphosate 53.8%', defaultRate: 22, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Flumioxazin 51% WDG', defaultRate: 3, rateUnit: 'oz/acre', packageSize: 5, packageUnit: 'lb', pricePerPackage: 0 },
                 { name: 'Atrazine 4L', defaultRate: 1, rateUnit: 'lb/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
-                { name: 'Hydrovant', defaultRate: 0.1, rateUnit: '% v/v', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0, isAdjuvant: true }
+                { name: 'Hydrovant fA', defaultRate: 0.1, rateUnit: '% v/v', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0, isAdjuvant: true }
             ]
         },
         'post-plant-pre-emerge': {
             name: 'Option 2 - Corn Post Plant Pre-Emerge',
             description: 'Post plant pre-emerge - fall atrazine already applied',
             chemicals: [
-                { name: 'Glyphosate', defaultRate: 22, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
-                { name: 'Mesotrione', defaultRate: 6, rateUnit: 'oz/acre', packageSize: 1, packageUnit: 'gal', pricePerPackage: 0 },
-                { name: 'Dicamba DMA', defaultRate: 4, rateUnit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'XSATE Glyphosate 53.8%', defaultRate: 22, rateUnit: 'oz/acre', packageSize: 250, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Meso 4SC', defaultRate: 6, rateUnit: 'oz/acre', packageSize: 1, packageUnit: 'gal', pricePerPackage: 0 },
+                { name: 'Dicamba 49.8% SL', defaultRate: 4, rateUnit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0 },
                 { name: 'Anthem Max', defaultRate: 3, rateUnit: 'oz/acre', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0 },
-                { name: 'Hydrovant', defaultRate: 0.1, rateUnit: '% v/v', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0, isAdjuvant: true }
+                { name: 'Hydrovant fA', defaultRate: 0.1, rateUnit: '% v/v', packageSize: 2.5, packageUnit: 'gal', pricePerPackage: 0, isAdjuvant: true }
             ]
         }
     }
@@ -5427,9 +5427,9 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
             { productName: 'Glyphosate 5.4', packSize: 'Tote', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminMarginDollars: 0.07, adminPrice: 13.32, marginDollars: 0.77, sellPrice: 14.09, category: 'herbicide', notes: '5.4 lb/gal glyphosate' },
 
             // XSATE Glyphosate 53.8% - Xingfa USA via Jabco (EPA 89343-5) - $13.25/gal cost, $16/gal retail
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
-            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'Glyphosate', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'XSATE Glyphosate 53.8%', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '30 gal', unit: 'gal', unitsPerPack: 30, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'XSATE Glyphosate 53.8%', percentage: 53.8, poundsPerGallon: 5.4 }] },
+            { productName: 'XSATE Glyphosate 53.8%', packSize: '2.5 gal', unit: 'gal', unitsPerPack: 2.5, costPrice: 13.25, adminMarginDollars: 1.25, adminPrice: 14.50, marginDollars: 1.50, sellPrice: 16.00, category: 'herbicide', sourceSupplier: 'Jabco', epaRegistrationNumber: '89343-5', signalWord: 'CAUTION', notes: '5.4 lb/gal glyphosate - Xingfa USA', activeIngredients: [{ name: 'XSATE Glyphosate 53.8%', percentage: 53.8, poundsPerGallon: 5.4 }] },
 
             // Atrazine
             { productName: 'Aatrex', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 13.35, sellPrice: 0, category: 'herbicide' },
