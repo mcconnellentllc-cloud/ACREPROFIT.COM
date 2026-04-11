@@ -13729,13 +13729,13 @@ connectDB().then(async () => {
                 await createLedgerEntry({
                     representativeId: ty._id,
                     description: 'JABCO products transferred to Ty for distribution',
-                    amount: 61110.00,
+                    amount: 59280.00,
                     type: 'debit',
                     category: 'adjustment',
                     referenceType: 'Manual',
-                    notes: 'Rancor 4F $8,190 + Meso 4SC $16,470 + Flumi WDG $10,080 + Sulfentrazone $12,870 + Hydrovant fA 180gal $13,500 = $61,110'
+                    notes: 'Rancor 4F $8,190 + Meso 4SC 320gal $14,640 + Flumi WDG $10,080 + Sulfentrazone $12,870 + Hydrovant fA 180gal $13,500 = $59,280'
                 });
-                console.log('Ledger: Ty debited $61,110 for JABCO products received');
+                console.log('Ledger: Ty debited $59,280 for JABCO products received');
             }
 
             // AP owes Ty for 6 shuttles Atrazine @ $12.57/gal = $19,986.30
@@ -13768,7 +13768,7 @@ connectDB().then(async () => {
         if (kyle && ty) {
             // Kyle's JABCO inventory - correct quantities
             const kyleProducts = [
-                { name: /meso 4sc/i, qty: 180, owner: kyle._id },
+                { name: /meso 4sc/i, qty: 320, owner: kyle._id },
                 { name: /xsate/i, qty: 4240, owner: kyle._id },
                 { name: /dicamba 49/i, qty: 180, owner: kyle._id },
                 { name: /defy lv/i, qty: 180, owner: kyle._id },
@@ -13778,7 +13778,7 @@ connectDB().then(async () => {
             // Ty's JABCO products (transferred from Kyle)
             const tyJabcoProducts = [
                 { name: /rancor/i, qty: 180, owner: ty._id },
-                { name: /meso 4sc/i, qty: 360, owner: ty._id },
+                { name: /meso 4sc/i, qty: 320, owner: ty._id },
                 { name: /flumioxazin/i, qty: 720, owner: ty._id },
                 { name: /sulfentrazone/i, qty: 180, owner: ty._id },
                 { name: /hydrovant/i, qty: 180, owner: ty._id },
