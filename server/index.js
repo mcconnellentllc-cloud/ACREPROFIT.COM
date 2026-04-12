@@ -14253,8 +14253,8 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
 
         if (kyle && ty) {
-            // Check if clean ledger already set up
-            const cleanMarker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO inventory' });
+            // Check if clean ledger already set up (v2 - corrected totals)
+            const cleanMarker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO SO# 2129' });
             if (!cleanMarker) {
                 // Wipe all old seed ledger entries
                 await LedgerEntry.deleteMany({});
@@ -14272,15 +14272,15 @@ connectDB().then(async () => {
                     notes: 'JABCO-2119: XSATE Glyphosate 53.8% - 4,240 gal @ $13.25/gal'
                 });
 
-                // JABCO Invoice 1622: $84,807
+                // JABCO Invoice 1622 SO# 2129: $76,617 (5 products, NOT including Rancor SO# 2131)
                 await createLedgerEntry({
                     representativeId: kyle._id,
-                    description: 'Loan: Kyle McConnell funded JABCO Invoice 1622',
-                    amount: 84807.00,
+                    description: 'Loan: Kyle McConnell funded JABCO SO# 2129',
+                    amount: 76617.00,
                     type: 'credit',
                     category: 'supplier_payment',
                     referenceType: 'Manual',
-                    notes: 'Meso 4SC 720gal $32,940 + Flumi WDG 1,440lb $20,160 + Sulfentrazone 180gal $12,870 + Dicamba 180gal $5,445 + Defy LV-6 180gal $5,202 + Rancor 4F 180gal $8,190'
+                    notes: 'Meso 4SC 720gal $32,940 + Flumi WDG 1,440lb $20,160 + Sulfentrazone 180gal $12,870 + Dicamba 180gal $5,445 + Defy LV-6 180gal $5,202 = $76,617'
                 });
 
                 // Hydrovant: $27,000
