@@ -14317,8 +14317,35 @@ connectDB().then(async () => {
                     notes: 'Atrazine 4L - 4,240 gal @ $12.50/gal'
                 });
 
-                console.log('Clean ledger created: Kyle loaned $167,987, Ty loaned $146,445');
+                console.log('Clean ledger created: Kyle loaned $159,797, Ty loaned $146,445');
             }
+        }
+
+        // Create JABCO vendor account and track unpaid Rancor 4F invoice
+        let jabcoVendor = await User.findOne({ email: 'vendor-jabco@acreprofit.com' });
+        if (!jabcoVendor) {
+            jabcoVendor = await User.create({
+                name: 'JABCO (Supplier)',
+                email: 'vendor-jabco@acreprofit.com',
+                role: 'distributor',
+                isVendor: true,
+                password: 'VENDOR_ACCOUNT_NO_LOGIN_' + Date.now()
+            });
+            console.log('Created JABCO vendor account for AP payables tracking');
+        }
+
+        const jabcoRancorEntry = await LedgerEntry.findOne({ description: 'Unpaid: JABCO SO# 2131 (Rancor 4F)' });
+        if (!jabcoRancorEntry && jabcoVendor) {
+            await createLedgerEntry({
+                representativeId: jabcoVendor._id,
+                description: 'Unpaid: JABCO SO# 2131 (Rancor 4F)',
+                amount: 8190.00,
+                type: 'credit',
+                category: 'supplier_payment',
+                referenceType: 'Manual',
+                notes: 'Rancor 4F (Metribuzin 4F) - 180 gal @ $45.50/gal. AP owes JABCO - check needs to be sent.'
+            });
+            console.log('Ledger: AP owes JABCO $8,190 for Rancor 4F SO# 2131');
         }
     } catch (e) { console.error('Clean ledger setup error:', e.message); }
 
