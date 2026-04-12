@@ -14254,9 +14254,9 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
 
         if (kyle && ty) {
-            // Check if clean ledger already set up (v5 - product line by line)
-            const cleanV5Marker = await LedgerEntry.findOne({ description: { $regex: /^\(v5\) / } });
-            if (!cleanV5Marker) {
+            // Check if clean ledger already set up (v6 - product line + transfers both ways)
+            const cleanV6Marker = await LedgerEntry.findOne({ description: { $regex: /^\(v5\) Transfer OUT:.*to Kyle$/ } });
+            if (!cleanV6Marker) {
                 // Wipe all old seed ledger entries
                 await LedgerEntry.deleteMany({});
                 console.log('Cleared old ledger entries for v5 product-line rebuild');
@@ -14344,6 +14344,36 @@ connectDB().then(async () => {
                 }
 
                 console.log(`v5 inventory transfers: ${transfersKyleToTy.length} Kyle→Ty transfers, $61,110 total (mirrored entries on both ledgers)`);
+
+                // Transfer from Ty's stock to Kyle: 1,590 gal Atrazine 4L @ $12.57
+                const transfersTyToKyle = [
+                    { product: 'Atrazine 4L', qty: 1590, unit: 'gal', cost: 12.57, amount: 19986.30 }
+                ];
+
+                for (const t of transfersTyToKyle) {
+                    // Ty's side: gave up inventory to Kyle
+                    await createLedgerEntry({
+                        representativeId: ty._id,
+                        description: `(v5) Transfer OUT: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} to Kyle`,
+                        amount: t.amount,
+                        type: 'debit',
+                        category: 'adjustment',
+                        referenceType: 'Manual',
+                        notes: `Product moved from Ty's location to Kyle | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit} | 6 shuttles`
+                    });
+                    // Kyle's side: received inventory, billed at cost
+                    await createLedgerEntry({
+                        representativeId: kyle._id,
+                        description: `(v5) Transfer IN: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} from Ty`,
+                        amount: t.amount,
+                        type: 'debit',
+                        category: 'adjustment',
+                        referenceType: 'Manual',
+                        notes: `Product moved from Ty's location to Kyle, billed at cost | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit} | 6 shuttles`
+                    });
+                }
+
+                console.log(`v5 Ty→Kyle transfers: ${transfersTyToKyle.length} transfer, $19,986.30 total`);
             }
         }
 
