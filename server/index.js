@@ -59,8 +59,9 @@ const connectDB = async () => {
             await backfillInventoryFromPOs();
             // Seed Hydrovant inventory (360 gal, paid by Kyle)
             await seedHydrovantInventory();
-            // Ensure correct ledger entries for all PO purchases
-            await seedPOLedgerEntries();
+            // NOTE: seedPOLedgerEntries() disabled - ledger entries now managed by
+            // the clean loan migration below (see "CLEAN LEDGER" section)
+            // await seedPOLedgerEntries();
             // Sync product catalog with inventory records
             await syncCatalogToInventory();
         } else {
@@ -14253,9 +14254,9 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
 
         if (kyle && ty) {
-            // Check if clean ledger already set up (v3 - Rancor 4F added back to Kyle)
-            const cleanMarker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO Invoice 1622' });
-            if (!cleanMarker) {
+            // Check if clean ledger already set up (v4 - duplicates removed, 3 entries per rep)
+            const cleanV4Marker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO Invoice 1622 (v4)' });
+            if (!cleanV4Marker) {
                 // Wipe all old seed ledger entries
                 await LedgerEntry.deleteMany({});
                 console.log('Cleared old ledger entries');
@@ -14275,7 +14276,7 @@ connectDB().then(async () => {
                 // JABCO Invoice 1622: $84,807 (SO# 2129 + SO# 2131 Rancor)
                 await createLedgerEntry({
                     representativeId: kyle._id,
-                    description: 'Loan: Kyle McConnell funded JABCO Invoice 1622',
+                    description: 'Loan: Kyle McConnell funded JABCO Invoice 1622 (v4)',
                     amount: 84807.00,
                     type: 'credit',
                     category: 'supplier_payment',
