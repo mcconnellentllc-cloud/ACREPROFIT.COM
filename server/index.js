@@ -14307,6 +14307,43 @@ connectDB().then(async () => {
                 }
 
                 console.log(`Clean v5 ledger: Kyle ${kyleProducts.length} product lines ($167,987), Ty ${tyProducts.length} product lines ($146,445)`);
+
+                // Inventory transfers from Kyle's stock to Ty
+                // Each transfer creates TWO mirror ledger entries:
+                //   - Kyle: Money Out (he gave up product, reduces what AP owes him)
+                //   - Ty: Money Out (he took product and was billed, reduces what AP owes him)
+                const transfersKyleToTy = [
+                    { product: 'Rancor 4F', qty: 180, unit: 'gal', cost: 45.50, amount: 8190.00 },
+                    { product: 'Flumioxazin 51% WDG', qty: 720, unit: 'lb', cost: 14.00, amount: 10080.00 },
+                    { product: 'Meso 4SC', qty: 360, unit: 'gal', cost: 45.75, amount: 16470.00 },
+                    { product: 'Sulfentrazone 39.6% SC', qty: 180, unit: 'gal', cost: 71.50, amount: 12870.00 },
+                    { product: 'Hydrovant fA', qty: 180, unit: 'gal', cost: 75.00, amount: 13500.00 }
+                ];
+
+                for (const t of transfersKyleToTy) {
+                    // Kyle's side: he gave up inventory to Ty, so AP's debt to Kyle goes down
+                    await createLedgerEntry({
+                        representativeId: kyle._id,
+                        description: `(v5) Transfer OUT: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} to Ty`,
+                        amount: t.amount,
+                        type: 'debit',
+                        category: 'adjustment',
+                        referenceType: 'Manual',
+                        notes: `Product moved from Kyle's location to Ty | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit}`
+                    });
+                    // Ty's side: he received inventory from Kyle, so AP's debt to Ty goes down (billed at cost)
+                    await createLedgerEntry({
+                        representativeId: ty._id,
+                        description: `(v5) Transfer IN: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} from Kyle`,
+                        amount: t.amount,
+                        type: 'debit',
+                        category: 'adjustment',
+                        referenceType: 'Manual',
+                        notes: `Product moved from Kyle's location to Ty, billed at cost | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit}`
+                    });
+                }
+
+                console.log(`v5 inventory transfers: ${transfersKyleToTy.length} Kyle→Ty transfers, $61,110 total (mirrored entries on both ledgers)`);
             }
         }
 
