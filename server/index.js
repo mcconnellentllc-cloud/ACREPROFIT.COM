@@ -14253,8 +14253,8 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
 
         if (kyle && ty) {
-            // Check if clean ledger already set up (v2 - corrected totals)
-            const cleanMarker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO SO# 2129' });
+            // Check if clean ledger already set up (v3 - Rancor 4F added back to Kyle)
+            const cleanMarker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO Invoice 1622' });
             if (!cleanMarker) {
                 // Wipe all old seed ledger entries
                 await LedgerEntry.deleteMany({});
@@ -14272,15 +14272,15 @@ connectDB().then(async () => {
                     notes: 'JABCO-2119: XSATE Glyphosate 53.8% - 4,240 gal @ $13.25/gal'
                 });
 
-                // JABCO Invoice 1622 SO# 2129: $76,617 (5 products, NOT including Rancor SO# 2131)
+                // JABCO Invoice 1622: $84,807 (SO# 2129 + SO# 2131 Rancor)
                 await createLedgerEntry({
                     representativeId: kyle._id,
-                    description: 'Loan: Kyle McConnell funded JABCO SO# 2129',
-                    amount: 76617.00,
+                    description: 'Loan: Kyle McConnell funded JABCO Invoice 1622',
+                    amount: 84807.00,
                     type: 'credit',
                     category: 'supplier_payment',
                     referenceType: 'Manual',
-                    notes: 'Meso 4SC 720gal $32,940 + Flumi WDG 1,440lb $20,160 + Sulfentrazone 180gal $12,870 + Dicamba 180gal $5,445 + Defy LV-6 180gal $5,202 = $76,617'
+                    notes: 'Meso 4SC 720gal $32,940 + Flumi WDG 1,440lb $20,160 + Sulfentrazone 180gal $12,870 + Dicamba 180gal $5,445 + Defy LV-6 180gal $5,202 + Rancor 4F 180gal $8,190 = $84,807'
                 });
 
                 // Hydrovant: $27,000
@@ -14317,35 +14317,14 @@ connectDB().then(async () => {
                     notes: 'Atrazine 4L - 4,240 gal @ $12.50/gal'
                 });
 
-                console.log('Clean ledger created: Kyle loaned $159,797, Ty loaned $146,445');
+                console.log('Clean ledger created: Kyle loaned $167,987, Ty loaned $146,445');
             }
         }
 
-        // Create JABCO vendor account and track unpaid Rancor 4F invoice
-        let jabcoVendor = await User.findOne({ email: 'vendor-jabco@acreprofit.com' });
-        if (!jabcoVendor) {
-            jabcoVendor = await User.create({
-                name: 'JABCO (Supplier)',
-                email: 'vendor-jabco@acreprofit.com',
-                role: 'distributor',
-                isVendor: true,
-                password: 'VENDOR_ACCOUNT_NO_LOGIN_' + Date.now()
-            });
-            console.log('Created JABCO vendor account for AP payables tracking');
-        }
-
-        const jabcoRancorEntry = await LedgerEntry.findOne({ description: 'Unpaid: JABCO SO# 2131 (Rancor 4F)' });
-        if (!jabcoRancorEntry && jabcoVendor) {
-            await createLedgerEntry({
-                representativeId: jabcoVendor._id,
-                description: 'Unpaid: JABCO SO# 2131 (Rancor 4F)',
-                amount: 8190.00,
-                type: 'credit',
-                category: 'supplier_payment',
-                referenceType: 'Manual',
-                notes: 'Rancor 4F (Metribuzin 4F) - 180 gal @ $45.50/gal. AP owes JABCO - check needs to be sent.'
-            });
-            console.log('Ledger: AP owes JABCO $8,190 for Rancor 4F SO# 2131');
+        // Clean up any stale JABCO vendor entries from previous version
+        const jabcoVendor = await User.findOne({ email: 'vendor-jabco@acreprofit.com' });
+        if (jabcoVendor) {
+            await LedgerEntry.deleteMany({ representativeId: jabcoVendor._id });
         }
     } catch (e) { console.error('Clean ledger setup error:', e.message); }
 
