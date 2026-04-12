@@ -14254,71 +14254,59 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
 
         if (kyle && ty) {
-            // Check if clean ledger already set up (v4 - duplicates removed, 3 entries per rep)
-            const cleanV4Marker = await LedgerEntry.findOne({ description: 'Loan: Kyle McConnell funded JABCO Invoice 1622 (v4)' });
-            if (!cleanV4Marker) {
+            // Check if clean ledger already set up (v5 - product line by line)
+            const cleanV5Marker = await LedgerEntry.findOne({ description: { $regex: /^\(v5\) / } });
+            if (!cleanV5Marker) {
                 // Wipe all old seed ledger entries
                 await LedgerEntry.deleteMany({});
-                console.log('Cleared old ledger entries');
+                console.log('Cleared old ledger entries for v5 product-line rebuild');
 
-                // Kyle's loan to AP: $167,987
-                // JABCO-2119 XSATE: $56,180
-                await createLedgerEntry({
-                    representativeId: kyle._id,
-                    description: 'Loan: Kyle McConnell funded JABCO inventory',
-                    amount: 56180.00,
-                    type: 'credit',
-                    category: 'supplier_payment',
-                    referenceType: 'Manual',
-                    notes: 'JABCO-2119: XSATE Glyphosate 53.8% - 4,240 gal @ $13.25/gal'
-                });
+                // Kyle's loans - ONE LINE PER PRODUCT - total $167,987
+                const kyleProducts = [
+                    { product: 'XSATE Glyphosate 53.8%', qty: 4240, unit: 'gal', cost: 13.25, amount: 56180.00, po: 'JABCO-2119' },
+                    { product: 'Meso 4SC', qty: 720, unit: 'gal', cost: 45.75, amount: 32940.00, po: 'JABCO SO# 2129' },
+                    { product: 'Flumioxazin 51% WDG', qty: 1440, unit: 'lb', cost: 14.00, amount: 20160.00, po: 'JABCO SO# 2129' },
+                    { product: 'Sulfentrazone 39.6% SC', qty: 180, unit: 'gal', cost: 71.50, amount: 12870.00, po: 'JABCO SO# 2129' },
+                    { product: 'Dicamba 49.8% SL', qty: 180, unit: 'gal', cost: 30.25, amount: 5445.00, po: 'JABCO SO# 2129' },
+                    { product: 'Defy LV-6', qty: 180, unit: 'gal', cost: 28.90, amount: 5202.00, po: 'JABCO SO# 2129' },
+                    { product: 'Rancor 4F', qty: 180, unit: 'gal', cost: 45.50, amount: 8190.00, po: 'JABCO SO# 2131' },
+                    { product: 'Hydrovant fA', qty: 360, unit: 'gal', cost: 75.00, amount: 27000.00, po: 'Direct purchase' }
+                ];
 
-                // JABCO Invoice 1622: $84,807 (SO# 2129 + SO# 2131 Rancor)
-                await createLedgerEntry({
-                    representativeId: kyle._id,
-                    description: 'Loan: Kyle McConnell funded JABCO Invoice 1622 (v4)',
-                    amount: 84807.00,
-                    type: 'credit',
-                    category: 'supplier_payment',
-                    referenceType: 'Manual',
-                    notes: 'Meso 4SC 720gal $32,940 + Flumi WDG 1,440lb $20,160 + Sulfentrazone 180gal $12,870 + Dicamba 180gal $5,445 + Defy LV-6 180gal $5,202 + Rancor 4F 180gal $8,190 = $84,807'
-                });
+                for (const p of kyleProducts) {
+                    await createLedgerEntry({
+                        representativeId: kyle._id,
+                        description: `(v5) ${p.product} - ${p.qty.toLocaleString()} ${p.unit}`,
+                        amount: p.amount,
+                        type: 'credit',
+                        category: 'supplier_payment',
+                        referenceType: 'Manual',
+                        notes: `${p.po} | ${p.qty.toLocaleString()} ${p.unit} @ $${p.cost.toFixed(2)}/${p.unit} | Kyle funded`
+                    });
+                }
 
-                // Hydrovant: $27,000
-                await createLedgerEntry({
-                    representativeId: kyle._id,
-                    description: 'Loan: Kyle McConnell funded Hydrovant fA purchase',
-                    amount: 27000.00,
-                    type: 'credit',
-                    category: 'supplier_payment',
-                    referenceType: 'Manual',
-                    notes: 'Hydrovant fA - 360 gal @ $75.00/gal (direct purchase)'
-                });
+                // Ty's loans - ONE LINE PER PRODUCT - total $146,445
+                const tyProducts = [
+                    { product: 'Atrazine 4L', qty: 4240, unit: 'gal', cost: 12.50, amount: 53000.00, po: 'Sims #103849' },
+                    { product: 'Dicamba DMA (Tigris)', qty: 1060, unit: 'gal', cost: 25.50, amount: 27030.00, po: 'Sims #103850' },
+                    { product: 'LV6 De-Ester (Drexel)', qty: 1060, unit: 'gal', cost: 22.75, amount: 24115.00, po: 'Sims #103850' },
+                    { product: 'Anthem NXT', qty: 90, unit: 'gal', cost: 430.00, amount: 38700.00, po: 'Sims #103850' },
+                    { product: 'Mivum', qty: 1600, unit: 'oz', cost: 2.25, amount: 3600.00, po: 'Sims #103850' }
+                ];
 
-                // Ty's loan to AP: $146,445
-                // Sims #103850: $93,445
-                await createLedgerEntry({
-                    representativeId: ty._id,
-                    description: 'Loan: Ty Mollohan funded Sims #103850',
-                    amount: 93445.00,
-                    type: 'credit',
-                    category: 'supplier_payment',
-                    referenceType: 'Manual',
-                    notes: 'Dicamba Tigris 1,060gal $27,030 + LV6 De-Ester 1,060gal $24,115 + Anthem NXT 90gal $38,700 + Mivum 1,600oz $3,600'
-                });
+                for (const p of tyProducts) {
+                    await createLedgerEntry({
+                        representativeId: ty._id,
+                        description: `(v5) ${p.product} - ${p.qty.toLocaleString()} ${p.unit}`,
+                        amount: p.amount,
+                        type: 'credit',
+                        category: 'supplier_payment',
+                        referenceType: 'Manual',
+                        notes: `${p.po} | ${p.qty.toLocaleString()} ${p.unit} @ $${p.cost.toFixed(2)}/${p.unit} | Ty funded`
+                    });
+                }
 
-                // Sims #103849: $53,000
-                await createLedgerEntry({
-                    representativeId: ty._id,
-                    description: 'Loan: Ty Mollohan funded Sims #103849',
-                    amount: 53000.00,
-                    type: 'credit',
-                    category: 'supplier_payment',
-                    referenceType: 'Manual',
-                    notes: 'Atrazine 4L - 4,240 gal @ $12.50/gal'
-                });
-
-                console.log('Clean ledger created: Kyle loaned $167,987, Ty loaned $146,445');
+                console.log(`Clean v5 ledger: Kyle ${kyleProducts.length} product lines ($167,987), Ty ${tyProducts.length} product lines ($146,445)`);
             }
         }
 
