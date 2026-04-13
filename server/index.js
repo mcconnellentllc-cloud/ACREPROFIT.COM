@@ -940,6 +940,15 @@ const chemicalOrderSchema = new mongoose.Schema({
     receivedAt: Date,
     deliveredAt: Date,
 
+    // Spray application parameters (from Build a Recipe)
+    sprayParams: {
+        gallonsPerAcre: Number,
+        nozzlePressure: Number, // PSI
+        nozzleType: String,     // e.g., AIXR, TTI, XR
+        crop: String,
+        acres: Number
+    },
+
     // Notes
     customerNotes: String,
     internalNotes: String,
@@ -7988,7 +7997,7 @@ app.put('/api/admin/chemicals/:chemicalId/link-supplier/:supplierId', authMiddle
 // Create chemical order (customer)
 app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
-        const { items, programId, programName, totalAcres, customerNotes } = req.body;
+        const { items, programId, programName, totalAcres, customerNotes, sprayParams } = req.body;
 
         // Calculate totals
         let subtotal = 0;
@@ -8023,10 +8032,11 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             items: orderItems,
             programId,
             programName,
-            totalAcres,
+            totalAcres: totalAcres || sprayParams?.acres,
             subtotal,
             total: subtotal,
             customerNotes,
+            sprayParams,
             status: 'draft'
         });
 
