@@ -5078,15 +5078,69 @@ app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
+        // Commissions earned by distributors (marginDollars × qty on paid orders)
+        const commissionsByRep = await Order.aggregate([
+            { $match: { status: { $in: paidStatuses }, repCommission: { $gt: 0 } } },
+            { $group: { _id: '$representativeId', total: { $sum: '$repCommission' } } }
+        ]);
+
+        // Admin margin accumulated (adminMarginDollars × qty on paid orders)
+        const adminRevenue = await Order.aggregate([
+            { $match: { status: { $in: paidStatuses }, adminRevenue: { $gt: 0 } } },
+            { $group: { _id: null, total: { $sum: '$adminRevenue' } } }
+        ]);
+
+        // Commissions paid out (category = commission, debit type)
+        const commissionsPaid = await LedgerEntry.aggregate([
+            { $match: { category: 'commission', type: 'debit' } },
+            { $group: { _id: '$representativeId', total: { $sum: '$amount' } } }
+        ]);
+        const commissionsPaidMap = {};
+        commissionsPaid.forEach(c => { if (c._id) commissionsPaidMap[c._id.toString()] = c.total; });
+
+        // Admin margin withdrawn (category = admin_withdrawal or similar)
+        const adminWithdrawn = await LedgerEntry.aggregate([
+            { $match: { category: 'admin_withdrawal', type: 'debit' } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+
+        // Build commission owed per rep
+        const repIds = commissionsByRep.map(c => c._id).filter(Boolean);
+        const reps = await User.find({ _id: { $in: repIds } }).select('name email');
+        const repMap = {};
+        reps.forEach(r => { repMap[r._id.toString()] = r.name; });
+
+        const commissionsOwed = commissionsByRep.map(c => {
+            const earned = c.total || 0;
+            const paid = commissionsPaidMap[c._id?.toString()] || 0;
+            return {
+                repId: c._id,
+                repName: repMap[c._id?.toString()] || 'Unknown',
+                earned,
+                paid,
+                owed: earned - paid
+            };
+        }).filter(c => c.owed > 0);
+
+        const totalCommissionsOwed = commissionsOwed.reduce((sum, c) => sum + c.owed, 0);
+        const adminMarginEarned = adminRevenue[0]?.total || 0;
+        const adminMarginWithdrawn = adminWithdrawn[0]?.total || 0;
+        const adminMarginBanked = adminMarginEarned - adminMarginWithdrawn;
+
         const customerPaymentsIn = (chemOrderSales[0]?.total || 0) + (orderSales[0]?.total || 0);
         const paidOutToDistributors = checksWritten[0]?.total || 0;
-        const cashInBank = customerPaymentsIn - paidOutToDistributors;
+        const cashInBank = customerPaymentsIn - paidOutToDistributors - (commissionsPaid.reduce((s, c) => s + c.total, 0)) - adminMarginWithdrawn;
 
         res.json({
             totalSales: customerPaymentsIn,
             cashInBank,
             paidOutToDistributors,
-            customerPaymentsIn
+            customerPaymentsIn,
+            commissionsOwed,
+            totalCommissionsOwed,
+            adminMarginEarned,
+            adminMarginWithdrawn,
+            adminMarginBanked
         });
     } catch (error) {
         res.status(400).json({ error: error.message });

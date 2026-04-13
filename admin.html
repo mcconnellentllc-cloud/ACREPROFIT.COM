@@ -6310,8 +6310,9 @@
                 return s.balance < 0 ? sum + Math.abs(s.balance) : sum;
             }, 0);
 
-            // Fetch cash position
+            // Fetch cash position + commissions + admin margin
             let cashInBank = 0, customerPaymentsIn = 0, paidOutToDistributors = 0;
+            let commissionsOwed = [], totalCommissionsOwed = 0, adminMarginBanked = 0, adminMarginEarned = 0;
             try {
                 const res = await fetch(`${API_URL}/api/admin/stats/sales-total`, {
                     headers: { 'Authorization': `Bearer ${token}` }
@@ -6321,13 +6322,20 @@
                     cashInBank = data.cashInBank || 0;
                     customerPaymentsIn = data.customerPaymentsIn || 0;
                     paidOutToDistributors = data.paidOutToDistributors || 0;
+                    commissionsOwed = data.commissionsOwed || [];
+                    totalCommissionsOwed = data.totalCommissionsOwed || 0;
+                    adminMarginBanked = data.adminMarginBanked || 0;
+                    adminMarginEarned = data.adminMarginEarned || 0;
                 }
             } catch (e) { /* ignore, default to 0 */ }
 
-            // Available to pay = min of cash on hand and remaining debt
             const canPayNow = Math.min(cashInBank, totalApDebt);
 
-            // Top summary: Total AP Debt + Cash in Bank + Available to Pay
+            // Build commissions tooltip
+            const commissionsDetail = commissionsOwed.length > 0
+                ? commissionsOwed.map(c => `${c.repName.split(' ')[0]}: $${c.owed.toLocaleString('en-US', {minimumFractionDigits: 2})}`).join(' | ')
+                : 'No unpaid commissions';
+
             document.getElementById('ledgerTopSummary').innerHTML = `
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #dc2626;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">TOTAL AP DEBT</div>
@@ -6342,7 +6350,17 @@
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #2563eb;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">AVAILABLE TO PAY</div>
                     <div style="font-size: 2rem; font-weight: 800; color: #2563eb;">$${canPayNow.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
-                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Ready to write checks to distributors</div>
+                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Ready for checks to distributors</div>
+                </div>
+                <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #d97706;">
+                    <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">COMMISSIONS OWED</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #d97706;">$${totalCommissionsOwed.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">${commissionsDetail}</div>
+                </div>
+                <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #7c3aed;">
+                    <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">ADMIN MARGIN BANKED</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #7c3aed;">$${adminMarginBanked.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Acre Profit's retained earnings</div>
                 </div>
             `;
 
