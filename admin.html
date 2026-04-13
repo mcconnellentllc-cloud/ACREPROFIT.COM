@@ -4001,6 +4001,33 @@
         }
 
         // Render customers grid
+        async function resetCustomerPassword(userId, email) {
+            const newPassword = prompt(`Reset password for ${email}.\n\nEnter new password (minimum 6 characters):`);
+            if (!newPassword) return;
+            if (newPassword.length < 6) {
+                alert('Password must be at least 6 characters');
+                return;
+            }
+            try {
+                const res = await fetch(`${API_URL}/api/admin/users/${userId}/reset-password`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ newPassword })
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    alert(`Password reset successfully for ${email}`);
+                } else {
+                    alert('Error: ' + (data.error || 'Failed to reset password'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
         function renderCustomers(customers) {
             document.getElementById('customersGrid').innerHTML = customers.length ? customers.map(c => `
                 <div class="customer-card" data-customer-id="${c._id}">
@@ -4016,6 +4043,7 @@
                     </div>
                     <div class="customer-actions">
                         <button class="btn btn-sm btn-outline" onclick="viewCustomer('${c._id}')">View Details</button>
+                        <button class="btn btn-sm btn-outline" onclick="resetCustomerPassword('${c._id}', '${c.email}')" style="color:#d97706; border-color:#d97706;">Reset Password</button>
                         <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${c.name.replace(/'/g, "\\'")}')">Place Order</button>
                     </div>
                 </div>
