@@ -73,6 +73,7 @@
                     </div>
 
                     <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
+                    <span id="auditLogNav" style="display: none;"><a href="#audit-log" class="admin-tab" data-tab="audit-log">Audit Log</a></span>
                 </div>
                 <button class="admin-tabs-scroll-btn right" onclick="scrollTabs(200)" aria-label="Scroll tabs right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
@@ -1166,6 +1167,41 @@
                             </label>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Audit Log Tab (Superadmin only) -->
+            <div id="audit-logTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Audit Log</h2>
+                    <p class="tab-subtitle">Immutable record of sensitive actions: impersonation, price/margin changes, password resets, and ledger edits.</p>
+                    <div class="tab-header-actions">
+                        <select id="auditActionFilter" onchange="loadAuditLog()" style="padding:8px 12px; border:2px solid var(--border); border-radius:var(--radius);">
+                            <option value="">All Actions</option>
+                            <option value="order_placed_as_customer">Placed Order As Customer</option>
+                            <option value="price_change">Price Changes</option>
+                            <option value="margin_change">Margin Changes</option>
+                            <option value="password_reset">Password Resets</option>
+                            <option value="ledger_entry_edit">Ledger Edits</option>
+                            <option value="impersonation_start">Impersonation Starts</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="orders-table-wrapper">
+                    <table class="admin-table" style="font-size:0.85rem;">
+                        <thead>
+                            <tr>
+                                <th style="width:140px;">When</th>
+                                <th style="width:120px;">Action</th>
+                                <th>Who Did It</th>
+                                <th>Affected</th>
+                                <th>Details</th>
+                            </tr>
+                        </thead>
+                        <tbody id="auditLogTableBody">
+                            <tr><td colspan="5" class="loading">Loading audit log...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
 
@@ -3199,6 +3235,7 @@
 
         if (userData.role === 'superadmin') {
             setDisplay('repAppsNav', 'block');
+            setDisplay('auditLogNav', 'block');
             // Pricing tab removed - functionality merged into Products
             setDisplay('commissionsNav', 'block');
             setDisplay('inventoryNav', 'block');
@@ -3566,6 +3603,7 @@
             // Lazy-load tab data
             if (tabName === 'products' && allProducts.length === 0) loadProducts();
             if (tabName === 'ledger') loadLedger();
+            if (tabName === 'audit-log') loadAuditLog();
             if (tabName === 'purchase-orders') loadPurchaseOrders();
             if (tabName === 'compliance') loadComplianceDashboard();
             if (tabName === 'inventory') loadInventory();
@@ -3850,6 +3888,68 @@
         }
 
         // Load dashboard reminders (superadmin only)
+        async function loadAuditLog() {
+            const tbody = document.getElementById('auditLogTableBody');
+            if (!tbody) return;
+            try {
+                const action = document.getElementById('auditActionFilter')?.value || '';
+                const url = `${API_URL}/api/admin/audit-log${action ? '?action=' + action : ''}`;
+                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty">Error loading audit log</td></tr>';
+                    return;
+                }
+                const entries = await res.json();
+                if (!entries.length) {
+                    tbody.innerHTML = '<tr><td colspan="5" class="empty">No audit entries yet</td></tr>';
+                    return;
+                }
+                const actionLabels = {
+                    order_placed_as_customer: 'Order As Customer',
+                    price_change: 'Price Change',
+                    margin_change: 'Margin Change',
+                    password_reset: 'Password Reset',
+                    ledger_entry_edit: 'Ledger Edit',
+                    impersonation_start: 'Impersonation',
+                    cash_deposit: 'Cash Deposit',
+                    check_written: 'Check Written',
+                    inventory_adjustment: 'Inventory Adj',
+                    customer_created: 'Customer Created',
+                    role_change: 'Role Change'
+                };
+                tbody.innerHTML = entries.map(e => {
+                    const actor = e.performedBy?.name || e.performedByName || 'Unknown';
+                    const actorRole = e.performedByRole || '';
+                    const target = e.targetUser?.name || e.targetUserName || '-';
+                    let details = '';
+                    if (e.before && e.after) {
+                        const changes = [];
+                        Object.keys(e.after).forEach(k => {
+                            if (e.before[k] !== e.after[k]) {
+                                changes.push(`${k}: ${JSON.stringify(e.before[k])} → ${JSON.stringify(e.after[k])}`);
+                            }
+                        });
+                        details = changes.join(', ');
+                    } else if (e.amount) {
+                        details = `$${e.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                    }
+                    if (e.reason) details = (details ? details + ' | ' : '') + e.reason;
+                    if (e.entityRef) details = (details ? details + ' | ' : '') + 'Ref: ' + e.entityRef;
+
+                    return `
+                    <tr>
+                        <td style="white-space:nowrap; font-size:0.8rem;">${new Date(e.createdAt).toLocaleString()}</td>
+                        <td><span style="background:#eff6ff; color:#1e40af; padding:2px 8px; border-radius:4px; font-size:0.75rem; font-weight:600;">${actionLabels[e.action] || e.action}</span></td>
+                        <td><strong>${actor}</strong>${actorRole ? `<br><small style="color:#666;">${actorRole}</small>` : ''}</td>
+                        <td>${target}</td>
+                        <td style="font-size:0.8rem; color:#666;">${details || '-'}</td>
+                    </tr>`;
+                }).join('');
+            } catch (e) {
+                tbody.innerHTML = '<tr><td colspan="5" class="empty">Error: ' + e.message + '</td></tr>';
+            }
+        }
+
         async function loadDashboardReminders() {
             if (userData.role !== 'superadmin') return;
 
