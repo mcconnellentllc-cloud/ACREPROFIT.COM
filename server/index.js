@@ -3742,6 +3742,17 @@ app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res)
         }
         user.password = newPassword;
         await user.save();
+
+        await logAudit({
+            action: 'password_reset',
+            req,
+            targetUser: user._id,
+            targetUserName: user.name,
+            entityType: 'User',
+            entityId: user._id,
+            reason: `Password reset by ${req.user.name} (${req.user.role})`
+        });
+
         res.json({ message: `Password reset for ${user.email}` });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -5222,6 +5233,29 @@ app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (
             adminMarginWithdrawn,
             adminMarginBanked
         });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Audit log (superadmin only - shows sensitive actions)
+app.get('/api/admin/audit-log', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Superadmin only' });
+        }
+        const { action, targetUser, entityType, limit = 200 } = req.query;
+        const query = {};
+        if (action) query.action = action;
+        if (targetUser) query.targetUser = targetUser;
+        if (entityType) query.entityType = entityType;
+
+        const entries = await AuditLog.find(query)
+            .populate('performedBy', 'name email role')
+            .populate('targetUser', 'name email')
+            .sort({ createdAt: -1 })
+            .limit(parseInt(limit));
+        res.json(entries);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
