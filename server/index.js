@@ -605,6 +605,185 @@ const chemicalPriceHistorySchema = new mongoose.Schema({
 
 const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
 
+// ============ AUDIT LOG MODEL ============
+// Immutable record of sensitive actions: impersonation, price changes, role changes, etc.
+const auditLogSchema = new mongoose.Schema({
+    action: {
+        type: String,
+        required: true,
+        enum: [
+            'impersonation_start',
+            'impersonation_end',
+            'order_placed_as_customer',
+            'price_change',
+            'margin_change',
+            'ledger_entry_edit',
+            'password_reset',
+            'role_change',
+            'customer_created',
+            'cash_deposit',
+            'check_written',
+            'inventory_adjustment',
+            'rup_block',
+            'license_change',
+            'login_failure'
+        ]
+    },
+    performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    performedByName: String,
+    performedByRole: String,
+    targetUser: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    targetUserName: String,
+    entityType: String,
+    entityId: mongoose.Schema.Types.ObjectId,
+    entityRef: String,
+    before: mongoose.Schema.Types.Mixed,
+    after: mongoose.Schema.Types.Mixed,
+    amount: Number,
+    reason: String,
+    ipAddress: String,
+    userAgent: String,
+    createdAt: { type: Date, default: Date.now, immutable: true }
+});
+auditLogSchema.index({ performedBy: 1, createdAt: -1 });
+auditLogSchema.index({ action: 1, createdAt: -1 });
+auditLogSchema.index({ targetUser: 1, createdAt: -1 });
+auditLogSchema.index({ entityType: 1, entityId: 1 });
+
+// Enforce createdAt immutability (per Grok Round 3 hardening)
+auditLogSchema.pre('save', function(next) {
+    if (!this.isNew && this.isModified('createdAt')) {
+        return next(new Error('AuditLog.createdAt is immutable'));
+    }
+    next();
+});
+// Block updates that would mutate an audit entry
+auditLogSchema.pre('findOneAndUpdate', function(next) {
+    const update = this.getUpdate() || {};
+    if (update.createdAt || (update.$set && update.$set.createdAt)) {
+        return next(new Error('AuditLog.createdAt is immutable'));
+    }
+    next();
+});
+
+const AuditLog = mongoose.model('AuditLog', auditLogSchema);
+
+// ============ RUP COMPLIANCE VALIDATOR ============
+// Validates that a customer has the required licenses/certifications
+// to purchase any restricted-use pesticide in their order.
+// Returns { ok: true } if all clear, or { ok: false, errors: [...] } if blocked.
+async function validateRupCompliance({ customer, items, allChemicals }) {
+    const errors = [];
+    const now = new Date();
+
+    // Helper: does the customer have a valid applicator license?
+    const hasValidApplicatorLicense = () => {
+        const priv = customer?.privateApplicatorLicense;
+        const comm = customer?.commercialApplicatorLicense;
+
+        const validPriv = priv?.hasLicense
+            && priv?.verificationStatus === 'verified'
+            && priv?.expirationDate
+            && new Date(priv.expirationDate) > now;
+
+        const validComm = comm?.hasLicense
+            && comm?.verificationStatus === 'verified'
+            && comm?.expirationDate
+            && new Date(comm.expirationDate) > now;
+
+        return validPriv || validComm;
+    };
+
+    const licenseExpDate = () => {
+        const priv = customer?.privateApplicatorLicense;
+        const comm = customer?.commercialApplicatorLicense;
+        if (priv?.hasLicense && priv?.expirationDate) return new Date(priv.expirationDate);
+        if (comm?.hasLicense && comm?.expirationDate) return new Date(comm.expirationDate);
+        return null;
+    };
+
+    const hasValidParaquatCert = () => {
+        const cert = customer?.paraquatCertification;
+        return cert?.completed && cert?.expirationDate && new Date(cert.expirationDate) > now;
+    };
+
+    const hasValidDicambaCert = () => {
+        const cert = customer?.dicambaCertification;
+        return cert?.completed && cert?.expirationDate && new Date(cert.expirationDate) > now;
+    };
+
+    for (const item of items) {
+        const productName = item.productName || item.name;
+        if (!productName) continue;
+
+        const chemical = allChemicals.find(c =>
+            c.productName === productName ||
+            c.productName?.toLowerCase() === productName.toLowerCase()
+        );
+        if (!chemical) continue;
+        if (!chemical.isRestrictedUse) continue;
+
+        // Restricted-use pesticide - need at minimum a valid applicator license
+        if (!hasValidApplicatorLicense()) {
+            const exp = licenseExpDate();
+            if (exp && exp <= now) {
+                errors.push({
+                    product: productName,
+                    reason: `${productName} is a Restricted Use Pesticide. Your applicator license expired on ${exp.toLocaleDateString()}. Please renew before ordering.`
+                });
+            } else {
+                errors.push({
+                    product: productName,
+                    reason: `${productName} is a Restricted Use Pesticide. A verified Private or Commercial Applicator License is required. Upload yours at /compliance.html or contact your rep.`
+                });
+            }
+            continue;
+        }
+
+        // Product-specific certifications
+        const required = chemical.requiredCertifications || [];
+        if (required.includes('paraquat_training') && !hasValidParaquatCert()) {
+            errors.push({
+                product: productName,
+                reason: `${productName} contains Paraquat. EPA-mandated Paraquat Training certification (valid for 3 years) is required. Upload yours at /compliance.html.`
+            });
+        }
+        if (required.includes('dicamba_training') && !hasValidDicambaCert()) {
+            errors.push({
+                product: productName,
+                reason: `${productName} contains Dicamba. Annual Dicamba training certification is required. Upload yours at /compliance.html.`
+            });
+        }
+    }
+
+    return errors.length === 0 ? { ok: true } : { ok: false, errors };
+}
+
+// Helper: non-blocking audit log writes (failures logged but don't break the audited action)
+async function logAudit({ action, req, targetUser, targetUserName, entityType, entityId, entityRef, before, after, amount, reason }) {
+    try {
+        await AuditLog.create({
+            action,
+            performedBy: req?.user?._id,
+            performedByName: req?.user?.name,
+            performedByRole: req?.user?.role,
+            targetUser,
+            targetUserName,
+            entityType,
+            entityId,
+            entityRef,
+            before,
+            after,
+            amount,
+            reason,
+            ipAddress: req?.ip || req?.headers?.['x-forwarded-for'],
+            userAgent: req?.headers?.['user-agent']
+        });
+    } catch (e) {
+        console.error('Audit log failed (non-blocking):', e.message);
+    }
+}
+
 // ============ DISTRIBUTOR PRICING MODEL ============
 // Allows each distributor to set their own retail prices
 // Distributors cannot see wholesale/cost prices - only their retail price
@@ -4464,6 +4643,34 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             return res.status(403).json({ error: 'Access denied - not your customer' });
         }
 
+        // RUP COMPLIANCE CHECK - validates against the CUSTOMER's licenses, not the distributor's
+        const allChemicalsForRupCheck = await Chemical.find({ isActive: true })
+            .select('productName isRestrictedUse requiredCertifications').lean();
+        const itemsForRupCheck = (chemicals || []).map(c => ({
+            productName: c.name || c.productName
+        }));
+        const rupCompliance = await validateRupCompliance({
+            customer,
+            items: itemsForRupCheck,
+            allChemicals: allChemicalsForRupCheck
+        });
+        if (!rupCompliance.ok) {
+            await logAudit({
+                action: 'rup_block',
+                req,
+                targetUser: customer._id,
+                targetUserName: customer.name,
+                entityType: 'Order',
+                reason: 'RUP compliance check failed - blocked at admin order creation',
+                after: { errors: rupCompliance.errors }
+            });
+            return res.status(403).json({
+                error: 'Restricted Use Pesticide compliance check failed for this customer',
+                rupErrors: rupCompliance.errors,
+                userMessage: `${customer.name} does not have valid licenses for one or more products in this order.`
+            });
+        }
+
         // Validate discount code
         let discountType = null;
         let discountDescription = '';
@@ -8041,6 +8248,37 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             }
         }
 
+        // RUP COMPLIANCE CHECK
+        const allChemicalsForCheck = await Chemical.find({ isActive: true }).select('productName isRestrictedUse requiredCertifications').lean();
+        const customerForCompliance = (orderUserId.toString() !== req.user._id.toString())
+            ? await User.findById(orderUserId).lean()
+            : req.user;
+        const itemsForCheck = items.map(i => {
+            const chem = allChemicalsForCheck.find(c => c._id.toString() === (i.chemicalId || '').toString());
+            return { productName: chem?.productName || i.productName };
+        });
+        const compliance = await validateRupCompliance({
+            customer: customerForCompliance,
+            items: itemsForCheck,
+            allChemicals: allChemicalsForCheck
+        });
+        if (!compliance.ok) {
+            await logAudit({
+                action: 'rup_block',
+                req,
+                targetUser: customerForCompliance?._id,
+                targetUserName: customerForCompliance?.name,
+                entityType: 'ChemicalOrder',
+                reason: 'RUP compliance check failed',
+                after: { errors: compliance.errors }
+            });
+            return res.status(403).json({
+                error: 'Restricted Use Pesticide compliance check failed',
+                rupErrors: compliance.errors,
+                userMessage: 'One or more products require a valid applicator license.'
+            });
+        }
+
         // Calculate totals
         let subtotal = 0;
         const orderItems = [];
@@ -8169,6 +8407,35 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
 
         // Build order items with server-side price verification
         const allChemicals = await Chemical.find({ isActive: true }).lean();
+
+        // RUP COMPLIANCE CHECK - block if customer doesn't have valid licenses
+        // For acting-as orders, validate against the customer (orderUserId), not the distributor
+        const customerForCompliance = (orderUserId && orderUserId.toString() !== req.user._id.toString())
+            ? await User.findById(orderUserId).lean()
+            : req.user;
+
+        const compliance = await validateRupCompliance({
+            customer: customerForCompliance,
+            items,
+            allChemicals
+        });
+
+        if (!compliance.ok) {
+            await logAudit({
+                action: 'rup_block',
+                req,
+                targetUser: customerForCompliance?._id,
+                targetUserName: customerForCompliance?.name,
+                entityType: 'ChemicalOrder',
+                reason: 'RUP compliance check failed - order blocked',
+                after: { errors: compliance.errors }
+            });
+            return res.status(403).json({
+                error: 'Restricted Use Pesticide compliance check failed',
+                rupErrors: compliance.errors,
+                userMessage: 'One or more products in your order require a valid applicator license. See details below.'
+            });
+        }
 
         const orderItems = [];
         let verifiedSubtotal = 0;

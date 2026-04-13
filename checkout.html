@@ -1092,6 +1092,26 @@
 
                     if (!orderResponse.ok) {
                         const err = await orderResponse.json();
+                        if (err.rupErrors && err.rupErrors.length > 0) {
+                            const rupList = err.rupErrors.map(e => `<li><strong>${e.product}:</strong> ${e.reason}</li>`).join('');
+                            const rupHtml = `
+                                <div style="background:#fef2f2; border:2px solid #dc2626; border-radius:8px; padding:16px; margin-bottom:16px;">
+                                    <div style="font-weight:700; color:#991b1b; font-size:1.05rem; margin-bottom:8px;">License Required - Order Cannot Be Processed</div>
+                                    <p style="color:#991b1b; margin-bottom:10px;">${err.userMessage || 'One or more products require valid licensing.'}</p>
+                                    <ul style="color:#991b1b; padding-left:20px;">${rupList}</ul>
+                                    <p style="margin-top:12px;">
+                                        <a href="/compliance.html" style="color:#dc2626; font-weight:600; text-decoration:underline;">Manage Licenses & Certifications</a>
+                                        &nbsp;|&nbsp;
+                                        <span style="color:#666;">Or remove restricted-use products from your order.</span>
+                                    </p>
+                                </div>`;
+                            const msgBox = document.getElementById('checkoutMessages') || document.querySelector('.checkout-content') || document.body;
+                            msgBox.insertAdjacentHTML('afterbegin', rupHtml);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            btn.disabled = false;
+                            btn.classList.remove('loading');
+                            return;
+                        }
                         throw new Error(err.error || 'Failed to create order');
                     }
 
@@ -1131,6 +1151,26 @@
 
                     if (!orderResponse.ok) {
                         const err = await orderResponse.json();
+                        if (err.rupErrors && err.rupErrors.length > 0) {
+                            const rupList = err.rupErrors.map(e => `<li><strong>${e.product}:</strong> ${e.reason}</li>`).join('');
+                            const rupHtml = `
+                                <div style="background:#fef2f2; border:2px solid #dc2626; border-radius:8px; padding:16px; margin-bottom:16px;">
+                                    <div style="font-weight:700; color:#991b1b; font-size:1.05rem; margin-bottom:8px;">License Required - Order Cannot Be Processed</div>
+                                    <p style="color:#991b1b; margin-bottom:10px;">${err.userMessage || 'One or more products require valid licensing.'}</p>
+                                    <ul style="color:#991b1b; padding-left:20px;">${rupList}</ul>
+                                    <p style="margin-top:12px;">
+                                        <a href="/compliance.html" style="color:#dc2626; font-weight:600; text-decoration:underline;">Manage Licenses & Certifications</a>
+                                        &nbsp;|&nbsp;
+                                        <span style="color:#666;">Or remove restricted-use products from your order.</span>
+                                    </p>
+                                </div>`;
+                            const msgBox = document.getElementById('checkoutMessages') || document.querySelector('.checkout-content') || document.body;
+                            msgBox.insertAdjacentHTML('afterbegin', rupHtml);
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                            btn.disabled = false;
+                            btn.classList.remove('loading');
+                            return;
+                        }
                         throw new Error(err.error || 'Failed to create order');
                     }
 
