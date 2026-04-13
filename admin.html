@@ -4694,7 +4694,13 @@
 
         // Quick place order (from card button)
         function quickActAsCustomer(customerId, customerName) {
-            window.location.href = `/admin-order.html?customer=${customerId}`;
+            // Store acting-as customer context in localStorage for chemicals page
+            localStorage.setItem('actingAsCustomer', JSON.stringify({
+                id: customerId,
+                name: customerName,
+                startedAt: new Date().toISOString()
+            }));
+            window.location.href = `/chemicals.html?actingAs=${customerId}`;
         }
 
         // Toggle edit mode

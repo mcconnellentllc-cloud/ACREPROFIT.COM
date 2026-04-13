@@ -7997,7 +7997,19 @@ app.put('/api/admin/chemicals/:chemicalId/link-supplier/:supplierId', authMiddle
 // Create chemical order (customer)
 app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
-        const { items, programId, programName, totalAcres, customerNotes, sprayParams } = req.body;
+        const { items, programId, programName, totalAcres, customerNotes, sprayParams, actingAsCustomerId } = req.body;
+
+        // If distributor/admin is acting on behalf of a customer, the order userId = customer
+        let orderUserId = req.user._id;
+        let orderRepId = req.user.representative;
+        if (actingAsCustomerId && ['admin', 'superadmin', 'distributor'].includes(req.user.role)) {
+            const customer = await User.findById(actingAsCustomerId);
+            if (customer && customer.role === 'customer') {
+                orderUserId = customer._id;
+                // Rep is the acting user (if they are a distributor) or the customer's assigned rep
+                orderRepId = req.user.role === 'distributor' ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
+            }
+        }
 
         // Calculate totals
         let subtotal = 0;
@@ -8026,8 +8038,9 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
         }
 
         const order = new ChemicalOrder({
-            userId: req.user._id,
-            representativeId: req.user.representative,
+            userId: orderUserId,
+            representativeId: orderRepId,
+            createdBy: req.user._id,
             orderType: programId ? 'program' : 'direct',
             items: orderItems,
             programId,
