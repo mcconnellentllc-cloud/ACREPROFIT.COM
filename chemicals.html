@@ -2257,6 +2257,49 @@
                         <div style="font-style:italic; font-size:0.9rem;">Thanks for placing an order and joining our cause - farmers helping farmers. We appreciate you.</div>
                     </div>
 
+                    ${(['admin','superadmin','distributor'].includes(userData.role) || window.actingAsCustomerId) ? `
+                    <div style="background:#fff7ed; border:1px dashed #d97706; padding:14px 18px; border-radius:8px; margin:16px 0;">
+                        <div style="font-weight:700; color:#92400e; margin-bottom:4px;">Distributor Controls</div>
+                        <div style="color:#92400e; font-size:0.85rem; margin-bottom:10px;">Adjust margins for this order only. Catalog prices stay the same.</div>
+
+                        <div style="margin-bottom:12px;">
+                            <div style="font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:6px;">Quick apply:</div>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                <button type="button" onclick="document.getElementById('programDiscountCode').value='NoDistMarg'; document.getElementById('programMarginAdjustment').value=''; updateProgramMarginPreview();" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                    No Distributor Margin
+                                </button>
+                                <button type="button" onclick="document.getElementById('programDiscountCode').value='AtcostAP'; document.getElementById('programMarginAdjustment').value=''; updateProgramMarginPreview();" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                    At Cost (No Markup)
+                                </button>
+                                <button type="button" onclick="document.getElementById('programDiscountCode').value=''; document.getElementById('programMarginAdjustment').value=''; document.getElementById('programMarginAdjustmentReason').value=''; updateProgramMarginPreview();" style="background:white; color:#6b7280; border:1px solid #6b7280; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:10px;">
+                            <label style="display:block; font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:4px;">Discount Code (optional)</label>
+                            <input type="text" id="programDiscountCode" placeholder="NoDistMarg / AtcostAP" style="width:100%; padding:8px; border:1px solid #d97706; border-radius:4px;" oninput="updateProgramMarginPreview()">
+                        </div>
+
+                        <div>
+                            <div style="font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:6px;">Or adjust distributor margin per unit (this order only):</div>
+                            <div style="display:flex; gap:8px; align-items:center;">
+                                <span style="color:#92400e;">$</span>
+                                <input type="number" id="programMarginAdjustment" step="0.01" placeholder="0.00 (negative to reduce, positive to increase)" style="flex:1; padding:8px; border:1px solid #d97706; border-radius:4px;" oninput="updateProgramMarginPreview()">
+                                <span style="color:#92400e; font-size:0.85rem;">per unit</span>
+                            </div>
+                            <input type="text" id="programMarginAdjustmentReason" placeholder="Reason (e.g., 'Volume discount', 'Long-time customer')" style="width:100%; margin-top:8px; padding:8px; border:1px solid #d97706; border-radius:4px;">
+                        </div>
+
+                        <div id="programMarginPreview" style="display:none; margin-top:12px; padding:10px; background:white; border:1px solid #d97706; border-radius:4px; color:#92400e; font-weight:600;"></div>
+
+                        <div style="color:#666; font-size:0.75rem; margin-top:10px; border-top:1px dashed #d97706; padding-top:8px;">
+                            All margin changes are logged in the audit trail with your name and reason.
+                        </div>
+                    </div>
+                    ` : ''}
+
                     <div style="background:#fffbeb; border:1px dashed #f59e0b; padding:14px 18px; border-radius:8px; margin:16px 0;">
                         <div style="font-weight:700; color:#92400e; margin-bottom:6px;">Want to save this as YOUR recipe?</div>
                         <div style="color:#92400e; font-size:0.9rem; margin-bottom:10px;">If you tweaked the rates, save it so you can come back to it. You decide if it stays private or helps other farmers.</div>
@@ -2610,8 +2653,82 @@ Generated by AcreProfit.com`;
             }
         }
 
+        // Live preview of distributor margin adjustment impact on program order
+        function updateProgramMarginPreview() {
+            const preview = document.getElementById('programMarginPreview');
+            if (!preview) return;
+
+            const discountCode = (document.getElementById('programDiscountCode')?.value || '').trim().toUpperCase();
+            const marginAdjust = parseFloat(document.getElementById('programMarginAdjustment')?.value) || 0;
+
+            if (!discountCode && !marginAdjust) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            // Rebuild item totals using current catalog + selected adjustment
+            if (!selectedProgram || !selectedProgram.applications) {
+                preview.style.display = 'none';
+                return;
+            }
+            const acresInput = document.getElementById('programAcres');
+            const acres = parseFloat(acresInput?.value) || 0;
+            if (!acres) {
+                preview.style.display = 'none';
+                return;
+            }
+
+            let originalTotal = 0;
+            let adjustedTotal = 0;
+            let totalUnits = 0;
+
+            selectedProgram.applications.forEach(app => {
+                app.chemicals.forEach(chemItem => {
+                    const totalNeeded = calculateAmount(chemItem.rate, chemItem.rateUnit, acres, chemItem.unit || 'gal');
+                    const packages = Math.ceil(totalNeeded / (chemItem.unitsPerPack || 250));
+                    const catalogMatch = (chemicals || []).find(c =>
+                        (c.productName || c.name) === chemItem.productName
+                    );
+                    if (!catalogMatch) return;
+
+                    const sellPrice = catalogMatch.sellPrice || catalogMatch.price || 0;
+                    const adminPrice = catalogMatch.adminPrice || sellPrice;
+                    const costPrice = catalogMatch.costPrice || 0;
+
+                    let adjUnit = sellPrice;
+                    if (discountCode === 'ATCOSTAP') adjUnit = costPrice || sellPrice;
+                    else if (discountCode === 'NODISTMARG') adjUnit = adminPrice;
+                    if (marginAdjust) adjUnit = Math.max(costPrice || 0, adjUnit + marginAdjust);
+
+                    originalTotal += sellPrice * packages;
+                    adjustedTotal += adjUnit * packages;
+                    totalUnits += packages;
+                });
+            });
+
+            const diff = adjustedTotal - originalTotal;
+            const sign = diff >= 0 ? '+' : '-';
+            preview.style.display = 'block';
+            preview.innerHTML = `
+                <div>Original total: $${originalTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                <div>Adjusted total: $${adjustedTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
+                <div style="color:${diff < 0 ? '#059669' : '#dc2626'};">Change: ${sign}$${Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})} over ${totalUnits} unit${totalUnits===1?'':'s'}</div>
+            `;
+        }
+
         async function submitProgramOrder(acres, totalCost) {
             if (!selectedProgram) return;
+
+            // Capture distributor margin adjustments (admin/distributor/superadmin only - server re-checks)
+            const discountCode = (document.getElementById('programDiscountCode')?.value || '').trim();
+            const marginAdjustment = parseFloat(document.getElementById('programMarginAdjustment')?.value) || 0;
+            const marginAdjustmentReason = (document.getElementById('programMarginAdjustmentReason')?.value || '').trim();
+
+            // Require a reason when a manual adjustment is entered
+            if (marginAdjustment !== 0 && !marginAdjustmentReason) {
+                alert('Please enter a reason for the margin adjustment (it will be saved to the audit log).');
+                return;
+            }
 
             const items = [];
             selectedProgram.applications.forEach(app => {
@@ -2667,7 +2784,10 @@ Generated by AcreProfit.com`;
                             acres
                         },
                         customerNotes: `Program: ${selectedProgram.name} for ${acres} acres`,
-                        actingAsCustomerId: window.actingAsCustomerId || null
+                        actingAsCustomerId: window.actingAsCustomerId || null,
+                        discountCode: discountCode || null,
+                        marginAdjustment: marginAdjustment || 0,
+                        marginAdjustmentReason: marginAdjustmentReason || ''
                     })
                 });
 

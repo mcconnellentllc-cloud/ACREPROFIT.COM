@@ -8302,12 +8302,41 @@ app.put('/api/admin/chemicals/:chemicalId/link-supplier/:supplierId', authMiddle
 // Create chemical order (customer)
 app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
-        const { items, programId, programName, totalAcres, customerNotes, sprayParams, actingAsCustomerId } = req.body;
+        const {
+            items,
+            programId,
+            programName,
+            totalAcres,
+            customerNotes,
+            sprayParams,
+            actingAsCustomerId,
+            discountCode,
+            marginAdjustment,
+            marginAdjustmentReason
+        } = req.body;
+
+        // Only admin/distributor/superadmin can adjust margins - re-check on server
+        const isAdminOrDistributor = ['admin', 'superadmin', 'distributor'].includes(req.user.role);
+        const applyMarginAdjust = isAdminOrDistributor && marginAdjustment ? parseFloat(marginAdjustment) : 0;
+
+        // Validate & normalize discount code
+        let discountType = null;
+        let discountDescription = '';
+        if (isAdminOrDistributor && discountCode) {
+            const code = String(discountCode).trim().toUpperCase();
+            if (code === 'NODISTMARG') {
+                discountType = 'no_dist_margin';
+                discountDescription = 'No distributor margin (admin price)';
+            } else if (code === 'ATCOSTAP') {
+                discountType = 'at_cost';
+                discountDescription = 'At cost (no markup)';
+            }
+        }
 
         // If distributor/admin is acting on behalf of a customer, the order userId = customer
         let orderUserId = req.user._id;
         let orderRepId = req.user.representative;
-        if (actingAsCustomerId && ['admin', 'superadmin', 'distributor'].includes(req.user.role)) {
+        if (actingAsCustomerId && isAdminOrDistributor) {
             const customer = await User.findById(actingAsCustomerId);
             if (customer && customer.role === 'customer') {
                 orderUserId = customer._id;
@@ -8347,16 +8376,34 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             });
         }
 
-        // Calculate totals
+        // Calculate totals with discount / margin adjustment applied server-side
         let subtotal = 0;
+        let totalDiscount = 0;
         const orderItems = [];
 
         for (const item of items) {
             const chemical = await Chemical.findById(item.chemicalId);
             if (!chemical) continue;
 
-            const totalPrice = item.quantity * chemical.sellPrice;
+            // Determine base unit price from discount code
+            let unitPrice = chemical.sellPrice;
+            if (discountType === 'at_cost') {
+                unitPrice = chemical.costPrice || chemical.sellPrice;
+            } else if (discountType === 'no_dist_margin') {
+                unitPrice = chemical.adminPrice || chemical.sellPrice;
+            }
+
+            // Apply manual per-unit margin adjustment (floor at cost)
+            if (applyMarginAdjust !== 0) {
+                unitPrice = Math.max(chemical.costPrice || 0, unitPrice + applyMarginAdjust);
+            }
+
+            const totalPrice = Math.round(item.quantity * unitPrice * 100) / 100;
             subtotal += totalPrice;
+
+            if (chemical.sellPrice) {
+                totalDiscount += (chemical.sellPrice - unitPrice) * item.quantity;
+            }
 
             orderItems.push({
                 chemicalId: chemical._id,
@@ -8364,13 +8411,25 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
                 packSize: chemical.packSize,
                 unit: chemical.unit,
                 quantity: item.quantity,
-                unitPrice: chemical.sellPrice,
+                unitPrice,
                 totalPrice,
                 acres: item.acres,
                 rate: item.rate,
                 rateUnit: item.rateUnit,
                 calculatedAmount: item.calculatedAmount
             });
+        }
+
+        subtotal = Math.round(subtotal * 100) / 100;
+        totalDiscount = Math.round(totalDiscount * 100) / 100;
+
+        // Build reason string for audit + order record
+        let discountReasonFull = discountDescription;
+        if (applyMarginAdjust !== 0) {
+            const sign = applyMarginAdjust < 0 ? 'off' : 'added';
+            discountReasonFull = (discountReasonFull ? discountReasonFull + ' | ' : '') +
+                `$${Math.abs(applyMarginAdjust).toFixed(2)}/unit ${sign} by ${req.user.name}` +
+                (marginAdjustmentReason ? ` - ${marginAdjustmentReason}` : '');
         }
 
         const order = new ChemicalOrder({
@@ -8386,10 +8445,36 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             total: subtotal,
             customerNotes,
             sprayParams,
+            discount: totalDiscount,
+            discountReason: discountReasonFull || undefined,
+            marginAdjustment: applyMarginAdjust || 0,
+            marginAdjustmentReason: marginAdjustmentReason || '',
+            marginAdjustedBy: applyMarginAdjust !== 0 ? req.user._id : undefined,
             status: 'draft'
         });
 
         await order.save();
+
+        // Audit log margin adjustments or discount code usage
+        if (applyMarginAdjust !== 0 || discountType) {
+            await logAudit({
+                action: 'margin_change',
+                req,
+                entityType: 'ChemicalOrder',
+                entityId: order._id,
+                entityRef: order.orderNumber,
+                amount: totalDiscount,
+                reason: discountReasonFull,
+                before: { totalDiscount: 0 },
+                after: {
+                    totalDiscount,
+                    marginAdjustment: applyMarginAdjust,
+                    discountCode: discountCode || null,
+                    programName: programName || null
+                }
+            });
+        }
+
         res.status(201).json(order);
     } catch (error) {
         res.status(400).json({ error: error.message });
