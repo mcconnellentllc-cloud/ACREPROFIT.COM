@@ -13665,7 +13665,7 @@ app.get('/api/my-mixes', authMiddleware, async (req, res) => {
 // Create a new mix
 app.post('/api/mixes', authMiddleware, async (req, res) => {
     try {
-        const {
+        let {
             name,
             crop,
             timing,
@@ -13681,8 +13681,37 @@ app.post('/api/mixes', authMiddleware, async (req, res) => {
             status,
             groundType,
             rotationRestrictions,
-            grazingRestrictions
+            grazingRestrictions,
+            applications,
+            visibility,
+            sprayParams,
+            basedOn
         } = req.body;
+
+        // If frontend sent an "applications" array (from Build a Recipe / Save Custom Recipe),
+        // flatten it into ingredients + timing
+        if ((!ingredients || ingredients.length === 0) && applications && applications.length > 0) {
+            timing = applications[0].timing || applications[0].name || 'Custom';
+            ingredients = [];
+            applications.forEach(app => {
+                (app.chemicals || []).forEach(c => {
+                    ingredients.push({
+                        productName: c.productName,
+                        rate: c.rate,
+                        rateUnit: c.rateUnit,
+                        timing: app.name,
+                        packSize: c.packSize,
+                        unit: c.unit,
+                        unitsPerPack: c.unitsPerPack
+                    });
+                });
+            });
+            if (sprayParams?.gallonsPerAcre) gallonsPerAcre = sprayParams.gallonsPerAcre;
+            if (basedOn && !description) description = `Based on ${basedOn}`;
+        }
+
+        // Map visibility to isPublic
+        const isPublic = visibility === 'public';
 
         if (!name || !crop || !timing || !ingredients || ingredients.length === 0) {
             return res.status(400).json({ error: 'Name, crop, timing, and at least one ingredient are required' });
@@ -13729,10 +13758,11 @@ app.post('/api/mixes', authMiddleware, async (req, res) => {
             tips,
             tags: tags || [],
             isAnonymous: isAnonymous !== false, // Default to anonymous
+            isPublic,
             creatorDisplayName,
             createdBy: req.user._id,
-            status: status || 'draft',
-            publishedAt: status === 'published' ? new Date() : null,
+            status: status || (isPublic ? 'published' : 'draft'),
+            publishedAt: (status === 'published' || isPublic) ? new Date() : null,
             groundType: autoGroundType,
             rotationRestrictions: autoRotation,
             grazingRestrictions: autoGrazing

@@ -398,6 +398,10 @@
                         <span>Estimated Total</span>
                         <span id="orderTotal">$0.00</span>
                     </div>
+                    <div id="orderCostPerAcreRow" class="total-row" style="display:none; background:#f0f7ef; padding:10px 12px; border-radius:6px; margin-top:8px;">
+                        <span style="color:#2d5a27; font-weight:700;">Cost Per Acre</span>
+                        <span id="orderCostPerAcre" style="color:#2d5a27; font-weight:800; font-size:1.1rem;">$0.00</span>
+                    </div>
                 </div>
                 <button id="submitOrder" class="btn btn-primary btn-block" disabled>
                     Submit Order
@@ -1542,13 +1546,40 @@
                 return;
             }
 
-            list.innerHTML = filtered.map(prog => `
+            list.innerHTML = filtered.map(prog => {
+                // Calculate estimated cost per acre across all applications
+                let estCostPerAcre = 0;
+                let canCalc = true;
+                prog.applications.forEach(app => {
+                    app.chemicals.forEach(c => {
+                        // Find real price from chemicals catalog if program price is 0
+                        let price = c.price;
+                        if (!price || price === 0) {
+                            const found = chemicals.find(ch => (ch.productName || ch.name) === c.productName);
+                            price = found?.sellPrice || found?.price || 0;
+                        }
+                        if (!price) { canCalc = false; return; }
+                        // Convert rate to product unit
+                        const inUnit = calculateAmount(c.rate, c.rateUnit, 1, c.unit || 'gal');
+                        estCostPerAcre += inUnit * price;
+                    });
+                });
+                const costPerAcreHTML = canCalc && estCostPerAcre > 0
+                    ? `<div style="background:#f0f7ef; border:2px solid #2d5a27; border-radius:8px; padding:14px 18px; margin-bottom:12px; text-align:center;">
+                        <div style="color:#2d5a27; font-size:0.75rem; font-weight:600; letter-spacing:0.5px;">ESTIMATED COST PER ACRE</div>
+                        <div style="color:#2d5a27; font-size:1.8rem; font-weight:800; margin-top:2px;">$${estCostPerAcre.toFixed(2)}</div>
+                        <div style="color:#666; font-size:0.75rem;">+ Hydrovant (adjusts with spray volume)</div>
+                       </div>`
+                    : '';
+
+                return `
                 <div class="program-card" data-program-id="${prog._id}">
                     <div class="program-header">
                         <h3>${prog.name}</h3>
                         <span class="program-crop-badge">${prog.crop}</span>
                     </div>
                     <p class="program-desc">${prog.description}</p>
+                    ${costPerAcreHTML}
                     ${prog.groundType ? `<div style="background:#f0f7ef; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.88rem; color:#2d5a27; border-left:3px solid #2d5a27;"><strong>Best For:</strong> ${prog.groundType}</div>` : ''}
                     <div class="program-applications">
                         ${prog.applications.map(app => `
@@ -1570,7 +1601,8 @@
                         Select This Program
                     </button>
                 </div>
-            `).join('');
+                `;
+            }).join('');
 
             document.querySelectorAll('.select-program-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
@@ -2089,9 +2121,9 @@
                                 <td colspan="3"><strong>Estimated Total</strong> (includes Hydrovant)</td>
                                 <td><strong class="grand-total">$${(totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)).toFixed(2)}</strong></td>
                             </tr>
-                            <tr>
-                                <td colspan="3">Cost Per Acre</td>
-                                <td>$${((totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)) / acres).toFixed(2)}</td>
+                            <tr style="background:#f0f7ef;">
+                                <td colspan="3" style="padding:14px; font-weight:700; color:#2d5a27; font-size:1.05rem;">COST PER ACRE</td>
+                                <td style="padding:14px; font-weight:800; color:#2d5a27; font-size:1.4rem;">$${((totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)) / acres).toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -2165,6 +2197,15 @@
                     <div style="background:#f0f7ef; border-left:3px solid #2d5a27; padding:14px 18px; border-radius:6px; margin:16px 0; color:#2d5a27;">
                         <div style="font-weight:700; font-size:1rem; margin-bottom:4px;">Thank you for your business.</div>
                         <div style="font-style:italic; font-size:0.9rem;">Thanks for placing an order and joining our cause - farmers helping farmers. We appreciate you.</div>
+                    </div>
+
+                    <div style="background:#fffbeb; border:1px dashed #f59e0b; padding:14px 18px; border-radius:8px; margin:16px 0;">
+                        <div style="font-weight:700; color:#92400e; margin-bottom:6px;">Want to save this as YOUR recipe?</div>
+                        <div style="color:#92400e; font-size:0.9rem; margin-bottom:10px;">If you tweaked the rates, save it so you can come back to it. You decide if it stays private or helps other farmers.</div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                            <button class="btn btn-outline btn-sm" onclick="saveCustomRecipe('private')" style="border-color:#92400e; color:#92400e;">Save (Private - only me)</button>
+                            <button class="btn btn-outline btn-sm" onclick="saveCustomRecipe('public')" style="border-color:#059669; color:#059669;">Save &amp; Share (helps other farmers)</button>
+                        </div>
                     </div>
 
                     <div class="order-actions">
@@ -2451,6 +2492,66 @@ Generated by AcreProfit.com`;
             });
         }
 
+        async function saveCustomRecipe(visibility) {
+            if (!selectedProgram) return;
+
+            const name = prompt(`Give your recipe a name:`, `My ${selectedProgram.name}`);
+            if (!name) return;
+
+            // Capture current rates (possibly modified from program defaults)
+            const acres = parseFloat(document.getElementById('programAcres')?.value) || 0;
+            const sprayVol = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
+            const pressure = parseInt(document.getElementById('nozzlePressure')?.value) || 40;
+            const nozzle = document.getElementById('nozzleType')?.value || 'AIXR';
+
+            const applications = selectedProgram.applications.map(app => ({
+                name: app.name,
+                timing: app.timing,
+                chemicals: app.chemicals.map(c => {
+                    // Check if there's a custom rate input for this chemical
+                    const input = document.querySelector(`input[data-chem-name="${c.productName}"]`);
+                    const rate = input ? (parseFloat(input.value) || c.rate) : c.rate;
+                    return {
+                        productName: c.productName,
+                        rate,
+                        rateUnit: c.rateUnit,
+                        packSize: c.packSize,
+                        unit: c.unit,
+                        unitsPerPack: c.unitsPerPack
+                    };
+                })
+            }));
+
+            try {
+                const res = await fetch(`${API_URL}/api/mixes`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        name,
+                        description: `Custom recipe based on ${selectedProgram.name}`,
+                        crop: selectedProgram.crop,
+                        applications,
+                        sprayParams: { gallonsPerAcre: sprayVol, nozzlePressure: pressure, nozzleType: nozzle },
+                        basedOn: selectedProgram.name,
+                        visibility // 'public' or 'private'
+                    })
+                });
+                if (res.ok) {
+                    alert(visibility === 'public'
+                        ? `Saved and shared. Thanks for helping other farmers!`
+                        : `Saved to your recipe book.`);
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + (err.error || 'Failed to save recipe'));
+                }
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
         async function submitProgramOrder(acres, totalCost) {
             if (!selectedProgram) return;
 
@@ -2544,6 +2645,20 @@ Generated by AcreProfit.com`;
             itemCount.textContent = `${orderItems.length} items`;
             orderTotal.textContent = `$${total.toFixed(2)}`;
             submitBtn.disabled = false;
+
+            // Cost per acre display (sidebar)
+            const acres = parseFloat(document.getElementById('cropAcres')?.value) ||
+                          parseFloat(document.getElementById('programAcres')?.value) || 0;
+            const cpaRow = document.getElementById('orderCostPerAcreRow');
+            const cpaSpan = document.getElementById('orderCostPerAcre');
+            if (cpaRow && cpaSpan) {
+                if (acres > 0) {
+                    cpaRow.style.display = 'flex';
+                    cpaSpan.textContent = '$' + (total / acres).toFixed(2);
+                } else {
+                    cpaRow.style.display = 'none';
+                }
+            }
         }
 
         function removeFromOrder(chemId) {
