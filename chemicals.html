@@ -1012,12 +1012,12 @@
                 {
                     _id: 'milo-2',
                     name: 'Sorghum - Full 2-Pass Program',
-                    description: 'Complete pre-plant + at-planting sorghum program',
+                    description: 'Complete pre-plant + at-planting sorghum program (on-label chemistry only)',
                     crop: 'milo',
                     type: 'recommended',
-                    groundType: 'Dryland grain sorghum with higher weed pressure. Two-pass program provides burndown residual plus at-planting protection.',
-                    rotationRestrictions: 'Wheat: 4 months. Corn: no restriction if atrazine under 1 lb ai/acre. Soybeans: 12 months after atrazine.',
-                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine application.',
+                    groundType: 'Dryland grain sorghum with higher weed pressure. Two-pass program: pre-plant burndown with flumioxazin (30 days min before planting) + at-planting residual stack (Atrazine + Meso + Rancor) for extended grass and broadleaf control. All products labeled for sorghum.',
+                    rotationRestrictions: 'Rancor (metribuzin): 18 months to most crops except wheat/barley after full rate. Atrazine: 12 months to soybeans. Wheat: 4 months after flumioxazin. Mesotrione: 18 months to soybeans.',
+                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine application. Rancor: do not graze or harvest forage for 28 days.',
                     applications: [
                         {
                             name: '30d Minimum Pre-Plant',
@@ -1036,10 +1036,11 @@
                             timing: 'Mid May (at planting)',
                             truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'FulTime NXT', rate: 2, rateUnit: 'qt/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 20.00 },
-                                { productName: 'StareDown', rate: 0.4, rateUnit: 'pt/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 100.00 },
-                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 12.90 },
-                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 110.00 }
+                                { productName: 'Atrazine 4L', rate: 2, rateUnit: 'qt/acre', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Meso 4SC', rate: 3, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Rancor 4F', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
                     ]
