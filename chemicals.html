@@ -1928,15 +1928,20 @@
                 let sheetChemicals = [];
                 let sheetCustomChemicals = [];
 
-                // Process CPD-supplied chemicals
+                // Process Acre Profit catalog chemicals
                 app.chemicals.forEach(chemItem => {
                     // Use customized rate from UI if available
                     const customRate = getCustomRate(chemItem.productName);
                     const rate = customRate !== null ? customRate : chemItem.rate;
                     const rateUnit = chemItem.rateUnit;
-                    const unit = chemItem.unit || 'gl';
+                    const unit = chemItem.unit || 'gal';
                     const unitsPerPack = chemItem.unitsPerPack || 250;
-                    const price = chemItem.price || 0;
+
+                    // Look up LIVE price from the catalog (chemicals array) - program prices are placeholders
+                    const catalogMatch = (chemicals || []).find(c =>
+                        (c.productName || c.name) === chemItem.productName
+                    );
+                    const price = (catalogMatch?.sellPrice || catalogMatch?.price) ?? chemItem.price ?? 0;
 
                     // Calculate amount needed
                     const totalNeeded = calculateAmount(rate, rateUnit, acres, unit);
@@ -2144,6 +2149,14 @@
                                     <td class="cost-col"><strong>$${actualCost.toFixed(2)}</strong></td>
                                 </tr>
                             `}).join('')}
+                            ${(() => {
+                                // Only show separate Hydrovant row if it's NOT already in the program (most programs include it)
+                                const hydrovantAlreadyIncluded = Object.keys(totalsByChemical).some(k => k.toLowerCase().includes('hydrovant'));
+                                if (hydrovantAlreadyIncluded) return '';
+                                const hydroCatalog = (chemicals || []).find(c => (c.productName || c.name || '').toLowerCase().includes('hydrovant'));
+                                const hydroPrice = hydroCatalog?.sellPrice || hydroCatalog?.price || 0;
+                                const hydroCost = Math.ceil(hydrovantGal / 5) * 5 * hydroPrice;
+                                return `
                             <tr class="hydrovant-row">
                                 <td><strong>Hydrovant (NIS)</strong><br><span style="font-size: 0.8rem; color: #666;">0.1% v/v surfactant</span></td>
                                 <td class="needed-col">
@@ -2157,17 +2170,18 @@
                                         = ${(Math.ceil(hydrovantGal / 5) * 5).toFixed(1)} gl ordered
                                     </div>
                                 </td>
-                                <td class="cost-col"><strong>$${(Math.ceil(hydrovantGal / 5) * 5 * 110).toFixed(2)}</strong></td>
-                            </tr>
+                                <td class="cost-col"><strong>$${hydroCost.toFixed(2)}</strong></td>
+                            </tr>`;
+                            })()}
                         </tbody>
                         <tfoot>
                             <tr class="total-row">
-                                <td colspan="3"><strong>Estimated Total</strong> (includes Hydrovant)</td>
-                                <td><strong class="grand-total">$${(totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)).toFixed(2)}</strong></td>
+                                <td colspan="3"><strong>Estimated Total</strong></td>
+                                <td><strong class="grand-total">$${totalCost.toFixed(2)}</strong></td>
                             </tr>
                             <tr style="background:#f0f7ef;">
                                 <td colspan="3" style="padding:14px; font-weight:700; color:#2d5a27; font-size:1.05rem;">COST PER ACRE</td>
-                                <td style="padding:14px; font-weight:800; color:#2d5a27; font-size:1.4rem;">$${((totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)) / acres).toFixed(2)}</td>
+                                <td style="padding:14px; font-weight:800; color:#2d5a27; font-size:1.4rem;">$${(totalCost / acres).toFixed(2)}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -2181,7 +2195,7 @@
                         });
                         const needed = Object.values(totalsByChemical).map(item => ({ name: item.name, needed: item.totalNeeded }));
                         const allInStock = needed.every((n, i) => stockStatus[i] >= n.needed);
-                        const amountDue = (totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)).toFixed(2);
+                        const amountDue = totalCost.toFixed(2);
 
                         if (allInStock) {
                             return `
