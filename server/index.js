@@ -996,10 +996,10 @@ ledgerEntrySchema.index({ referenceType: 1, referenceId: 1 });
 const LedgerEntry = mongoose.model('LedgerEntry', ledgerEntrySchema);
 
 // Helper: Create a ledger entry and compute running balance
-async function createLedgerEntry({ representativeId, description, amount, type, category, referenceType, referenceId, createdBy, notes }) {
-    const lastEntry = await LedgerEntry.findOne({ representativeId })
-        .sort({ date: -1, createdAt: -1 })
-        .lean();
+async function createLedgerEntry({ representativeId, description, amount, type, category, referenceType, referenceId, createdBy, notes, session }) {
+    const query = LedgerEntry.findOne({ representativeId }).sort({ date: -1, createdAt: -1 });
+    if (session) query.session(session);
+    const lastEntry = await query.lean();
 
     const previousBalance = lastEntry ? lastEntry.runningBalance : 0;
     const balanceChange = type === 'debit' ? amount : -amount;
@@ -1019,7 +1019,7 @@ async function createLedgerEntry({ representativeId, description, amount, type, 
         date: new Date()
     });
 
-    await entry.save();
+    await entry.save({ session });
     return entry;
 }
 
@@ -2269,13 +2269,15 @@ async function deductInventory({ chemicalId, quantity, location, orderId, orderN
 }
 
 // Helper: Reserve inventory when an order is placed/updated
-async function reserveInventory({ chemicalId, quantity, location, orderId, orderNumber, userId, notes }) {
-    let inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+async function reserveInventory({ chemicalId, quantity, location, orderId, orderNumber, userId, notes, session }) {
+    const invQuery = Inventory.findOne({ chemicalId, location: location || 'main' });
+    if (session) invQuery.session(session);
+    let inventory = await invQuery;
 
     if (!inventory) {
-        // No inventory record yet - create one with zero quantities
-        // This tracks the reservation even before stock arrives
-        const chemical = await Chemical.findById(chemicalId);
+        const chemQuery = Chemical.findById(chemicalId);
+        if (session) chemQuery.session(session);
+        const chemical = await chemQuery;
         inventory = new Inventory({
             chemicalId,
             productName: chemical?.name || 'Unknown Product',
@@ -2295,9 +2297,8 @@ async function reserveInventory({ chemicalId, quantity, location, orderId, order
     inventory.quantityAvailable = inventory.quantityOnHand - inventory.quantityReserved;
     inventory.updatedAt = new Date();
 
-    await inventory.save();
+    await inventory.save({ session });
 
-    // Create transaction record for audit trail
     const transaction = new InventoryTransaction({
         inventoryId: inventory._id,
         chemicalId,
@@ -2316,7 +2317,7 @@ async function reserveInventory({ chemicalId, quantity, location, orderId, order
         createdBy: userId
     });
 
-    await transaction.save();
+    await transaction.save({ session });
 
     return { inventory, transaction };
 }
@@ -4512,50 +4513,49 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
             : totalPrice;
         const adjustedCostPerAcre = acres > 0 ? Math.round((adjustedTotal / acres) * 100) / 100 : 0;
 
-        const order = new Order({
-            userId: customerId,
-            representativeId: req.user._id,
-            crop,
-            program: programId,
-            acres,
-            gpa,
-            year: year || new Date().getFullYear(),
-            chemicals: normalizedChemicals,
-            seeds,
-            pivotBio,
-            totalCost: adjustedTotal,
-            costPerAcre: adjustedCostPerAcre,
-            discount: Math.round(totalDiscount * 100) / 100,
-            discountReason: discountDescription || undefined,
-            status: status || 'draft',
-            notes,
-            createdBy: req.user._id // Track who created this order
-        });
-
-        await order.save();
-
-        // Reserve inventory and calculate commissions for each chemical
-        const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
-        if (chemicalIds.length > 0) {
-            try {
-                // Fetch chemical pricing data for commission calculation
-                const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
-                    .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars');
-
-                const pricingMap = {};
-                chemicalPricing.forEach(c => {
-                    pricingMap[c._id.toString()] = c;
+        // Atomic transaction: order + inventory reservations must succeed together or not at all
+        let order;
+        const dbSession = await mongoose.startSession();
+        try {
+            await dbSession.withTransaction(async () => {
+                order = new Order({
+                    userId: customerId,
+                    representativeId: req.user._id,
+                    crop,
+                    program: programId,
+                    acres,
+                    gpa,
+                    year: year || new Date().getFullYear(),
+                    chemicals: normalizedChemicals,
+                    seeds,
+                    pivotBio,
+                    totalCost: adjustedTotal,
+                    costPerAcre: adjustedCostPerAcre,
+                    discount: Math.round(totalDiscount * 100) / 100,
+                    discountReason: discountDescription || undefined,
+                    status: status || 'draft',
+                    notes,
+                    createdBy: req.user._id
                 });
 
-                let totalRepCommission = 0;
-                let totalAdminRevenue = 0;
+                await order.save({ session: dbSession });
 
-                // Reserve inventory and calculate commissions for each item
-                for (const chem of normalizedChemicals) {
-                    const qty = chem.qty || chem.quantity || 0;
-                    if (chem.chemicalId && qty > 0) {
-                        // Reserve inventory
-                        try {
+                // Reserve inventory + calculate commissions atomically
+                const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
+                if (chemicalIds.length > 0) {
+                    const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
+                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars')
+                        .session(dbSession);
+
+                    const pricingMap = {};
+                    chemicalPricing.forEach(c => { pricingMap[c._id.toString()] = c; });
+
+                    let totalRepCommission = 0;
+                    let totalAdminRevenue = 0;
+
+                    for (const chem of normalizedChemicals) {
+                        const qty = chem.qty || chem.quantity || 0;
+                        if (chem.chemicalId && qty > 0) {
                             await reserveInventory({
                                 chemicalId: chem.chemicalId,
                                 quantity: qty,
@@ -4563,35 +4563,31 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                                 orderId: order._id,
                                 orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
                                 userId: req.user._id,
-                                notes: `Reserved for order - ${crop}`
+                                notes: `Reserved for order - ${crop}`,
+                                session: dbSession
                             });
-                        } catch (invErr) {
-                            console.warn('Inventory reservation warning:', invErr.message);
-                            // Continue even if reservation fails (might not have inventory records yet)
-                        }
 
-                        // Calculate commission from pricing data
-                        const pricing = pricingMap[chem.chemicalId.toString()];
-                        if (pricing) {
-                            // Rep commission = marginDollars * quantity
-                            totalRepCommission += (pricing.marginDollars || 0) * qty;
-                            // Admin revenue = adminMarginDollars * quantity
-                            totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                            const pricing = pricingMap[chem.chemicalId.toString()];
+                            if (pricing) {
+                                totalRepCommission += (pricing.marginDollars || 0) * qty;
+                                totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                            }
                         }
                     }
-                }
 
-                // Update order with commission data
-                if (totalRepCommission > 0 || totalAdminRevenue > 0) {
-                    order.repCommission = totalRepCommission;
-                    order.adminRevenue = totalAdminRevenue;
-                    await order.save();
+                    if (totalRepCommission > 0 || totalAdminRevenue > 0) {
+                        order.repCommission = totalRepCommission;
+                        order.adminRevenue = totalAdminRevenue;
+                        await order.save({ session: dbSession });
+                    }
                 }
-            } catch (err) {
-                console.error('Error processing inventory/commissions:', err.message);
-                // Don't fail order creation if this fails
-            }
+            });
+        } catch (txErr) {
+            await dbSession.endSession();
+            console.error('Order transaction failed - rolled back:', txErr.message);
+            return res.status(500).json({ error: 'Order could not be completed. No changes saved. Please try again.' });
         }
+        await dbSession.endSession();
 
         // Send order confirmation email to customer
         const transporter = createEmailTransporter();
