@@ -1088,7 +1088,7 @@ const chemicalRestrictions = {
         groundNotes: 'Non-selective - kills all green vegetation on contact'
     },
     'flumioxazin': {
-        rotation: 'Pre-plant to sorghum: 30 days minimum with adequate rainfall at max 2 oz/acre. Rotating after corn: 18 months to sorghum at rates above 2 oz/acre. Wheat: 4 months. Soybeans: 12 months.',
+        rotation: 'Sorghum/Milo: 10 months after application at 2 oz/acre with 15+ inches rainfall (corn-to-milo spring rotation is typically fine). Wheat: 4 months. Soybeans: 12 months. Pre-plant to sorghum: 30 days minimum at max 2 oz/acre.',
         grazing: 'Do not graze or harvest forage for 30 days',
         groundNotes: 'Pre-emerge residual broadleaf control. Works best on medium-textured soils. Need rainfall/irrigation to activate.'
     },
