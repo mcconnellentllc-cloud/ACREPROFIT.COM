@@ -3843,6 +3843,52 @@ app.get('/api/representatives', async (req, res) => {
 });
 
 // Public endpoint: Get active distributors for checkout/pickup location selection
+// Price Mining: customer-submitted competitor quotes
+const priceMiningQuoteSchema = new mongoose.Schema({
+    product: { type: String, required: true },
+    supplier: { type: String, required: true },
+    price: { type: String, required: true },
+    notes: String,
+    submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    submittedByName: String,
+    createdAt: { type: Date, default: Date.now }
+});
+const PriceMiningQuote = mongoose.models.PriceMiningQuote || mongoose.model('PriceMiningQuote', priceMiningQuoteSchema);
+
+app.post('/api/price-mining/submit', async (req, res) => {
+    try {
+        const { product, supplier, price, notes } = req.body;
+        if (!product || !supplier || !price) return res.status(400).json({ error: 'Missing required fields' });
+
+        let submittedBy, submittedByName;
+        const authHeader = req.header('Authorization');
+        if (authHeader) {
+            try {
+                const decoded = jwt.verify(authHeader.replace('Bearer ', ''), JWT_SECRET);
+                const user = await User.findById(decoded.userId);
+                if (user) {
+                    submittedBy = user._id;
+                    submittedByName = user.name;
+                }
+            } catch (e) { /* anonymous ok */ }
+        }
+
+        const quote = await PriceMiningQuote.create({ product, supplier, price, notes, submittedBy, submittedByName });
+        res.json(quote);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.get('/api/price-mining/quotes', async (req, res) => {
+    try {
+        const quotes = await PriceMiningQuote.find().sort({ createdAt: -1 }).limit(100);
+        res.json(quotes);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 app.get('/api/distributors', async (req, res) => {
     try {
         const distributors = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin'] } })
