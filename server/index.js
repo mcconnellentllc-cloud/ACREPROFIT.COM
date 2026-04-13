@@ -6176,6 +6176,8 @@ app.get('/api/chemicals/available', async (req, res) => {
                 labelUrl: c.labelUrl,
                 sdsUrl: c.sdsUrl,
                 availability,
+                quantityOnHand: onHand,
+                quantityOnOrder: onOrder,
                 isRestrictedUse: c.isRestrictedUse,
                 locations: invData?.locations || []
             };

@@ -155,7 +155,7 @@
             </div>
 
             <div class="search-filter">
-                <input type="text" class="search-input" id="searchInput" placeholder="Search products by name...">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search products by name or active ingredient...">
                 <div class="filter-buttons">
                     <button class="filter-btn active" data-filter="all">All</button>
                     <button class="filter-btn" data-filter="herbicide">Herbicides</button>
@@ -163,6 +163,13 @@
                     <button class="filter-btn" data-filter="fertilizer">Fertilizers</button>
                     <button class="filter-btn" data-filter="insecticide">Insecticides</button>
                     <button class="filter-btn" data-filter="fungicide">Fungicides</button>
+                </div>
+                <div class="filter-buttons" style="margin-top: 8px;">
+                    <span style="font-weight:600; color:#666; font-size:0.85rem; padding:6px 0;">Stock:</span>
+                    <button class="filter-btn active" data-stock-filter="all">All</button>
+                    <button class="filter-btn" data-stock-filter="in_stock" style="color:#059669;">In Stock</button>
+                    <button class="filter-btn" data-stock-filter="low_stock" style="color:#d97706;">Low Stock</button>
+                    <button class="filter-btn" data-stock-filter="out_of_stock" style="color:#dc2626;">Out of Stock</button>
                 </div>
             </div>
 
@@ -231,6 +238,7 @@
 
         let products = [];
         let currentFilter = 'all';
+        let currentStockFilter = 'all';
         let searchTerm = '';
         let token = localStorage.getItem('acreprofit_token');
 
@@ -248,8 +256,6 @@
                 const data = await response.json();
                 products = data
                     .filter(p => {
-                        // Only show products that are actually in stock (quantityOnHand > 0)
-                        if (p.availability !== 'in_stock') return false;
                         // Must have a sell price set (server already filters sellPrice > costPrice)
                         const price = p.sellPrice || 0;
                         if (price <= 0) return false;
@@ -270,8 +276,8 @@
                         sdsUrl: p.sdsUrl || '',
                         epaReg: p.epaRegistrationNumber || '',
                         rup: p.isRestrictedUse,
-                        inStock: true,
-                        quantityAvailable: 100,
+                        inStock: (p.quantityOnHand || 0) > 0,
+                        quantityAvailable: p.quantityOnHand || 0,
                         availability: p.availability,
                         locations: p.locations || [],
                         qty: 0
@@ -291,7 +297,18 @@
                 const matchesFilter = currentFilter === 'all' || p.category === currentFilter;
                 const matchesSearch = p.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                                      (p.activeIngredients || '').toLowerCase().includes(searchTerm.toLowerCase());
-                return matchesFilter && matchesSearch;
+
+                // Stock filter
+                let matchesStock = true;
+                if (currentStockFilter !== 'all') {
+                    const qty = p.quantityAvailable || 0;
+                    const availability = p.availability || 'out_of_stock';
+                    if (currentStockFilter === 'in_stock') matchesStock = availability === 'in_stock' && qty > 20;
+                    else if (currentStockFilter === 'low_stock') matchesStock = availability === 'in_stock' && qty > 0 && qty <= 20;
+                    else if (currentStockFilter === 'out_of_stock') matchesStock = availability !== 'in_stock' || qty === 0;
+                }
+
+                return matchesFilter && matchesSearch && matchesStock;
             });
 
             if (filtered.length === 0) {
@@ -571,11 +588,20 @@
             renderProducts();
         });
 
-        document.querySelectorAll('.filter-btn').forEach(btn => {
+        document.querySelectorAll('.filter-btn[data-filter]').forEach(btn => {
             btn.addEventListener('click', function() {
-                document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.filter-btn[data-filter]').forEach(b => b.classList.remove('active'));
                 this.classList.add('active');
                 currentFilter = this.dataset.filter;
+                renderProducts();
+            });
+        });
+
+        document.querySelectorAll('.filter-btn[data-stock-filter]').forEach(btn => {
+            btn.addEventListener('click', function() {
+                document.querySelectorAll('.filter-btn[data-stock-filter]').forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                currentStockFilter = this.dataset.stockFilter;
                 renderProducts();
             });
         });
