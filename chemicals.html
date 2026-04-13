@@ -51,6 +51,7 @@
             <div class="page-header">
                 <h1>Crop Protection</h1>
                 <p>Choose how you'd like to build your order</p>
+                <p style="color:#2d5a27; font-style:italic; font-weight:600; font-size:0.95rem; margin-top:8px;">Farmers helping farmers - doing what co-ops should be doing.</p>
             </div>
 
             <!-- Option Tabs -->
@@ -320,10 +321,10 @@
                         </div>
                     </div>
 
-                    <!-- Custom Chemicals Section (not from CPD) -->
+                    <!-- Custom Chemicals Section (not in Acre Profit catalog) -->
                     <div class="custom-chemicals-section">
-                        <h4>Add Your Own Chemicals <span class="badge-info">Not supplied by CPD</span></h4>
-                        <p class="section-note">Add chemicals you'll source elsewhere. We'll generate a bid sheet you can send to suppliers.</p>
+                        <h4>Add Your Own Chemicals <span class="badge-info">Not in Acre Profit catalog</span></h4>
+                        <p class="section-note">Don't see what you need? Add it and we'll go shopping for you - pooling orders to get better prices.</p>
 
                         <div id="customChemicalsList">
                             <!-- Populated dynamically -->
@@ -2003,7 +2004,7 @@
                             ${sheet.chemicals.map(c => `
                                 <tr>
                                     <td>${c.name}</td>
-                                    <td><span class="source-badge cpd">CPD</span></td>
+                                    <td><span class="source-badge cpd">Acre Profit</span></td>
                                     <td>${c.rate} ${c.rateUnit}</td>
                                     <td><strong>${c.totalNeeded.toFixed(2)} ${c.unit}</strong></td>
                                 </tr>
@@ -2120,9 +2121,13 @@
                         </div>
                     </div>
 
+                    <div style="background:#f0f7ef; border-left:3px solid #2d5a27; padding:12px 16px; border-radius:6px; margin:16px 0; color:#2d5a27; font-style:italic; font-weight:500; font-size:0.9rem;">
+                        Thanks for buying through Acre Profit - farmers helping farmers, keeping more money in your pocket instead of paying for someone else's fancy corporate office.
+                    </div>
+
                     <div class="order-actions">
                         <button class="btn btn-primary btn-lg" onclick="submitProgramOrder(${acres}, ${totalCost})">
-                            Submit CPD Order
+                            Submit Order to Acre Profit
                         </button>
                         <button class="btn btn-outline" onclick="window.print()">
                             Print Order Summary
@@ -2139,7 +2144,7 @@
                 <div class="bid-sheet-section">
                     <div class="bid-sheet-header">
                         <h3>Supplier Bid Request Sheet</h3>
-                        <p>The following chemicals are NOT supplied by CPD. Forward this bid sheet to your preferred suppliers to get competitive quotes.</p>
+                        <p>These chemicals aren't in our Acre Profit catalog yet. Forward this bid sheet to suppliers - or let us go shopping for you through Price Mining.</p>
                     </div>
 
                     <div class="bid-sheet-content" id="bidSheetContent">
