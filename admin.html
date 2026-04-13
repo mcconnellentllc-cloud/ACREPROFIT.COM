@@ -1634,7 +1634,10 @@
                     </div>
                 </div>
 
-                <!-- Balance Summary Cards -->
+                <!-- Top Summary: Total AP Debt + Customer Sales -->
+                <div id="ledgerTopSummary" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; margin-bottom: 24px;"></div>
+
+                <!-- Per-Distributor Balance Cards -->
                 <div id="ledgerSummary" class="stats-grid" style="margin-bottom: 24px;"></div>
 
                 <!-- Ledger Table -->
@@ -6299,17 +6302,46 @@
             });
         }
 
-        function renderLedgerSummary(summaries) {
+        async function renderLedgerSummary(summaries) {
             const activeSummaries = summaries.filter(s => s.totalCredits > 0 || s.totalDebits > 0);
+
+            // Calculate total AP debt (sum of all amounts AP owes)
+            const totalApDebt = activeSummaries.reduce((sum, s) => {
+                return s.balance < 0 ? sum + Math.abs(s.balance) : sum;
+            }, 0);
+
+            // Fetch total customer sales
+            let totalCustomerSales = 0;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/stats/sales-total`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    totalCustomerSales = data.totalSales || 0;
+                }
+            } catch (e) { /* ignore, default to 0 */ }
+
+            // Top summary: Total AP Debt + Customer Sales
+            document.getElementById('ledgerTopSummary').innerHTML = `
+                <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #dc2626;">
+                    <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">TOTAL AP DEBT</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #dc2626;">$${totalApDebt.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Combined loans from distributors</div>
+                </div>
+                <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #059669;">
+                    <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">CUSTOMER SALES</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #059669;">$${totalCustomerSales.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Total chemicals purchased by customers</div>
+                </div>
+            `;
+
+            // Per-distributor cards
             document.getElementById('ledgerSummary').innerHTML = activeSummaries.map(s => {
                 const balance = s.balance;
-                // Credits = money they put in (AP owes them)
-                // Debits = money paid back or product they took (reduces what AP owes)
-                const moneyIn = s.totalCredits || 0;  // Total invested
-                const moneyOut = s.totalDebits || 0;  // Total paid back / taken
+                const moneyIn = s.totalCredits || 0;
+                const moneyOut = s.totalDebits || 0;
                 const firstName = s.rep.name.split(' ')[0];
-
-                // Negative balance = AP owes them, Positive = they owe AP
                 const apOwes = balance < 0;
                 const owing = Math.abs(balance);
 

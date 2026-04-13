@@ -5054,6 +5054,31 @@ app.post('/api/admin/orders/:orderId/send-payment-request', authMiddleware, admi
 });
 
 // Get order stats (admin only)
+// Total sales to customers (sum of all paid/confirmed orders)
+app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const paidStatuses = ['paid', 'confirmed', 'ready', 'delivered', 'completed', 'payment_secured'];
+
+        const chemOrderSales = await ChemicalOrder.aggregate([
+            { $match: { $or: [
+                { paymentStatus: 'paid' },
+                { status: { $in: paidStatuses } }
+            ]}},
+            { $group: { _id: null, total: { $sum: '$total' } } }
+        ]);
+
+        const orderSales = await Order.aggregate([
+            { $match: { status: { $in: paidStatuses } } },
+            { $group: { _id: null, total: { $sum: '$totalCost' } } }
+        ]);
+
+        const totalSales = (chemOrderSales[0]?.total || 0) + (orderSales[0]?.total || 0);
+        res.json({ totalSales });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         let query = {};
