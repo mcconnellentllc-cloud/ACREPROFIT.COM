@@ -904,36 +904,35 @@
                 },
                 {
                     _id: 'corn-2',
-                    name: 'Corn - 2-Pass Program',
-                    description: 'Burndown + Pre-emerge (End March through Mid May)',
+                    name: 'Corn - Hardy Economical Program (Best All-Around)',
+                    description: 'Reliable 2-pass program built for resistant weed pressure in dryland/High Plains. Uses our heavy-stock actives for strong residual control at a reasonable cost per acre.',
                     crop: 'corn',
                     type: 'recommended',
-                    groundType: 'Dryland or irrigated corn. Two applications for season-long weed control. Anthem NXT provides extended residual grass and broadleaf control through the canopy.',
-                    rotationRestrictions: 'Sorghum/Milo: 10-12 months with adequate rainfall (corn-to-milo spring rotation works). Wheat: 4 months. Soybeans: 12 months. Anthem NXT adds Group 15 restriction - check label for specific rotational crops.',
-                    grazingRestrictions: 'Do not graze or harvest forage from treated areas for 30 days.',
+                    badge: 'Recommended for most fields',
+                    groundType: 'Dryland or irrigated corn with real weed pressure (kochia, waterhemp, pigweed, lambsquarters, foxtail). 5+ modes of action layered. Scout 14-21 days after application and adjust based on soil type, OM, and pressure. Need heavy grass control (shattercane/johnsongrass)? Add S-metolachlor or acetochlor via Price Mining.',
+                    rotationRestrictions: 'Sorghum/Milo: 10-12 months with adequate rainfall (corn-to-milo spring rotation is safe). Wheat: 4 months after flumioxazin. Soybeans: 12 months after atrazine.',
+                    grazingRestrictions: 'Do not graze or harvest forage from treated areas for 30 days. Atrazine: 60 days for sorghum forage.',
                     applications: [
                         {
-                            name: 'Burndown',
-                            timing: 'End March - April',
-                            truckRouteDate: 'Mid March',
+                            name: 'Pass 1: Early Pre-Plant / Burndown',
+                            timing: 'Late March - Early April (30+ days before planting)',
+                            truckRouteDate: 'Mid-Late March',
                             chemicals: [
-                                { productName: 'Flumioxazin 51% WDG', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
-                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 12.90 },
-                                { productName: 'Dicamba 49.8% SL', rate: 10, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 28.25 },
-                                { productName: 'Atrazine 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 13.35 },
-                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 110.00 }
+                                { productName: 'Flumioxazin 51% WDG', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 0 },
+                                { productName: 'Atrazine 4L', rate: 1.25, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 32, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Dicamba 49.8% SL', rate: 10, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         },
                         {
-                            name: 'Pre-Emerge (2nd Pass)',
-                            timing: 'Mid May',
+                            name: 'Pass 2: At-Planting / Pre-Emerge',
+                            timing: 'Mid May (at or just before planting)',
                             truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Atrazine 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
                                 { productName: 'Meso 4SC', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
-                                { productName: 'Anthem NXT', rate: 3, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
-                                { productName: 'Atrazine 4L', rate: 1, rateUnit: 'lb/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
-                                { productName: 'Dicamba 49.8% SL', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Dicamba 49.8% SL', rate: 6, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
                                 { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
@@ -995,7 +994,7 @@
                     description: '30-day minimum pre-plant burndown for grain sorghum',
                     crop: 'milo',
                     type: 'recommended',
-                    groundType: 'Dryland grain sorghum. Must apply at least 30 days before planting. Flumioxazin provides pre-emerge residual. Good for wheat stubble rotation.',
+                    groundType: 'Dryland grain sorghum. Must apply at least 30 days before planting. Flumioxazin provides pre-emerge broadleaf residual. Atrazine handles some early grass. NOTE: Heavy grass pressure (shattercane, johnsongrass, big crabgrass) needs a Group 15 residual (acetochlor/S-metolachlor) added at planting - requires Concep-treated seed. Ask your rep about adding via Price Mining.',
                     rotationRestrictions: 'Wheat: 4 months. Corn: no restriction if atrazine rate is under 1 lb ai/acre. Soybeans: 12 months after atrazine.',
                     grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine application.',
                     applications: [
@@ -1015,35 +1014,35 @@
                 },
                 {
                     _id: 'milo-2',
-                    name: 'Sorghum - Full 2-Pass Program',
-                    description: 'Complete pre-plant + at-planting sorghum program (on-label chemistry only)',
+                    name: 'Sorghum - Hardy Economical Program (Best All-Around)',
+                    description: 'Reliable 2-pass program for dryland/High Plains grain sorghum. Heavy broadleaf residual stack using our stock chemistry. Designed for resistant weed pressure at reasonable cost per acre.',
                     crop: 'milo',
                     type: 'recommended',
-                    groundType: 'Dryland grain sorghum with higher weed pressure. Two-pass program: pre-plant burndown with flumioxazin (30 days min before planting) + at-planting residual stack (Atrazine + Meso + Rancor) for extended grass and broadleaf control. All products labeled for sorghum.',
-                    rotationRestrictions: 'Rancor (metribuzin): 18 months to most crops except wheat/barley after full rate. Atrazine: 12 months to soybeans. Wheat: 4 months after flumioxazin. Mesotrione: 18 months to soybeans.',
-                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine application. Rancor: do not graze or harvest forage for 28 days.',
+                    badge: 'Recommended for most fields',
+                    groundType: 'Dryland grain sorghum. Excellent broadleaf residual (pigweed, waterhemp, kochia, lambsquarters). Uses multiple Group 5 + 27 + 14 + 9 MOAs for resistance management. WARNING: For heavy annual grass pressure (shattercane, johnsongrass, crabgrass, foxtail), add a Group 15 residual (acetochlor like Warrant, S-metolachlor like Dual II Magnum) at planting. Group 15 products require Concep-treated sorghum seed - check your seed tag. Source via Price Mining.',
+                    rotationRestrictions: 'Rancor (metribuzin): 4 months to wheat (most labels), 18 months to most other crops at full rate. Atrazine: 12 months to soybeans. Wheat/barley next fall: safe. Mesotrione: 18 months to soybeans.',
+                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine. Rancor: do not graze or harvest forage for 28 days.',
                     applications: [
                         {
-                            name: '30d Minimum Pre-Plant',
+                            name: 'Pass 1: Early Pre-Plant / Burndown',
                             timing: 'Early-Mid April (30 days before planting)',
                             truckRouteDate: 'Late March',
                             chemicals: [
-                                { productName: 'Flumioxazin 51% WDG', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 14.25 },
-                                { productName: 'Atrazine 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 13.35 },
-                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 12.90 },
-                                { productName: 'Dicamba 49.8% SL', rate: 8, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 28.25 },
-                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 110.00 }
+                                { productName: 'Flumioxazin 51% WDG', rate: 2, rateUnit: 'oz/acre', packSize: '4x5 lb', unit: 'lb', unitsPerPack: 20, price: 0 },
+                                { productName: 'Atrazine 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 32, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Dicamba 49.8% SL', rate: 8, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         },
                         {
-                            name: 'At Planting',
+                            name: 'Pass 2: At-Planting / Pre-Emerge',
                             timing: 'Mid May (at planting)',
                             truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'Atrazine 4L', rate: 2, rateUnit: 'qt/acre', packSize: '265 gal', unit: 'gal', unitsPerPack: 265, price: 0 },
-                                { productName: 'Meso 4SC', rate: 3, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Atrazine 4L', rate: 1.25, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Meso 4SC', rate: 5, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
                                 { productName: 'Rancor 4F', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
-                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
                                 { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
@@ -1573,14 +1572,16 @@
                     : '';
 
                 return `
-                <div class="program-card" data-program-id="${prog._id}">
+                <div class="program-card" data-program-id="${prog._id}" ${prog.badge ? 'style="border: 2px solid #2d5a27; box-shadow: 0 4px 12px rgba(45,90,39,0.15);"' : ''}>
                     <div class="program-header">
                         <h3>${prog.name}</h3>
                         <span class="program-crop-badge">${prog.crop}</span>
                     </div>
+                    ${prog.badge ? `<div style="background:linear-gradient(135deg, #2d5a27 0%, #1f4019 100%); color:white; padding:6px 12px; border-radius:4px; display:inline-block; font-size:0.75rem; font-weight:700; letter-spacing:0.5px; margin-bottom:12px;">&#9733; ${prog.badge.toUpperCase()}</div>` : ''}
                     <p class="program-desc">${prog.description}</p>
                     ${costPerAcreHTML}
                     ${prog.groundType ? `<div style="background:#f0f7ef; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.88rem; color:#2d5a27; border-left:3px solid #2d5a27;"><strong>Best For:</strong> ${prog.groundType}</div>` : ''}
+                    <div style="background:#fffbeb; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.8rem; color:#92400e; border-left:3px solid #f59e0b;"><strong>Scout 14-21 days after application.</strong> Adjust rates based on soil type, organic matter, and actual weed pressure. Label is the law.</div>
                     <div class="program-applications">
                         ${prog.applications.map(app => `
                             <div class="program-pass">
