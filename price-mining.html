@@ -71,19 +71,21 @@
         </div>
 
         <div class="quote-form-card">
-            <h2>Request a Price / Submit a Quote You've Seen</h2>
-            <p>Tell us the product, when you need it, and any pricing you've already been quoted. We'll do the legwork.</p>
-            <div class="quote-form-grid">
-                <input type="text" id="qProduct" placeholder="Product name (e.g., Roundup PowerMax)">
-                <input type="text" id="qSupplier" placeholder="Supplier/Retailer (or 'any')">
-                <input type="text" id="qPrice" placeholder="Best price seen (e.g., $12.50/gal)">
-                <input type="text" id="qNotes" placeholder="When needed? Quantity? Pack size?">
+            <h2>What Are You Looking For?</h2>
+            <p>List the products and quantities you need. We'll go shopping and get back to you with the best price.</p>
+            <div id="requestLines"></div>
+            <button type="button" onclick="addRequestLine()" style="background:white; color:#92400e; border:1px dashed #92400e; padding:8px 16px; border-radius:6px; font-weight:600; cursor:pointer; margin-top:8px;">+ Add Another Product</button>
+
+            <div style="margin-top:16px; display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                <input type="text" id="qWhenNeeded" placeholder="When do you need it? (e.g., Pre-plant, Early May)" style="padding:10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.95rem;">
+                <input type="text" id="qNotes" placeholder="Any other notes? (optional)" style="padding:10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.95rem;">
             </div>
-            <button class="btn-submit" onclick="submitQuote()">Submit Request</button>
+
+            <button class="btn-submit" onclick="submitQuote()" style="margin-top:16px;">Submit Request</button>
             <div id="submitStatus" style="margin-top:10px; font-weight:600;"></div>
         </div>
 
-        <h2 class="section-heading">Recent Requests &amp; Quotes</h2>
+        <h2 class="section-heading">Recent Requests</h2>
         <div id="quotesList" class="quotes-list">
             <div class="empty">Loading quotes...</div>
         </div>
@@ -99,15 +101,44 @@
             window.location.href = '/login.html';
         });
 
+        let lineCount = 0;
+
+        function addRequestLine() {
+            lineCount++;
+            const container = document.getElementById('requestLines');
+            const row = document.createElement('div');
+            row.className = 'request-line';
+            row.dataset.lineId = lineCount;
+            row.style.cssText = 'display:grid; grid-template-columns:2fr 1fr auto; gap:10px; margin-bottom:10px; align-items:center;';
+            row.innerHTML = `
+                <input type="text" class="line-product" placeholder="Product name (e.g., Roundup PowerMax, Meso 4SC)" style="padding:10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.95rem;">
+                <input type="text" class="line-qty" placeholder="Quantity needed (e.g., 500 gal)" style="padding:10px; border:1px solid #d1d5db; border-radius:6px; font-size:0.95rem;">
+                <button type="button" onclick="removeRequestLine(${lineCount})" style="background:white; color:#dc2626; border:1px solid #dc2626; padding:8px 12px; border-radius:6px; cursor:pointer; font-weight:600;">Remove</button>
+            `;
+            container.appendChild(row);
+        }
+
+        function removeRequestLine(id) {
+            const row = document.querySelector(`.request-line[data-line-id="${id}"]`);
+            if (row) row.remove();
+            // Always keep at least one line visible
+            if (document.querySelectorAll('.request-line').length === 0) {
+                addRequestLine();
+            }
+        }
+
         async function submitQuote() {
-            const product = document.getElementById('qProduct').value.trim();
-            const supplier = document.getElementById('qSupplier').value.trim();
-            const price = document.getElementById('qPrice').value.trim();
+            const lines = Array.from(document.querySelectorAll('.request-line')).map(row => ({
+                product: row.querySelector('.line-product').value.trim(),
+                quantity: row.querySelector('.line-qty').value.trim()
+            })).filter(l => l.product);
+
+            const whenNeeded = document.getElementById('qWhenNeeded').value.trim();
             const notes = document.getElementById('qNotes').value.trim();
             const status = document.getElementById('submitStatus');
 
-            if (!product || !supplier || !price) {
-                status.textContent = 'Please fill in product, supplier, and price.';
+            if (lines.length === 0) {
+                status.textContent = 'Please add at least one product.';
                 status.style.color = '#dc2626';
                 return;
             }
@@ -119,32 +150,31 @@
                         'Content-Type': 'application/json',
                         ...(token ? { 'Authorization': `Bearer ${token}` } : {})
                     },
-                    body: JSON.stringify({ product, supplier, price, notes })
+                    body: JSON.stringify({ lines, whenNeeded, notes })
                 });
 
                 if (res.ok) {
-                    status.textContent = 'Quote submitted - thank you!';
+                    status.textContent = `Request submitted (${lines.length} product${lines.length === 1 ? '' : 's'}) - we'll get back to you soon!`;
                     status.style.color = '#059669';
-                    document.getElementById('qProduct').value = '';
-                    document.getElementById('qSupplier').value = '';
-                    document.getElementById('qPrice').value = '';
+                    document.getElementById('requestLines').innerHTML = '';
+                    addRequestLine();
+                    document.getElementById('qWhenNeeded').value = '';
                     document.getElementById('qNotes').value = '';
                     loadQuotes();
                 } else {
-                    // Fallback - store in localStorage if endpoint doesn't exist yet
                     const local = JSON.parse(localStorage.getItem('pricemining_submissions') || '[]');
-                    local.unshift({ product, supplier, price, notes, date: new Date().toISOString() });
+                    local.unshift({ lines, whenNeeded, notes, date: new Date().toISOString() });
                     localStorage.setItem('pricemining_submissions', JSON.stringify(local));
-                    status.textContent = 'Quote saved - thank you!';
+                    status.textContent = `Request saved (${lines.length} product${lines.length === 1 ? '' : 's'}) - we'll get back to you soon!`;
                     status.style.color = '#059669';
-                    document.getElementById('qProduct').value = '';
-                    document.getElementById('qSupplier').value = '';
-                    document.getElementById('qPrice').value = '';
+                    document.getElementById('requestLines').innerHTML = '';
+                    addRequestLine();
+                    document.getElementById('qWhenNeeded').value = '';
                     document.getElementById('qNotes').value = '';
                     renderLocal();
                 }
             } catch (e) {
-                status.textContent = 'Error submitting quote. Please try again.';
+                status.textContent = 'Error submitting request. Please try again.';
                 status.style.color = '#dc2626';
             }
         }
@@ -161,36 +191,44 @@
                     renderLocal();
                     return;
                 }
-                list.innerHTML = quotes.map(q => `
-                    <div class="quote-card">
-                        <div class="product">${q.product}</div>
-                        <div class="supplier">${q.supplier}</div>
-                        <div class="price">${q.price}</div>
-                        <div class="date">${new Date(q.date || q.createdAt).toLocaleDateString()}</div>
-                    </div>
-                `).join('');
+                list.innerHTML = quotes.map(q => renderQuoteCard(q)).join('');
             } catch (e) {
                 renderLocal();
             }
+        }
+
+        function renderQuoteCard(q) {
+            const lines = q.lines && q.lines.length ? q.lines : (q.product ? [{ product: q.product, quantity: q.supplier || '' }] : []);
+            const linesHtml = lines.map(l => `<div><strong>${l.product}</strong>${l.quantity ? ` &mdash; ${l.quantity}` : ''}</div>`).join('');
+            const whenNeeded = q.whenNeeded ? `<div style="color:#92400e; font-size:0.85rem; margin-top:6px;">Needed: ${q.whenNeeded}</div>` : '';
+            const notes = q.notes ? `<div style="color:#666; font-size:0.85rem; margin-top:4px;">${q.notes}</div>` : '';
+            const date = new Date(q.date || q.createdAt).toLocaleDateString();
+            return `
+                <div style="background:white; border:1px solid #e5e7eb; border-radius:8px; padding:16px 20px;">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:16px;">
+                        <div style="flex:1;">
+                            ${linesHtml}
+                            ${whenNeeded}
+                            ${notes}
+                        </div>
+                        <div style="color:#999; font-size:0.85rem; white-space:nowrap;">${date}</div>
+                    </div>
+                </div>
+            `;
         }
 
         function renderLocal() {
             const local = JSON.parse(localStorage.getItem('pricemining_submissions') || '[]');
             const list = document.getElementById('quotesList');
             if (!local.length) {
-                list.innerHTML = '<div class="empty">No quotes submitted yet. Be the first to share pricing you\'ve seen!</div>';
+                list.innerHTML = '<div class="empty">No requests submitted yet. Be the first to ask!</div>';
                 return;
             }
-            list.innerHTML = local.map(q => `
-                <div class="quote-card">
-                    <div class="product">${q.product}</div>
-                    <div class="supplier">${q.supplier}</div>
-                    <div class="price">${q.price}</div>
-                    <div class="date">${new Date(q.date).toLocaleDateString()}</div>
-                </div>
-            `).join('');
+            list.innerHTML = local.map(q => renderQuoteCard(q)).join('');
         }
 
+        // Start with one line
+        addRequestLine();
         loadQuotes();
     </script>
 </body>

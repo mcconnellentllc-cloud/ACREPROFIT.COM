@@ -3845,20 +3845,31 @@ app.get('/api/representatives', async (req, res) => {
 // Public endpoint: Get active distributors for checkout/pickup location selection
 // Price Mining: customer-submitted competitor quotes
 const priceMiningQuoteSchema = new mongoose.Schema({
-    product: { type: String, required: true },
-    supplier: { type: String, required: true },
-    price: { type: String, required: true },
+    lines: [{
+        product: String,
+        quantity: String
+    }],
+    whenNeeded: String,
     notes: String,
+    // Legacy fields
+    product: String,
+    supplier: String,
+    price: String,
     submittedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     submittedByName: String,
+    status: { type: String, enum: ['open', 'quoted', 'ordered', 'closed'], default: 'open' },
     createdAt: { type: Date, default: Date.now }
 });
 const PriceMiningQuote = mongoose.models.PriceMiningQuote || mongoose.model('PriceMiningQuote', priceMiningQuoteSchema);
 
 app.post('/api/price-mining/submit', async (req, res) => {
     try {
-        const { product, supplier, price, notes } = req.body;
-        if (!product || !supplier || !price) return res.status(400).json({ error: 'Missing required fields' });
+        const { lines, whenNeeded, notes, product, supplier, price } = req.body;
+
+        // Support both multi-line and legacy single-line submissions
+        const hasLines = lines && Array.isArray(lines) && lines.some(l => l.product);
+        const hasLegacy = product;
+        if (!hasLines && !hasLegacy) return res.status(400).json({ error: 'Add at least one product' });
 
         let submittedBy, submittedByName;
         const authHeader = req.header('Authorization');
@@ -3873,7 +3884,13 @@ app.post('/api/price-mining/submit', async (req, res) => {
             } catch (e) { /* anonymous ok */ }
         }
 
-        const quote = await PriceMiningQuote.create({ product, supplier, price, notes, submittedBy, submittedByName });
+        const quote = await PriceMiningQuote.create({
+            lines: hasLines ? lines.filter(l => l.product) : [{ product, quantity: supplier || '' }],
+            whenNeeded,
+            notes: notes || price,
+            submittedBy,
+            submittedByName
+        });
         res.json(quote);
     } catch (error) {
         res.status(400).json({ error: error.message });
