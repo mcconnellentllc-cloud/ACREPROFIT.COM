@@ -1284,6 +1284,17 @@ const purchaseOrderSchema = new mongoose.Schema({
         default: 'draft'
     },
 
+    // Payment tracking
+    paidBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who paid the supplier
+    paidDate: Date,
+    paymentStatus: {
+        type: String,
+        enum: ['unpaid', 'paid', 'partial'],
+        default: 'unpaid'
+    },
+    paymentMethod: String, // 'check', 'ach', 'wire', etc.
+    checkNumber: String,
+
     // Dates
     orderDate: { type: Date, default: Date.now },
     expectedDeliveryDate: Date,
@@ -9168,18 +9179,45 @@ app.delete('/api/admin/suppliers/:id', authMiddleware, adminMiddleware, async (r
 // Get all purchase orders
 app.get('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { status, supplier } = req.query;
+        const { status, supplier, paymentStatus } = req.query;
         let query = {};
 
         if (status) query.status = status;
         if (supplier) query['supplier.name'] = new RegExp(supplier, 'i');
+        if (paymentStatus) query.paymentStatus = paymentStatus;
 
         const purchaseOrders = await PurchaseOrder.find(query)
             .populate('createdBy', 'name email')
             .populate('updatedBy', 'name email')
+            .populate('paidBy', 'name email')
             .sort({ orderDate: -1 });
 
-        res.json(purchaseOrders);
+        // For each PO, calculate current distribution (who's holding what)
+        const enriched = await Promise.all(purchaseOrders.map(async (po) => {
+            const poObj = po.toObject();
+            const itemsWithDistribution = await Promise.all((poObj.items || []).map(async (item) => {
+                if (!item.chemicalId) return { ...item, distribution: [] };
+
+                // Find all inventory locations for this chemical
+                const invRecords = await Inventory.find({ chemicalId: item.chemicalId })
+                    .populate('distributorId', 'name');
+
+                const distribution = invRecords
+                    .filter(inv => (inv.quantityOnHand || 0) > 0)
+                    .map(inv => ({
+                        distributor: inv.distributorId?.name || 'Unassigned',
+                        location: inv.location,
+                        quantity: inv.quantityOnHand,
+                        value: Math.round((inv.quantityOnHand * item.pricePerUnit) * 100) / 100
+                    }));
+
+                return { ...item, distribution };
+            }));
+            poObj.items = itemsWithDistribution;
+            return poObj;
+        }));
+
+        res.json(enriched);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -14418,6 +14456,24 @@ connectDB().then(async () => {
                     referenceType: 'Manual',
                     notes: 'System marker - safe to ignore. Created when ledger was cleaned and initialized with loan entries only.'
                 });
+
+                // Mark PO payment status - who paid which supplier invoice
+                const jabcoKyle = ['JABCO-2119', 'JABCO-SO2129', 'JABCO-SO2131'];
+                const simsTy = ['SIMS-103849', 'SIMS-103850'];
+
+                for (const poNum of jabcoKyle) {
+                    await PurchaseOrder.updateMany(
+                        { poNumber: poNum },
+                        { $set: { paidBy: kyle._id, paymentStatus: 'paid', paidDate: new Date('2026-03-30'), paymentMethod: 'check' } }
+                    );
+                }
+                for (const poNum of simsTy) {
+                    await PurchaseOrder.updateMany(
+                        { poNumber: poNum },
+                        { $set: { paidBy: ty._id, paymentStatus: 'paid', paidDate: new Date('2026-03-30'), paymentMethod: 'check' } }
+                    );
+                }
+                console.log('PO payment status updated: JABCO=Kyle, Sims=Ty');
 
                 console.log(`Clean v5 ledger: Kyle ${kyleProducts.length} product lines ($167,987), Ty ${tyProducts.length} product lines ($146,445) - Total AP debt: $314,432`);
 
