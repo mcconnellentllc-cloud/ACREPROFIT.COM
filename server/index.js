@@ -5054,7 +5054,7 @@ app.post('/api/admin/orders/:orderId/send-payment-request', authMiddleware, admi
 });
 
 // Get order stats (admin only)
-// Total sales to customers (sum of all paid/confirmed orders)
+// Cash position: customer payments received minus checks written to distributors
 app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const paidStatuses = ['paid', 'confirmed', 'ready', 'delivered', 'completed', 'payment_secured'];
@@ -5072,8 +5072,22 @@ app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (
             { $group: { _id: null, total: { $sum: '$totalCost' } } }
         ]);
 
-        const totalSales = (chemOrderSales[0]?.total || 0) + (orderSales[0]?.total || 0);
-        res.json({ totalSales });
+        // Checks written to distributors (category = payment, debit type = money out of AP)
+        const checksWritten = await LedgerEntry.aggregate([
+            { $match: { category: 'payment', type: 'debit' } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+
+        const customerPaymentsIn = (chemOrderSales[0]?.total || 0) + (orderSales[0]?.total || 0);
+        const paidOutToDistributors = checksWritten[0]?.total || 0;
+        const cashInBank = customerPaymentsIn - paidOutToDistributors;
+
+        res.json({
+            totalSales: customerPaymentsIn,
+            cashInBank,
+            paidOutToDistributors,
+            customerPaymentsIn
+        });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
