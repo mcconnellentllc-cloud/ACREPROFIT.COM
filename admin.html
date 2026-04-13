@@ -1706,7 +1706,7 @@
                 </div>
 
                 <!-- PO Filters -->
-                <div style="display: flex; gap: 12px; margin-bottom: 16px;">
+                <div style="display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap;">
                     <select id="poStatusFilter" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadPurchaseOrders()">
                         <option value="">All Statuses</option>
                         <option value="draft">Draft</option>
@@ -1716,29 +1716,18 @@
                         <option value="received">Received</option>
                         <option value="closed">Closed</option>
                     </select>
+                    <select id="poPaymentFilter" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadPurchaseOrders()">
+                        <option value="">All Payments</option>
+                        <option value="unpaid">UNPAID</option>
+                        <option value="paid">Paid</option>
+                        <option value="partial">Partial</option>
+                    </select>
                     <input type="text" id="poSupplierFilter" placeholder="Search supplier..." style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); flex: 1;" onkeyup="if(event.key==='Enter')loadPurchaseOrders()">
                     <button class="btn btn-outline" onclick="loadPurchaseOrders()">Search</button>
                 </div>
 
-                <!-- PO Table -->
-                <div class="orders-table-wrapper">
-                    <table class="admin-table" id="poTable">
-                        <thead>
-                            <tr>
-                                <th>PO #</th>
-                                <th>Supplier</th>
-                                <th>Items</th>
-                                <th>Total</th>
-                                <th>Status</th>
-                                <th>Order Date</th>
-                                <th>Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody id="poTableBody">
-                            <tr><td colspan="7" class="loading">Loading purchase orders...</td></tr>
-                        </tbody>
-                    </table>
-                </div>
+                <!-- PO Cards (better for showing distribution) -->
+                <div id="poCardsContainer"></div>
             </div>
 
             <!-- Rep Commissions Tab (Superadmin Only) -->
@@ -6789,17 +6778,19 @@
         let distributors = [];
 
         async function loadPurchaseOrders() {
-            const tbody = document.getElementById('poTableBody');
-            tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading purchase orders...</td></tr>';
+            const container = document.getElementById('poCardsContainer');
+            if (container) container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading purchase orders...</div>';
 
             try {
                 const status = document.getElementById('poStatusFilter').value;
                 const supplier = document.getElementById('poSupplierFilter').value;
+                const paymentStatus = document.getElementById('poPaymentFilter')?.value || '';
 
                 let url = `${API_URL}/api/admin/purchase-orders`;
                 const params = new URLSearchParams();
                 if (status) params.append('status', status);
                 if (supplier) params.append('supplier', supplier);
+                if (paymentStatus) params.append('paymentStatus', paymentStatus);
                 if (params.toString()) url += '?' + params.toString();
 
                 const res = await fetch(url, {
@@ -6823,51 +6814,74 @@
 
             } catch (error) {
                 console.error('Error loading purchase orders:', error);
-                tbody.innerHTML = '<tr><td colspan="7" class="empty">Error loading purchase orders</td></tr>';
+                const c = document.getElementById('poCardsContainer');
+                if (c) c.innerHTML = '<div class="empty" style="padding:40px; text-align:center; color:#dc2626;">Error loading purchase orders</div>';
             }
         }
 
         function renderPurchaseOrders() {
-            const tbody = document.getElementById('poTableBody');
+            const container = document.getElementById('poCardsContainer');
+            if (!container) return;
 
             if (purchaseOrders.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty">No purchase orders found. Create your first PO!</td></tr>';
+                container.innerHTML = '<div class="empty" style="padding:40px; text-align:center;">No purchase orders found.</div>';
                 return;
             }
 
             const statusLabels = {
-                draft: 'Draft',
-                submitted: 'Submitted',
-                confirmed: 'Confirmed',
-                partial_received: 'Partial',
-                received: 'Received',
-                closed: 'Closed',
-                cancelled: 'Cancelled'
+                draft: 'Draft', submitted: 'Submitted', confirmed: 'Confirmed',
+                partial_received: 'Partial', received: 'Received', closed: 'Closed', cancelled: 'Cancelled'
             };
-
             const statusColors = {
-                draft: '#6b7280',
-                submitted: '#f59e0b',
-                confirmed: '#3b82f6',
-                partial_received: '#8b5cf6',
-                received: '#10b981',
-                closed: '#1f2937',
-                cancelled: '#ef4444'
+                draft: '#6b7280', submitted: '#f59e0b', confirmed: '#3b82f6',
+                partial_received: '#8b5cf6', received: '#10b981', closed: '#1f2937', cancelled: '#ef4444'
             };
 
-            tbody.innerHTML = purchaseOrders.map(po => `
-                <tr style="cursor: pointer;" onclick="openPODetail('${po._id}')">
-                    <td><strong>${po.poNumber}</strong></td>
-                    <td>${po.supplier?.name || '-'}</td>
-                    <td>${po.items?.length || 0} items</td>
-                    <td><strong>$${(po.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong></td>
-                    <td><span class="order-status" style="background: ${statusColors[po.status]}20; color: ${statusColors[po.status]};">${statusLabels[po.status] || po.status}</span></td>
-                    <td>${po.orderDate ? new Date(po.orderDate).toLocaleDateString() : '-'}</td>
-                    <td>
-                        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation(); openPODetail('${po._id}')">View</button>
-                    </td>
-                </tr>
-            `).join('');
+            container.innerHTML = purchaseOrders.map(po => {
+                const isPaid = po.paymentStatus === 'paid';
+                const paidBadge = isPaid
+                    ? `<span style="background:#d1fae5; color:#059669; padding:4px 10px; border-radius:4px; font-weight:700; font-size:0.8rem;">PAID by ${po.paidBy?.name?.split(' ')[0] || '?'}</span>`
+                    : po.paymentStatus === 'partial'
+                        ? `<span style="background:#fef3c7; color:#d97706; padding:4px 10px; border-radius:4px; font-weight:700; font-size:0.8rem;">PARTIAL</span>`
+                        : `<span style="background:#fef2f2; color:#dc2626; padding:4px 10px; border-radius:4px; font-weight:700; font-size:0.8rem;">UNPAID</span>`;
+
+                const itemsHtml = (po.items || []).map(item => {
+                    const distribution = item.distribution || [];
+                    const distHtml = distribution.length > 0
+                        ? distribution.map(d => `<span style="background:${d.distributor.includes('Kyle') ? '#dbeafe' : d.distributor.includes('Ty') ? '#ede9fe' : '#f3f4f6'}; color:#333; padding:2px 8px; border-radius:3px; margin-right:6px; font-size:0.8rem;">${d.distributor.split(' ')[0]}: ${d.quantity.toLocaleString()} ${item.unit || ''} ($${d.value.toLocaleString(undefined, {minimumFractionDigits: 2})})</span>`).join('')
+                        : '<span style="color:#999; font-size:0.8rem;">No inventory</span>';
+
+                    return `
+                    <div style="padding:10px 0; border-bottom:1px solid #eee;">
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                            <strong>${item.productName}</strong>
+                            <span style="color:#666; font-size:0.9rem;">${item.quantityOrdered.toLocaleString()} ${item.unit || ''} @ $${item.pricePerUnit.toFixed(2)} = $${(item.totalPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                        </div>
+                        <div style="color:#666; font-size:0.85rem;">Currently held: ${distHtml}</div>
+                    </div>`;
+                }).join('');
+
+                return `
+                <div style="background:white; border:1px solid #e5e7eb; border-radius:8px; padding:20px; margin-bottom:16px; ${isPaid ? 'border-left:4px solid #059669;' : 'border-left:4px solid #dc2626;'}">
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:12px; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <div style="display:flex; gap:10px; align-items:center; margin-bottom:4px;">
+                                <strong style="font-size:1.1rem;">${po.poNumber}</strong>
+                                <span class="order-status" style="background: ${statusColors[po.status]}20; color: ${statusColors[po.status]}; font-size:0.75rem;">${statusLabels[po.status] || po.status}</span>
+                                ${paidBadge}
+                            </div>
+                            <div style="color:#666; font-size:0.9rem;">${po.supplier?.name || '-'} | Ordered ${po.orderDate ? new Date(po.orderDate).toLocaleDateString() : '-'}${po.paidDate ? ' | Paid ' + new Date(po.paidDate).toLocaleDateString() : ''}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div style="font-size:1.4rem; font-weight:800; color:#111;">$${(po.totalCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                            <button class="btn btn-outline btn-sm" onclick="openPODetail('${po._id}')" style="margin-top:4px;">View / Edit</button>
+                        </div>
+                    </div>
+                    <div style="margin-top:12px;">
+                        ${itemsHtml}
+                    </div>
+                </div>`;
+            }).join('');
         }
 
         // Create PO Modal Functions
