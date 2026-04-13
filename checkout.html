@@ -620,10 +620,60 @@
                         </div>
                     </div>
 
-                    <!-- Discount Code -->
+                    <!-- Delivery Option -->
                     <div class="notes-section" style="margin-bottom: 16px;">
-                        <h3 class="section-title">Discount Code</h3>
+                        <h3 class="section-title">Delivery Option</h3>
+                        <div style="display:flex; gap:10px; flex-wrap:wrap;">
+                            <label style="flex:1; min-width:240px; border:2px solid #2d5a27; border-radius:8px; padding:14px; cursor:pointer; background:#f0f7ef;">
+                                <input type="radio" name="deliveryOption" value="pickup" checked onchange="updateDeliveryOption()" style="margin-right:8px;">
+                                <strong>Pickup at Rep's Location</strong>
+                                <div style="color:#666; font-size:0.85rem; margin-left:22px;">Free - pick up when ready</div>
+                            </label>
+                            <label style="flex:1; min-width:240px; border:2px solid #ddd; border-radius:8px; padding:14px; cursor:pointer;">
+                                <input type="radio" name="deliveryOption" value="delivery" onchange="updateDeliveryOption()" style="margin-right:8px;">
+                                <strong>Deliver to My Farm</strong>
+                                <div style="color:#666; font-size:0.85rem; margin-left:22px;">Minimum $400 freight charge (exact amount depends on location &amp; volume)</div>
+                            </label>
+                        </div>
+                        <div id="deliveryAddressSection" style="display:none; margin-top:10px;">
+                            <textarea id="deliveryAddress" placeholder="Delivery address (street, city, state, zip)" style="width:100%; padding:10px; border:2px solid #ddd; border-radius:6px; font-size:0.95rem; resize:vertical; min-height:60px;"></textarea>
+                        </div>
+                    </div>
+
+                    <!-- Discount Code / Margin Adjustment -->
+                    <div class="notes-section" style="margin-bottom: 16px;">
+                        <h3 class="section-title">Discount Code (optional)</h3>
                         <input type="text" id="discountCode" placeholder="Enter code if applicable" style="width: 100%; padding: 10px; border: 2px solid #ddd; border-radius: 6px; font-size: 1rem;">
+                        <div id="distributorDiscountButtons" style="display:none; margin-top:10px; padding:12px; background:#fff7ed; border:1px dashed #d97706; border-radius:6px;">
+                            <div style="font-size:0.9rem; color:#92400e; margin-bottom:8px; font-weight:700;">Distributor Controls</div>
+                            <div style="color:#92400e; font-size:0.8rem; margin-bottom:10px;">Adjust margins for this order only (catalog prices stay the same).</div>
+
+                            <div style="margin-bottom:10px;">
+                                <div style="font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:6px;">Quick apply:</div>
+                                <div style="display:flex; gap:8px; flex-wrap:wrap;">
+                                    <button type="button" onclick="document.getElementById('discountCode').value='NoDistMarg'; document.getElementById('marginAdjustment').value='';" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                        No Distributor Margin
+                                    </button>
+                                    <button type="button" onclick="document.getElementById('discountCode').value='AtcostAP'; document.getElementById('marginAdjustment').value='';" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                        At Cost (No Markup)
+                                    </button>
+                                </div>
+                            </div>
+
+                            <div>
+                                <div style="font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:6px;">Or adjust distributor margin per unit (this order only):</div>
+                                <div style="display:flex; gap:8px; align-items:center;">
+                                    <span style="color:#92400e;">$</span>
+                                    <input type="number" id="marginAdjustment" step="0.01" placeholder="0.00 (negative to reduce, positive to increase)" style="flex:1; padding:8px; border:1px solid #d97706; border-radius:4px;">
+                                    <span style="color:#92400e; font-size:0.85rem;">per unit</span>
+                                </div>
+                                <input type="text" id="marginAdjustmentReason" placeholder="Reason (e.g., 'Volume discount', 'Long-time customer')" style="width:100%; margin-top:8px; padding:8px; border:1px solid #d97706; border-radius:4px;">
+                            </div>
+
+                            <div style="color:#666; font-size:0.75rem; margin-top:10px; border-top:1px dashed #d97706; padding-top:8px;">
+                                All margin changes are logged in the audit trail with your name and reason.
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Order Notes -->
@@ -783,6 +833,12 @@
             // Render order items
             renderOrderItems();
 
+            // Show distributor controls if user is admin/distributor/superadmin
+            if (userData && ['admin', 'superadmin', 'distributor'].includes(userData.role)) {
+                const el = document.getElementById('distributorDiscountButtons');
+                if (el) el.style.display = 'block';
+            }
+
             // Set delivery info
             const location = orderData.location || 'mcconnell';
             const rep = reps[location] || Object.values(reps)[0] || { name: 'Acre Profit', phone: '' };
@@ -817,6 +873,21 @@
             `).join('');
         }
 
+        function updateDeliveryOption() {
+            const opt = document.querySelector('input[name="deliveryOption"]:checked')?.value || 'pickup';
+            const addrSection = document.getElementById('deliveryAddressSection');
+            if (addrSection) addrSection.style.display = opt === 'delivery' ? 'block' : 'none';
+            // Update radio card styling
+            document.querySelectorAll('input[name="deliveryOption"]').forEach(r => {
+                const label = r.closest('label');
+                if (label) {
+                    label.style.borderColor = r.checked ? '#2d5a27' : '#ddd';
+                    label.style.background = r.checked ? '#f0f7ef' : 'white';
+                }
+            });
+            updateTotals();
+        }
+
         function updateTotals() {
             const items = orderData.items || [];
             const subtotal = items.reduce((sum, item) => sum + (item.total || item.price || 0), 0);
@@ -824,13 +895,17 @@
             document.getElementById('itemCount').textContent = items.length;
             document.getElementById('itemsSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
 
+            // Freight charge for delivery option
+            const deliveryOpt = document.querySelector('input[name="deliveryOption"]:checked')?.value || 'pickup';
+            const freight = deliveryOpt === 'delivery' ? 400 : 0;
+
             // Calculate processing fee based on payment method
             const feeRow = document.getElementById('processingFeeRow');
             const feeLabel = document.getElementById('feeLabel');
             const feeAmount = document.getElementById('processingFeeAmount');
 
             if (selectedPaymentMethod === 'ach') {
-                processingFee = Math.min(subtotal * 0.008, 5); // 0.8% capped at $5
+                processingFee = Math.min((subtotal + freight) * 0.008, 5);
                 feeRow.style.display = 'flex';
                 feeLabel.textContent = 'Processing Fee (ACH)';
                 feeAmount.textContent = '$' + processingFee.toFixed(2);
@@ -839,9 +914,29 @@
                 feeRow.style.display = 'none';
             }
 
-            const total = subtotal + processingFee;
+            // Show freight line if applicable
+            let freightRow = document.getElementById('freightRow');
+            if (!freightRow && freight > 0) {
+                const totalRow = document.getElementById('processingFeeRow')?.parentElement;
+                if (totalRow) {
+                    const row = document.createElement('div');
+                    row.id = 'freightRow';
+                    row.style.cssText = 'display:flex; justify-content:space-between; padding:4px 0;';
+                    row.innerHTML = '<span>Freight (delivery to farm - estimate)</span><span id="freightAmount">$' + freight.toFixed(2) + '</span>';
+                    totalRow.appendChild(row);
+                    freightRow = row;
+                }
+            }
+            if (freightRow) {
+                freightRow.style.display = freight > 0 ? 'flex' : 'none';
+                const amt = document.getElementById('freightAmount');
+                if (amt) amt.textContent = '$' + freight.toFixed(2);
+            }
+
+            const total = subtotal + freight + processingFee;
             document.getElementById('orderTotal').textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2});
             orderData.subtotal = subtotal;
+            orderData.freight = freight;
             orderData.processingFee = processingFee;
             orderData.total = total;
         }
@@ -965,7 +1060,11 @@
                     customerPhone: phone,
                     customerFarm: document.getElementById('customerFarm').value.trim(),
                     notes: document.getElementById('orderNotes').value.trim(),
-                    discountCode: document.getElementById('discountCode').value.trim()
+                    discountCode: document.getElementById('discountCode').value.trim(),
+                    deliveryOption: document.querySelector('input[name="deliveryOption"]:checked')?.value || 'pickup',
+                    deliveryAddress: document.getElementById('deliveryAddress')?.value.trim() || '',
+                    marginAdjustment: parseFloat(document.getElementById('marginAdjustment')?.value) || 0,
+                    marginAdjustmentReason: document.getElementById('marginAdjustmentReason')?.value.trim() || ''
                 };
 
                 // Include acting as customer data if admin is placing order for customer

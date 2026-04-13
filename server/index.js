@@ -907,6 +907,12 @@ const chemicalOrderSchema = new mongoose.Schema({
     subtotal: Number,
     discount: { type: Number, default: 0 },
     discountReason: String,
+    marginAdjustment: { type: Number, default: 0 },       // Per-unit margin adjustment ($ off or on)
+    marginAdjustmentReason: String,                        // Why distributor adjusted margin
+    marginAdjustedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Who approved it
+    freight: { type: Number, default: 0 },                 // Delivery/freight charge
+    deliveryOption: { type: String, enum: ['pickup', 'delivery'], default: 'pickup' },
+    deliveryAddress: String,
     processingFee: { type: Number, default: 0 },
     total: Number,
 
@@ -8101,8 +8107,19 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             customerPhone,
             customerFarm,
             notes,
-            discountCode
+            discountCode,
+            deliveryOption,
+            deliveryAddress,
+            marginAdjustment,
+            marginAdjustmentReason
         } = req.body;
+
+        // Only admin/distributor/superadmin can adjust margins
+        const isAdminOrDistributor = ['admin', 'superadmin', 'distributor'].includes(req.user.role);
+        const applyMarginAdjust = isAdminOrDistributor && marginAdjustment ? parseFloat(marginAdjustment) : 0;
+
+        // Freight: minimum $400 for delivery
+        const freightCharge = deliveryOption === 'delivery' ? 400 : 0;
 
         // Validate required fields
         if (!items || items.length === 0) {
@@ -8177,8 +8194,15 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                     } else {
                         unitPrice = chemical.sellPrice;
                     }
+
+                    // Apply distributor margin adjustment (admin/distributor only)
+                    // Negative value = discount, positive = surcharge
+                    if (applyMarginAdjust !== 0) {
+                        unitPrice = Math.max(chemical.costPrice || 0, unitPrice + applyMarginAdjust);
+                    }
+
                     // Track the discount amount
-                    if (discountType && chemical.sellPrice) {
+                    if (chemical.sellPrice) {
                         totalDiscount += (chemical.sellPrice - unitPrice) * qty;
                     }
                 }
@@ -8201,8 +8225,18 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
 
         // Server calculates the final totals (never trust frontend totals)
         const calculatedSubtotal = Math.round(verifiedSubtotal * 100) / 100;
-        const calculatedFee = paymentMethod === 'ach' ? Math.min(calculatedSubtotal * 0.008, 5) : 0;
-        const calculatedTotal = Math.round((calculatedSubtotal + calculatedFee) * 100) / 100;
+        const calculatedWithFreight = calculatedSubtotal + freightCharge;
+        const calculatedFee = paymentMethod === 'ach' ? Math.min(calculatedWithFreight * 0.008, 5) : 0;
+        const calculatedTotal = Math.round((calculatedWithFreight + calculatedFee) * 100) / 100;
+
+        // Build reason string
+        let discountReasonFull = discountDescription;
+        if (applyMarginAdjust !== 0) {
+            const sign = applyMarginAdjust < 0 ? 'off' : 'added';
+            discountReasonFull = (discountReasonFull ? discountReasonFull + ' | ' : '') +
+                `$${Math.abs(applyMarginAdjust).toFixed(2)}/unit ${sign} by ${req.user.name}` +
+                (marginAdjustmentReason ? ` - ${marginAdjustmentReason}` : '');
+        }
 
         // Create the order
         const order = new ChemicalOrder({
@@ -8212,11 +8246,17 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             items: orderItems,
             totalAcres: 0,
             subtotal: calculatedSubtotal,
+            freight: freightCharge,
+            deliveryOption: deliveryOption || 'pickup',
+            deliveryAddress: deliveryOption === 'delivery' ? deliveryAddress : '',
             processingFee: calculatedFee,
             total: calculatedTotal,
             customerNotes: notes,
             discount: Math.round(totalDiscount * 100) / 100,
-            discountReason: discountDescription || undefined,
+            discountReason: discountReasonFull || undefined,
+            marginAdjustment: applyMarginAdjust || 0,
+            marginAdjustmentReason: marginAdjustmentReason || '',
+            marginAdjustedBy: applyMarginAdjust !== 0 ? req.user._id : undefined,
             status: 'submitted',
             paymentMethod: paymentMethod,
             paymentStatus: paymentMethod === 'check' ? 'pending' : 'processing',
@@ -8233,6 +8273,25 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
         });
 
         await order.save();
+
+        // Audit log margin adjustments or discount code usage
+        if (applyMarginAdjust !== 0 || discountType) {
+            await logAudit({
+                action: 'margin_change',
+                req,
+                entityType: 'ChemicalOrder',
+                entityId: order._id,
+                entityRef: order.orderNumber,
+                amount: Math.round(totalDiscount * 100) / 100,
+                reason: discountReasonFull,
+                before: { totalDiscount: 0 },
+                after: {
+                    totalDiscount: Math.round(totalDiscount * 100) / 100,
+                    marginAdjustment: applyMarginAdjust,
+                    discountCode: discountCode || null
+                }
+            });
+        }
 
         // Update user info if provided
         if (customerPhone && !req.user.phone) {
