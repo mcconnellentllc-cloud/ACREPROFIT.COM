@@ -67,23 +67,23 @@
     <div class="page-wrap">
         <div class="page-header">
             <h1>Price Mining</h1>
-            <p>Crowdsourced pricing from farmers across the region. Submit a quote you got from another supplier and we'll try to match or beat it.</p>
+            <p style="max-width: 700px; margin: 0 auto; line-height: 1.6;">This is our way to go shopping for you in bigger volumes. Tell us what you're looking for, when you need it, and the best price you've seen elsewhere. We'll pool orders across all our farmers, negotiate with multiple suppliers, and get back to you as soon as possible with the best deal we can find.</p>
         </div>
 
         <div class="quote-form-card">
-            <h2>Submit a Price Quote</h2>
-            <p>Found a better price? Share it with us - we pool orders to negotiate better pricing for everyone.</p>
+            <h2>Request a Price / Submit a Quote You've Seen</h2>
+            <p>Tell us the product, when you need it, and any pricing you've already been quoted. We'll do the legwork.</p>
             <div class="quote-form-grid">
                 <input type="text" id="qProduct" placeholder="Product name (e.g., Roundup PowerMax)">
-                <input type="text" id="qSupplier" placeholder="Supplier/Retailer">
-                <input type="text" id="qPrice" placeholder="Their price (e.g., $12.50/gal)">
-                <input type="text" id="qNotes" placeholder="Notes (pack size, terms, etc.)">
+                <input type="text" id="qSupplier" placeholder="Supplier/Retailer (or 'any')">
+                <input type="text" id="qPrice" placeholder="Best price seen (e.g., $12.50/gal)">
+                <input type="text" id="qNotes" placeholder="When needed? Quantity? Pack size?">
             </div>
-            <button class="btn-submit" onclick="submitQuote()">Submit Quote</button>
+            <button class="btn-submit" onclick="submitQuote()">Submit Request</button>
             <div id="submitStatus" style="margin-top:10px; font-weight:600;"></div>
         </div>
 
-        <h2 class="section-heading">Recent Submissions</h2>
+        <h2 class="section-heading">Recent Requests &amp; Quotes</h2>
         <div id="quotesList" class="quotes-list">
             <div class="empty">Loading quotes...</div>
         </div>
