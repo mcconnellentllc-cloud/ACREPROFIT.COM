@@ -2104,9 +2104,10 @@ async function generateInvoiceNumber() {
 }
 
 // Helper: Update inventory when receiving a PO
-async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, lotNumber, supplierName, userId }) {
-    // Find or create inventory record (aggregate tracking)
-    let inventory = await Inventory.findOne({ chemicalId, location: location || 'main' });
+async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, lotNumber, supplierName, userId, session }) {
+    const invQuery = Inventory.findOne({ chemicalId, location: location || 'main' });
+    if (session) invQuery.session(session);
+    let inventory = await invQuery;
 
     if (!inventory) {
         inventory = new Inventory({
@@ -2126,7 +2127,6 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
     const previousQuantity = inventory.quantityOnHand;
     const newQuantity = previousQuantity + quantity;
 
-    // Calculate new weighted average cost
     if (previousQuantity > 0 && inventory.averageCost > 0) {
         const totalOldValue = previousQuantity * inventory.averageCost;
         const totalNewValue = quantity * unitCost;
@@ -2141,9 +2141,8 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
     inventory.lastReceivedDate = new Date();
     inventory.updatedAt = new Date();
 
-    await inventory.save();
+    await inventory.save({ session });
 
-    // Create batch record for PO-based tracking
     const batch = new InventoryBatch({
         chemicalId,
         productName,
@@ -2162,9 +2161,8 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
         receivedDate: new Date()
     });
 
-    await batch.save();
+    await batch.save({ session });
 
-    // Create transaction record
     const transaction = new InventoryTransaction({
         inventoryId: inventory._id,
         chemicalId,
@@ -2182,41 +2180,37 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
         createdBy: userId
     });
 
-    await transaction.save();
+    await transaction.save({ session });
 
     // Auto-update product cost when new batch arrives at a different price
-    // Margins stay the same - sell price recalculates automatically
-    try {
-        const chemical = await Chemical.findById(chemicalId);
-        if (chemical && unitCost !== chemical.costPrice) {
-            const oldCost = chemical.costPrice;
-            chemical.costPrice = unitCost;
-            chemical.adminPrice = Math.round((unitCost + (chemical.adminMarginDollars || 0)) * 100) / 100;
-            chemical.sellPrice = Math.round((chemical.adminPrice + (chemical.marginDollars || 0)) * 100) / 100;
-            chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
-            chemical.priceDate = new Date();
-            chemical.updatedAt = new Date();
-            await chemical.save();
+    const chemQuery = Chemical.findById(chemicalId);
+    if (session) chemQuery.session(session);
+    const chemical = await chemQuery;
+    if (chemical && unitCost !== chemical.costPrice) {
+        const oldCost = chemical.costPrice;
+        chemical.costPrice = unitCost;
+        chemical.adminPrice = Math.round((unitCost + (chemical.adminMarginDollars || 0)) * 100) / 100;
+        chemical.sellPrice = Math.round((chemical.adminPrice + (chemical.marginDollars || 0)) * 100) / 100;
+        chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
+        chemical.priceDate = new Date();
+        chemical.updatedAt = new Date();
+        await chemical.save({ session });
 
-            // Log price change
-            await ChemicalPriceHistory.create({
-                chemicalId: chemical._id,
-                productName: chemical.productName,
-                sourceSupplier: chemical.sourceSupplier,
-                packSize: chemical.packSize,
-                unit: chemical.unit,
-                costPrice: unitCost,
-                previousCostPrice: oldCost,
-                adminPrice: chemical.adminPrice,
-                sellPrice: chemical.sellPrice,
-                priceVersion: `PO-${poNumber || 'manual'}`,
-                notes: `Cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)} via ${poNumber || 'receive'}. Margins unchanged.`
-            });
+        await ChemicalPriceHistory.create([{
+            chemicalId: chemical._id,
+            productName: chemical.productName,
+            sourceSupplier: chemical.sourceSupplier,
+            packSize: chemical.packSize,
+            unit: chemical.unit,
+            costPrice: unitCost,
+            previousCostPrice: oldCost,
+            adminPrice: chemical.adminPrice,
+            sellPrice: chemical.sellPrice,
+            priceVersion: `PO-${poNumber || 'manual'}`,
+            notes: `Cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)} via ${poNumber || 'receive'}. Margins unchanged.`
+        }], { session });
 
-            console.log(`Price auto-updated: ${productName} cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)}, sell $${chemical.sellPrice.toFixed(2)} (margins unchanged)`);
-        }
-    } catch (priceErr) {
-        console.error('Error auto-updating product cost:', priceErr.message);
+        console.log(`Price auto-updated: ${productName} cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)}, sell $${chemical.sellPrice.toFixed(2)} (margins unchanged)`);
     }
 
     return { inventory, transaction, batch };
