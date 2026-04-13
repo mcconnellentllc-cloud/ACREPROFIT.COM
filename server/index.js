@@ -4023,7 +4023,75 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
             }
         });
 
+        // Handle license / certification updates
+        const licenseUpdates = {};
+        if (updates.privateApplicatorLicense) {
+            const incoming = updates.privateApplicatorLicense;
+            const existing = req.user.privateApplicatorLicense?.toObject?.() || req.user.privateApplicatorLicense || {};
+            req.user.privateApplicatorLicense = {
+                ...existing,
+                hasLicense: true,
+                licenseNumber: incoming.licenseNumber || existing.licenseNumber,
+                state: incoming.state || existing.state,
+                expirationDate: incoming.expirationDate || existing.expirationDate,
+                certificationCategories: incoming.certificationCategories || existing.certificationCategories || [],
+                verificationStatus: 'pending' // reset verification on customer self-update
+            };
+            licenseUpdates.privateApplicatorLicense = req.user.privateApplicatorLicense;
+        }
+        if (updates.commercialApplicatorLicense) {
+            const incoming = updates.commercialApplicatorLicense;
+            const existing = req.user.commercialApplicatorLicense?.toObject?.() || req.user.commercialApplicatorLicense || {};
+            req.user.commercialApplicatorLicense = {
+                ...existing,
+                hasLicense: true,
+                licenseNumber: incoming.licenseNumber || existing.licenseNumber,
+                state: incoming.state || existing.state,
+                businessName: incoming.businessName || existing.businessName,
+                expirationDate: incoming.expirationDate || existing.expirationDate,
+                verificationStatus: 'pending'
+            };
+            licenseUpdates.commercialApplicatorLicense = req.user.commercialApplicatorLicense;
+        }
+        if (updates.paraquatCertification) {
+            const incoming = updates.paraquatCertification;
+            req.user.paraquatCertification = {
+                ...(req.user.paraquatCertification?.toObject?.() || req.user.paraquatCertification || {}),
+                completed: true,
+                certificateNumber: incoming.certificateNumber,
+                completionDate: incoming.completionDate,
+                expirationDate: incoming.expirationDate
+            };
+            licenseUpdates.paraquatCertification = req.user.paraquatCertification;
+        }
+        if (updates.dicambaCertification) {
+            const incoming = updates.dicambaCertification;
+            req.user.dicambaCertification = {
+                ...(req.user.dicambaCertification?.toObject?.() || req.user.dicambaCertification || {}),
+                completed: true,
+                certificateNumber: incoming.certificateNumber,
+                completionDate: incoming.completionDate,
+                expirationDate: incoming.expirationDate
+            };
+            licenseUpdates.dicambaCertification = req.user.dicambaCertification;
+        }
+
         await req.user.save();
+
+        // Audit log license changes
+        if (Object.keys(licenseUpdates).length > 0) {
+            await logAudit({
+                action: 'license_change',
+                req,
+                targetUser: req.user._id,
+                targetUserName: req.user.name,
+                entityType: 'User',
+                entityId: req.user._id,
+                after: licenseUpdates,
+                reason: 'Customer self-update via /compliance.html'
+            });
+        }
+
         res.json({ user: req.user });
     } catch (error) {
         res.status(400).json({ error: error.message });
