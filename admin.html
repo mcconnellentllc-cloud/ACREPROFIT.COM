@@ -1621,6 +1621,7 @@
                     <div class="tab-header-actions">
                         <button class="btn btn-primary superadmin-only-ledger" onclick="openAddLedgerModal()">+ Add Entry</button>
                         <button class="btn btn-outline superadmin-only-ledger" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Check to Distributor</button>
+                        <button class="btn btn-outline superadmin-only-ledger" onclick="openCashDepositModal()" style="border-color: #2563eb; color: #2563eb;">Record Cash Deposit</button>
                         <select id="ledgerRepFilter" style="display:none; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);" onchange="loadLedger()">
                             <option value="">All</option>
                         </select>
@@ -2693,6 +2694,47 @@
                     <div class="customer-modal-actions">
                         <button class="btn btn-outline" onclick="closeRecordPaymentModal()">Cancel</button>
                         <button class="btn btn-primary" style="background: #059669;" onclick="submitRecordPayment()">Record Payment</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Record Cash Deposit Modal -->
+            <div class="modal-overlay" id="cashDepositModal" style="display: none;">
+                <div class="modal-content" style="max-width: 500px;">
+                    <button class="modal-close" onclick="closeCashDepositModal()">&times;</button>
+                    <div class="customer-modal-header" style="background: #2563eb; color: var(--white);">
+                        <div class="customer-modal-avatar" style="background: rgba(255,255,255,0.2);">$</div>
+                        <div class="customer-modal-title">
+                            <h2 style="color: var(--white);">Record Cash Deposit</h2>
+                            <p style="color: rgba(255,255,255,0.8);">Add cash/capital to AP bank balance</p>
+                        </div>
+                    </div>
+                    <div class="customer-modal-body">
+                        <form id="cashDepositForm" class="edit-customer-form">
+                            <div class="form-group">
+                                <label>From (who deposited)</label>
+                                <select id="cashDepositFrom" required></select>
+                            </div>
+                            <div class="form-group">
+                                <label>Amount ($) *</label>
+                                <input type="number" id="cashDepositAmount" step="0.01" min="0.01" required placeholder="100.00">
+                            </div>
+                            <div class="form-group">
+                                <label>Description *</label>
+                                <input type="text" id="cashDepositDesc" required placeholder="e.g., Initial operating cash, Capital contribution">
+                            </div>
+                            <div class="form-group">
+                                <label>Notes</label>
+                                <input type="text" id="cashDepositNotes" placeholder="Optional notes">
+                            </div>
+                            <div style="background:#eff6ff; padding:12px; border-radius:6px; font-size:0.85rem; color:#1e40af;">
+                                This adds to Cash in Bank and increases what AP owes this person (if loan) or tracks as adjustment.
+                            </div>
+                        </form>
+                    </div>
+                    <div class="customer-modal-actions">
+                        <button class="btn btn-outline" onclick="closeCashDepositModal()">Cancel</button>
+                        <button class="btn btn-primary" style="background: #2563eb;" onclick="submitCashDeposit()">Record Deposit</button>
                     </div>
                 </div>
             </div>
@@ -6622,6 +6664,68 @@
 
         function closeRecordPaymentModal() {
             document.getElementById('recordPaymentModal').style.display = 'none';
+        }
+
+        async function openCashDepositModal() {
+            document.getElementById('cashDepositModal').style.display = 'flex';
+            document.getElementById('cashDepositForm').reset();
+
+            // Populate "from" dropdown with distributors
+            try {
+                const res = await fetch(`${API_URL}/api/admin/distributors`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const distributors = await res.json();
+                const select = document.getElementById('cashDepositFrom');
+                select.innerHTML = distributors.map(d =>
+                    `<option value="${d._id}">${d.name}</option>`
+                ).join('');
+            } catch (e) { console.error(e); }
+        }
+
+        function closeCashDepositModal() {
+            document.getElementById('cashDepositModal').style.display = 'none';
+        }
+
+        async function submitCashDeposit() {
+            const representativeId = document.getElementById('cashDepositFrom').value;
+            const amount = parseFloat(document.getElementById('cashDepositAmount').value);
+            const description = document.getElementById('cashDepositDesc').value.trim();
+            const notes = document.getElementById('cashDepositNotes').value.trim();
+
+            if (!representativeId || !amount || amount <= 0 || !description) {
+                alert('Please fill in all required fields');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ledger`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        representativeId,
+                        description,
+                        amount,
+                        type: 'credit',
+                        category: 'cash_deposit',
+                        notes: notes || 'Cash deposit into AP bank account'
+                    })
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Failed to record deposit');
+                }
+
+                closeCashDepositModal();
+                loadLedger();
+                alert(`Cash deposit of $${amount.toFixed(2)} recorded`);
+            } catch (error) {
+                alert('Error: ' + error.message);
+            }
         }
 
         async function submitRecordPayment() {

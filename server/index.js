@@ -969,7 +969,7 @@ const ledgerEntrySchema = new mongoose.Schema({
     type: { type: String, enum: ['debit', 'credit'], required: true },
     category: {
         type: String,
-        enum: ['order', 'payment', 'supplier_payment', 'commission', 'adjustment', 'refund'],
+        enum: ['order', 'payment', 'supplier_payment', 'commission', 'adjustment', 'refund', 'cash_deposit', 'admin_withdrawal'],
         default: 'adjustment'
     },
     referenceType: { type: String, enum: ['ChemicalOrder', 'Order', 'PurchaseOrder', 'Manual'], default: 'Manual' },
@@ -5127,9 +5127,16 @@ app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (
         const adminMarginWithdrawn = adminWithdrawn[0]?.total || 0;
         const adminMarginBanked = adminMarginEarned - adminMarginWithdrawn;
 
+        // Cash deposits / capital contributions (category = cash_deposit, credit = money into bank)
+        const cashDeposits = await LedgerEntry.aggregate([
+            { $match: { category: 'cash_deposit', type: 'credit' } },
+            { $group: { _id: null, total: { $sum: '$amount' } } }
+        ]);
+
         const customerPaymentsIn = (chemOrderSales[0]?.total || 0) + (orderSales[0]?.total || 0);
         const paidOutToDistributors = checksWritten[0]?.total || 0;
-        const cashInBank = customerPaymentsIn - paidOutToDistributors - (commissionsPaid.reduce((s, c) => s + c.total, 0)) - adminMarginWithdrawn;
+        const capitalIn = cashDeposits[0]?.total || 0;
+        const cashInBank = capitalIn + customerPaymentsIn - paidOutToDistributors - (commissionsPaid.reduce((s, c) => s + c.total, 0)) - adminMarginWithdrawn;
 
         res.json({
             totalSales: customerPaymentsIn,
