@@ -1015,13 +1015,13 @@
                 {
                     _id: 'milo-2',
                     name: 'Sorghum - Hardy Economical Program (Best All-Around)',
-                    description: 'Reliable 2-pass program for dryland/High Plains grain sorghum. Heavy broadleaf residual stack using our stock chemistry. Designed for resistant weed pressure at reasonable cost per acre.',
+                    description: 'Reliable 2-pass program for dryland/High Plains grain sorghum. Burndown + broadleaf residual at Pass 1, then Group 15 grass residual + post broadleaf at planting. Designed for resistant weed pressure at reasonable cost per acre.',
                     crop: 'milo',
                     type: 'recommended',
                     badge: 'Recommended for most fields',
-                    groundType: 'Dryland grain sorghum. Excellent broadleaf residual (pigweed, waterhemp, kochia, lambsquarters). Uses multiple Group 5 + 27 + 14 + 9 MOAs for resistance management. WARNING: For heavy annual grass pressure (shattercane, johnsongrass, crabgrass, foxtail), add a Group 15 residual (acetochlor like Warrant, S-metolachlor like Dual II Magnum) at planting. Group 15 products require Concep-treated sorghum seed - check your seed tag. Source via Price Mining.',
-                    rotationRestrictions: 'Rancor (metribuzin): 4 months to wheat (most labels), 18 months to most other crops at full rate. Atrazine: 12 months to soybeans. Wheat/barley next fall: safe. Mesotrione: 18 months to soybeans.',
-                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine. Rancor: do not graze or harvest forage for 28 days.',
+                    groundType: 'Dryland grain sorghum. Pass 1 stacks Group 5 + 9 + 14 + 4 for burndown + broadleaf residual. Pass 2 adds Group 15 (S-metolachlor) for shattercane/johnsongrass/crabgrass/foxtail control + Group 27 (mesotrione) for late broadleaf + Group 4 (dicamba) for any remaining broadleaf escapes. REQUIRES Concep-treated sorghum seed for the S-metolachlor at Pass 2 - check your seed tag before ordering.',
+                    rotationRestrictions: 'S-Metolachlor (Pass 2): no rotational restrictions to most crops the following spring. Atrazine: 12 months to soybeans. Mesotrione: 18 months to soybeans. Dicamba: 30 days before planting sensitive broadleaf crops. Wheat/barley the following fall is safe.',
+                    grazingRestrictions: 'Do not graze sorghum forage for 60 days after atrazine. S-Metolachlor: 50 days for grain harvest, 40 days for forage.',
                     applications: [
                         {
                             name: 'Pass 1: Early Pre-Plant / Burndown',
@@ -1037,13 +1037,12 @@
                         },
                         {
                             name: 'Pass 2: At-Planting / Pre-Emerge',
-                            timing: 'Mid May (at planting)',
+                            timing: 'Mid May (at planting). Requires 1.5" rain or 15 days before milo emergence for dicamba.',
                             truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'Atrazine 4L', rate: 1.25, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
-                                { productName: 'Meso 4SC', rate: 5, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
-                                { productName: 'Rancor 4F', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
-                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                                { productName: 'S-Metolachlor (Dual II Magnum)', rate: 1.33, rateUnit: 'pt/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 38.00 },
+                                { productName: 'Meso 4SC', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 48.25 },
+                                { productName: 'Dicamba 49.8% SL', rate: 4, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 28.25 }
                             ]
                         }
                     ]
