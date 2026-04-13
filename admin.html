@@ -4992,6 +4992,66 @@
                 </tr>
                 `;
             }).join('');
+
+            // Totals row - sum across all products weighted by inventory on hand
+            let totalCostValue = 0;         // cost × inventory
+            let totalAdminMarginValue = 0;  // admin margin × inventory
+            let totalDistMarginValue = 0;   // distributor margin × inventory
+            let totalSellValue = 0;         // sell × inventory
+            let totalInventoryItems = 0;
+
+            // Per-unit totals (if every unit sold at set margins)
+            let totalCostPerUnit = 0;
+            let totalAdminMarginPerUnit = 0;
+            let totalDistMarginPerUnit = 0;
+
+            products.forEach(p => {
+                const cost = p.costPrice || 0;
+                const adminMargin = p.adminMarginDollars !== undefined ? p.adminMarginDollars : ((p.adminPrice || cost) - cost);
+                const distMargin = p.marginDollars !== undefined ? p.marginDollars : ((p.sellPrice || cost) - (p.adminPrice || cost));
+                const sell = p.sellPrice || cost;
+                const inv = p.quantityOnHand || 0;
+
+                totalCostValue += cost * inv;
+                totalAdminMarginValue += adminMargin * inv;
+                totalDistMarginValue += distMargin * inv;
+                totalSellValue += sell * inv;
+                totalInventoryItems += inv;
+
+                totalCostPerUnit += cost;
+                totalAdminMarginPerUnit += adminMargin;
+                totalDistMarginPerUnit += distMargin;
+            });
+
+            tbody.innerHTML += `
+                <tr style="background:#f8fafc; border-top: 3px solid #2d5a27; font-weight:700;">
+                    <td colspan="3" style="padding:16px 12px;">
+                        <div style="font-size:1.05rem; color:#2d5a27;">INVENTORY VALUE CHECK</div>
+                        <small style="color:#666; font-weight:400;">Sum of (price × current inventory) across all products</small>
+                    </td>
+                    <td style="padding:16px 12px;">
+                        <div style="color:#111;">$${totalCostValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <small style="color:#666; font-weight:400;">Total cost of inventory</small>
+                    </td>
+                    <td style="padding:16px 12px;">
+                        <div style="color:#059669;">$${totalAdminMarginValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <small style="color:#666; font-weight:400;">Admin margin if all sells</small>
+                    </td>
+                    <td style="padding:16px 12px;">
+                        <div style="color:#7c3aed;">$${totalDistMarginValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <small style="color:#666; font-weight:400;">Dist margin if all sells</small>
+                    </td>
+                    <td style="padding:16px 12px;">
+                        <div style="color:#2d5a27;">$${totalSellValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <small style="color:#666; font-weight:400;">Total revenue potential</small>
+                    </td>
+                    <td style="padding:16px 12px;">
+                        <div style="color:#111;">${totalInventoryItems.toLocaleString()}</div>
+                        <small style="color:#666; font-weight:400;">Units on hand</small>
+                    </td>
+                    <td colspan="3"></td>
+                </tr>
+            `;
         }
 
         // Add Product Modal
