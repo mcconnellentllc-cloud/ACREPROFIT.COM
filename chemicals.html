@@ -1051,48 +1051,85 @@
                 // WHEAT PROGRAMS
                 {
                     _id: 'wheat-1',
-                    name: 'Wheat - Herbicide Only',
-                    description: 'Broadleaf weed control for winter wheat',
+                    name: 'Wheat - Herbicide Only (Dry Year / Low Disease)',
+                    description: 'Broadleaf weed control only - skip the fungicide when disease pressure is low or dry year conditions make foliar disease unlikely. Save ~$8/acre.',
                     crop: 'wheat',
                     type: 'recommended',
-                    groundType: 'Winter wheat - spring application during active tillering to jointing. For fields with broadleaf weed pressure (kochia, mustard, etc.) but no disease concerns.',
+                    groundType: 'Winter wheat with broadleaf pressure but low disease risk. Dry spring forecast, drought-stressed crop, or fields with no disease history. If heads flag leaf shows disease symptoms later, you can still apply a fungicide separately.',
                     rotationRestrictions: 'Mivum (metsulfuron): Do not plant corn, sorghum, or other grass crops for 60 days. Soybeans: no restriction. Wheat: no restriction.',
                     grazingRestrictions: 'Do not graze or cut treated wheat for hay within 28 days of Defy LV-6 application.',
                     applications: [
                         {
-                            name: 'Herbicide Application',
+                            name: 'Spring Herbicide Only',
                             timing: 'March - Early April (tillering to jointing)',
                             truckRouteDate: 'Mid-Late February',
                             chemicals: [
                                 { productName: 'Mivum', rate: 0.1, rateUnit: 'oz/acre', packSize: '8x16 oz', unit: 'oz', unitsPerPack: 128, price: 0 },
-                                { productName: 'Defy LV-6', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                                { productName: 'Defy LV-6', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
                     ]
                 },
                 {
                     _id: 'wheat-2',
-                    name: 'Wheat - Herbicide + Fungicide',
-                    description: 'Broadleaf weed control + disease prevention for winter wheat',
+                    name: 'Wheat - Hardy Economical Program (Best All-Around)',
+                    description: 'Spring broadleaf control + fungicide protection for winter wheat. Covers weeds and disease in one pass - the standard program for most High Plains winter wheat.',
                     crop: 'wheat',
                     type: 'recommended',
-                    groundType: 'Winter wheat with disease history or high-yield potential fields. AzoxyProp provides preventative protection against stripe rust, leaf rust, and Septoria. Apply at tillering to flag leaf.',
+                    badge: 'Recommended for most fields',
+                    groundType: 'Winter wheat with typical disease/weed pressure. Mivum hits ALS-susceptible broadleaves (kochia still variable - scout), Defy LV-6 cleans up mustard/tansy/thistle, AzoxyProp gives preventative stripe rust, leaf rust, and Septoria protection. Apply at tillering through jointing. Skip the fungicide (use Herbicide Only program) if dry year or low disease pressure to save ~$8/acre.',
                     rotationRestrictions: 'Mivum (metsulfuron): Do not plant corn, sorghum, or other grass crops for 60 days. AzoxyProp: no rotational restrictions.',
                     grazingRestrictions: 'Do not graze or cut treated wheat for hay within 28 days of Defy LV-6 application. AzoxyProp: 45-day pre-harvest interval for grain.',
                     applications: [
                         {
-                            name: 'Herbicide + Fungicide Application',
+                            name: 'Spring Herbicide + Fungicide',
                             timing: 'March - Early April (tillering to jointing)',
                             truckRouteDate: 'Mid-Late February',
                             chemicals: [
                                 { productName: 'Mivum', rate: 0.1, rateUnit: 'oz/acre', packSize: '8x16 oz', unit: 'oz', unitsPerPack: 128, price: 0 },
                                 { productName: 'Defy LV-6', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
-                                { productName: 'AzoxyProp', rate: 10.5, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                                { productName: 'AzoxyProp', rate: 10.5, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
                     ]
                 },
                 // SUMMER FALLOW PROGRAMS
+                {
+                    _id: 'fallow-hardy',
+                    name: 'Summer Fallow - Hardy Economical Program (Best All-Around)',
+                    description: 'Full-season fallow management: spring burndown + mid-summer residual stack to hold ground clean into fall wheat planting. Uses stock chemistry at reasonable cost per acre.',
+                    crop: 'fallow',
+                    type: 'recommended',
+                    badge: 'Recommended for most fields',
+                    groundType: 'Wheat stubble, failed crop, or planned fallow going into wheat next fall. Hardy residual program holds ground clean through summer dry spells and targets kochia, pigweed, marestail/horseweed, and volunteer wheat. Mid-summer pass uses Sulfentrazone for extended PPO residual and Rancor (metribuzin) for broadleaf carry-through.',
+                    rotationRestrictions: 'Rancor (metribuzin): 4 months to wheat - application in June/July is safe for September wheat. Sulfentrazone: 4 months to wheat at 8 oz/acre with 15+ inches rainfall. Corn/Sorghum: 18 months after Sulfentrazone. Soybeans: 12 months.',
+                    grazingRestrictions: 'Do not graze treated areas for 7 days after glyphosate. Rancor: 28 days grazing/forage restriction. Avoid grazing fallow receiving full residual stack.',
+                    applications: [
+                        {
+                            name: 'Pass 1: Spring Burndown',
+                            timing: 'Early Spring (March - April as weeds green up)',
+                            truckRouteDate: 'Mid March',
+                            chemicals: [
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 32, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Dicamba 49.8% SL', rate: 8, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                            ]
+                        },
+                        {
+                            name: 'Pass 2: Mid-Summer Residual',
+                            timing: 'Mid-Late June (when flush returns, 60-90 days before wheat planting)',
+                            truckRouteDate: 'Early June',
+                            chemicals: [
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 24, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Rancor 4F', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Sulfentrazone 39.6% SC', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                            ]
+                        }
+                    ]
+                },
                 {
                     _id: 'fallow-1',
                     name: 'Summer Fallow - Burndown',
@@ -1538,7 +1575,13 @@
 
         function renderPrograms(cropFilter = 'all') {
             const list = document.getElementById('programList');
-            const filtered = cropFilter === 'all' ? programs : programs.filter(p => p.crop === cropFilter);
+            const baseFiltered = cropFilter === 'all' ? programs : programs.filter(p => p.crop === cropFilter);
+            // Hardy "Best All-Around" programs first (programs with badge), then everything else
+            const filtered = [...baseFiltered].sort((a, b) => {
+                const aHardy = a.badge ? 0 : 1;
+                const bHardy = b.badge ? 0 : 1;
+                return aHardy - bHardy;
+            });
 
             if (filtered.length === 0) {
                 list.innerHTML = '<p class="no-results">No programs found for this crop</p>';
