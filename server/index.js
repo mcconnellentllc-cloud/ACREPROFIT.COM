@@ -14254,9 +14254,11 @@ connectDB().then(async () => {
         const ty = await User.findOne({ email: 'tymollohan77@gmail.com' });
 
         if (kyle && ty) {
-            // Check if clean ledger already set up (v6 - product line + transfers both ways)
-            const cleanV6Marker = await LedgerEntry.findOne({ description: { $regex: /^\(v5\) Transfer OUT:.*to Kyle$/ } });
-            if (!cleanV6Marker) {
+            // Check if clean ledger already set up (v7 - loans only, no transfer entries)
+            // Wipe if v5 transfer entries exist (force clean rebuild)
+            const hasOldTransferEntries = await LedgerEntry.findOne({ description: { $regex: /^\(v5\) Transfer/ } });
+            const cleanV7Marker = await LedgerEntry.findOne({ description: '(v7) Ledger initialized - loans only' });
+            if (!cleanV7Marker || hasOldTransferEntries) {
                 // Wipe all old seed ledger entries
                 await LedgerEntry.deleteMany({});
                 console.log('Cleared old ledger entries for v5 product-line rebuild');
@@ -14306,74 +14308,23 @@ connectDB().then(async () => {
                     });
                 }
 
-                console.log(`Clean v5 ledger: Kyle ${kyleProducts.length} product lines ($167,987), Ty ${tyProducts.length} product lines ($146,445)`);
+                // Marker entry to prevent re-seed
+                await createLedgerEntry({
+                    representativeId: kyle._id,
+                    description: '(v7) Ledger initialized - loans only',
+                    amount: 0,
+                    type: 'debit',
+                    category: 'adjustment',
+                    referenceType: 'Manual',
+                    notes: 'System marker - safe to ignore. Created when ledger was cleaned and initialized with loan entries only.'
+                });
 
-                // Inventory transfers from Kyle's stock to Ty
-                // Each transfer creates TWO mirror ledger entries:
-                //   - Kyle: Money Out (he gave up product, reduces what AP owes him)
-                //   - Ty: Money Out (he took product and was billed, reduces what AP owes him)
-                const transfersKyleToTy = [
-                    { product: 'Rancor 4F', qty: 180, unit: 'gal', cost: 45.50, amount: 8190.00 },
-                    { product: 'Flumioxazin 51% WDG', qty: 720, unit: 'lb', cost: 14.00, amount: 10080.00 },
-                    { product: 'Meso 4SC', qty: 360, unit: 'gal', cost: 45.75, amount: 16470.00 },
-                    { product: 'Sulfentrazone 39.6% SC', qty: 180, unit: 'gal', cost: 71.50, amount: 12870.00 },
-                    { product: 'Hydrovant fA', qty: 180, unit: 'gal', cost: 75.00, amount: 13500.00 }
-                ];
+                console.log(`Clean v5 ledger: Kyle ${kyleProducts.length} product lines ($167,987), Ty ${tyProducts.length} product lines ($146,445) - Total AP debt: $314,432`);
 
-                for (const t of transfersKyleToTy) {
-                    // Kyle's side: he gave up inventory to Ty, so AP's debt to Kyle goes down
-                    await createLedgerEntry({
-                        representativeId: kyle._id,
-                        description: `(v5) Transfer OUT: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} to Ty`,
-                        amount: t.amount,
-                        type: 'debit',
-                        category: 'adjustment',
-                        referenceType: 'Manual',
-                        notes: `Product moved from Kyle's location to Ty | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit}`
-                    });
-                    // Ty's side: he received inventory from Kyle, so AP's debt to Ty goes down (billed at cost)
-                    await createLedgerEntry({
-                        representativeId: ty._id,
-                        description: `(v5) Transfer IN: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} from Kyle`,
-                        amount: t.amount,
-                        type: 'debit',
-                        category: 'adjustment',
-                        referenceType: 'Manual',
-                        notes: `Product moved from Kyle's location to Ty, billed at cost | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit}`
-                    });
-                }
-
-                console.log(`v5 inventory transfers: ${transfersKyleToTy.length} Kyle→Ty transfers, $61,110 total (mirrored entries on both ledgers)`);
-
-                // Transfer from Ty's stock to Kyle: 1,590 gal Atrazine 4L @ $12.57
-                const transfersTyToKyle = [
-                    { product: 'Atrazine 4L', qty: 1590, unit: 'gal', cost: 12.57, amount: 19986.30 }
-                ];
-
-                for (const t of transfersTyToKyle) {
-                    // Ty's side: gave up inventory to Kyle
-                    await createLedgerEntry({
-                        representativeId: ty._id,
-                        description: `(v5) Transfer OUT: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} to Kyle`,
-                        amount: t.amount,
-                        type: 'debit',
-                        category: 'adjustment',
-                        referenceType: 'Manual',
-                        notes: `Product moved from Ty's location to Kyle | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit} | 6 shuttles`
-                    });
-                    // Kyle's side: received inventory, billed at cost
-                    await createLedgerEntry({
-                        representativeId: kyle._id,
-                        description: `(v5) Transfer IN: ${t.product} - ${t.qty.toLocaleString()} ${t.unit} from Ty`,
-                        amount: t.amount,
-                        type: 'debit',
-                        category: 'adjustment',
-                        referenceType: 'Manual',
-                        notes: `Product moved from Ty's location to Kyle, billed at cost | ${t.qty.toLocaleString()} ${t.unit} @ $${t.cost.toFixed(2)}/${t.unit} | 6 shuttles`
-                    });
-                }
-
-                console.log(`v5 Ty→Kyle transfers: ${transfersTyToKyle.length} transfer, $19,986.30 total`);
+                // NOTE: Inventory transfers between Kyle and Ty (Rancor/Flumi/Meso/Sulf/Hydrovant
+                // to Ty, Atrazine to Kyle) are tracked in Inventory records, NOT the ledger.
+                // AP's loan debt stays at $314,432 until AP writes checks to pay them back.
+                // Transfers create debts BETWEEN Kyle and Ty (not with AP) - handled separately.
             }
         }
 
