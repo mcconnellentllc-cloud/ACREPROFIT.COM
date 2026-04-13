@@ -2095,34 +2095,75 @@
                         </tfoot>
                     </table>
 
-                    <div class="payment-deadline-box">
-                        <div class="deadline-header">
-                            <span class="deadline-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg></span>
-                            <h4>Order & Payment Due Together</h4>
-                        </div>
-                        <div class="deadline-warning">
-                            <strong>We do not order chemicals without payment or prior arrangements.</strong>
-                        </div>
-                        <div class="deadline-grid">
-                            <div class="deadline-item order-deadline" style="border-left-color: #dc2626;">
-                                <span class="deadline-label">Order + Payment Due</span>
-                                <span class="deadline-date" style="color: #dc2626;">${getOrderDeadline()}</span>
-                                <span class="deadline-note">Submit order AND payment by this date</span>
-                            </div>
-                            <div class="deadline-item delivery-date">
-                                <span class="deadline-label">Estimated Delivery</span>
-                                <span class="deadline-date">${getDeliveryDate()}</span>
-                                <span class="deadline-note">To your rep's pickup location</span>
-                            </div>
-                        </div>
-                        <div class="payment-amount-highlight">
-                            <strong>Amount Due: $${(totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)).toFixed(2)}</strong>
-                            <span>Payment via ACH or check only</span>
-                        </div>
-                    </div>
+                    ${(() => {
+                        // Check if all products in the order are in stock
+                        const productNames = Object.values(totalsByChemical).map(item => item.name);
+                        const stockStatus = productNames.map(name => {
+                            const c = chemicals.find(ch => (ch.productName || ch.name) === name);
+                            return c ? (c.quantityOnHand || 0) : 0;
+                        });
+                        const needed = Object.values(totalsByChemical).map(item => ({ name: item.name, needed: item.totalNeeded }));
+                        const allInStock = needed.every((n, i) => stockStatus[i] >= n.needed);
+                        const amountDue = (totalCost + (Math.ceil(hydrovantGal / 5) * 5 * 110)).toFixed(2);
 
-                    <div style="background:#f0f7ef; border-left:3px solid #2d5a27; padding:12px 16px; border-radius:6px; margin:16px 0; color:#2d5a27; font-style:italic; font-weight:500; font-size:0.9rem;">
-                        Thanks for buying through Acre Profit - farmers helping farmers, keeping more money in your pocket instead of paying for someone else's fancy corporate office.
+                        if (allInStock) {
+                            return `
+                            <div class="payment-deadline-box" style="background:linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%); border:2px solid #059669;">
+                                <div class="deadline-header" style="color:#065f46;">
+                                    <h4 style="color:#065f46;">Everything's In Stock - Come Pick It Up</h4>
+                                </div>
+                                <div style="background:white; padding:12px 16px; border-radius:6px; color:#065f46; margin:12px 0;">
+                                    All items are on the shelf. Swing by your rep's location to pick them up whenever works for you. We'll settle up at pickup.
+                                </div>
+                                <div class="deadline-grid">
+                                    <div class="deadline-item" style="border-left-color:#059669;">
+                                        <span class="deadline-label">Pickup</span>
+                                        <span class="deadline-date" style="color:#059669;">Ready Today</span>
+                                        <span class="deadline-note">Your rep's location</span>
+                                    </div>
+                                    <div class="deadline-item" style="border-left-color:#059669;">
+                                        <span class="deadline-label">Settle Up</span>
+                                        <span class="deadline-date" style="color:#059669;">At Pickup</span>
+                                        <span class="deadline-note">ACH, check, or arranged</span>
+                                    </div>
+                                </div>
+                                <div class="payment-amount-highlight" style="background:#059669;">
+                                    <strong>Total: $${amountDue}</strong>
+                                    <span>Thank you for your business</span>
+                                </div>
+                            </div>`;
+                        }
+
+                        return `
+                        <div class="payment-deadline-box">
+                            <div class="deadline-header">
+                                <h4>Heads Up - A Few Items Need to Be Ordered</h4>
+                            </div>
+                            <div style="background:white; padding:12px 16px; border-radius:6px; margin:12px 0; color:#92400e;">
+                                Some items aren't on the shelf yet. So we can pool with other farmers and get you the best price, we like to have payment (or prior arrangements) before we place the order with the supplier.
+                            </div>
+                            <div class="deadline-grid">
+                                <div class="deadline-item order-deadline" style="border-left-color: #d97706;">
+                                    <span class="deadline-label">Order By</span>
+                                    <span class="deadline-date" style="color: #d97706;">${getOrderDeadline()}</span>
+                                    <span class="deadline-note">So we can get it in on the next truck</span>
+                                </div>
+                                <div class="deadline-item delivery-date">
+                                    <span class="deadline-label">Estimated Ready for Pickup</span>
+                                    <span class="deadline-date">${getDeliveryDate()}</span>
+                                    <span class="deadline-note">At your rep's location</span>
+                                </div>
+                            </div>
+                            <div class="payment-amount-highlight">
+                                <strong>Total: $${amountDue}</strong>
+                                <span>ACH or check - whatever works for you</span>
+                            </div>
+                        </div>`;
+                    })()}
+
+                    <div style="background:#f0f7ef; border-left:3px solid #2d5a27; padding:14px 18px; border-radius:6px; margin:16px 0; color:#2d5a27;">
+                        <div style="font-weight:700; font-size:1rem; margin-bottom:4px;">Thank you for your business.</div>
+                        <div style="font-style:italic; font-size:0.9rem;">Thanks for placing an order and joining our cause - farmers helping farmers. We appreciate you.</div>
                     </div>
 
                     <div class="order-actions">
