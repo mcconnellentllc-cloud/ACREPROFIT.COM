@@ -1088,9 +1088,9 @@ const chemicalRestrictions = {
         groundNotes: 'Non-selective - kills all green vegetation on contact'
     },
     'flumioxazin': {
-        rotation: 'Wheat: 4 months. Soybeans: 12 months. Sorghum: 18 months at rates above 2 oz/acre',
+        rotation: 'Pre-plant to sorghum: 30 days minimum with adequate rainfall at max 2 oz/acre. Rotating after corn: 18 months to sorghum at rates above 2 oz/acre. Wheat: 4 months. Soybeans: 12 months.',
         grazing: 'Do not graze or harvest forage for 30 days',
-        groundNotes: 'Pre-emerge residual broadleaf control. Works best on medium-textured soils'
+        groundNotes: 'Pre-emerge residual broadleaf control. Works best on medium-textured soils. Need rainfall/irrigation to activate.'
     },
     'dicamba': {
         rotation: 'Soybeans/sensitive broadleaf crops: 30 days minimum',
