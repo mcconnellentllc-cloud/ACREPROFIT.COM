@@ -46,17 +46,17 @@
                 <button class="option-tab active" data-option="direct">
                     <span class="tab-icon"></span>
                     <span class="tab-title">Direct Selection</span>
-                    <span class="tab-desc">Choose from our chemical list</span>
+                    <span class="tab-desc">See what's in stock and prices</span>
                 </button>
-                <button class="option-tab" data-option="crop">
-                    <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v6m0 12v2M4.93 4.93l4.24 4.24m5.66 5.66l4.24 4.24M2 12h6m8 0h6M4.93 19.07l4.24-4.24m5.66-5.66l4.24-4.24"></path></svg></span>
-                    <span class="tab-title">By Crop & Rates</span>
-                    <span class="tab-desc">Enter rates per acre</span>
+                <button class="option-tab" data-option="recipebook">
+                    <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg></span>
+                    <span class="tab-title">Recipe Book</span>
+                    <span class="tab-desc">Browse programs by crop</span>
                 </button>
-                <button class="option-tab" data-option="program">
-                    <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg></span>
-                    <span class="tab-title">Program Packages</span>
-                    <span class="tab-desc">Pre-built spray programs</span>
+                <button class="option-tab" data-option="buildrecipe">
+                    <span class="tab-icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg></span>
+                    <span class="tab-title">Build a Recipe</span>
+                    <span class="tab-desc">Enter your own rates per acre</span>
                 </button>
             </div>
 
@@ -154,7 +154,7 @@
             </div>
 
             <!-- OPTION 2: Crop-Based Calculator -->
-            <div id="cropSection" class="option-section">
+            <div id="buildrecipeSection" class="option-section">
                 <div class="section-header">
                     <h2>Calculate by Crop & Application Rates</h2>
                     <p>Select your crop, enter your acres, and specify application rates per acre</p>
@@ -195,26 +195,58 @@
             </div>
 
             <!-- OPTION 3: Program Packages -->
-            <div id="programSection" class="option-section">
-                <div class="section-header">
-                    <h2>Standard Spray Program Packages</h2>
-                    <p>Select a pre-built program, enter your acres, and we'll calculate everything for you</p>
-                </div>
-
-                <div class="program-crop-filter">
-                    <label>Filter by Crop:</label>
-                    <div class="crop-filter-buttons">
-                        <button class="crop-filter-btn active" data-crop="all">All Programs</button>
-                        <button class="crop-filter-btn" data-crop="wheat">Wheat</button>
-                        <button class="crop-filter-btn" data-crop="corn">Corn</button>
-                        <button class="crop-filter-btn" data-crop="milo">Milo</button>
-                        <button class="crop-filter-btn" data-crop="millet">Millet</button>
-                        <button class="crop-filter-btn" data-crop="fallow">Fallow</button>
+            <div id="recipebookSection" class="option-section">
+                <!-- Crop selection cards (shown first) -->
+                <div id="recipeBookCropCards">
+                    <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <h2>Recipe Book</h2>
+                            <p>Choose your crop to see available spray programs</p>
+                        </div>
+                        <button class="btn btn-outline" onclick="document.querySelector('.option-tab[data-option=buildrecipe]').click()" style="border-color:#2d5a27; color:#2d5a27;">Don't see what you need? Build a Recipe</button>
+                    </div>
+                    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:16px; margin-top:20px;">
+                        <div class="crop-book-card" onclick="showRecipesForCrop('corn')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Corn</div>
+                            <div style="color:#666; font-size:0.9rem;" id="cornProgramCount">View programs</div>
+                        </div>
+                        <div class="crop-book-card" onclick="showRecipesForCrop('milo')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Sorghum / Milo</div>
+                            <div style="color:#666; font-size:0.9rem;" id="miloProgramCount">View programs</div>
+                        </div>
+                        <div class="crop-book-card" onclick="showRecipesForCrop('wheat')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Wheat</div>
+                            <div style="color:#666; font-size:0.9rem;" id="wheatProgramCount">View programs</div>
+                        </div>
+                        <div class="crop-book-card" onclick="showRecipesForCrop('millet')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Millet</div>
+                            <div style="color:#666; font-size:0.9rem;" id="milletProgramCount">View programs</div>
+                        </div>
+                        <div class="crop-book-card" onclick="showRecipesForCrop('fallow')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Summer Fallow</div>
+                            <div style="color:#666; font-size:0.9rem;" id="fallowProgramCount">View programs</div>
+                        </div>
+                        <div class="crop-book-card" onclick="document.querySelector('.option-tab[data-option=buildrecipe]').click()" style="cursor:pointer; background:#f0f7ef; border:2px dashed #2d5a27; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">+ Build Your Own</div>
+                            <div style="color:#2d5a27; font-size:0.9rem;">Create a custom recipe</div>
+                        </div>
                     </div>
                 </div>
 
-                <div class="program-list" id="programList">
-                    <div class="loading">Loading programs...</div>
+                <!-- Program list for selected crop (shown after clicking a crop) -->
+                <div id="recipeBookProgramList" style="display:none;">
+                    <div class="section-header" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+                        <div>
+                            <button class="btn btn-outline btn-sm" onclick="backToCropCards()" style="margin-bottom:8px;">&larr; Back to Crops</button>
+                            <h2 id="selectedCropTitle">Corn Programs</h2>
+                            <p>Select a pre-built program, enter your acres, and we'll calculate everything for you</p>
+                        </div>
+                        <button class="btn btn-outline" onclick="document.querySelector('.option-tab[data-option=buildrecipe]').click()" style="border-color:#2d5a27; color:#2d5a27;">Don't see what you need? Build a Recipe</button>
+                    </div>
+
+                    <div class="program-list" id="programList">
+                        <div class="loading">Loading programs...</div>
+                    </div>
                 </div>
 
                 <div id="programAcresSection" class="program-config-card" style="display: none;">
@@ -529,7 +561,7 @@
             }
             // Auto-generate restrictions for any programs missing them
             applyAutoRestrictions(programs);
-            renderPrograms();
+            updateCropProgramCounts();
         }
 
         // Demo data fallback - Full CPD Price List
@@ -1383,6 +1415,30 @@
                 renderPrograms(btn.dataset.crop);
             });
         });
+
+        function showRecipesForCrop(crop) {
+            document.getElementById('recipeBookCropCards').style.display = 'none';
+            document.getElementById('recipeBookProgramList').style.display = 'block';
+            const cropNames = { corn: 'Corn', milo: 'Sorghum / Milo', wheat: 'Wheat', millet: 'Millet', fallow: 'Summer Fallow' };
+            document.getElementById('selectedCropTitle').textContent = (cropNames[crop] || crop) + ' Programs';
+            renderPrograms(crop);
+        }
+
+        function backToCropCards() {
+            document.getElementById('recipeBookCropCards').style.display = 'block';
+            document.getElementById('recipeBookProgramList').style.display = 'none';
+            document.getElementById('programAcresSection').style.display = 'none';
+            updateCropProgramCounts();
+        }
+
+        function updateCropProgramCounts() {
+            const crops = ['corn', 'milo', 'wheat', 'millet', 'fallow'];
+            crops.forEach(crop => {
+                const count = (programs || []).filter(p => p.crop === crop).length;
+                const el = document.getElementById(crop + 'ProgramCount');
+                if (el) el.textContent = count > 0 ? `${count} program${count === 1 ? '' : 's'}` : 'Coming soon';
+            });
+        }
 
         function renderPrograms(cropFilter = 'all') {
             const list = document.getElementById('programList');
