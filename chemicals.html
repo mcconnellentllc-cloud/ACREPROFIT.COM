@@ -472,7 +472,59 @@
          * Calculate optimal package breakdown
          * e.g., 280 gal needed = 1 Shuttle (250 gal) + 6 x 2.5 gal jugs (15 gal)
          * Returns: { packages: [{name, qty, size}], totalOrdered: number, overage: number }
+         *
+         * If productPackSize/unitsPerPack passed in, ONLY uses that exact pack size
+         * (for products that only come in one size like Anthem NXT = 2x2.5 gal only)
          */
+        function calculateProductPackages(totalNeeded, chemical) {
+            const packSize = chemical.packSize || '';
+            const unitsPerPack = chemical.unitsPerPack || 0;
+            const unit = chemical.unit || 'gal';
+            const productName = (chemical.productName || '').toLowerCase();
+
+            // Special handling for Flumioxazin: comes in 5 lb jugs or 20 lb cases (4 jugs)
+            if (productName.includes('flumi') && unit === 'lb') {
+                const sizes = [
+                    { name: 'Case (4x5 lb)', size: 20, singular: '4x5 lb case', plural: '4x5 lb cases' },
+                    { name: '5 lb jug', size: 5, singular: '5 lb jug', plural: '5 lb jugs' }
+                ];
+                return breakdownBySizes(totalNeeded, sizes);
+            }
+
+            // For all other products: use their single pack size, round up
+            const qty = Math.max(1, Math.ceil(totalNeeded / (unitsPerPack || 1)));
+            return {
+                packages: [{ name: packSize, qty, size: unitsPerPack, label: qty === 1 ? packSize : packSize + 's' }],
+                totalOrdered: qty * (unitsPerPack || 1),
+                overage: (qty * (unitsPerPack || 1)) - totalNeeded,
+                breakdown: `${qty} × ${packSize}`
+            };
+        }
+
+        function breakdownBySizes(totalNeeded, sizes) {
+            const result = { packages: [], totalOrdered: 0, overage: 0, breakdown: '' };
+            let remaining = totalNeeded;
+            for (const pkg of sizes) {
+                if (remaining >= pkg.size) {
+                    const qty = Math.floor(remaining / pkg.size);
+                    if (qty > 0) {
+                        result.packages.push({ name: pkg.name, qty, size: pkg.size, label: qty === 1 ? pkg.singular : pkg.plural });
+                        remaining -= qty * pkg.size;
+                        result.totalOrdered += qty * pkg.size;
+                    }
+                }
+            }
+            if (remaining > 0 && sizes.length > 0) {
+                const smallest = sizes[sizes.length - 1];
+                const qty = Math.ceil(remaining / smallest.size);
+                result.packages.push({ name: smallest.name, qty, size: smallest.size, label: qty === 1 ? smallest.singular : smallest.plural });
+                result.totalOrdered += qty * smallest.size;
+            }
+            result.overage = result.totalOrdered - totalNeeded;
+            result.breakdown = result.packages.map(p => `${p.qty} ${p.label}`).join(' + ');
+            return result;
+        }
+
         function calculatePackageBreakdown(totalNeeded, unit = 'gl', availableSizes = null) {
             const sizes = availableSizes || PACKAGE_SIZES[unit] || PACKAGE_SIZES['gl'];
             const result = {
@@ -1413,26 +1465,35 @@
 
         function calculateAmount(rate, rateUnit, acres, targetUnit) {
             let totalNeeded = rate * acres;
+            const target = (targetUnit || 'gal').toLowerCase();
+            const unit = (rateUnit || '').toLowerCase();
 
-            // Convert to gallons if needed
-            if (targetUnit === 'gl') {
-                if (rateUnit.includes('oz')) {
+            // Convert to gallons (accept 'gal' or 'gl')
+            if (target === 'gal' || target === 'gl') {
+                if (unit.includes('fl oz') || unit === 'oz/acre' || unit.startsWith('oz')) {
                     totalNeeded = totalNeeded / 128; // fl oz to gallons
-                } else if (rateUnit.includes('pt')) {
+                } else if (unit.includes('pt')) {
                     totalNeeded = totalNeeded / 8;
-                } else if (rateUnit.includes('qt')) {
+                } else if (unit.includes('qt')) {
                     totalNeeded = totalNeeded / 4;
+                } else if (unit.includes('lb')) {
+                    totalNeeded = totalNeeded / 10; // rough approx for liquid lb (varies)
                 }
+                // if already gal/acre, no conversion needed
             }
-            // Convert to pounds if needed
-            else if (targetUnit === 'lb') {
-                if (rateUnit.includes('oz')) {
-                    totalNeeded = totalNeeded / 16; // oz to lb
+            // Convert to pounds
+            else if (target === 'lb') {
+                if (unit.startsWith('oz')) {
+                    totalNeeded = totalNeeded / 16; // dry oz to lb
                 }
+                // if already lb/acre, no conversion
             }
-            // Convert to oz if needed (for products sold in oz packages)
-            else if (targetUnit === 'oz') {
-                // rate is already in oz, no conversion needed
+            // Target is oz (for products sold in oz containers like Mivum)
+            else if (target === 'oz') {
+                if (unit.includes('lb')) {
+                    totalNeeded = totalNeeded * 16; // lb to oz
+                }
+                // if already oz/acre, no conversion
             }
             return totalNeeded;
         }
@@ -1976,7 +2037,12 @@
                         </thead>
                         <tbody>
                             ${Object.values(totalsByChemical).map(item => {
-                                const breakdown = calculatePackageBreakdown(item.totalNeeded, item.unit);
+                                const breakdown = calculateProductPackages(item.totalNeeded, {
+                                    packSize: item.packSize,
+                                    unitsPerPack: item.unitsPerPack,
+                                    unit: item.unit,
+                                    productName: item.name
+                                });
                                 // Recalculate cost based on actual packages
                                 const actualCost = breakdown.totalOrdered * item.price;
                                 return `
