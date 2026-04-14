@@ -51,6 +51,8 @@ const connectDB = async () => {
             console.log('MongoDB connected successfully');
             // Initialize admin users
             await initializeAdmins();
+            // Seed atomic sequence counters from existing records (I8)
+            await initializeCounters();
             // Seed initial inventory
             await seedJabcoInventory();
             // Seed March 2026 purchase orders
@@ -1142,11 +1144,71 @@ const chemicalOrderSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// ============ ATOMIC SEQUENCE COUNTER (I8) ============
+// Single Counter collection, one doc per (kind-year) sequence. nextSequence()
+// uses findOneAndUpdate/$inc/upsert which is atomic under MongoDB, so two
+// concurrent saves can never produce the same number. Replaces the old
+// countDocuments()+1 pattern that was race-prone under concurrent order
+// creation.
+
+const counterSchema = new mongoose.Schema({
+    _id: { type: String, required: true },  // e.g. 'chemicalOrder-2026'
+    seq: { type: Number, default: 0 }
+});
+const Counter = mongoose.model('Counter', counterSchema);
+
+async function nextSequence(name) {
+    const result = await Counter.findOneAndUpdate(
+        { _id: name },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+    return result.seq;
+}
+
+// Seed counters from existing records. $setOnInsert means this is a no-op on
+// redeploy - never stomps a live counter. Safe to run every startup.
+// Parses the max numeric suffix from existing XXX-YYYY-NNNNN numbers so the
+// first atomic increment after deploy returns a unique next number.
+async function initializeCounters() {
+    try {
+        const year = new Date().getFullYear();
+
+        const seedOne = async (counterName, Model, field, prefix) => {
+            const escPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const last = await Model.findOne({ [field]: { $regex: `^${escPrefix}` } })
+                .sort({ [field]: -1 })
+                .select(field)
+                .lean();
+            let seed = 0;
+            if (last && last[field]) {
+                const parts = last[field].split('-');
+                const n = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(n)) seed = n;
+            }
+            const result = await Counter.findOneAndUpdate(
+                { _id: counterName },
+                { $setOnInsert: { seq: seed } },
+                { upsert: true, new: true }
+            );
+            console.log(`Counter ${counterName}: seq=${result.seq} (seeded from max=${seed})`);
+        };
+
+        await seedOne(`chemicalOrder-${year}`, mongoose.model('ChemicalOrder'), 'orderNumber', `CO-${year}-`);
+        await seedOne(`invoice-${year}`, mongoose.model('Invoice'), 'invoiceNumber', `INV-${year}-`);
+        await seedOne(`quoteRequest-${year}`, mongoose.model('QuoteRequest'), 'quoteNumber', `QR-${year}-`);
+        await seedOne(`supplierBidSheet-${year}`, mongoose.model('SupplierBidSheet'), 'bidNumber', `BID-${year}-`);
+    } catch (err) {
+        console.error('initializeCounters error:', err.message);
+    }
+}
+
 // Auto-generate order number
 chemicalOrderSchema.pre('save', async function(next) {
     if (!this.orderNumber) {
-        const count = await mongoose.model('ChemicalOrder').countDocuments();
-        this.orderNumber = `CO-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+        const year = new Date().getFullYear();
+        const seq = await nextSequence(`chemicalOrder-${year}`);
+        this.orderNumber = `CO-${year}-${String(seq).padStart(5, '0')}`;
     }
     next();
 });
@@ -1633,8 +1695,8 @@ const quoteRequestSchema = new mongoose.Schema({
 quoteRequestSchema.pre('save', async function(next) {
     if (!this.quoteNumber) {
         const year = new Date().getFullYear();
-        const count = await QuoteRequest.countDocuments();
-        this.quoteNumber = `QR-${year}-${String(count + 1).padStart(5, '0')}`;
+        const seq = await nextSequence(`quoteRequest-${year}`);
+        this.quoteNumber = `QR-${year}-${String(seq).padStart(5, '0')}`;
     }
     next();
 });
@@ -1742,8 +1804,8 @@ const supplierBidSheetSchema = new mongoose.Schema({
 supplierBidSheetSchema.pre('save', async function(next) {
     if (!this.bidNumber) {
         const year = new Date().getFullYear();
-        const count = await SupplierBidSheet.countDocuments();
-        this.bidNumber = `BID-${year}-${String(count + 1).padStart(5, '0')}`;
+        const seq = await nextSequence(`supplierBidSheet-${year}`);
+        this.bidNumber = `BID-${year}-${String(seq).padStart(5, '0')}`;
     }
     next();
 });
@@ -2271,21 +2333,8 @@ async function updateMixRatingStats(mixId) {
 // Helper: Generate invoice number
 async function generateInvoiceNumber() {
     const year = new Date().getFullYear();
-    const prefix = `INV-${year}-`;
-
-    const lastInvoice = await Invoice.findOne({ invoiceNumber: { $regex: `^${prefix}` } })
-        .sort({ invoiceNumber: -1 })
-        .lean();
-
-    let nextNum = 1;
-    if (lastInvoice && lastInvoice.invoiceNumber) {
-        const lastNum = parseInt(lastInvoice.invoiceNumber.split('-')[2], 10);
-        if (!isNaN(lastNum)) {
-            nextNum = lastNum + 1;
-        }
-    }
-
-    return `${prefix}${String(nextNum).padStart(5, '0')}`;
+    const seq = await nextSequence(`invoice-${year}`);
+    return `INV-${year}-${String(seq).padStart(5, '0')}`;
 }
 
 // Auto-generate an Invoice record when an order transitions to paid.
