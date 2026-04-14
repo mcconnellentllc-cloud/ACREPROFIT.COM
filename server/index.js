@@ -324,7 +324,7 @@ const orderSchema = new mongoose.Schema({
     // Order status
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered', 'archived', 'cancelled', 'quote_pending', 'quote_sent'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered', 'shipped', 'delivered', 'archived', 'cancelled', 'quote_pending', 'quote_sent', 'payment_pending', 'payment_secured'],
         default: 'draft'
     },
     orderStatus: {
@@ -1110,7 +1110,7 @@ const chemicalOrderSchema = new mongoose.Schema({
     // Status tracking
     status: {
         type: String,
-        enum: ['draft', 'submitted', 'confirmed', 'ordered_from_supplier', 'received', 'ready_for_pickup', 'delivered', 'cancelled', 'archived'],
+        enum: ['draft', 'submitted', 'confirmed', 'ordered_from_supplier', 'received', 'ready_for_pickup', 'delivered', 'cancelled', 'archived', 'payment_pending', 'payment_secured'],
         default: 'draft'
     },
 
