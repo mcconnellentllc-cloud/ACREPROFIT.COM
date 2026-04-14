@@ -12143,6 +12143,87 @@ app.post('/api/admin/backfill-march-2026-inventory', authMiddleware, superAdminM
     }
 });
 
+// Seed or update the milo 2-pass program (KSU-based, NE Colorado dryland).
+// Idempotent: finds the program by name, updates if exists, creates if not.
+// Uses the real schema field names (suggestedRate, deliveryWindow, isAdjuvant,
+// precautions) added in commit 14cd798.
+app.post('/api/admin/seed-milo-program', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const miloProgram = {
+            name: 'Milo 2-Pass Program - Hardy Economical',
+            crop: 'milo',
+            type: 'template',
+            isPublic: true,
+            description: 'KSU-based 2-pass program for NE Colorado dryland milo. Pass 1 burndown 30 days before planting, Pass 2 at-planting pre-emerge. Requires Concep-safened seed.',
+            applications: [
+                {
+                    name: 'Pass 1 — Pre-Plant Burndown',
+                    timing: '30 days before planting (Early-Mid April)',
+                    deliveryWindow: 'Late March',
+                    chemicals: [
+                        { productName: 'XSATE Glyphosate 53.8%', suggestedRate: 22, rateUnit: 'oz/acre', notes: 'Kills emerged weeds' },
+                        { productName: 'Atrazine 4L', suggestedRate: 1, rateUnit: 'qt/acre', notes: 'Residual broadleaf - pigweed, ragweed, mustards' },
+                        { productName: 'Flumioxazin 51% WDG', suggestedRate: 2, rateUnit: 'oz/acre', notes: 'Palmer amaranth, kochia, marestail residual. MUST be 30 days before planting.' },
+                        { productName: 'Dicamba 49.8% SL', suggestedRate: 4, rateUnit: 'oz/acre', notes: 'Broadleaf burndown boost' },
+                        { productName: 'Hydrovant fA', suggestedRate: 1.28, rateUnit: 'fl oz/acre', isAdjuvant: true, notes: 'Drift reduction adjuvant' }
+                    ]
+                },
+                {
+                    name: 'Pass 2 — At-Planting / Pre-Emerge',
+                    timing: 'At planting (Mid May)',
+                    deliveryWindow: 'Early May',
+                    chemicals: [
+                        { productName: 'XSATE Glyphosate 53.8%', suggestedRate: 22, rateUnit: 'oz/acre', notes: 'Kills weeds emerged since Pass 1' },
+                        { productName: 'Atrazine 4L', suggestedRate: 1, rateUnit: 'qt/acre', notes: 'Pre-emerge residual. Safe at-planting with Concep-safened seed.' },
+                        { productName: 'S-Metolachlor (Dual II Magnum)', suggestedRate: 1.33, rateUnit: 'pt/acre', notes: 'Grass + small broadleaf residual. REQUIRES Concep-safened seed.' },
+                        { productName: 'Meso 4SC', suggestedRate: 6, rateUnit: 'fl oz/acre', notes: 'Kochia, pigweed, velvetleaf control' },
+                        { productName: 'Hydrovant fA', suggestedRate: 1.28, rateUnit: 'fl oz/acre', isAdjuvant: true, notes: 'Drift reduction adjuvant' }
+                    ]
+                }
+            ],
+            precautions: [
+                'CONCEP-SAFENED SEED REQUIRED - S-Metolachlor (Dual II Magnum) will injure milo without Concep III safener on seed. Corn safener does NOT work.',
+                'FLUMIOXAZIN 30-DAY RULE - Must be applied minimum 30 days before planting. At least 1 inch rainfall required between application and planting.',
+                'NO POST-EMERGE GRASS CONTROL - There are no herbicides labeled for post-emergence grass control in conventional grain sorghum. Pass 1 and Pass 2 residuals are your only grass protection.',
+                'DICAMBA WAIT - 15-day waiting period between dicamba application and sorghum planting when using 8 fl oz Clarity. At 4 oz rate, 7-day wait recommended.',
+                'ATRAZINE RUNOFF - In sensitive watersheds, do not exceed 1 lb ai/acre at planting due to runoff risk.',
+                'GRAZING - Do not graze sorghum forage for 60 days after atrazine application.',
+                'SCOUT 14-21 days after each application. Adjust rates based on soil type, organic matter, and weed pressure. Label is the law.'
+            ]
+        };
+
+        // Link chemicals to their catalog IDs where possible (for cost calculations)
+        for (const app of miloProgram.applications) {
+            for (const chem of app.chemicals) {
+                const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit').lean();
+                if (catalogMatch) {
+                    chem.chemicalId = catalogMatch._id;
+                    chem.packSize = catalogMatch.packSize;
+                    chem.unit = catalogMatch.unit;
+                }
+            }
+        }
+
+        const existing = await SprayProgram.findOne({ name: miloProgram.name });
+        if (existing) {
+            Object.assign(existing, miloProgram);
+            existing.updatedAt = new Date();
+            await existing.save();
+            return res.json({ message: 'Milo program updated', id: existing._id, program: existing });
+        }
+
+        const program = new SprayProgram({
+            ...miloProgram,
+            createdBy: req.user._id
+        });
+        await program.save();
+        res.json({ message: 'Milo program created', id: program._id, program });
+    } catch (error) {
+        console.error('seed-milo-program error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Transfer inventory between locations
 app.post('/api/admin/inventory/transfer', authMiddleware, adminMiddleware, async (req, res) => {
     try {

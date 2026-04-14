@@ -1621,13 +1621,20 @@
                     ${costPerAcreHTML}
                     ${prog.groundType ? `<div style="background:#f0f7ef; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.88rem; color:#2d5a27; border-left:3px solid #2d5a27;"><strong>Best For:</strong> ${prog.groundType}</div>` : ''}
                     <div style="background:#fffbeb; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.8rem; color:#92400e; border-left:3px solid #f59e0b;"><strong>Scout 14-21 days after application.</strong> Adjust rates based on soil type, organic matter, and actual weed pressure. Label is the law.</div>
+                    ${Array.isArray(prog.precautions) && prog.precautions.length > 0 ? `
+                    <div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:12px 16px; margin-bottom:12px; color:#856404;">
+                        <div style="font-weight:700; margin-bottom:8px; color:#dc3545;">Program Precautions</div>
+                        <ul style="margin:0; padding-left:20px; font-size:0.85rem; line-height:1.5;">
+                            ${prog.precautions.map(p => `<li style="margin-bottom:4px;">${p}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
                     <div class="program-applications">
                         ${prog.applications.map(app => `
                             <div class="program-pass">
                                 <strong>${app.name}</strong> (${app.timing})
-                                ${app.truckRouteDate ? `<span class="pass-truck-route">Delivery: ${app.truckRouteDate}</span>` : ''}
+                                ${(app.deliveryWindow || app.truckRouteDate) ? `<span class="pass-truck-route">Delivery: ${app.deliveryWindow || app.truckRouteDate}</span>` : ''}
                                 <ul>
-                                    ${app.chemicals.map(c => `<li>${c.productName} - ${c.rate} ${c.rateUnit}</li>`).join('')}
+                                    ${app.chemicals.map(c => `<li>${c.productName} - ${c.suggestedRate ?? c.rate} ${c.rateUnit}</li>`).join('')}
                                 </ul>
                             </div>
                         `).join('')}
