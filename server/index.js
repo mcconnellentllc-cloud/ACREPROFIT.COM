@@ -3072,10 +3072,14 @@ async function initializeAdmins() {
                 continue;
             }
 
-            // Existing admin: sync role, ensure the must-change flag is true.
-            // Never touch the password. Log every decision with before/after
-            // state so we can verify each account after deploy instead of
-            // guessing from silence.
+            // Existing admin: sync the role, never touch the password or the
+            // mustChangePassword flag. The initial flag migration was a one-shot
+            // that's already run in production - running it every startup would
+            // flip freshly-rotated admins BACK to mustChangePassword=true on
+            // every Render restart, trapping them in a loop. Kyle confirmed
+            // this bug in production. Future admins who need to be flagged
+            // (e.g. compromised account) use POST /api/admin/users/:id/
+            // force-password-change instead.
             const before = {
                 role: existing.role,
                 mustChangePassword: existing.mustChangePassword
@@ -3086,23 +3090,13 @@ async function initializeAdmins() {
                 existing.role = admin.role;
                 changed = true;
             }
-            if (existing.mustChangePassword !== true) {
-                existing.mustChangePassword = true;
-                // Force the dirty flag: Mongoose can skip persisting a field
-                // whose new value equals the schema default's shape under
-                // certain load paths. markModified guarantees the save writes.
-                existing.markModified('mustChangePassword');
-                changed = true;
-            }
 
             if (changed) {
                 await existing.save();
-                // Re-fetch to confirm the write actually landed in Mongo,
-                // not just the in-memory doc.
                 const after = await User.findOne({ email: admin.email })
                     .select('role mustChangePassword')
                     .lean();
-                console.log(`Admin ${admin.email}: before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
+                console.log(`Admin ${admin.email}: role synced before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
             } else {
                 console.log(`Admin ${admin.email}: OK (role=${existing.role}, mustChangePassword=${existing.mustChangePassword})`);
             }
@@ -4156,6 +4150,9 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
 
         user.password = newPassword;
         user.mustChangePassword = false;
+        // Force dirty flag in case Mongoose's change detection skips a boolean
+        // field whose new value matches the schema default (false).
+        user.markModified('mustChangePassword');
         await user.save();
 
         // Issue a fresh token so the session continues seamlessly
