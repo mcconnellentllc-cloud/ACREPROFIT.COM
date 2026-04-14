@@ -18,12 +18,19 @@
         .order-id { font-weight: 700; font-size: 1.1rem; }
         .order-date { color: #666; font-size: 0.9rem; }
         .order-status { padding: 0.35rem 0.75rem; border-radius: 20px; font-size: 0.85rem; font-weight: 600; }
-        .status-pending { background: #fff3cd; color: #856404; }
-        .status-confirmed { background: #cce5ff; color: #004085; }
-        .status-processing { background: #d4edda; color: #155724; }
-        .status-shipped { background: #d1ecf1; color: #0c5460; }
-        .status-delivered { background: #d4edda; color: #155724; }
-        .status-cancelled { background: #f8d7da; color: #721c24; }
+        .status-draft            { background: #e2e3e5; color: #383d41; }
+        .status-submitted        { background: #fff3cd; color: #856404; }
+        .status-confirmed        { background: #cce5ff; color: #004085; }
+        .status-ordered_from_supplier { background: #d6d8f7; color: #2d2f8f; }
+        .status-received         { background: #d1ecf1; color: #0c5460; }
+        .status-ready_for_pickup { background: #d4edda; color: #155724; }
+        .status-delivered        { background: #c3e6cb; color: #155724; }
+        .status-cancelled        { background: #f8d7da; color: #721c24; }
+        .status-archived         { background: #e2e3e5; color: #6c757d; }
+        .status-payment_pending  { background: #ffeeba; color: #856404; }
+        .status-payment_secured  { background: #d4edda; color: #155724; }
+        .status-paid             { background: #c3e6cb; color: #155724; }
+        .status-pending          { background: #fff3cd; color: #856404; }
 
         .order-body { padding: 1.5rem; }
         .order-items { margin-bottom: 1rem; }
@@ -133,12 +140,32 @@
 
     <script>
         const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
-        let token = localStorage.getItem('acreprofit_token');
+        let token = localStorage.getItem('token');
         let currentUser = null;
         let orders = [];
 
+        const STATUS_LABEL = {
+            draft:                  'Order Started',
+            submitted:              'Pooling with Other Orders',
+            confirmed:              'Order Confirmed',
+            ordered_from_supplier:  'On the Way from Supplier',
+            received:               'Received at Warehouse',
+            ready_for_pickup:       'Ready for Pickup',
+            delivered:              'Delivered',
+            cancelled:              'Cancelled',
+            archived:               'Archived',
+            payment_pending:        'Payment Pending',
+            payment_secured:        'Payment Secured',
+            pending:                'Payment Pending',
+            paid:                   'Paid',
+        };
+
+        function friendlyStatus(status) {
+            return STATUS_LABEL[(status || '').toLowerCase()] || status || 'Pending';
+        }
+
         function checkAuth() {
-            const userStr = localStorage.getItem('acreprofit_user');
+            const userStr = localStorage.getItem('user');
             if (!token || !userStr) {
                 window.location.href = '/login.html';
                 return false;
@@ -181,7 +208,8 @@
             }
 
             container.innerHTML = orders.map(order => {
-                const statusClass = `status-${(order.status || 'pending').toLowerCase()}`;
+                const rawStatus = (order.status || 'pending').toLowerCase();
+                const statusClass = `status-${rawStatus}`;
                 const date = new Date(order.createdAt).toLocaleDateString('en-US', {
                     year: 'numeric', month: 'short', day: 'numeric'
                 });
@@ -196,7 +224,7 @@
                                 <span class="order-id">Order #${orderId}</span>
                                 <span class="order-date">${date}</span>
                             </div>
-                            <span class="order-status ${statusClass}">${order.status || 'Pending'}</span>
+                            <span class="order-status ${statusClass}">${friendlyStatus(rawStatus)}</span>
                         </div>
                         <div class="order-body">
                             <div class="order-items">
@@ -215,7 +243,7 @@
                             </div>
                             <div class="order-actions">
                                 <button class="btn btn-primary" onclick="viewInvoice('${order._id}')">View Invoice</button>
-                                ${order.status === 'pending' ? `<button class="btn btn-outline" onclick="cancelOrder('${order._id}')">Cancel</button>` : ''}
+                                ${['draft', 'submitted'].includes(rawStatus) ? `<button class="btn btn-outline" onclick="cancelOrder('${order._id}')">Cancel</button>` : ''}
                             </div>
                         </div>
                     </div>
@@ -279,7 +307,7 @@
                 </div>
 
                 <p><strong>Invoice Date:</strong> ${date}</p>
-                <p><strong>Status:</strong> ${serverInvoice?.paymentStatus || order.status || 'Pending'}</p>
+                <p><strong>Status:</strong> ${friendlyStatus(serverInvoice?.paymentStatus || order.status)}</p>
 
                 <table class="invoice-table">
                     <thead>
@@ -345,15 +373,15 @@
                 if (!response.ok) throw new Error('Failed to cancel');
                 loadOrders();
             } catch (error) {
-                alert('Unable to cancel order. Please try again.');
+                alert('Unable to cancel order through the site. Please contact us directly at contact@acreprofit.com or call your rep.');
             }
         }
 
         // Event listeners
         document.getElementById('logoutBtn').addEventListener('click', e => {
             e.preventDefault();
-            localStorage.removeItem('acreprofit_token');
-            localStorage.removeItem('acreprofit_user');
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
             window.location.href = '/';
         });
 
