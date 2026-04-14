@@ -2459,7 +2459,7 @@ async function reserveInventory({ chemicalId, quantity, location, orderId, order
         const chemical = await chemQuery;
         inventory = new Inventory({
             chemicalId,
-            productName: chemical?.name || 'Unknown Product',
+            productName: chemical?.productName || 'Unknown Product',
             packSize: chemical?.packSize || '',
             unit: chemical?.unit || 'units',
             location: location || 'main',
