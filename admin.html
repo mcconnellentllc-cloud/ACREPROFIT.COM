@@ -4394,12 +4394,22 @@
             }
         }
 
-        function renderCustomers(customers) {
-            document.getElementById('customersGrid').innerHTML = customers.length ? customers.map(c => `
+        function titleCaseRep(s) {
+            if (!s) return null;
+            return String(s).charAt(0).toUpperCase() + String(s).slice(1).toLowerCase();
+        }
+
+        function customerCardHtml(c) {
+            const repName = c.representative?.name || titleCaseRep(c.representativeId) || null;
+            const repLabel = repName || 'Unassigned';
+            const repBadgeColor = repName ? '#2d5a27' : '#9ca3af';
+            const safeName = (c.name || '').replace(/'/g, "\\'");
+            const initials = (c.name || '??').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase();
+            return `
                 <div class="customer-card" data-customer-id="${c._id}">
-                    <div class="customer-avatar">${c.name.split(' ').map(n => n[0]).join('')}</div>
+                    <div class="customer-avatar">${initials}</div>
                     <div class="customer-info">
-                        <h4>${c.name}</h4>
+                        <h4>${c.name || 'Unknown'} <span class="rep-badge" style="background:${repBadgeColor}; color:white; font-size:0.7rem; padding:2px 8px; border-radius:10px; font-weight:600; margin-left:6px; vertical-align:middle;">${repLabel}</span></h4>
                         <p>${c.farm?.name || 'No farm name'}</p>
                         <p class="customer-detail">${c.crops?.join(', ') || 'No crops'} • ${c.farm?.state || 'N/A'}</p>
                         <div class="customer-contact">
@@ -4410,10 +4420,54 @@
                     <div class="customer-actions">
                         <button class="btn btn-sm btn-outline" onclick="viewCustomer('${c._id}')">View Details</button>
                         <button class="btn btn-sm btn-outline" onclick="resetCustomerPassword('${c._id}', '${c.email}')" style="color:#d97706; border-color:#d97706;">Reset Password</button>
-                        <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${c.name.replace(/'/g, "\\'")}')">Place Order</button>
+                        <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${safeName}')">Place Order</button>
                     </div>
                 </div>
-            `).join('') : '<p class="empty">No customers yet</p>';
+            `;
+        }
+
+        function renderCustomers(customers) {
+            const grid = document.getElementById('customersGrid');
+            if (!customers || customers.length === 0) {
+                grid.innerHTML = '<p class="empty">No customers yet</p>';
+                return;
+            }
+
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const isSuperadmin = currentUser.role === 'superadmin';
+
+            // Distributors see only their own customers (server-scoped) - flat grid, no groups.
+            if (!isSuperadmin) {
+                grid.innerHTML = customers.map(customerCardHtml).join('');
+                return;
+            }
+
+            // Superadmin: group by representative so Kyle can see who's assigned to whom
+            const groups = {};
+            customers.forEach(c => {
+                const repKey = (c.representative?._id?.toString()) || c.representativeId || '__unassigned__';
+                const repName = c.representative?.name || titleCaseRep(c.representativeId) || 'Unassigned';
+                if (!groups[repKey]) groups[repKey] = { name: repName, customers: [] };
+                groups[repKey].customers.push(c);
+            });
+
+            const sortedGroups = Object.values(groups).sort((a, b) => {
+                if (a.name === 'Unassigned') return 1;
+                if (b.name === 'Unassigned') return -1;
+                return a.name.localeCompare(b.name);
+            });
+
+            grid.innerHTML = sortedGroups.map(g => `
+                <div class="customer-group" style="grid-column: 1 / -1; margin-top: 16px;">
+                    <h3 style="color: var(--primary); margin-bottom: 10px; padding-bottom: 6px; border-bottom: 2px solid var(--border); display: flex; align-items: baseline; gap: 10px;">
+                        <span>${g.name}</span>
+                        <span style="color: var(--text-muted); font-weight: 400; font-size: 0.85rem;">${g.customers.length} customer${g.customers.length === 1 ? '' : 's'}</span>
+                    </h3>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 16px;">
+                        ${g.customers.map(customerCardHtml).join('')}
+                    </div>
+                </div>
+            `).join('');
         }
 
         // Customer search functionality
