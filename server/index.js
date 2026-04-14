@@ -5033,6 +5033,82 @@ app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res
     }
 });
 
+// ============ MULTI-COLLECTION ORDER READ HELPERS ============
+// Admin-created orders land in the legacy Order collection (POST /api/admin/
+// orders/for-customer at line 5296 writes new Order({...})). Customer-placed
+// orders land in ChemicalOrder. These helpers merge both so admin read paths
+// surface a complete picture without the frontend needing to know about two
+// collections. Write paths are unchanged - cleanup of the legacy write is a
+// separate migration conversation.
+
+// Normalize a doc for list views. Frontend modal card reads crop/acres/
+// totalCost; ChemicalOrder uses sprayParams.crop/totalAcres/total, so we
+// project onto the legacy names. Detail view already handles both shapes.
+function normalizeListOrder(doc, source) {
+    const o = doc && doc.toObject ? doc.toObject() : (doc || {});
+    if (source === 'chemical') {
+        if (o.crop === undefined || o.crop === null) {
+            o.crop = o.sprayParams?.crop || o.orderType || 'General';
+        }
+        if (o.acres === undefined || o.acres === null) {
+            o.acres = o.totalAcres || 0;
+        }
+        if (o.totalCost === undefined || o.totalCost === null) {
+            o.totalCost = o.total || 0;
+        }
+    }
+    o._sourceCollection = source;
+    return o;
+}
+
+// List fetch across both collections. Merges, sorts by createdAt desc,
+// returns optional slice. totalCount reflects the full union, not the slice.
+async function findOrdersInBothCollections(userQuery, opts = {}) {
+    const { limit = null } = opts;
+    const [legacy, chem] = await Promise.all([
+        Order.find(userQuery)
+            .populate('userId', 'name email phone farm')
+            .populate('representativeId', 'name email')
+            .sort({ createdAt: -1 })
+            .lean(),
+        ChemicalOrder.find(userQuery)
+            .populate('userId', 'name email phone farm')
+            .populate('representativeId', 'name email')
+            .sort({ createdAt: -1 })
+            .lean()
+    ]);
+    const merged = [
+        ...legacy.map(o => normalizeListOrder(o, 'legacy')),
+        ...chem.map(o => normalizeListOrder(o, 'chemical'))
+    ].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt));
+    const totalCount = legacy.length + chem.length;
+    const orders = limit ? merged.slice(0, limit) : merged;
+    return { orders, totalCount };
+}
+
+// Detail fetch: try Order first, fall back to ChemicalOrder on miss.
+// No normalization - displayOrderDetail() already handles both shapes.
+// Stamps _sourceCollection so future frontend code can branch if needed.
+async function findOrderInEitherCollection(query) {
+    const legacyDoc = await Order.findOne(query)
+        .populate('userId', 'name email phone farm')
+        .populate('representativeId', 'name email');
+    if (legacyDoc) {
+        const obj = legacyDoc.toObject();
+        obj._sourceCollection = 'legacy';
+        return obj;
+    }
+    const chemDoc = await ChemicalOrder.findOne(query)
+        .populate('userId', 'name email phone farm')
+        .populate('representativeId', 'name email');
+    if (chemDoc) {
+        const obj = chemDoc.toObject();
+        obj._sourceCollection = 'chemical';
+        return obj;
+    }
+    return null;
+}
+
 // Get single customer details (admin only)
 app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -5050,15 +5126,16 @@ app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        // Get order count and recent orders
-        const orders = await ChemicalOrder.find({ userId: customer._id })
-            .sort({ createdAt: -1 })
-            .limit(10);
+        // Get order count and recent orders from both collections
+        const { orders, totalCount } = await findOrdersInBothCollections(
+            { userId: customer._id },
+            { limit: 10 }
+        );
 
         res.json({
             ...customer.toObject(),
             orders,
-            orderCount: await ChemicalOrder.countDocuments({ userId: customer._id })
+            orderCount: totalCount
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -5173,9 +5250,7 @@ app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddlewa
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        const orders = await ChemicalOrder.find({ userId: customer._id })
-            .populate('representativeId', 'name email')
-            .sort({ createdAt: -1 });
+        const { orders } = await findOrdersInBothCollections({ userId: customer._id });
 
         res.json(orders);
     } catch (error) {
@@ -5565,9 +5640,7 @@ app.get('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
             query.representativeId = req.user._id;
         }
 
-        const order = await Order.findOne(query)
-            .populate('userId', 'name email phone farm')
-            .populate('representativeId', 'name email');
+        const order = await findOrderInEitherCollection(query);
 
         if (!order) {
             return res.status(404).json({ error: 'Order not found or access denied' });
@@ -5589,10 +5662,7 @@ app.get('/api/admin/orders', authMiddleware, adminMiddleware, async (req, res) =
             query.representativeId = req.user._id;
         }
 
-        const orders = await Order.find(query)
-            .populate('userId', 'name email phone farm')
-            .populate('representativeId', 'name email')
-            .sort({ createdAt: -1 });
+        const { orders } = await findOrdersInBothCollections(query);
         res.json(orders);
     } catch (error) {
         res.status(400).json({ error: error.message });
