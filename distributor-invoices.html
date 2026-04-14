@@ -241,6 +241,14 @@
         </div>
     </main>
 
+    <!-- View Invoice Modal -->
+    <div id="viewInvoiceModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; max-width:720px; width:92%; max-height:90vh; overflow:auto; border-radius:8px; padding:24px; position:relative;">
+            <button onclick="closeViewInvoice()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+            <div id="viewInvoiceContent">Loading...</div>
+        </div>
+    </div>
+
     <script>
         const API_URL = 'https://acreprofit-com.onrender.com';
         let token = localStorage.getItem('token');
@@ -748,6 +756,8 @@
                             ${inv.status !== 'sent' && inv.status !== 'paid' ?
                                 `<button class="btn btn-sm btn-primary" onclick="sendInvoice('${inv._id}', '${inv.customerEmail || inv.customerId?.email}')">Send</button>` : ''}
                             <button class="btn btn-sm btn-outline" onclick="viewInvoice('${inv._id}')">View</button>
+                            ${inv.status === 'draft' ?
+                                `<button class="btn btn-sm btn-danger" onclick="deleteInvoice('${inv._id}', '${inv.invoiceNumber}')">Delete</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -775,9 +785,98 @@
             }
         }
 
-        function viewInvoice(invoiceId) {
-            // Could open a modal or navigate to detail page
-            window.open(`/admin.html#orders`, '_blank');
+        async function viewInvoice(invoiceId) {
+            const modal = document.getElementById('viewInvoiceModal');
+            const content = document.getElementById('viewInvoiceContent');
+            content.innerHTML = 'Loading...';
+            modal.style.display = 'flex';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to load invoice');
+                const inv = await res.json();
+
+                const items = (inv.items || []).map(i => `
+                    <tr>
+                        <td style="padding:8px; border-bottom:1px solid #eee;">${i.productName || ''}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee;">${i.quantity || 0} ${i.unit || ''}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">$${(i.unitPrice || 0).toFixed(2)}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">$${(i.totalPrice || 0).toFixed(2)}</td>
+                    </tr>
+                `).join('');
+
+                const dueStr = inv.dueDate ? new Date(inv.dueDate).toLocaleDateString() : '-';
+                const invDate = new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString();
+
+                content.innerHTML = `
+                    <h2 style="margin:0 0 4px 0; color:#2d5a27;">${inv.invoiceNumber}</h2>
+                    <div style="color:#666; font-size:0.9rem; margin-bottom:16px;">
+                        Status: <strong>${inv.status || 'draft'}</strong>
+                        ${inv.paymentStatus === 'paid' ? ' · Paid' : ''}
+                        · Invoice Date: ${invDate}
+                        · Due: ${dueStr}
+                    </div>
+
+                    <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px;">
+                        <div>
+                            <div style="font-size:0.8rem; color:#666; text-transform:uppercase;">Bill To</div>
+                            <div><strong>${inv.customerName || ''}</strong></div>
+                            <div style="color:#666; font-size:0.9rem;">${inv.customerEmail || ''}</div>
+                            <div style="color:#666; font-size:0.9rem;">${inv.customerPhone || ''}</div>
+                        </div>
+                        <div>
+                            <div style="font-size:0.8rem; color:#666; text-transform:uppercase;">Order</div>
+                            <div>${inv.orderNumber || '-'}</div>
+                        </div>
+                    </div>
+
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                        <thead>
+                            <tr style="background:#f8f9fa;">
+                                <th style="padding:8px; text-align:left;">Product</th>
+                                <th style="padding:8px; text-align:left;">Qty</th>
+                                <th style="padding:8px; text-align:right;">Unit Price</th>
+                                <th style="padding:8px; text-align:right;">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>${items || '<tr><td colspan="4" style="padding:12px; color:#999;">No items</td></tr>'}</tbody>
+                    </table>
+
+                    <div style="display:flex; justify-content:flex-end;">
+                        <table>
+                            <tr><td style="padding:4px 12px;">Subtotal:</td><td style="text-align:right; padding:4px 0;">$${(inv.subtotal || 0).toFixed(2)}</td></tr>
+                            ${(inv.discount || 0) > 0 ? `<tr><td style="padding:4px 12px;">Discount:</td><td style="text-align:right; padding:4px 0;">-$${inv.discount.toFixed(2)}</td></tr>` : ''}
+                            <tr style="font-weight:700; border-top:2px solid #2d5a27;"><td style="padding:8px 12px;">Total:</td><td style="text-align:right; padding:8px 0;">$${(inv.total || 0).toFixed(2)}</td></tr>
+                            <tr><td style="padding:4px 12px; color:#666;">Amount Due:</td><td style="text-align:right; padding:4px 0; color:#666;">$${(inv.amountDue ?? inv.total ?? 0).toFixed(2)}</td></tr>
+                        </table>
+                    </div>
+
+                    ${inv.notes ? `<p style="margin-top:16px;"><strong>Notes:</strong> ${inv.notes}</p>` : ''}
+                `;
+            } catch (err) {
+                content.innerHTML = `<p style="color:#c00;">Error: ${err.message}</p>`;
+            }
+        }
+
+        function closeViewInvoice() {
+            document.getElementById('viewInvoiceModal').style.display = 'none';
+        }
+
+        async function deleteInvoice(invoiceId, invoiceNumber) {
+            if (!confirm(`Delete draft invoice ${invoiceNumber}? This cannot be undone.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Delete failed');
+                loadInvoices();
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
         }
 
         // Close dropdown when clicking outside

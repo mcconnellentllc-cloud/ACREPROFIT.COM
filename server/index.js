@@ -12752,6 +12752,46 @@ app.put('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, 
     }
 });
 
+// Delete a DRAFT invoice. Sent/paid invoices stay - deleting a record that was
+// already emailed to a customer would create accounting/audit gaps. Use the
+// 'cancelled' status path for those.
+app.delete('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (invoice.status && invoice.status !== 'draft') {
+            return res.status(400).json({
+                error: `Cannot delete invoice in status '${invoice.status}'. Only draft invoices can be hard-deleted.`
+            });
+        }
+
+        const snapshot = {
+            invoiceNumber: invoice.invoiceNumber,
+            customerName: invoice.customerName,
+            total: invoice.total,
+            status: invoice.status
+        };
+
+        await Invoice.deleteOne({ _id: invoice._id });
+
+        await logAudit({
+            action: 'invoice_delete',
+            req,
+            entityType: 'Invoice',
+            entityId: invoice._id,
+            entityRef: invoice.invoiceNumber,
+            before: snapshot,
+            reason: req.body?.reason || `Draft invoice deleted by ${req.user.name}`
+        });
+
+        res.json({ message: `Invoice ${snapshot.invoiceNumber} deleted` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Send invoice to customer
 app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
     try {
