@@ -381,6 +381,14 @@
         });
 
         function initDashboard() {
+            // Superadmin and distributor: admin.html IS their dashboard — redirect immediately
+            // Exception: if superadmin is previewing as customer via role switcher, let them stay
+            const viewingAs = localStorage.getItem('viewAsRole');
+            if ((userRole === 'superadmin' || userRole === 'admin' || userRole === 'distributor') && viewingAs !== 'customer') {
+                window.location.href = '/admin.html';
+                return;
+            }
+
             // Set user info in nav
             document.getElementById('navUserName').textContent = userData.name || userData.email || 'User';
 
@@ -448,19 +456,31 @@
             document.querySelectorAll('.role-btn').forEach(btn => {
                 btn.addEventListener('click', () => {
                     const role = btn.dataset.role;
-                    localStorage.setItem('viewAsRole', role);
-                    currentViewRole = role;
-                    showRoleView(role);
-                    loadDashboardData();
+                    // Customer preview stays on the dashboard; distributor/superadmin
+                    // views live on admin.html now — clear the override and go there.
+                    if (role === 'customer') {
+                        localStorage.setItem('viewAsRole', role);
+                        currentViewRole = role;
+                        showRoleView(role);
+                        loadDashboardData();
+                    } else {
+                        localStorage.removeItem('viewAsRole');
+                        window.location.href = '/admin.html';
+                    }
                 });
             });
         }
 
         function viewAsRole(role) {
-            localStorage.setItem('viewAsRole', role);
-            currentViewRole = role;
-            showRoleView(role);
-            loadDashboardData();
+            if (role === 'customer') {
+                localStorage.setItem('viewAsRole', role);
+                currentViewRole = role;
+                showRoleView(role);
+                loadDashboardData();
+            } else {
+                localStorage.removeItem('viewAsRole');
+                window.location.href = '/admin.html';
+            }
         }
 
         async function loadDashboardData() {
