@@ -5132,10 +5132,20 @@ app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
             { limit: 10 }
         );
 
+        // Get recent invoices built for this customer (by any distributor)
+        const invoices = await Invoice.find({ customerId: customer._id })
+            .populate('representativeId', 'name email')
+            .sort({ invoiceDate: -1, createdAt: -1 })
+            .limit(10)
+            .lean();
+        const invoiceCount = await Invoice.countDocuments({ customerId: customer._id });
+
         res.json({
             ...customer.toObject(),
             orders,
-            orderCount: totalCount
+            orderCount: totalCount,
+            invoices,
+            invoiceCount
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
