@@ -15398,6 +15398,8 @@ connectDB().then(async () => {
         );
         if (paraquatResult.modifiedCount > 0) {
             console.log(`Paraquat RUP flag migration: fixed ${paraquatResult.modifiedCount} record(s)`);
+        } else {
+            console.log(`Paraquat RUP flag migration: matched ${paraquatResult.matchedCount}, modified 0 (nothing to fix)`);
         }
     } catch (e) { console.error('Paraquat RUP flag migration error:', e.message); }
 
