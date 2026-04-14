@@ -158,9 +158,6 @@
                                 <span class="big-number" id="totalDistributorsCount">5</span>
                                 <span class="stat-detail">Active Distributors</span>
                             </div>
-                            <div class="overview-card-sub">
-                                <span>Suppliers: <strong>Jabco, Corbet</strong></span>
-                            </div>
                         </div>
                         <div class="overview-card-arrow">→</div>
                     </div>
@@ -954,15 +951,6 @@
                         </div>
                     </div>
                     <div class="stat-card">
-                        <div class="stat-icon blue">
-                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path></svg>
-                        </div>
-                        <div class="stat-content">
-                            <span class="stat-value" id="totalSuppliers">2</span>
-                            <span class="stat-label">Suppliers (Jabco, Corbet)</span>
-                        </div>
-                    </div>
-                    <div class="stat-card">
                         <div class="stat-icon purple">
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
                         </div>
@@ -976,30 +964,6 @@
                 <!-- Distributors Grid -->
                 <div class="distributors-grid" id="distributorsGrid">
                     <p style="color: #666; grid-column: 1 / -1;">Loading distributors...</p>
-                </div>
-
-                <!-- Suppliers Section -->
-                <div class="card" style="margin-top: 24px;">
-                    <div class="card-header">
-                        <h3>Suppliers</h3>
-                        <button class="btn btn-sm btn-outline" onclick="openAddSupplierModal()">+ Add Supplier</button>
-                    </div>
-                    <div class="suppliers-list">
-                        <div class="supplier-row">
-                            <div class="supplier-info">
-                                <strong>Jabco</strong>
-                                <span class="supplier-contact">Contact sales rep for details</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                        <div class="supplier-row">
-                            <div class="supplier-info">
-                                <strong>Corbet</strong>
-                                <span class="supplier-contact">Contact sales rep for details</span>
-                            </div>
-                            <span class="status-badge status-active">Active</span>
-                        </div>
-                    </div>
                 </div>
             </div>
 
@@ -2939,8 +2903,6 @@
                                 <label>Select Existing Supplier</label>
                                 <select id="poSupplierSelect" onchange="fillSupplierInfo()" style="padding: 10px; border: 2px solid var(--border); border-radius: 8px;">
                                     <option value="">-- New Supplier --</option>
-                                    <option value="jabco" data-name="Jabco" data-contact="Sales Rep" data-phone="" data-email="">Jabco</option>
-                                    <option value="corbet" data-name="Corbet" data-contact="Sales Rep" data-phone="" data-email="">Corbet</option>
                                 </select>
                             </div>
                             <div class="form-row">
