@@ -112,6 +112,10 @@ const connectDB = async () => {
             console.log('MongoDB connected successfully');
             // Initialize admin users
             await initializeAdmins();
+            // Seed supplier User docs (JABCO/SIMS/CORBET/CPD) + normalize
+            // Chemical.sourceSupplier + backfill Chemical.supplierId
+            const { initializeSuppliers } = require('./seedSuppliers');
+            await initializeSuppliers(User, Chemical);
             // Seed atomic sequence counters from existing records (I8)
             await initializeCounters();
             // Seed initial inventory
