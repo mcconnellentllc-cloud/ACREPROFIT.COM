@@ -262,6 +262,12 @@ const userSchema = new mongoose.Schema({
     canPurchaseRUP: { type: Boolean, default: false },
     rupEligibilityNotes: String,
 
+    // S1: Force password rotation on first login after admin seeding.
+    // Defaults to false so normal signups are unaffected. Set true by the
+    // admin seeder (for fresh admins with random temp passwords) and by the
+    // startup migration (for existing Farm2026! admins).
+    mustChangePassword: { type: Boolean, default: false },
+
     createdAt: { type: Date, default: Date.now }
 });
 
@@ -3041,72 +3047,48 @@ async function generatePONumber() {
 
 async function initializeAdmins() {
     const admins = [
-        {
-            name: 'Acre Profit Admin',
-            email: 'contact@acreprofit.com',
-            password: 'Farm2026!',
-            phone: '970-571-1015',
-            role: 'superadmin'
-        },
-        {
-            name: 'Kyle McConnell',
-            email: 'office@togoag.com',
-            password: 'Farm2026!',
-            phone: '970-571-1015',
-            role: 'distributor'
-        },
-        {
-            name: 'Ty Mollohan',
-            email: 'tymollohan77@gmail.com',
-            password: 'Farm2026!',
-            phone: '970-520-2340',
-            role: 'distributor'
-        },
-        {
-            name: 'Chad Bamford',
-            email: 'ckbamford@yahoo.com',
-            password: 'Farm2026!',
-            phone: '970-520-3716',
-            role: 'distributor'
-        },
-        {
-            name: 'Seth Rolfs',
-            email: 'seth@acreprofit.com',
-            password: 'Farm2026!',
-            phone: '785-531-0680',
-            role: 'distributor'
-        },
-        {
-            name: 'Tyson',
-            email: 'fyeagllc@gmail.com',
-            password: 'Farm2026!',
-            role: 'distributor'
-        }
+        { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', phone: '970-571-1015', role: 'superadmin' },
+        { name: 'Kyle McConnell',    email: 'office@togoag.com',       phone: '970-571-1015', role: 'distributor' },
+        { name: 'Ty Mollohan',       email: 'tymollohan77@gmail.com',  phone: '970-520-2340', role: 'distributor' },
+        { name: 'Chad Bamford',      email: 'ckbamford@yahoo.com',     phone: '970-520-3716', role: 'distributor' },
+        { name: 'Seth Rolfs',        email: 'seth@acreprofit.com',     phone: '785-531-0680', role: 'distributor' },
+        { name: 'Tyson',             email: 'fyeagllc@gmail.com',                             role: 'distributor' }
     ];
 
     for (const admin of admins) {
         try {
             const existing = await User.findOne({ email: admin.email });
             if (!existing) {
-                await User.create(admin);
-                console.log(`Created admin: ${admin.name}`);
+                // New admin: random 12-char temp password, must-change flag on.
+                // Temp is logged to the Render console - Kyle grabs it once and
+                // distributes out-of-band. After first login the user changes it.
+                const tempPassword = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '').slice(0, 12);
+                await User.create({
+                    ...admin,
+                    password: tempPassword,
+                    mustChangePassword: true
+                });
+                console.log(`[INITIAL PASSWORD] ${admin.email}: ${tempPassword} — MUST CHANGE ON FIRST LOGIN`);
             } else {
-                // Ensure role and password are correct
+                // Existing admin: only sync the role, never the password.
+                // Migrate any admin still on the public Farm2026! seed (or without
+                // the flag yet) to mustChangePassword:true so next login forces
+                // rotation. We do NOT touch the password itself - admins keep
+                // whatever they currently use until they rotate.
                 let updated = false;
                 if (existing.role !== admin.role) {
                     existing.role = admin.role;
                     updated = true;
                 }
-                // Reset password for accounts that may be locked out
-                existing.password = admin.password;
-                updated = true;
-                if (updated) {
-                    await existing.save();
-                    console.log(`Updated account for: ${admin.name}`);
+                if (existing.mustChangePassword !== true) {
+                    existing.mustChangePassword = true;
+                    updated = true;
+                    console.log(`Migrated ${admin.email} to mustChangePassword=true (will force rotation on next login)`);
                 }
+                if (updated) await existing.save();
             }
         } catch (error) {
-            console.log(`Admin ${admin.email} may already exist`);
+            console.log(`Admin ${admin.email}: ${error.message}`);
         }
     }
 }
@@ -3944,6 +3926,15 @@ function calculateHydrovantPrice(quantity) {
 
 // ============ AUTH MIDDLEWARE ============
 
+// Routes that a user with mustChangePassword=true is still allowed to hit.
+// Anything else returns 403 so a determined admin who ignores the frontend
+// redirect can't keep using their temp-password session.
+const MUST_CHANGE_PASSWORD_ALLOWED_PATHS = new Set([
+    '/api/auth/change-password',
+    '/api/auth/me',
+    '/api/auth/logout'
+]);
+
 const authMiddleware = async (req, res, next) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -3955,6 +3946,16 @@ const authMiddleware = async (req, res, next) => {
         if (!user) {
             return res.status(401).json({ error: 'User not found' });
         }
+
+        // S1: block everything except the change-password / me routes while
+        // the user is still on a temp password.
+        if (user.mustChangePassword && !MUST_CHANGE_PASSWORD_ALLOWED_PATHS.has(req.path)) {
+            return res.status(403).json({
+                error: 'Password change required',
+                passwordChangeRequired: true
+            });
+        }
+
         req.user = user;
         req.token = token;
         next();
@@ -4003,38 +4004,11 @@ app.get('/api/health', (req, res) => {
 });
 
 // Reset/reinitialize admin users (use this if login fails)
-app.post('/api/admin/reset-admins', async (req, res) => {
-    try {
-        const { secretKey } = req.body;
-
-        // Simple secret key protection
-        if (secretKey !== 'acreprofit2026reset') {
-            return res.status(403).json({ error: 'Invalid secret key' });
-        }
-
-        const admins = [
-            { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
-            { name: 'Kyle McConnell', email: 'office@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'distributor' },
-            { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'distributor' },
-            { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'distributor' },
-            { name: 'Seth Rolfs', email: 'seth@acreprofit.com', password: 'Farm2026!', phone: '785-531-0680', role: 'distributor' }
-        ];
-
-        const results = [];
-        for (const admin of admins) {
-            // Delete existing user if exists
-            await User.deleteOne({ email: admin.email.toLowerCase() });
-            // Create fresh
-            const user = new User(admin);
-            await user.save();
-            results.push(`Created/reset: ${admin.email}`);
-        }
-
-        res.json({ message: 'Admin users reset successfully', results });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// S2: /api/admin/reset-admins was removed. It allowed anyone with the
+// hardcoded secret 'acreprofit2026reset' (public in this repo) to delete
+// and recreate every admin account. Recovery path now goes through Atlas
+// directly - same place the JWT_SECRET and connection string live, so
+// recovery requires the same level of access as everything else.
 
 // ---- AUTH ROUTES ----
 
@@ -4129,8 +4103,45 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
 
         res.json({
             user: userResponse,
-            token
+            token,
+            passwordChangeRequired: user.mustChangePassword === true
         });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// S1: change password for an authenticated user. Used by the forced-rotation
+// flow (mustChangePassword=true) and available any time after that. Verifies
+// the old password, hashes the new via the userSchema.pre('save') hook,
+// clears the flag, and returns a fresh JWT so the client doesn't need to
+// re-login.
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current and new password are required' });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters' });
+        }
+        if (newPassword === currentPassword) {
+            return res.status(400).json({ error: 'New password must be different from current password' });
+        }
+
+        const user = await User.findById(req.user._id);
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        user.password = newPassword;
+        user.mustChangePassword = false;
+        await user.save();
+
+        // Issue a fresh token so the session continues seamlessly
+        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
+        res.json({ message: 'Password changed successfully', token });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

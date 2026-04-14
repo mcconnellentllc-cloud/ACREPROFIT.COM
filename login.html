@@ -95,7 +95,14 @@
         const token = localStorage.getItem('token');
         const user = localStorage.getItem('user');
         if (token && user) {
-            redirectByRole(JSON.parse(user).role);
+            // If the last login flagged a password change, keep sending them
+            // there until they complete it - otherwise they'll land on a page
+            // that 403s on every request.
+            if (localStorage.getItem('passwordChangeRequired') === 'true') {
+                window.location.href = '/change-password.html';
+            } else {
+                redirectByRole(JSON.parse(user).role);
+            }
         }
 
         async function attemptLogin(data, attempt) {
@@ -135,6 +142,15 @@
                     // Store token and user data
                     localStorage.setItem('token', result.token);
                     localStorage.setItem('user', JSON.stringify(result.user));
+
+                    // S1: force password rotation before any other routing.
+                    // Server also enforces this server-side - the redirect is UX, not security.
+                    if (result.passwordChangeRequired) {
+                        localStorage.setItem('passwordChangeRequired', 'true');
+                        window.location.href = '/change-password.html';
+                        return;
+                    }
+                    localStorage.removeItem('passwordChangeRequired');
 
                     redirectByRole(result.user.role);
                     return;
