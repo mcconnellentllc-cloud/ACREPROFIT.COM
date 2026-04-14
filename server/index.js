@@ -3069,26 +3069,45 @@ async function initializeAdmins() {
                     mustChangePassword: true
                 });
                 console.log(`[INITIAL PASSWORD] ${admin.email}: ${tempPassword} — MUST CHANGE ON FIRST LOGIN`);
+                continue;
+            }
+
+            // Existing admin: sync role, ensure the must-change flag is true.
+            // Never touch the password. Log every decision with before/after
+            // state so we can verify each account after deploy instead of
+            // guessing from silence.
+            const before = {
+                role: existing.role,
+                mustChangePassword: existing.mustChangePassword
+            };
+            let changed = false;
+
+            if (existing.role !== admin.role) {
+                existing.role = admin.role;
+                changed = true;
+            }
+            if (existing.mustChangePassword !== true) {
+                existing.mustChangePassword = true;
+                // Force the dirty flag: Mongoose can skip persisting a field
+                // whose new value equals the schema default's shape under
+                // certain load paths. markModified guarantees the save writes.
+                existing.markModified('mustChangePassword');
+                changed = true;
+            }
+
+            if (changed) {
+                await existing.save();
+                // Re-fetch to confirm the write actually landed in Mongo,
+                // not just the in-memory doc.
+                const after = await User.findOne({ email: admin.email })
+                    .select('role mustChangePassword')
+                    .lean();
+                console.log(`Admin ${admin.email}: before=${JSON.stringify(before)} after=${JSON.stringify(after)}`);
             } else {
-                // Existing admin: only sync the role, never the password.
-                // Migrate any admin still on the public Farm2026! seed (or without
-                // the flag yet) to mustChangePassword:true so next login forces
-                // rotation. We do NOT touch the password itself - admins keep
-                // whatever they currently use until they rotate.
-                let updated = false;
-                if (existing.role !== admin.role) {
-                    existing.role = admin.role;
-                    updated = true;
-                }
-                if (existing.mustChangePassword !== true) {
-                    existing.mustChangePassword = true;
-                    updated = true;
-                    console.log(`Migrated ${admin.email} to mustChangePassword=true (will force rotation on next login)`);
-                }
-                if (updated) await existing.save();
+                console.log(`Admin ${admin.email}: OK (role=${existing.role}, mustChangePassword=${existing.mustChangePassword})`);
             }
         } catch (error) {
-            console.log(`Admin ${admin.email}: ${error.message}`);
+            console.error(`Admin ${admin.email} migration error:`, error.message);
         }
     }
 }
@@ -4364,6 +4383,45 @@ app.post('/api/admin/users/:id/reset-password', authMiddleware, async (req, res)
         });
 
         res.json({ message: `Password reset for ${user.email}` });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Superadmin-only: flip any user's mustChangePassword flag on without rotating
+// their password. Forces them to rotate on next login. Used to patch accounts
+// that slipped past initializeAdmins() migration, and as an operational tool
+// when a password is suspected compromised but hasn't been confirmed.
+app.post('/api/admin/users/:id/force-password-change', authMiddleware, async (req, res) => {
+    try {
+        if (req.user.role !== 'superadmin') {
+            return res.status(403).json({ error: 'Only superadmin can force password changes' });
+        }
+        const user = await User.findById(req.params.id);
+        if (!user) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+        const before = { mustChangePassword: user.mustChangePassword };
+        user.mustChangePassword = true;
+        user.markModified('mustChangePassword');
+        await user.save();
+
+        await logAudit({
+            action: 'force_password_change',
+            req,
+            targetUser: user._id,
+            targetUserName: user.name,
+            entityType: 'User',
+            entityId: user._id,
+            before,
+            after: { mustChangePassword: true },
+            reason: req.body.reason || `Forced by ${req.user.name} (${req.user.role})`
+        });
+
+        res.json({
+            message: `${user.email} will be required to change password on next login`,
+            user: { id: user._id, email: user.email, mustChangePassword: true }
+        });
     } catch (error) {
         res.status(500).json({ error: error.message });
     }
