@@ -161,6 +161,7 @@ const userSchema = new mongoose.Schema({
     },
     // Supplier-specific fields
     companyName: String, // For suppliers - company/business name
+    bidEligible: { type: Boolean, default: true }, // Include in Price Mining bid sheets. false = direct-purchase only (e.g. Corbet/Hydrovant)
     supplierCode: String, // Unique code for supplier (e.g., "CPD", "AGRISTAR")
     representative: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For customers - their rep
     representativeId: String, // kyle, ty, or chad - for quick lookup
@@ -8918,11 +8919,17 @@ app.post('/api/admin/suppliers', authMiddleware, superAdminMiddleware, async (re
     }
 });
 
-// Admin: Get all suppliers
-app.get('/api/admin/suppliers', authMiddleware, superAdminMiddleware, async (req, res) => {
+// Admin: Get all suppliers (read is available to any admin tier so distributors can
+// populate the bid-sheet supplier checkbox list; writes below stay on superadmin).
+app.get('/api/admin/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const suppliers = await User.find({ role: 'supplier' })
-            .select('name email companyName supplierCode phone createdAt')
+        // Optional ?bidEligible=true filter for the Price Mining selection modal
+        const query = { role: 'supplier' };
+        if (req.query.bidEligible === 'true') query.bidEligible = true;
+        if (req.query.bidEligible === 'false') query.bidEligible = false;
+
+        const suppliers = await User.find(query)
+            .select('name email companyName supplierCode phone bidEligible createdAt')
             .sort({ companyName: 1 });
 
         // Get product count for each supplier

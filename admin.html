@@ -2284,6 +2284,41 @@
                 </div>
             </div>
 
+            <!-- Bid Sheet Supplier Selection Modal -->
+            <div class="modal-overlay" id="bidSheetSupplierModal" style="display: none;">
+                <div class="modal-content" style="max-width: 600px; max-height: 90vh; overflow-y: auto;">
+                    <button class="modal-close" onclick="closeBidSheetSupplierModal()">&times;</button>
+                    <h2 style="margin-bottom: 8px;">New Bid Sheet</h2>
+                    <p style="color: var(--text-muted); margin-bottom: 20px;">Pick which suppliers should receive this bid request. Only bid-eligible suppliers are shown.</p>
+
+                    <div style="margin-bottom: 16px;">
+                        <label for="bidSheetTitleInput" style="display:block; font-weight:600; margin-bottom:6px;">Bid Sheet Title</label>
+                        <input type="text" id="bidSheetTitleInput" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius); font-size:1rem;">
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label style="display:block; font-weight:600; margin-bottom:6px;">Suppliers to Invite</label>
+                        <div id="bidSheetSupplierList" style="border:2px solid var(--border); border-radius:var(--radius); padding:8px; max-height:300px; overflow-y:auto;">
+                            <div style="padding:12px; color:var(--text-muted); text-align:center;">Loading suppliers...</div>
+                        </div>
+                        <div id="bidSheetSupplierEmpty" style="display:none; color:var(--text-muted); font-size:0.85rem; margin-top:6px;">No bid-eligible suppliers found. Add suppliers or toggle bidEligible on existing ones.</div>
+                    </div>
+
+                    <div style="margin-bottom: 16px;">
+                        <label for="bidSheetDueDateInput" style="display:block; font-weight:600; margin-bottom:6px;">Response Due Date</label>
+                        <input type="date" id="bidSheetDueDateInput" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius); font-size:1rem;">
+                        <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">How long suppliers have to respond. Defaults to 7 days.</div>
+                    </div>
+
+                    <div style="display:flex; gap:8px; justify-content:flex-end;">
+                        <button class="btn btn-outline" onclick="closeBidSheetSupplierModal()">Cancel</button>
+                        <button class="btn btn-primary" id="bidSheetCreateBtn" onclick="submitBidSheetWithSelectedSuppliers()" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+                            Create Bid Sheet
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Volume Needs Modal -->
             <div class="modal-overlay" id="volumeNeedsModal" style="display: none;">
                 <div class="modal-content" style="max-width: 800px; max-height: 90vh; overflow-y: auto;">
@@ -6243,18 +6278,89 @@
             }).join('');
         }
 
+        // Opens the supplier-selection modal (replaces the old prompt() flow).
+        // Both entry points ("Start Price Mining" on Volume Needs + "+ New Bid Sheet"
+        // on the Price Mining tab header) land here.
         async function createBidSheetFromVolume() {
             closeVolumeNeedsModal();
+            await openBidSheetSupplierModal();
+        }
 
-            const title = prompt('Enter a title for this bid sheet:', `Volume Needs - ${new Date().toLocaleDateString()}`);
-            if (!title) return;
+        async function openBidSheetSupplierModal() {
+            // Pre-fill title with today's date. Default response-due-date to 7 days out.
+            const today = new Date();
+            const dueDate = new Date(today.getTime() + 7 * 24 * 60 * 60 * 1000);
+            document.getElementById('bidSheetTitleInput').value = `Volume Needs - ${today.toLocaleDateString()}`;
+            document.getElementById('bidSheetDueDateInput').value = dueDate.toISOString().split('T')[0];
 
-            const suppliersInput = prompt('Enter supplier names (comma-separated):\nExample: Supplier A, Supplier B', '');
-            if (!suppliersInput) return;
+            document.getElementById('bidSheetSupplierModal').style.display = 'flex';
 
-            const suppliers = suppliersInput.split(',').map(s => ({
-                supplierName: s.trim()
-            })).filter(s => s.supplierName);
+            // Load bid-eligible suppliers and render as checkboxes
+            const listEl = document.getElementById('bidSheetSupplierList');
+            const emptyEl = document.getElementById('bidSheetSupplierEmpty');
+            listEl.innerHTML = '<div style="padding:12px; color:var(--text-muted); text-align:center;">Loading suppliers...</div>';
+            emptyEl.style.display = 'none';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/suppliers?bidEligible=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load suppliers');
+                const suppliers = await res.json();
+
+                if (!Array.isArray(suppliers) || suppliers.length === 0) {
+                    listEl.innerHTML = '';
+                    emptyEl.style.display = 'block';
+                    return;
+                }
+
+                listEl.innerHTML = suppliers.map(s => `
+                    <label style="display:flex; align-items:center; gap:10px; padding:8px 10px; border-bottom:1px solid var(--border); cursor:pointer;">
+                        <input type="checkbox" class="bid-supplier-check" value="${s._id || s.id}" data-name="${(s.companyName || s.name || '').replace(/"/g, '&quot;')}" data-email="${(s.email || '').replace(/"/g, '&quot;')}" data-phone="${(s.phone || '').replace(/"/g, '&quot;')}" checked>
+                        <div>
+                            <div style="font-weight:600;">${s.companyName || s.name}</div>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${s.supplierCode || ''} · ${s.email || 'no email'}</div>
+                        </div>
+                    </label>
+                `).join('');
+            } catch (err) {
+                listEl.innerHTML = `<div style="padding:12px; color:#dc2626;">Error loading suppliers: ${err.message}</div>`;
+            }
+        }
+
+        function closeBidSheetSupplierModal() {
+            document.getElementById('bidSheetSupplierModal').style.display = 'none';
+        }
+
+        async function submitBidSheetWithSelectedSuppliers() {
+            const title = document.getElementById('bidSheetTitleInput').value.trim();
+            if (!title) {
+                alert('Please enter a title for this bid sheet.');
+                return;
+            }
+
+            const checks = Array.from(document.querySelectorAll('.bid-supplier-check:checked'));
+            if (checks.length === 0) {
+                alert('Pick at least one supplier to invite.');
+                return;
+            }
+
+            const invitedSuppliers = checks.map(cb => ({
+                supplierId: cb.value,
+                supplierName: cb.getAttribute('data-name'),
+                contactEmail: cb.getAttribute('data-email'),
+                contactPhone: cb.getAttribute('data-phone')
+            }));
+
+            const dueDateInput = document.getElementById('bidSheetDueDateInput').value;
+            const responseDueDate = dueDateInput
+                ? new Date(dueDateInput)
+                : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+
+            const btn = document.getElementById('bidSheetCreateBtn');
+            const originalText = btn.textContent;
+            btn.disabled = true;
+            btn.textContent = 'Creating...';
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/bid-sheets/from-volume-needs`, {
@@ -6263,24 +6369,24 @@
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${token}`
                     },
-                    body: JSON.stringify({
-                        title,
-                        invitedSuppliers: suppliers,
-                        responseDueDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000) // 7 days
-                    })
+                    body: JSON.stringify({ title, invitedSuppliers, responseDueDate })
                 });
 
                 if (res.ok) {
                     const bidSheet = await res.json();
-                    alert(`Bid Sheet ${bidSheet.bidNumber} created with ${bidSheet.items.length} items!\n\nGo to Price Mining tab to send to suppliers.`);
+                    closeBidSheetSupplierModal();
+                    alert(`Bid Sheet ${bidSheet.bidNumber} created with ${bidSheet.items.length} items, ${invitedSuppliers.length} supplier${invitedSuppliers.length === 1 ? '' : 's'} invited.\n\nGo to Price Mining tab to send.`);
                     navigateToTab('price-mining');
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + error.error);
+                    alert('Failed: ' + (error.error || 'Unknown error'));
                 }
             } catch (error) {
                 console.error('Error creating bid sheet:', error);
                 alert('Error creating bid sheet');
+            } finally {
+                btn.disabled = false;
+                btn.textContent = originalText;
             }
         }
 

@@ -26,7 +26,7 @@ const SUPPLIERS = [
         name: 'JABCO Sales',
         email: 'jabco@acreprofit.com',  // Placeholder - mail forwarding rule at Office 365
         phone: '',
-        // sourceSupplier strings currently in prod that should map to JABCO
+        bidEligible: true,
         aliases: ['Jabco', 'jabco', 'JABCO LLC']
     },
     {
@@ -35,6 +35,7 @@ const SUPPLIERS = [
         name: 'Sims Sales',
         email: 'sims@acreprofit.com',
         phone: '',
+        bidEligible: true,
         aliases: ['Sims Fertilizer & Chemical', 'Sims', 'sims']
     },
     {
@@ -43,6 +44,8 @@ const SUPPLIERS = [
         name: 'Corbet Sales',
         email: 'corbet@acreprofit.com',
         phone: '',
+        // Direct-purchase only (Hydrovant). Never included in competitive bids.
+        bidEligible: false,
         aliases: ['Corbet Scientific, LLC', 'Corbet Scientific', 'Corbet']
     },
     {
@@ -51,6 +54,7 @@ const SUPPLIERS = [
         name: 'CPD Sales',
         email: 'cpd@acreprofit.com',
         phone: '',
+        bidEligible: true,
         aliases: ['Crop Protect Direct', 'cpd']
     }
 ];
@@ -82,7 +86,8 @@ async function initializeSuppliers(User, Chemical) {
             let supplier;
 
             if (existing) {
-                // Sync drift on role / companyName / supplierCode. Never touches password.
+                // Sync drift on role / companyName / supplierCode / bidEligible.
+                // Never touches password.
                 let changed = false;
                 if (existing.role !== 'supplier') {
                     existing.role = 'supplier';
@@ -96,9 +101,17 @@ async function initializeSuppliers(User, Chemical) {
                     existing.supplierCode = spec.supplierCode;
                     changed = true;
                 }
+                if (existing.bidEligible !== spec.bidEligible) {
+                    existing.bidEligible = spec.bidEligible;
+                    // markModified: Mongoose can skip persisting a boolean that
+                    // matches the schema default. Force the dirty flag so the
+                    // write actually lands.
+                    existing.markModified('bidEligible');
+                    changed = true;
+                }
                 if (changed) {
                     await existing.save();
-                    console.log(`  Updated supplier ${spec.supplierCode}: synced role/companyName/code drift`);
+                    console.log(`  Updated existing supplier: ${spec.supplierCode} (bidEligible=${spec.bidEligible})`);
                     totalUpdated++;
                 } else {
                     console.log(`  Supplier ${spec.supplierCode} already seeded, skipping`);
@@ -117,6 +130,7 @@ async function initializeSuppliers(User, Chemical) {
                     companyName: spec.companyName,
                     supplierCode: spec.supplierCode,
                     phone: spec.phone,
+                    bidEligible: spec.bidEligible,
                     mustChangePassword: true
                 });
                 await supplier.save();
