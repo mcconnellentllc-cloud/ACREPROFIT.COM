@@ -7608,6 +7608,90 @@ app.post('/api/chemicals/:id/unarchive', authMiddleware, adminMiddleware, async 
     }
 });
 
+// Diagnostic: find every Chemical doc matching a productName and return the
+// signals Kyle needs to decide which one is real vs duplicate. Case-insensitive
+// substring match by default. Non-cancelled/non-draft order count per doc.
+// Aggregate inventory across all locations per doc.
+app.get('/api/admin/chemicals/duplicates-audit', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { productName } = req.query;
+        if (!productName) {
+            return res.status(400).json({ error: 'productName query parameter is required' });
+        }
+
+        const chemicals = await Chemical.find({
+            productName: { $regex: productName, $options: 'i' }
+        })
+            .sort({ productName: 1, packSize: 1 })
+            .lean();
+
+        if (chemicals.length === 0) {
+            return res.json({ query: productName, count: 0, matches: [] });
+        }
+
+        // Aggregate inventory totals per chemicalId across every location
+        const chemIds = chemicals.map(c => c._id);
+        const invAgg = await Inventory.aggregate([
+            { $match: { chemicalId: { $in: chemIds } } },
+            { $group: {
+                _id: '$chemicalId',
+                quantityOnHand: { $sum: { $ifNull: ['$quantityOnHand', 0] } },
+                quantityReserved: { $sum: { $ifNull: ['$quantityReserved', 0] } },
+                locationCount: { $sum: 1 }
+            }}
+        ]);
+        const invMap = {};
+        invAgg.forEach(r => { invMap[r._id.toString()] = r; });
+
+        // Order count - orders that actually matter (not draft/cancelled)
+        const matches = [];
+        for (const chem of chemicals) {
+            const inv = invMap[chem._id.toString()] || { quantityOnHand: 0, quantityReserved: 0, locationCount: 0 };
+            const orderCount = await ChemicalOrder.countDocuments({
+                'items.chemicalId': chem._id,
+                status: { $nin: ['cancelled', 'draft'] }
+            });
+            // Also check if any SprayProgram references this chemicalId (so Kyle
+            // knows the one linked to the milo program, etc.)
+            const programRefCount = await SprayProgram.countDocuments({
+                'applications.chemicals.chemicalId': chem._id
+            });
+
+            matches.push({
+                _id: chem._id,
+                productName: chem.productName,
+                packSize: chem.packSize,
+                unit: chem.unit,
+                sourceSupplier: chem.sourceSupplier,
+                isActive: chem.isActive !== false,
+                isRestrictedUse: chem.isRestrictedUse === true,
+                costPrice: chem.costPrice || 0,
+                sellPrice: chem.sellPrice || 0,
+                priceDate: chem.priceDate || null,
+                quantityOnHand: inv.quantityOnHand,
+                quantityReserved: inv.quantityReserved,
+                inventoryLocations: inv.locationCount,
+                orderCount,
+                programRefCount,
+                // Human-readable verdict hint
+                recommendation: (inv.quantityOnHand > 0 || orderCount > 0 || programRefCount > 0)
+                    ? 'KEEP - has inventory, orders, or program linkage'
+                    : 'SAFE TO ARCHIVE - no inventory, no orders, no program refs'
+            });
+        }
+
+        // Sort: active+linked first, dead rows last
+        matches.sort((a, b) => {
+            const score = m => (m.isActive ? 1 : 0) * 8 + (m.quantityOnHand > 0 ? 4 : 0) + (m.orderCount > 0 ? 2 : 0) + (m.programRefCount > 0 ? 1 : 0);
+            return score(b) - score(a);
+        });
+
+        res.json({ query: productName, count: matches.length, matches });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ============ CHEMICAL QUOTE / PRICE COMPARISON API ROUTES ============
 
 // Get all quotes with optional filters
