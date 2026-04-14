@@ -4611,6 +4611,7 @@ const priceMiningQuoteSchema = new mongoose.Schema({
         quantity: String
     }],
     whenNeeded: String,
+    neededBy: Date,      // Machine-filterable needed-by date; whenNeeded stays for soft context (growth stage)
     notes: String,
     // Legacy fields
     product: String,
@@ -4625,7 +4626,7 @@ const PriceMiningQuote = mongoose.models.PriceMiningQuote || mongoose.model('Pri
 
 app.post('/api/price-mining/submit', async (req, res) => {
     try {
-        const { lines, whenNeeded, notes, product, supplier, price } = req.body;
+        const { lines, whenNeeded, neededBy, notes, product, supplier, price } = req.body;
 
         // Support both multi-line and legacy single-line submissions
         const hasLines = lines && Array.isArray(lines) && lines.some(l => l.product);
@@ -4648,6 +4649,7 @@ app.post('/api/price-mining/submit', async (req, res) => {
         const quote = await PriceMiningQuote.create({
             lines: hasLines ? lines.filter(l => l.product) : [{ product, quantity: supplier || '' }],
             whenNeeded,
+            neededBy: neededBy ? new Date(neededBy) : null,
             notes: notes || price,
             submittedBy,
             submittedByName
@@ -14586,44 +14588,113 @@ app.post('/api/admin/bid-sheets/from-volume-needs', authMiddleware, adminMiddlew
     try {
         const { title, description, invitedSuppliers, responseDueDate } = req.body;
 
-        // Get current volume needs
-        const volumeNeeds = {};
-        const orderStatuses = ['pending', 'payment_pending', 'payment_secured', 'manufacturer_ordered'];
-        const quoteStatuses = ['submitted', 'pricing', 'quoted', 'accepted'];
+        // Default: aggregate only requests needed within the next 14 days.
+        // Override with ?withinDays=N (0 or 'all' disables the date filter).
+        const rawWithin = req.query.withinDays;
+        const withinDays = (rawWithin === 'all' || rawWithin === '0')
+            ? null
+            : (rawWithin !== undefined ? parseInt(rawWithin, 10) : 14);
+        const dateHorizon = withinDays && withinDays > 0
+            ? new Date(Date.now() + withinDays * 24 * 60 * 60 * 1000)
+            : null;
 
-        // From orders
-        const orders = await Order.find({ status: { $in: orderStatuses } }).select('chemicals');
-        for (const order of orders) {
-            for (const chem of order.chemicals || []) {
-                const key = `${chem.name || chem.productName}|${chem.packSize || 'N/A'}|${chem.unit || 'unit'}`;
-                if (!volumeNeeds[key]) {
-                    volumeNeeds[key] = {
-                        productName: chem.name || chem.productName,
-                        packSize: chem.packSize || 'N/A',
-                        unit: chem.unit || 'unit',
-                        chemicalId: chem.chemicalId,
-                        quantityNeeded: 0
-                    };
-                }
-                volumeNeeds[key].quantityNeeded += (chem.qty || chem.quantity || chem.packagesNeeded || 0);
+        // Product-name normalization: fold free-text customer requests onto
+        // canonical catalog entries. Case-insensitive match; fallback to raw.
+        const catalog = await Chemical.find({ isActive: true })
+            .select('productName packSize unit')
+            .lean();
+        const catalogByName = {};
+        catalog.forEach(c => {
+            if (c.productName) catalogByName[c.productName.toLowerCase().trim()] = c;
+        });
+        const normalize = (rawName) => {
+            if (!rawName) return null;
+            const match = catalogByName[String(rawName).toLowerCase().trim()];
+            if (match) return { productName: match.productName, packSize: match.packSize, unit: match.unit };
+            return { productName: String(rawName).trim(), packSize: null, unit: null };
+        };
+
+        const volumeNeeds = {};
+        const addToBucket = (rawName, packSize, unit, chemicalId, quantity) => {
+            if (!rawName || !(quantity > 0)) return;
+            const norm = normalize(rawName);
+            if (!norm) return;
+            const finalPackSize = norm.packSize || packSize || 'N/A';
+            const finalUnit = norm.unit || unit || 'unit';
+            const key = `${norm.productName}|${finalPackSize}|${finalUnit}`;
+            if (!volumeNeeds[key]) {
+                volumeNeeds[key] = {
+                    productName: norm.productName,
+                    packSize: finalPackSize,
+                    unit: finalUnit,
+                    chemicalId: chemicalId || null,
+                    quantityNeeded: 0
+                };
+            }
+            volumeNeeds[key].quantityNeeded += quantity;
+            if (!volumeNeeds[key].chemicalId && chemicalId) {
+                volumeNeeds[key].chemicalId = chemicalId;
+            }
+        };
+
+        // Source 1: ChemicalOrder (modern customer-placed orders)
+        const chemicalOrderStatuses = ['submitted', 'confirmed', 'ordered_from_supplier', 'received', 'ready_for_pickup', 'payment_pending', 'payment_secured'];
+        const chemOrders = await ChemicalOrder.find({ status: { $in: chemicalOrderStatuses } })
+            .select('items')
+            .lean();
+        for (const order of chemOrders) {
+            for (const item of order.items || []) {
+                addToBucket(item.productName, item.packSize, item.unit, item.chemicalId, item.quantity || 0);
             }
         }
 
-        // From quotes
-        const quotes = await QuoteRequest.find({ status: { $in: quoteStatuses } }).select('items');
-        for (const quote of quotes) {
-            for (const item of quote.items || []) {
-                const key = `${item.productName}|${item.packSize || 'N/A'}|${item.unit || 'unit'}`;
-                if (!volumeNeeds[key]) {
-                    volumeNeeds[key] = {
-                        productName: item.productName,
-                        packSize: item.packSize || 'N/A',
-                        unit: item.unit || 'unit',
-                        chemicalId: item.chemicalId,
-                        quantityNeeded: 0
-                    };
+        // Source 2: Legacy Order (admin-created via for-customer route).
+        // Keep-alive until the pricing refactor retires this write path.
+        const legacyOrderStatuses = ['pending', 'payment_pending', 'payment_secured', 'manufacturer_ordered'];
+        const legacyOrders = await Order.find({ status: { $in: legacyOrderStatuses } })
+            .select('chemicals')
+            .lean();
+        for (const order of legacyOrders) {
+            for (const chem of order.chemicals || []) {
+                const qty = chem.qty || chem.quantity || chem.packagesNeeded || 0;
+                addToBucket(chem.name || chem.productName, chem.packSize, chem.unit, chem.chemicalId, qty);
+            }
+        }
+
+        // Source 3: PriceMiningQuote (customer 2-week-out requests, not yet orders).
+        // Filtered by neededBy when present; records without neededBy fall through
+        // (can't filter them without losing legacy data).
+        const pmqQuery = { status: 'open' };
+        if (dateHorizon) {
+            pmqQuery.$or = [
+                { neededBy: { $lte: dateHorizon } },
+                { neededBy: null },
+                { neededBy: { $exists: false } }
+            ];
+        }
+        const pmQuotes = await PriceMiningQuote.find(pmqQuery)
+            .select('lines product supplier')
+            .lean();
+        for (const quote of pmQuotes) {
+            if (Array.isArray(quote.lines) && quote.lines.length > 0) {
+                for (const line of quote.lines) {
+                    const qty = parseFloat(line.quantity) || 0;
+                    addToBucket(line.product, null, null, null, qty);
                 }
-                volumeNeeds[key].quantityNeeded += (item.quantityNeeded || 0);
+            } else if (quote.product) {
+                // Legacy single-line shape: quantity was stuffed into 'supplier'
+                addToBucket(quote.product, null, null, null, parseFloat(quote.supplier) || 0);
+            }
+        }
+
+        // Source 4: QuoteRequest (kept from original aggregation)
+        const quoteStatuses = ['submitted', 'pricing', 'quoted', 'accepted'];
+        const quotes = await QuoteRequest.find({ status: { $in: quoteStatuses } })
+            .select('items')
+            .lean();
+        for (const q of quotes) {
+            for (const item of q.items || []) {
+                addToBucket(item.productName, item.packSize, item.unit, item.chemicalId, item.quantityNeeded || 0);
             }
         }
 
@@ -14633,9 +14704,12 @@ app.post('/api/admin/bid-sheets/from-volume-needs', authMiddleware, adminMiddlew
             return res.status(400).json({ error: 'No pending volume needs found' });
         }
 
+        const horizonNote = withinDays
+            ? ` (within ${withinDays} days)`
+            : '';
         const bidSheet = new SupplierBidSheet({
             title: title || `Volume Needs Bid - ${new Date().toLocaleDateString()}`,
-            description: description || 'Auto-generated from pending orders and quote requests',
+            description: description || `Auto-generated from pending orders, quote requests, and price mining submissions${horizonNote}`,
             items,
             invitedSuppliers: (invitedSuppliers || []).map(s => ({
                 supplierId: s.supplierId,
