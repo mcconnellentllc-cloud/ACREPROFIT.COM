@@ -12177,6 +12177,7 @@ app.post('/api/admin/seed-milo-program', authMiddleware, superAdminMiddleware, a
                         { productName: 'Atrazine 4L', suggestedRate: 1, rateUnit: 'qt/acre', notes: 'Pre-emerge residual. Safe at-planting with Concep-safened seed.' },
                         { productName: 'S-Metolachlor (Dual II Magnum)', suggestedRate: 1.33, rateUnit: 'pt/acre', notes: 'Grass + small broadleaf residual. REQUIRES Concep-safened seed.' },
                         { productName: 'Meso 4SC', suggestedRate: 6, rateUnit: 'fl oz/acre', notes: 'Kochia, pigweed, velvetleaf control' },
+                        { productName: 'Dicamba 49.8% SL', suggestedRate: 4, rateUnit: 'fl oz/acre', notes: 'Broadleaf escape control. 4 oz rate = 7-day wait before planting.' },
                         { productName: 'Hydrovant fA', suggestedRate: 1.28, rateUnit: 'fl oz/acre', isAdjuvant: true, notes: 'Drift reduction adjuvant' }
                     ]
                 }
