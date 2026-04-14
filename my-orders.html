@@ -223,17 +223,35 @@
             }).join('');
         }
 
-        function viewInvoice(orderId) {
+        async function viewInvoice(orderId) {
             const order = orders.find(o => o._id === orderId);
             if (!order) return;
 
-            const date = new Date(order.createdAt).toLocaleDateString('en-US', {
+            // Try to fetch the official Invoice record; fall back to client-side synthesis
+            // on 404 (invoice not yet generated - legacy orders or not-yet-paid orders)
+            let serverInvoice = null;
+            try {
+                const token = localStorage.getItem('token');
+                const res = await fetch(`${API_URL}/api/invoices/by-order/${orderId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (res.ok) {
+                    serverInvoice = await res.json();
+                }
+            } catch (e) {
+                // Network error - use client-side synthesis below
+            }
+
+            const date = new Date(
+                serverInvoice?.invoiceDate || order.createdAt
+            ).toLocaleDateString('en-US', {
                 year: 'numeric', month: 'long', day: 'numeric'
             });
-            const invoiceNum = order._id.slice(-8).toUpperCase();
-            const items = order.items || [];
-            const subtotal = items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
-            const total = order.totalAmount || subtotal;
+            const invoiceNum = serverInvoice?.invoiceNumber || order._id.slice(-8).toUpperCase();
+            const items = serverInvoice?.items || order.items || [];
+            const subtotal = serverInvoice?.subtotal
+                ?? items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+            const total = serverInvoice?.total ?? order.totalAmount ?? subtotal;
 
             document.getElementById('invoiceContent').innerHTML = `
                 <div class="invoice-header">
@@ -261,7 +279,7 @@
                 </div>
 
                 <p><strong>Invoice Date:</strong> ${date}</p>
-                <p><strong>Status:</strong> ${order.status || 'Pending'}</p>
+                <p><strong>Status:</strong> ${serverInvoice?.paymentStatus || order.status || 'Pending'}</p>
 
                 <table class="invoice-table">
                     <thead>
@@ -277,7 +295,7 @@
                             <tr>
                                 <td>${item.productName}</td>
                                 <td>${item.quantity} ${item.unit}</td>
-                                <td class="text-right">$${(item.pricePerUnit || 0).toFixed(2)}</td>
+                                <td class="text-right">$${(item.unitPrice || item.pricePerUnit || 0).toFixed(2)}</td>
                                 <td class="text-right">$${(item.totalPrice || 0).toFixed(2)}</td>
                             </tr>
                         `).join('')}
