@@ -2288,6 +2288,148 @@ async function generateInvoiceNumber() {
     return `${prefix}${String(nextNum).padStart(5, '0')}`;
 }
 
+// Auto-generate an Invoice record when an order transitions to paid.
+// Fires from the Stripe webhook (payment_intent.succeeded / charge.succeeded)
+// and from the admin check-received route. Idempotent - one invoice per order.
+// Never throws - logs and returns null on failure so it can't break the
+// payment confirmation flow.
+async function autoGenerateInvoiceForPaidOrder(order) {
+    try {
+        if (!order) return null;
+        if (order.paymentStatus !== 'paid') {
+            console.log(`autoGenerateInvoice: skipping ${order._id} - paymentStatus=${order.paymentStatus}`);
+            return null;
+        }
+
+        // Idempotency - one invoice per order
+        const existing = await Invoice.findOne({ orderId: order._id });
+        if (existing) return existing;
+
+        // Detect which order collection this is (ChemicalOrder vs legacy Order)
+        const isChemicalOrder = order.constructor?.modelName === 'ChemicalOrder'
+            || (typeof order.orderNumber === 'string' && order.orderNumber.startsWith('CO-'));
+
+        const customer = await User.findById(order.userId).lean();
+        if (!customer) {
+            console.error(`autoGenerateInvoice: customer not found for order ${order._id}`);
+            return null;
+        }
+
+        const invoiceNumber = await generateInvoiceNumber();
+
+        let invoiceItems = [];
+        let subtotal = 0;
+        let total = 0;
+        let orderNumber = '';
+
+        if (isChemicalOrder) {
+            // Enrich items with catalog cost/margin data
+            const chemicalIds = (order.items || []).map(i => i.chemicalId).filter(Boolean);
+            const chemicalsMap = {};
+            if (chemicalIds.length > 0) {
+                const chems = await Chemical.find({ _id: { $in: chemicalIds } }).lean();
+                chems.forEach(c => { chemicalsMap[c._id.toString()] = c; });
+            }
+
+            invoiceItems = (order.items || []).map(item => {
+                const chem = item.chemicalId ? chemicalsMap[item.chemicalId.toString()] : null;
+                const costPrice = chem?.costPrice || 0;
+                const adminPrice = chem?.adminPrice || 0;
+                const unitPrice = item.unitPrice || item.pricePerUnit || chem?.sellPrice || 0;
+                const qty = item.quantity || 0;
+                return {
+                    productName: item.productName,
+                    description: `${item.packSize || ''} ${item.unit || ''}`.trim(),
+                    packSize: item.packSize,
+                    unit: item.unit,
+                    unitsPerPack: chem?.unitsPerPack || 1,
+                    quantity: qty,
+                    packQuantity: item.packQuantity || (chem?.unitsPerPack ? Math.ceil(qty / chem.unitsPerPack) : qty),
+                    unitPrice,
+                    costPrice,
+                    adminPrice,
+                    totalPrice: qty * unitPrice,
+                    margin: (unitPrice - costPrice) * qty
+                };
+            });
+            subtotal = order.subtotal || 0;
+            total = order.total || subtotal;
+            orderNumber = order.orderNumber || '';
+        } else {
+            // Legacy Order model has chemicals/seeds/pivotBio arrays
+            (order.chemicals || []).forEach(chem => {
+                invoiceItems.push({
+                    productName: chem.name,
+                    description: `${chem.packageSize} ${chem.packageUnit}`,
+                    packSize: `${chem.packageSize}`,
+                    unit: chem.packageUnit,
+                    quantity: chem.packagesNeeded,
+                    unitPrice: chem.pricePerPackage,
+                    totalPrice: chem.totalPrice
+                });
+            });
+            (order.seeds || []).forEach(seed => {
+                invoiceItems.push({
+                    productName: seed.name,
+                    description: `${seed.crop} seed`,
+                    packSize: 'bag',
+                    unit: 'bags',
+                    quantity: seed.bagsNeeded,
+                    unitPrice: seed.pricePerBag,
+                    totalPrice: seed.totalPrice
+                });
+            });
+            (order.pivotBio || []).forEach(pb => {
+                invoiceItems.push({
+                    productName: pb.product,
+                    description: 'PivotBio',
+                    packSize: 'unit',
+                    unit: 'units',
+                    quantity: Math.ceil(pb.totalAmount),
+                    unitPrice: pb.pricePerUnit,
+                    totalPrice: pb.totalPrice
+                });
+            });
+            subtotal = order.totalCost || invoiceItems.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+            total = subtotal;
+            orderNumber = `ORD-${order._id.toString().slice(-8).toUpperCase()}`;
+        }
+
+        const invoice = new Invoice({
+            invoiceNumber,
+            customerId: customer._id,
+            customerName: customer.name,
+            customerEmail: customer.email,
+            customerPhone: customer.phone,
+            customerAddress: customer.address,
+            orderId: order._id,
+            orderNumber,
+            representativeId: order.representativeId,
+            items: invoiceItems,
+            subtotal,
+            discount: order.discount || 0,
+            total,
+            amountPaid: total,
+            amountDue: 0,
+            paymentStatus: 'paid',
+            paymentMethod: order.paymentMethod,
+            paymentDate: order.paidAt || new Date(),
+            stripePaymentIntentId: order.stripePaymentIntentId || null,
+            status: 'paid',
+            invoiceDate: new Date(),
+            dueDate: new Date(),
+            createdBy: order.createdBy || order.representativeId || null
+        });
+
+        await invoice.save();
+        console.log(`Invoice ${invoice.invoiceNumber} auto-generated for order ${order._id}`);
+        return invoice;
+    } catch (err) {
+        console.error(`autoGenerateInvoice error for order ${order?._id}:`, err.message);
+        return null;
+    }
+}
+
 // Helper: Update inventory when receiving a PO
 async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, lotNumber, supplierName, userId, session }) {
     const invQuery = Inventory.findOne({ chemicalId, location: location || 'main' });
@@ -6016,6 +6158,9 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
         order.updatedAt = new Date();
         await order.save();
 
+        // Auto-generate invoice now that payment has cleared (idempotent)
+        await autoGenerateInvoiceForPaidOrder(order);
+
         res.json({ message: 'Payment recorded', order });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -6083,12 +6228,16 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 await order.save();
                 console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
 
+                // Auto-generate invoice now that payment has cleared (idempotent)
+                await autoGenerateInvoiceForPaidOrder(order);
+
                 // Send payment confirmation email to customer
                 try {
                     const customer = await User.findById(order.userId);
                     const transporter = createTransporter();
                     if (transporter && customer?.email) {
                         const amount = (paymentIntent.amount / 100).toFixed(2);
+                        const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
                         await transporter.sendMail({
                             from: process.env.EMAIL_FROM || process.env.SMTP_USER,
                             to: customer.email,
@@ -6098,6 +6247,7 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                                 <p>Hi ${customer.name || 'Farmer'},</p>
                                 <p>Your payment of <strong>$${amount}</strong> has been received via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
                                 <p>Your order is now being processed. We'll notify you when your products are ready for pickup.</p>
+                                <p style="margin-top:18px;">View your invoice and order details: <a href="${invoiceUrl}" style="color:#2d5a27; font-weight:600;">${invoiceUrl}</a></p>
                                 <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
                                 <p style="color: #888; font-size: 0.9em;">Thank you for choosing Acre Profit.<br>Questions? Contact your local representative.</p>
                             </div>`
@@ -6146,6 +6296,9 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 order.updatedAt = new Date();
                 await order.save();
                 console.log(`ACH charge confirmed for order ${orderId}`);
+
+                // Auto-generate invoice now that payment has cleared (idempotent - payment_intent.succeeded usually fires first)
+                await autoGenerateInvoiceForPaidOrder(order);
             }
         }
     }
@@ -11966,6 +12119,32 @@ app.get('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res)
             .sort({ invoiceDate: -1 });
 
         res.json(invoices);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Customer-facing: get the invoice for one of their orders (or admin/rep lookup)
+// Returns 404 if no invoice exists yet - frontend falls back to client-side synthesis
+// Returns 403 if the user doesn't own the order
+app.get('/api/invoices/by-order/:orderId', authMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findOne({ orderId: req.params.orderId })
+            .populate('customerId', 'name email phone farm address')
+            .populate('representativeId', 'name email phone');
+
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+
+        // Ownership: customer on the invoice, OR admin/superadmin/distributor
+        const isOwner = invoice.customerId?._id?.toString() === req.user._id.toString();
+        const isAdmin = ['admin', 'superadmin', 'distributor'].includes(req.user.role);
+        if (!isOwner && !isAdmin) {
+            return res.status(403).json({ error: 'Not authorized to view this invoice' });
+        }
+
+        res.json(invoice);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
