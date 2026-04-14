@@ -10789,7 +10789,7 @@ app.delete('/api/admin/purchase-orders/:id/items/:itemIndex', authMiddleware, ad
 app.get('/api/admin/distributors', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const distributors = await User.find({
-            role: { $in: ['admin', 'superadmin', 'distributor'] }
+            role: { $in: ['admin', 'distributor'] }
         }).select('name email role').sort({ name: 1 });
 
         // Enrich with inventory value, order count, customer count
