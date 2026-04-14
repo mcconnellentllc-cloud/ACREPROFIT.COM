@@ -494,6 +494,24 @@
 
                     <!-- View Mode -->
                     <div class="customer-modal-body" id="viewMode">
+                        <!-- Distributor assignment panel (superadmin only - shown/hidden by showCustomerModal) -->
+                        <div id="modalReassignPanel" style="display:none; background:#f9fafb; border:1px solid var(--border); border-radius:var(--radius); padding:12px 14px; margin-bottom:16px;">
+                            <div style="display:flex; align-items:center; gap:10px; flex-wrap:wrap;">
+                                <div style="font-size:0.8rem; color:var(--text-muted); text-transform:uppercase; letter-spacing:0.5px;">Assigned Distributor</div>
+                                <div id="modalReassignCurrent" style="font-weight:700; color:var(--primary);">—</div>
+                                <button type="button" class="btn btn-sm btn-outline" id="modalReassignTrigger" onclick="openReassignDropdown()" style="margin-left:auto;">Reassign</button>
+                            </div>
+                            <div id="modalReassignDropdownWrap" style="display:none; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border);">
+                                <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
+                                    <select id="modalReassignSelect" style="flex:1; min-width:200px; padding:8px; border:1px solid var(--border); border-radius:var(--radius);">
+                                        <option value="">Loading distributors...</option>
+                                    </select>
+                                    <button type="button" class="btn btn-sm btn-primary" id="modalReassignSaveBtn" onclick="submitReassignCustomer()">Save</button>
+                                    <button type="button" class="btn btn-sm btn-outline" onclick="closeReassignDropdown()">Cancel</button>
+                                </div>
+                            </div>
+                        </div>
+
                         <div class="customer-info-grid">
                             <div class="info-item">
                                 <span class="info-label">Email</span>
@@ -4511,6 +4529,22 @@
             const initials = customer.name.split(' ').map(n => n[0]).join('');
             document.getElementById('modalCustomerAvatar').textContent = initials;
             document.getElementById('modalCustomerName').textContent = customer.name;
+
+            // Superadmin-only reassignment panel
+            const viewer = JSON.parse(localStorage.getItem('user') || '{}');
+            const reassignPanel = document.getElementById('modalReassignPanel');
+            if (viewer.role === 'superadmin') {
+                const currentRepName = customer.representative?.name
+                    || (customer.representativeId
+                        ? customer.representativeId.charAt(0).toUpperCase() + customer.representativeId.slice(1).toLowerCase()
+                        : 'Unassigned');
+                document.getElementById('modalReassignCurrent').textContent = currentRepName;
+                // Reset dropdown visibility on every reopen
+                document.getElementById('modalReassignDropdownWrap').style.display = 'none';
+                reassignPanel.style.display = 'block';
+            } else {
+                reassignPanel.style.display = 'none';
+            }
             document.getElementById('modalCustomerFarm').textContent = customer.farm?.name || 'No farm name';
             document.getElementById('modalCustomerEmail').textContent = customer.email;
             document.getElementById('modalCustomerPhone').textContent = customer.phone || '-';
@@ -5242,6 +5276,86 @@
         }
 
         // Save customer
+        // Superadmin-only: open the Reassign dropdown + lazy-load distributor list
+        async function openReassignDropdown() {
+            const wrap = document.getElementById('modalReassignDropdownWrap');
+            const select = document.getElementById('modalReassignSelect');
+            wrap.style.display = 'block';
+            select.innerHTML = '<option value="">Loading distributors...</option>';
+            select.disabled = true;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/distributors`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load distributors');
+                const distributors = await res.json();
+                const currentRepId = selectedCustomer?.representative?._id
+                    || selectedCustomer?.representative
+                    || null;
+
+                if (!distributors.length) {
+                    select.innerHTML = '<option value="">No distributors available</option>';
+                    return;
+                }
+
+                select.innerHTML = distributors.map(d => {
+                    const id = d._id || d.id;
+                    const isCurrent = id && currentRepId && id.toString() === currentRepId.toString();
+                    return `<option value="${id}" ${isCurrent ? 'selected' : ''}>${d.name}${isCurrent ? ' (current)' : ''}</option>`;
+                }).join('');
+                select.disabled = false;
+            } catch (err) {
+                select.innerHTML = `<option value="">Error: ${err.message}</option>`;
+            }
+        }
+
+        function closeReassignDropdown() {
+            document.getElementById('modalReassignDropdownWrap').style.display = 'none';
+        }
+
+        async function submitReassignCustomer() {
+            if (!selectedCustomer?._id) return;
+            const select = document.getElementById('modalReassignSelect');
+            const distributorId = select.value;
+            if (!distributorId) {
+                alert('Pick a distributor.');
+                return;
+            }
+
+            const saveBtn = document.getElementById('modalReassignSaveBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.disabled = true;
+            saveBtn.textContent = 'Saving...';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/customers/${selectedCustomer._id}/assign`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ distributorId })
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Reassignment failed');
+
+                // Update local caches so the customer grid + modal both reflect the new rep
+                const idx = allCustomers.findIndex(c => c._id === selectedCustomer._id);
+                if (idx !== -1) allCustomers[idx] = { ...allCustomers[idx], ...result };
+                selectedCustomer = { ...selectedCustomer, ...result };
+
+                closeReassignDropdown();
+                showCustomerModal(selectedCustomer);  // refresh the displayed rep name
+                renderCustomers(allCustomers);        // refresh the group-by-distributor grouping
+            } catch (err) {
+                alert('Reassignment failed: ' + err.message);
+            } finally {
+                saveBtn.disabled = false;
+                saveBtn.textContent = originalText;
+            }
+        }
+
         async function saveCustomer() {
             if (!selectedCustomer) return;
 
