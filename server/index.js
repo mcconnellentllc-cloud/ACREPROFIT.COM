@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -36,12 +38,71 @@ const app = express();
 // Initialize Stripe (will be configured per-request for Connect)
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'acreprofit-secret-key-change-in-production';
 
-// Middleware
-app.use(cors());
+// S6: JWT_SECRET must be explicitly set - no silent fallback to a known string
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable is required. Refusing to start.');
+    process.exit(1);
+}
+
+// S3: helmet sets common security headers (HSTS, X-Content-Type-Options,
+// X-Frame-Options, Referrer-Policy, etc). CSP disabled because this server
+// returns JSON not HTML - CSP is enforced by the static frontend host.
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// S5: CORS whitelist. Browser requests from any other origin are rejected.
+// No-origin requests (Stripe webhooks, curl, server-to-server) are allowed.
+const allowedOrigins = [
+    'https://acreprofit.com',
+    'https://www.acreprofit.com',
+    'https://acreprofit-com.onrender.com'
+];
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push(
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8080'
+    );
+}
+app.use(cors({
+    origin: (origin, cb) => {
+        if (!origin) return cb(null, true);                 // non-browser / same-origin
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        console.warn(`CORS blocked origin: ${origin}`);
+        cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// S4: rate limiters for authentication endpoints. Brute-force protection -
+// applied per-IP. Webhook, order, and read routes are not limited.
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,                                                // 10 attempts / 15 min / IP
+    message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,                                                 // 5 signups / hour / IP
+    message: { error: 'Too many signup attempts. Please try again in an hour.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,                                                 // 5 reset requests / hour / IP
+    message: { error: 'Too many password reset attempts. Please try again in an hour.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -51,6 +112,8 @@ const connectDB = async () => {
             console.log('MongoDB connected successfully');
             // Initialize admin users
             await initializeAdmins();
+            // Seed atomic sequence counters from existing records (I8)
+            await initializeCounters();
             // Seed initial inventory
             await seedJabcoInventory();
             // Seed March 2026 purchase orders
@@ -198,6 +261,12 @@ const userSchema = new mongoose.Schema({
     // RUP Purchase Eligibility (calculated field)
     canPurchaseRUP: { type: Boolean, default: false },
     rupEligibilityNotes: String,
+
+    // S1: Force password rotation on first login after admin seeding.
+    // Defaults to false so normal signups are unaffected. Set true by the
+    // admin seeder (for fresh admins with random temp passwords) and by the
+    // startup migration (for existing Farm2026! admins).
+    mustChangePassword: { type: Boolean, default: false },
 
     createdAt: { type: Date, default: Date.now }
 });
@@ -1142,11 +1211,71 @@ const chemicalOrderSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+// ============ ATOMIC SEQUENCE COUNTER (I8) ============
+// Single Counter collection, one doc per (kind-year) sequence. nextSequence()
+// uses findOneAndUpdate/$inc/upsert which is atomic under MongoDB, so two
+// concurrent saves can never produce the same number. Replaces the old
+// countDocuments()+1 pattern that was race-prone under concurrent order
+// creation.
+
+const counterSchema = new mongoose.Schema({
+    _id: { type: String, required: true },  // e.g. 'chemicalOrder-2026'
+    seq: { type: Number, default: 0 }
+});
+const Counter = mongoose.model('Counter', counterSchema);
+
+async function nextSequence(name) {
+    const result = await Counter.findOneAndUpdate(
+        { _id: name },
+        { $inc: { seq: 1 } },
+        { new: true, upsert: true }
+    );
+    return result.seq;
+}
+
+// Seed counters from existing records. $setOnInsert means this is a no-op on
+// redeploy - never stomps a live counter. Safe to run every startup.
+// Parses the max numeric suffix from existing XXX-YYYY-NNNNN numbers so the
+// first atomic increment after deploy returns a unique next number.
+async function initializeCounters() {
+    try {
+        const year = new Date().getFullYear();
+
+        const seedOne = async (counterName, Model, field, prefix) => {
+            const escPrefix = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const last = await Model.findOne({ [field]: { $regex: `^${escPrefix}` } })
+                .sort({ [field]: -1 })
+                .select(field)
+                .lean();
+            let seed = 0;
+            if (last && last[field]) {
+                const parts = last[field].split('-');
+                const n = parseInt(parts[parts.length - 1], 10);
+                if (!isNaN(n)) seed = n;
+            }
+            const result = await Counter.findOneAndUpdate(
+                { _id: counterName },
+                { $setOnInsert: { seq: seed } },
+                { upsert: true, new: true }
+            );
+            console.log(`Counter ${counterName}: seq=${result.seq} (seeded from max=${seed})`);
+        };
+
+        await seedOne(`chemicalOrder-${year}`, mongoose.model('ChemicalOrder'), 'orderNumber', `CO-${year}-`);
+        await seedOne(`invoice-${year}`, mongoose.model('Invoice'), 'invoiceNumber', `INV-${year}-`);
+        await seedOne(`quoteRequest-${year}`, mongoose.model('QuoteRequest'), 'quoteNumber', `QR-${year}-`);
+        await seedOne(`supplierBidSheet-${year}`, mongoose.model('SupplierBidSheet'), 'bidNumber', `BID-${year}-`);
+    } catch (err) {
+        console.error('initializeCounters error:', err.message);
+    }
+}
+
 // Auto-generate order number
 chemicalOrderSchema.pre('save', async function(next) {
     if (!this.orderNumber) {
-        const count = await mongoose.model('ChemicalOrder').countDocuments();
-        this.orderNumber = `CO-${new Date().getFullYear()}-${String(count + 1).padStart(5, '0')}`;
+        const year = new Date().getFullYear();
+        const seq = await nextSequence(`chemicalOrder-${year}`);
+        this.orderNumber = `CO-${year}-${String(seq).padStart(5, '0')}`;
     }
     next();
 });
@@ -1633,8 +1762,8 @@ const quoteRequestSchema = new mongoose.Schema({
 quoteRequestSchema.pre('save', async function(next) {
     if (!this.quoteNumber) {
         const year = new Date().getFullYear();
-        const count = await QuoteRequest.countDocuments();
-        this.quoteNumber = `QR-${year}-${String(count + 1).padStart(5, '0')}`;
+        const seq = await nextSequence(`quoteRequest-${year}`);
+        this.quoteNumber = `QR-${year}-${String(seq).padStart(5, '0')}`;
     }
     next();
 });
@@ -1742,8 +1871,8 @@ const supplierBidSheetSchema = new mongoose.Schema({
 supplierBidSheetSchema.pre('save', async function(next) {
     if (!this.bidNumber) {
         const year = new Date().getFullYear();
-        const count = await SupplierBidSheet.countDocuments();
-        this.bidNumber = `BID-${year}-${String(count + 1).padStart(5, '0')}`;
+        const seq = await nextSequence(`supplierBidSheet-${year}`);
+        this.bidNumber = `BID-${year}-${String(seq).padStart(5, '0')}`;
     }
     next();
 });
@@ -2271,21 +2400,8 @@ async function updateMixRatingStats(mixId) {
 // Helper: Generate invoice number
 async function generateInvoiceNumber() {
     const year = new Date().getFullYear();
-    const prefix = `INV-${year}-`;
-
-    const lastInvoice = await Invoice.findOne({ invoiceNumber: { $regex: `^${prefix}` } })
-        .sort({ invoiceNumber: -1 })
-        .lean();
-
-    let nextNum = 1;
-    if (lastInvoice && lastInvoice.invoiceNumber) {
-        const lastNum = parseInt(lastInvoice.invoiceNumber.split('-')[2], 10);
-        if (!isNaN(lastNum)) {
-            nextNum = lastNum + 1;
-        }
-    }
-
-    return `${prefix}${String(nextNum).padStart(5, '0')}`;
+    const seq = await nextSequence(`invoice-${year}`);
+    return `INV-${year}-${String(seq).padStart(5, '0')}`;
 }
 
 // Auto-generate an Invoice record when an order transitions to paid.
@@ -2931,72 +3047,48 @@ async function generatePONumber() {
 
 async function initializeAdmins() {
     const admins = [
-        {
-            name: 'Acre Profit Admin',
-            email: 'contact@acreprofit.com',
-            password: 'Farm2026!',
-            phone: '970-571-1015',
-            role: 'superadmin'
-        },
-        {
-            name: 'Kyle McConnell',
-            email: 'office@togoag.com',
-            password: 'Farm2026!',
-            phone: '970-571-1015',
-            role: 'distributor'
-        },
-        {
-            name: 'Ty Mollohan',
-            email: 'tymollohan77@gmail.com',
-            password: 'Farm2026!',
-            phone: '970-520-2340',
-            role: 'distributor'
-        },
-        {
-            name: 'Chad Bamford',
-            email: 'ckbamford@yahoo.com',
-            password: 'Farm2026!',
-            phone: '970-520-3716',
-            role: 'distributor'
-        },
-        {
-            name: 'Seth Rolfs',
-            email: 'seth@acreprofit.com',
-            password: 'Farm2026!',
-            phone: '785-531-0680',
-            role: 'distributor'
-        },
-        {
-            name: 'Tyson',
-            email: 'fyeagllc@gmail.com',
-            password: 'Farm2026!',
-            role: 'distributor'
-        }
+        { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', phone: '970-571-1015', role: 'superadmin' },
+        { name: 'Kyle McConnell',    email: 'office@togoag.com',       phone: '970-571-1015', role: 'distributor' },
+        { name: 'Ty Mollohan',       email: 'tymollohan77@gmail.com',  phone: '970-520-2340', role: 'distributor' },
+        { name: 'Chad Bamford',      email: 'ckbamford@yahoo.com',     phone: '970-520-3716', role: 'distributor' },
+        { name: 'Seth Rolfs',        email: 'seth@acreprofit.com',     phone: '785-531-0680', role: 'distributor' },
+        { name: 'Tyson',             email: 'fyeagllc@gmail.com',                             role: 'distributor' }
     ];
 
     for (const admin of admins) {
         try {
             const existing = await User.findOne({ email: admin.email });
             if (!existing) {
-                await User.create(admin);
-                console.log(`Created admin: ${admin.name}`);
+                // New admin: random 12-char temp password, must-change flag on.
+                // Temp is logged to the Render console - Kyle grabs it once and
+                // distributes out-of-band. After first login the user changes it.
+                const tempPassword = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '').slice(0, 12);
+                await User.create({
+                    ...admin,
+                    password: tempPassword,
+                    mustChangePassword: true
+                });
+                console.log(`[INITIAL PASSWORD] ${admin.email}: ${tempPassword} — MUST CHANGE ON FIRST LOGIN`);
             } else {
-                // Ensure role and password are correct
+                // Existing admin: only sync the role, never the password.
+                // Migrate any admin still on the public Farm2026! seed (or without
+                // the flag yet) to mustChangePassword:true so next login forces
+                // rotation. We do NOT touch the password itself - admins keep
+                // whatever they currently use until they rotate.
                 let updated = false;
                 if (existing.role !== admin.role) {
                     existing.role = admin.role;
                     updated = true;
                 }
-                // Reset password for accounts that may be locked out
-                existing.password = admin.password;
-                updated = true;
-                if (updated) {
-                    await existing.save();
-                    console.log(`Updated account for: ${admin.name}`);
+                if (existing.mustChangePassword !== true) {
+                    existing.mustChangePassword = true;
+                    updated = true;
+                    console.log(`Migrated ${admin.email} to mustChangePassword=true (will force rotation on next login)`);
                 }
+                if (updated) await existing.save();
             }
         } catch (error) {
-            console.log(`Admin ${admin.email} may already exist`);
+            console.log(`Admin ${admin.email}: ${error.message}`);
         }
     }
 }
@@ -3834,6 +3926,15 @@ function calculateHydrovantPrice(quantity) {
 
 // ============ AUTH MIDDLEWARE ============
 
+// Routes that a user with mustChangePassword=true is still allowed to hit.
+// Anything else returns 403 so a determined admin who ignores the frontend
+// redirect can't keep using their temp-password session.
+const MUST_CHANGE_PASSWORD_ALLOWED_PATHS = new Set([
+    '/api/auth/change-password',
+    '/api/auth/me',
+    '/api/auth/logout'
+]);
+
 const authMiddleware = async (req, res, next) => {
     try {
         const token = req.header('Authorization')?.replace('Bearer ', '');
@@ -3845,6 +3946,16 @@ const authMiddleware = async (req, res, next) => {
         if (!user) {
             return res.status(401).json({ error: 'User not found' });
         }
+
+        // S1: block everything except the change-password / me routes while
+        // the user is still on a temp password.
+        if (user.mustChangePassword && !MUST_CHANGE_PASSWORD_ALLOWED_PATHS.has(req.path)) {
+            return res.status(403).json({
+                error: 'Password change required',
+                passwordChangeRequired: true
+            });
+        }
+
         req.user = user;
         req.token = token;
         next();
@@ -3893,42 +4004,15 @@ app.get('/api/health', (req, res) => {
 });
 
 // Reset/reinitialize admin users (use this if login fails)
-app.post('/api/admin/reset-admins', async (req, res) => {
-    try {
-        const { secretKey } = req.body;
-
-        // Simple secret key protection
-        if (secretKey !== 'acreprofit2026reset') {
-            return res.status(403).json({ error: 'Invalid secret key' });
-        }
-
-        const admins = [
-            { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', password: 'Farm2026!', phone: '970-571-1015', role: 'superadmin' },
-            { name: 'Kyle McConnell', email: 'office@togoag.com', password: 'Farm2026!', phone: '970-571-1015', role: 'distributor' },
-            { name: 'Ty Mollohan', email: 'tymollohan77@gmail.com', password: 'Farm2026!', phone: '970-520-2340', role: 'distributor' },
-            { name: 'Chad Bamford', email: 'ckbamford@yahoo.com', password: 'Farm2026!', phone: '970-520-3716', role: 'distributor' },
-            { name: 'Seth Rolfs', email: 'seth@acreprofit.com', password: 'Farm2026!', phone: '785-531-0680', role: 'distributor' }
-        ];
-
-        const results = [];
-        for (const admin of admins) {
-            // Delete existing user if exists
-            await User.deleteOne({ email: admin.email.toLowerCase() });
-            // Create fresh
-            const user = new User(admin);
-            await user.save();
-            results.push(`Created/reset: ${admin.email}`);
-        }
-
-        res.json({ message: 'Admin users reset successfully', results });
-    } catch (error) {
-        res.status(500).json({ error: error.message });
-    }
-});
+// S2: /api/admin/reset-admins was removed. It allowed anyone with the
+// hardcoded secret 'acreprofit2026reset' (public in this repo) to delete
+// and recreate every admin account. Recovery path now goes through Atlas
+// directly - same place the JWT_SECRET and connection string live, so
+// recovery requires the same level of access as everything else.
 
 // ---- AUTH ROUTES ----
 
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', signupLimiter, async (req, res) => {
     try {
         const { name, email, password, phone, address, farm, crops, representativeId } = req.body;
 
@@ -3986,7 +4070,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -4019,8 +4103,45 @@ app.post('/api/auth/login', async (req, res) => {
 
         res.json({
             user: userResponse,
-            token
+            token,
+            passwordChangeRequired: user.mustChangePassword === true
         });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// S1: change password for an authenticated user. Used by the forced-rotation
+// flow (mustChangePassword=true) and available any time after that. Verifies
+// the old password, hashes the new via the userSchema.pre('save') hook,
+// clears the flag, and returns a fresh JWT so the client doesn't need to
+// re-login.
+app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
+    try {
+        const { currentPassword, newPassword } = req.body;
+        if (!currentPassword || !newPassword) {
+            return res.status(400).json({ error: 'Current and new password are required' });
+        }
+        if (newPassword.length < 8) {
+            return res.status(400).json({ error: 'New password must be at least 8 characters' });
+        }
+        if (newPassword === currentPassword) {
+            return res.status(400).json({ error: 'New password must be different from current password' });
+        }
+
+        const user = await User.findById(req.user._id);
+        const isMatch = await user.comparePassword(currentPassword);
+        if (!isMatch) {
+            return res.status(401).json({ error: 'Current password is incorrect' });
+        }
+
+        user.password = newPassword;
+        user.mustChangePassword = false;
+        await user.save();
+
+        // Issue a fresh token so the session continues seamlessly
+        const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
+        res.json({ message: 'Password changed successfully', token });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -4065,7 +4186,7 @@ const createEmailTransporter = () => {
 };
 
 // Request password reset
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -4156,7 +4277,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 });
 
 // Reset password with token
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
     try {
         const { token, password } = req.body;
 
@@ -15398,6 +15519,8 @@ connectDB().then(async () => {
         );
         if (paraquatResult.modifiedCount > 0) {
             console.log(`Paraquat RUP flag migration: fixed ${paraquatResult.modifiedCount} record(s)`);
+        } else {
+            console.log(`Paraquat RUP flag migration: matched ${paraquatResult.matchedCount}, modified 0 (nothing to fix)`);
         }
     } catch (e) { console.error('Paraquat RUP flag migration error:', e.message); }
 
