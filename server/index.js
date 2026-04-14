@@ -7560,11 +7560,49 @@ app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res
 // Delete chemical (admin only)
 app.delete('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const chemical = await Chemical.findByIdAndDelete(req.params.id);
-        if (!chemical) {
+        // Guard: must be archived (isActive=false) before hard delete. This
+        // enforces the archive->delete two-step from the admin UI, so a single
+        // misclick on a live product can't nuke it. Admin archives first,
+        // confirms the product is actually dead, THEN hard-deletes.
+        const existing = await Chemical.findById(req.params.id);
+        if (!existing) {
             return res.status(404).json({ error: 'Chemical not found' });
         }
-        res.json({ message: 'Chemical deleted', chemical });
+        if (existing.isActive !== false) {
+            return res.status(400).json({
+                error: 'Product must be archived before it can be deleted. Archive it first (isActive=false), then retry the delete.'
+            });
+        }
+        await Chemical.findByIdAndDelete(req.params.id);
+        res.json({ message: 'Chemical deleted', chemical: existing });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Archive (soft-delete) a product - hides it from customer views but keeps all
+// order/invoice/inventory references intact. Reversible via /unarchive.
+app.post('/api/chemicals/:id/archive', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) return res.status(404).json({ error: 'Chemical not found' });
+        chemical.isActive = false;
+        chemical.updatedAt = new Date();
+        await chemical.save();
+        res.json({ message: 'Chemical archived', chemical });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+app.post('/api/chemicals/:id/unarchive', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) return res.status(404).json({ error: 'Chemical not found' });
+        chemical.isActive = true;
+        chemical.updatedAt = new Date();
+        await chemical.save();
+        res.json({ message: 'Chemical unarchived', chemical });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
@@ -12475,7 +12513,14 @@ app.post('/api/admin/purchase-orders/:id/receive', authMiddleware, adminMiddlewa
 // Get products with inventory levels (for Products tab)
 app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const chemicals = await Chemical.find({ isActive: true })
+        // Filter: ?status=active (default) | archived | all
+        const statusFilter = (req.query.status || 'active').toLowerCase();
+        const query = {};
+        if (statusFilter === 'active') query.isActive = true;
+        else if (statusFilter === 'archived') query.isActive = false;
+        // 'all' leaves query empty
+
+        const chemicals = await Chemical.find(query)
             .sort({ productName: 1, packSize: 1 });
 
         // Get inventory for all chemicals

@@ -1380,6 +1380,11 @@
                             <option value="needs_pricing">Needs Pricing</option>
                             <option value="ready_to_sell">Ready to Sell</option>
                         </select>
+                        <select id="productStatusFilter" onchange="loadProducts()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="active">Active</option>
+                            <option value="archived">Archived</option>
+                            <option value="all">All</option>
+                        </select>
                     </div>
                 </div>
                 <div class="orders-table-wrapper">
@@ -4991,7 +4996,8 @@
         async function loadProducts() {
             try {
                 // Use the endpoint that includes inventory data
-                const res = await fetch(`${API_URL}/api/admin/products-with-inventory`, {
+                const statusFilter = document.getElementById('productStatusFilter')?.value || 'active';
+                const res = await fetch(`${API_URL}/api/admin/products-with-inventory?status=${statusFilter}`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 allProducts = await res.json();
@@ -5122,9 +5128,18 @@
                         <button class="btn btn-sm ${needsPricing && inventory > 0 ? 'btn-primary' : 'btn-outline'}" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins" ${needsPricing && inventory > 0 ? 'style="background:#dc2626; border-color:#dc2626; animation: pulse 2s infinite;"' : ''}>
                             ${needsPricing && inventory > 0 ? 'Set Price' : 'Edit'}
                         </button>
-                        <button class="btn btn-sm" style="background:#dc2626; color:white; border-color:#dc2626; margin-left:4px;" onclick="deleteProduct('${p._id}', '${p.productName}')">
-                            Delete
-                        </button>
+                        ${p.isActive === false ? `
+                            <button class="btn btn-sm" style="background:#059669; color:white; border-color:#059669; margin-left:4px;" onclick="unarchiveProduct('${p._id}', '${p.productName}')" title="Restore to active">
+                                Unarchive
+                            </button>
+                            <button class="btn btn-sm" style="background:#dc2626; color:white; border-color:#dc2626; margin-left:4px;" onclick="deleteProduct('${p._id}', '${p.productName}')" title="Permanently delete - cannot be undone">
+                                Delete Forever
+                            </button>
+                        ` : `
+                            <button class="btn btn-sm" style="background:#d97706; color:white; border-color:#d97706; margin-left:4px;" onclick="archiveProduct('${p._id}', '${p.productName}')" title="Hide from customer catalog - reversible">
+                                Archive
+                            </button>
+                        `}
                     </td>
                 </tr>
                 `;
@@ -5229,8 +5244,43 @@
             document.getElementById('editProductModal').style.display = 'none';
         }
 
+        async function archiveProduct(productId, productName) {
+            if (!confirm(`Archive "${productName}"? It will be hidden from the customer catalog but all order and inventory history is preserved. You can unarchive it anytime.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/${productId}/archive`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    loadProducts();
+                } else {
+                    alert('Archive failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Archive failed: ' + err.message);
+            }
+        }
+
+        async function unarchiveProduct(productId, productName) {
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/${productId}/unarchive`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    loadProducts();
+                } else {
+                    alert('Unarchive failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Unarchive failed: ' + err.message);
+            }
+        }
+
         async function deleteProduct(productId, productName) {
-            if (!confirm(`Delete "${productName}"? This cannot be undone.`)) return;
+            if (!confirm(`Permanently delete "${productName}"? This cannot be undone. Every order and inventory reference to this product will become orphaned.`)) return;
             try {
                 const res = await fetch(`${API_URL}/api/chemicals/${productId}`, {
                     method: 'DELETE',
