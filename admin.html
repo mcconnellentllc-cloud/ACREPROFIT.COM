@@ -48,13 +48,13 @@
                             <a href="#products" class="dropdown-item" data-tab="products">Products Catalog</a>
                             <a href="#inventory" class="dropdown-item" data-tab="inventory">Stock Levels</a>
                             <a href="#purchase-orders" class="dropdown-item" data-tab="purchase-orders">Purchase Orders</a>
-                            <span id="suppliersNav"><a href="#suppliers" class="dropdown-item" data-tab="suppliers">Suppliers</a></span>
                             <a href="/quoter.html" class="dropdown-item" target="_blank">Price Quoter Tool</a>
                         </div>
                     </div>
 
                     <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
                     <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
+                    <span id="suppliersNavTop"><a href="#suppliers" class="admin-tab" data-tab="suppliers">Suppliers</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
                     <a href="/distributor-invoices.html" class="admin-tab" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">Invoicing</a>
                     <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
@@ -2451,7 +2451,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>
                         </div>
                         <div class="stat-content">
-                            <span class="stat-value" id="totalSuppliersCount">2</span>
+                            <span class="stat-value" id="totalSuppliersCount">0</span>
                             <span class="stat-label">Active Suppliers</span>
                         </div>
                     </div>
@@ -2480,45 +2480,76 @@
                     <table class="admin-table" id="suppliersTable">
                         <thead>
                             <tr>
-                                <th>Supplier Name</th>
+                                <th>Code</th>
+                                <th>Company</th>
                                 <th>Contact Name</th>
                                 <th>Phone</th>
                                 <th>Email</th>
-                                <th>Total Orders</th>
-                                <th>Total Value</th>
-                                <th>Status</th>
+                                <th>Products</th>
+                                <th>Bid Eligible</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>
                         <tbody id="suppliersTableBody">
-                            <tr>
-                                <td><strong>Jabco</strong></td>
-                                <td>Sales Rep</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>0</td>
-                                <td>$0</td>
-                                <td><span class="status-badge status-active">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline" onclick="editSupplier('jabco')">Edit</button>
-                                    <button class="btn btn-sm btn-outline" onclick="viewSupplierOrders('jabco')">View POs</button>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td><strong>Corbet</strong></td>
-                                <td>Sales Rep</td>
-                                <td>-</td>
-                                <td>-</td>
-                                <td>0</td>
-                                <td>$0</td>
-                                <td><span class="status-badge status-active">Active</span></td>
-                                <td>
-                                    <button class="btn btn-sm btn-outline" onclick="editSupplier('corbet')">Edit</button>
-                                    <button class="btn btn-sm btn-outline" onclick="viewSupplierOrders('corbet')">View POs</button>
-                                </td>
-                            </tr>
+                            <tr><td colspan="8" class="loading" style="text-align:center; padding:24px; color:var(--text-muted);">Loading suppliers...</td></tr>
                         </tbody>
                     </table>
+                </div>
+
+                <!-- Supplier Edit/Add Modal -->
+                <div class="modal-overlay" id="supplierEditModal" style="display:none;">
+                    <div class="modal-content" style="max-width: 560px; max-height: 90vh; overflow-y: auto;">
+                        <button class="modal-close" onclick="closeSupplierModal()">&times;</button>
+                        <h2 id="supplierModalTitle" style="margin-bottom: 16px;">Add Supplier</h2>
+                        <input type="hidden" id="supplierEditId">
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Supplier Code *</label>
+                                <input type="text" id="supplierCodeInput" placeholder="JABCO" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius); text-transform:uppercase;">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Company Name *</label>
+                                <input type="text" id="supplierCompanyInput" placeholder="JABCO LLC" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            </div>
+                        </div>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Contact Name *</label>
+                                <input type="text" id="supplierNameInput" placeholder="Jeff Sales" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Phone</label>
+                                <input type="text" id="supplierPhoneInput" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            </div>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Email *</label>
+                            <input type="email" id="supplierEmailInput" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                        </div>
+                        <div id="supplierPasswordRow" style="margin-top:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Initial Password *</label>
+                            <input type="text" id="supplierPasswordInput" placeholder="Auto-generate on blank" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            <div style="font-size:0.8rem; color:var(--text-muted); margin-top:4px;">Leave blank to auto-generate a 12-char temp password (logged to Render console).</div>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Internal Notes</label>
+                            <textarea id="supplierNotesInput" rows="3" placeholder="Jeff prefers phone after 3pm, net-30 terms..." style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius); font-family:inherit;"></textarea>
+                        </div>
+                        <div style="margin-top:12px;">
+                            <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+                                <input type="checkbox" id="supplierBidEligibleInput" checked>
+                                <span style="font-weight:600;">Bid Eligible</span>
+                                <span style="font-size:0.85rem; color:var(--text-muted);">— uncheck for direct-purchase-only suppliers like Corbet</span>
+                            </label>
+                        </div>
+                        <div style="display:flex; gap:8px; justify-content:space-between; margin-top:20px;">
+                            <button id="supplierDeleteBtn" class="btn btn-sm" style="background:#dc3545; color:white; display:none;" onclick="deleteSupplierFromModal()">Delete Forever</button>
+                            <div style="display:flex; gap:8px; margin-left:auto;">
+                                <button class="btn btn-outline" onclick="closeSupplierModal()">Cancel</button>
+                                <button class="btn btn-primary" id="supplierSaveBtn" onclick="saveSupplierFromModal()">Save</button>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Supplier Notes -->
@@ -3287,7 +3318,7 @@
             setDisplay('inventoryNav', 'block');
             setDisplay('companySettingsNav', 'block');
             setDisplay('distributorsNav', 'block');
-            setDisplay('suppliersNav', 'block');
+            setDisplay('suppliersNavTop', 'block');
             setDisplay('complianceNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
@@ -3305,7 +3336,8 @@
             setDisplay('commissionsNav', 'none');
             setDisplay('repAppsNav', 'none');
             setDisplay('distributorsNav', 'none');
-            setDisplay('suppliersNav', 'none');
+            // Distributors see Suppliers (needed for Price Mining bid sheets)
+            setDisplay('suppliersNavTop', 'block');
             setDisplay('companySettingsNav', 'none');
             setDisplay('complianceNav', 'none');
         } else {
@@ -3317,7 +3349,7 @@
             // Hide superadmin-only tabs
             setDisplay('repAppsNav', 'none');
             setDisplay('distributorsNav', 'none');
-            setDisplay('suppliersNav', 'none');
+            setDisplay('suppliersNavTop', 'none');
             setDisplay('companySettingsNav', 'none');
             setDisplay('complianceNav', 'none');
             loadRepOwnCommission(userData);
@@ -3767,9 +3799,235 @@
             }
         }
 
-        function loadSuppliers() {
-            // Future: Load supplier data from API
-            console.log('Loading suppliers...');
+        let loadedSuppliers = [];  // populated by loadSuppliers, used by editSupplier
+
+        async function loadSuppliers() {
+            const tbody = document.getElementById('suppliersTableBody');
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const canEdit = currentUser.role === 'superadmin';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/suppliers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load suppliers');
+                const suppliers = await res.json();
+                loadedSuppliers = suppliers;
+
+                // Update stats
+                document.getElementById('totalSuppliersCount').textContent = suppliers.length;
+
+                if (suppliers.length === 0) {
+                    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">No suppliers yet. ${canEdit ? 'Click + Add Supplier to create one.' : ''}</td></tr>`;
+                    return;
+                }
+
+                tbody.innerHTML = suppliers.map(s => {
+                    const id = s._id || s.id;
+                    const productCount = s.productCount !== undefined ? s.productCount : '-';
+                    const bidBadge = s.bidEligible
+                        ? `<span class="status-badge status-active">YES</span>`
+                        : `<span class="status-badge" style="background:#e2e3e5; color:#6c757d;">NO (direct only)</span>`;
+                    const toggleBtn = canEdit
+                        ? `<button class="btn btn-sm btn-outline" onclick="toggleSupplierBidEligible('${id}', ${s.bidEligible ? 'false' : 'true'})" title="Toggle bid eligibility">${s.bidEligible ? 'Disable' : 'Enable'}</button>`
+                        : '';
+                    const editBtn = canEdit
+                        ? `<button class="btn btn-sm btn-outline" onclick="editSupplier('${id}')">Edit</button>`
+                        : '';
+                    return `
+                        <tr>
+                            <td><strong>${s.supplierCode || '-'}</strong></td>
+                            <td>${s.companyName || '-'}</td>
+                            <td>${s.name || '-'}</td>
+                            <td>${s.phone || '-'}</td>
+                            <td>${s.email || '-'}</td>
+                            <td>${productCount}</td>
+                            <td>${bidBadge} ${toggleBtn}</td>
+                            <td>
+                                ${editBtn}
+                                <button class="btn btn-sm btn-outline" onclick="viewSupplierOrders('${id}', '${s.supplierCode || ''}')">View POs</button>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:#dc3545;">Error loading suppliers: ${err.message}</td></tr>`;
+            }
+        }
+
+        function openAddSupplierModal() {
+            document.getElementById('supplierModalTitle').textContent = 'Add Supplier';
+            document.getElementById('supplierEditId').value = '';
+            document.getElementById('supplierCodeInput').value = '';
+            document.getElementById('supplierCodeInput').disabled = false;
+            document.getElementById('supplierCompanyInput').value = '';
+            document.getElementById('supplierNameInput').value = '';
+            document.getElementById('supplierPhoneInput').value = '';
+            document.getElementById('supplierEmailInput').value = '';
+            document.getElementById('supplierPasswordInput').value = '';
+            document.getElementById('supplierNotesInput').value = '';
+            document.getElementById('supplierBidEligibleInput').checked = true;
+            document.getElementById('supplierPasswordRow').style.display = 'block';
+            document.getElementById('supplierDeleteBtn').style.display = 'none';
+            document.getElementById('supplierEditModal').style.display = 'flex';
+        }
+
+        function editSupplier(supplierId) {
+            const s = loadedSuppliers.find(x => (x._id || x.id) === supplierId);
+            if (!s) {
+                alert('Supplier not found in loaded list. Refresh and try again.');
+                return;
+            }
+            document.getElementById('supplierModalTitle').textContent = `Edit Supplier: ${s.supplierCode || s.companyName}`;
+            document.getElementById('supplierEditId').value = supplierId;
+            document.getElementById('supplierCodeInput').value = s.supplierCode || '';
+            // supplierCode is immutable post-creation (chemicals link to it)
+            document.getElementById('supplierCodeInput').disabled = true;
+            document.getElementById('supplierCompanyInput').value = s.companyName || '';
+            document.getElementById('supplierNameInput').value = s.name || '';
+            document.getElementById('supplierPhoneInput').value = s.phone || '';
+            document.getElementById('supplierEmailInput').value = s.email || '';
+            document.getElementById('supplierNotesInput').value = s.notes || '';
+            document.getElementById('supplierBidEligibleInput').checked = s.bidEligible !== false;
+            // Password field hidden in edit mode - use the force-password-change endpoint for that
+            document.getElementById('supplierPasswordRow').style.display = 'none';
+            // Delete only visible to superadmin on existing suppliers
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            document.getElementById('supplierDeleteBtn').style.display = currentUser.role === 'superadmin' ? 'inline-block' : 'none';
+            document.getElementById('supplierEditModal').style.display = 'flex';
+        }
+
+        function closeSupplierModal() {
+            document.getElementById('supplierEditModal').style.display = 'none';
+        }
+
+        async function saveSupplierFromModal() {
+            const editId = document.getElementById('supplierEditId').value;
+            const isEdit = !!editId;
+
+            const payload = {
+                name: document.getElementById('supplierNameInput').value.trim(),
+                companyName: document.getElementById('supplierCompanyInput').value.trim(),
+                email: document.getElementById('supplierEmailInput').value.trim().toLowerCase(),
+                phone: document.getElementById('supplierPhoneInput').value.trim(),
+                notes: document.getElementById('supplierNotesInput').value.trim(),
+                bidEligible: document.getElementById('supplierBidEligibleInput').checked
+            };
+
+            if (!payload.name || !payload.companyName || !payload.email) {
+                alert('Name, company, and email are required.');
+                return;
+            }
+
+            if (!isEdit) {
+                payload.supplierCode = document.getElementById('supplierCodeInput').value.trim().toUpperCase();
+                if (!payload.supplierCode) {
+                    alert('Supplier code is required (e.g. JABCO, SIMS).');
+                    return;
+                }
+                // Password - use provided or auto-generate
+                let password = document.getElementById('supplierPasswordInput').value.trim();
+                if (!password) {
+                    password = Array.from(crypto.getRandomValues(new Uint8Array(9)))
+                        .map(b => b.toString(36).padStart(2, '0'))
+                        .join('')
+                        .replace(/[^a-z0-9]/g, '')
+                        .slice(0, 12);
+                    alert(`Auto-generated initial password:\n\n${password}\n\nCopy this now — it will not be shown again.`);
+                }
+                payload.password = password;
+            }
+
+            const btn = document.getElementById('supplierSaveBtn');
+            btn.disabled = true;
+            btn.textContent = 'Saving...';
+
+            try {
+                const url = isEdit
+                    ? `${API_URL}/api/admin/suppliers/${editId}`
+                    : `${API_URL}/api/admin/suppliers`;
+                const method = isEdit ? 'PUT' : 'POST';
+                const res = await fetch(url, {
+                    method,
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Save failed');
+
+                closeSupplierModal();
+                loadSuppliers();
+            } catch (err) {
+                alert('Save failed: ' + err.message);
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Save';
+            }
+        }
+
+        async function deleteSupplierFromModal() {
+            const editId = document.getElementById('supplierEditId').value;
+            const supplierCode = document.getElementById('supplierCodeInput').value;
+            if (!editId) return;
+            if (!confirm(`Delete supplier "${supplierCode}" FOREVER?\n\nAll chemicals currently linked to this supplier will have their supplierId cleared. This cannot be undone.`)) return;
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/suppliers/${editId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Delete failed');
+                alert(`${result.message}\n\nChemicals unlinked: ${result.chemicalsUnlinked || 0}`);
+                closeSupplierModal();
+                loadSuppliers();
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        async function toggleSupplierBidEligible(supplierId, newValue) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/suppliers/${supplierId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ bidEligible: newValue === true || newValue === 'true' })
+                });
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Toggle failed');
+                }
+                loadSuppliers();
+            } catch (err) {
+                alert('Toggle failed: ' + err.message);
+            }
+        }
+
+        async function viewSupplierOrders(supplierId, supplierCode) {
+            if (!supplierCode) {
+                const s = loadedSuppliers.find(x => (x._id || x.id) === supplierId);
+                supplierCode = s?.supplierCode || '';
+            }
+            if (!supplierCode) {
+                alert('Missing supplier code - cannot filter purchase orders.');
+                return;
+            }
+            // Jump to Purchase Orders tab with supplier filter pre-applied
+            navigateToTab('purchase-orders');
+            // Best-effort: try to pre-populate the supplier filter on the PO page
+            setTimeout(() => {
+                const supplierFilter = document.getElementById('poSupplierFilter') || document.getElementById('purchaseOrderSupplierFilter');
+                if (supplierFilter) {
+                    supplierFilter.value = supplierCode;
+                    supplierFilter.dispatchEvent(new Event('change'));
+                }
+            }, 300);
         }
 
         function viewDistributorInventory(distributorId) {

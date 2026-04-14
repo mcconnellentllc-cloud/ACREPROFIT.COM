@@ -162,6 +162,7 @@ const userSchema = new mongoose.Schema({
     // Supplier-specific fields
     companyName: String, // For suppliers - company/business name
     bidEligible: { type: Boolean, default: true }, // Include in Price Mining bid sheets. false = direct-purchase only (e.g. Corbet/Hydrovant)
+    notes: String, // Internal notes about this user (operational hints, preferences, etc.)
     supplierCode: String, // Unique code for supplier (e.g., "CPD", "AGRISTAR")
     representative: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // For customers - their rep
     representativeId: String, // kyle, ty, or chad - for quick lookup
@@ -897,7 +898,7 @@ const chemicalQuoteSchema = new mongoose.Schema({
 
     // Supplier info
     supplier: { type: String, required: true }, // "Sims", "CPD", "Agri-Star", etc.
-    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     // Packaging
     packSize: { type: String, required: true }, // "265 gal", "2.5 gal", "16 oz"
@@ -1677,26 +1678,9 @@ purchaseOrderSchema.index({ orderDate: -1 });
 const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
 
 // Supplier Model - Save supplier information for reuse
-const supplierSchema = new mongoose.Schema({
-    name: { type: String, required: true },
-    contact: String,
-    phone: String,
-    email: String,
-    address: {
-        street: String,
-        city: String,
-        state: String,
-        zip: String
-    },
-    notes: String,
-    isActive: { type: Boolean, default: true },
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-supplierSchema.index({ name: 1 });
-const Supplier = mongoose.model('Supplier', supplierSchema);
+// Suppliers live in the User collection with role:'supplier'. The legacy
+// Supplier/supplierSchema model (previously defined here) was removed along
+// with Block B's dead routes. See the seeder at server/seedSuppliers.js.
 
 // Quote Request Model - Customers submit quantity needed, admin provides pricing
 const quoteRequestSchema = new mongoose.Schema({
@@ -1811,7 +1795,7 @@ const supplierBidSheetSchema = new mongoose.Schema({
 
     // Suppliers invited to bid
     invitedSuppliers: [{
-        supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+        supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         supplierName: String,
         contactEmail: String,
         contactPhone: String,
@@ -1825,7 +1809,7 @@ const supplierBidSheetSchema = new mongoose.Schema({
 
     // Supplier responses/bids
     supplierBids: [{
-        supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+        supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
         supplierName: String,
         receivedAt: { type: Date, default: Date.now },
 
@@ -1871,7 +1855,7 @@ const supplierBidSheetSchema = new mongoose.Schema({
     expiresAt: Date,
 
     // If converted to PO
-    awardedSupplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+    awardedSupplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     awardedSupplierName: String,
     purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' },
 
@@ -2087,7 +2071,7 @@ const inventoryBatchSchema = new mongoose.Schema({
     expirationDate: Date,
 
     // Supplier info
-    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'Supplier' },
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     supplierName: String,
 
     createdAt: { type: Date, default: Date.now },
@@ -8956,17 +8940,23 @@ app.get('/api/admin/suppliers', authMiddleware, adminMiddleware, async (req, res
 // Admin: Update supplier
 app.put('/api/admin/suppliers/:id', authMiddleware, superAdminMiddleware, async (req, res) => {
     try {
-        const { name, companyName, phone, email } = req.body;
+        const { name, companyName, phone, email, address, notes, bidEligible } = req.body;
 
         const supplier = await User.findOne({ _id: req.params.id, role: 'supplier' });
         if (!supplier) {
             return res.status(404).json({ error: 'Supplier not found' });
         }
 
-        if (name) supplier.name = name;
-        if (companyName) supplier.companyName = companyName;
-        if (phone) supplier.phone = phone;
-        if (email) supplier.email = email.toLowerCase();
+        if (name !== undefined) supplier.name = name;
+        if (companyName !== undefined) supplier.companyName = companyName;
+        if (phone !== undefined) supplier.phone = phone;
+        if (email !== undefined) supplier.email = email.toLowerCase();
+        if (address !== undefined) supplier.address = address;
+        if (notes !== undefined) supplier.notes = notes;
+        if (bidEligible !== undefined) {
+            supplier.bidEligible = bidEligible;
+            supplier.markModified('bidEligible');
+        }
 
         await supplier.save();
 
@@ -8977,8 +8967,55 @@ app.put('/api/admin/suppliers/:id', authMiddleware, superAdminMiddleware, async 
                 name: supplier.name,
                 email: supplier.email,
                 companyName: supplier.companyName,
-                supplierCode: supplier.supplierCode
+                supplierCode: supplier.supplierCode,
+                phone: supplier.phone,
+                address: supplier.address,
+                notes: supplier.notes,
+                bidEligible: supplier.bidEligible
             }
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Admin: Delete a supplier (superadmin only, scorched-earth - unlinks chemicals)
+app.delete('/api/admin/suppliers/:id', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const supplier = await User.findOne({ _id: req.params.id, role: 'supplier' });
+        if (!supplier) {
+            return res.status(404).json({ error: 'Supplier not found' });
+        }
+
+        // Unlink any Chemical docs pointing at this supplier - don't orphan
+        // the reference, just clear it. sourceSupplier string stays for history.
+        const unlinkResult = await Chemical.updateMany(
+            { supplierId: supplier._id },
+            { $unset: { supplierId: '' } }
+        );
+
+        const snapshot = {
+            id: supplier._id,
+            email: supplier.email,
+            supplierCode: supplier.supplierCode,
+            companyName: supplier.companyName
+        };
+
+        await User.deleteOne({ _id: supplier._id });
+
+        await logAudit({
+            action: 'supplier_delete',
+            req,
+            entityType: 'User',
+            entityId: snapshot.id,
+            entityRef: snapshot.supplierCode || snapshot.email,
+            before: snapshot,
+            reason: req.body?.reason || `Supplier deleted by ${req.user.name}; ${unlinkResult.modifiedCount} chemicals unlinked`
+        });
+
+        res.json({
+            message: `Supplier ${snapshot.supplierCode || snapshot.email} deleted`,
+            chemicalsUnlinked: unlinkResult.modifiedCount
         });
     } catch (error) {
         res.status(500).json({ error: error.message });
@@ -10415,84 +10452,6 @@ app.put('/api/admin/ledger/:id', authMiddleware, adminMiddleware, async (req, re
             .populate('createdBy', 'name');
 
         res.json(populated);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// ============ SUPPLIER ENDPOINTS ============
-
-// Get all suppliers
-app.get('/api/admin/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const suppliers = await Supplier.find({ isActive: true }).sort({ name: 1 });
-        res.json(suppliers);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Create a new supplier
-app.post('/api/admin/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const { name, contact, phone, email, address, notes } = req.body;
-
-        if (!name) {
-            return res.status(400).json({ error: 'Supplier name is required' });
-        }
-
-        const supplier = new Supplier({
-            name,
-            contact,
-            phone,
-            email,
-            address,
-            notes,
-            createdBy: req.user._id
-        });
-
-        await supplier.save();
-        res.status(201).json(supplier);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Update a supplier
-app.put('/api/admin/suppliers/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const { name, contact, phone, email, address, notes } = req.body;
-
-        const supplier = await Supplier.findByIdAndUpdate(
-            req.params.id,
-            { name, contact, phone, email, address, notes, updatedAt: new Date() },
-            { new: true }
-        );
-
-        if (!supplier) {
-            return res.status(404).json({ error: 'Supplier not found' });
-        }
-
-        res.json(supplier);
-    } catch (error) {
-        res.status(400).json({ error: error.message });
-    }
-});
-
-// Delete (deactivate) a supplier
-app.delete('/api/admin/suppliers/:id', authMiddleware, adminMiddleware, async (req, res) => {
-    try {
-        const supplier = await Supplier.findByIdAndUpdate(
-            req.params.id,
-            { isActive: false, updatedAt: new Date() },
-            { new: true }
-        );
-
-        if (!supplier) {
-            return res.status(404).json({ error: 'Supplier not found' });
-        }
-
-        res.json({ message: 'Supplier deleted' });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
