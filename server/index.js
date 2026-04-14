@@ -12346,15 +12346,15 @@ app.post('/api/admin/seed-milo-program', authMiddleware, superAdminMiddleware, a
                 },
                 {
                     name: 'Pass 2 — At-Planting / Pre-Emerge',
-                    timing: 'At planting (Mid May)',
+                    timing: 'Mid May. Apply after seed germination but before crop emergence. Dicamba must be applied in this window — after germination, before emergence — to avoid crop injury.',
                     deliveryWindow: 'Early May',
                     chemicals: [
-                        { productName: 'XSATE Glyphosate 53.8%', suggestedRate: 22, rateUnit: 'oz/acre', notes: 'Kills weeds emerged since Pass 1' },
-                        { productName: 'Atrazine 4L', suggestedRate: 1, rateUnit: 'qt/acre', notes: 'Pre-emerge residual. Safe at-planting with Concep-safened seed.' },
-                        { productName: 'S-Metolachlor (Dual II Magnum)', suggestedRate: 1.33, rateUnit: 'pt/acre', notes: 'Grass + small broadleaf residual. REQUIRES Concep-safened seed.' },
-                        { productName: 'Meso 4SC', suggestedRate: 6, rateUnit: 'fl oz/acre', notes: 'Kochia, pigweed, velvetleaf control' },
-                        { productName: 'Dicamba 49.8% SL', suggestedRate: 4, rateUnit: 'fl oz/acre', notes: 'Broadleaf escape control. 4 oz rate = 7-day wait before planting.' },
-                        { productName: 'Hydrovant fA', suggestedRate: 1.28, rateUnit: 'fl oz/acre', isAdjuvant: true, notes: 'Drift reduction adjuvant' }
+                        { productName: 'S-Metolachlor (Dual II Magnum)', suggestedRate: 1.33, rateUnit: 'pt/acre' },
+                        { productName: 'Meso 4SC', suggestedRate: 6, rateUnit: 'fl oz/acre' },
+                        { productName: 'Atrazine 4L', suggestedRate: 1, rateUnit: 'qt/acre' },
+                        { productName: 'XSATE Glyphosate 53.8%', suggestedRate: 28, rateUnit: 'fl oz/acre' },
+                        { productName: 'Dicamba 49.8% SL', suggestedRate: 6, rateUnit: 'fl oz/acre' },
+                        { productName: 'Hydrovant fA', suggestedRate: 1.28, rateUnit: 'fl oz/acre', isAdjuvant: true }
                     ]
                 }
             ],
@@ -12397,6 +12397,69 @@ app.post('/api/admin/seed-milo-program', authMiddleware, superAdminMiddleware, a
         res.json({ message: 'Milo program created', id: program._id, program });
     } catch (error) {
         console.error('seed-milo-program error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Seed Field Pea Pre-Emerge program. Single-pass pre-emerge weed control for
+// field peas. Applied at planting before pea emergence. Idempotent: returns the
+// existing doc if the program is already seeded.
+app.post('/api/admin/seed-field-pea-program', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const existing = await SprayProgram.findOne({ name: 'Field Pea Pre-Emerge Program' });
+        if (existing) {
+            return res.json({ message: 'Field Pea program already exists', program: existing });
+        }
+
+        const program = new SprayProgram({
+            name: 'Field Pea Pre-Emerge Program',
+            crop: 'fieldpeas',
+            description: 'Pre-emerge weed control for field peas. Apply at planting before pea emergence. Proven on this crop in NE Colorado.',
+            type: 'template',
+            isPublic: true,
+            isActive: true,
+            applications: [
+                {
+                    name: 'Pass 1: Pre-Emerge',
+                    timing: 'At planting — apply before pea emergence. Works in the soil ahead of germinating weeds.',
+                    deliveryWindow: 'Early May',
+                    chemicals: [
+                        { productName: 'Sulfentrazone 39.6% SC', suggestedRate: 6, rateUnit: 'fl oz/acre' },
+                        { productName: 'S-Metolachlor (Dual II Magnum)', suggestedRate: 21, rateUnit: 'fl oz/acre' },
+                        { productName: 'XSATE Glyphosate 53.8%', suggestedRate: 21, rateUnit: 'fl oz/acre' },
+                        { productName: 'Hydrovant fA', suggestedRate: 1.28, rateUnit: 'fl oz/acre', isAdjuvant: true }
+                    ]
+                }
+            ],
+            precautions: [
+                'SULFENTRAZONE — 18-month rotation restriction to corn and sorghum. Safe to wheat the following fall at labeled rates.',
+                'S-METOLACHLOR (Dual II Magnum) — labeled for field peas. No seed safener required for peas (safener required for sorghum only).',
+                'Confirm your field pea variety tolerance with your seed rep before application.',
+                'Activation requires rainfall or irrigation within 7 days of application for best residual control.',
+                'Avoid sandy soils or soils with pH above 7.5 for sulfentrazone — binding is reduced and crop injury risk increases.'
+            ],
+            rotationRestrictions: 'Corn/Sorghum: 18 months after sulfentrazone. Wheat: 4 months. Soybeans: 12 months. Always check the full sulfentrazone label for your planned rotation.',
+            grazingRestrictions: 'Do not graze treated areas or cut for hay for 28 days after sulfentrazone application.',
+            groundType: 'Field pea ground with annual grass and broadleaf pressure. Medium to heavy textured soils preferred for sulfentrazone. Avoid coarse sands or high-pH soils.',
+            createdBy: req.user._id
+        });
+
+        // Link chemicals to catalog (same pattern as seed-milo-program).
+        for (const app of program.applications) {
+            for (const chem of app.chemicals) {
+                const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit').lean();
+                if (catalogMatch) {
+                    chem.chemicalId = catalogMatch._id;
+                    chem.packSize = catalogMatch.packSize;
+                    chem.unit = catalogMatch.unit;
+                }
+            }
+        }
+
+        await program.save();
+        res.json({ message: 'Field Pea Pre-Emerge Program seeded successfully', program });
+    } catch (error) {
+        console.error('seed-field-pea-program error:', error);
         res.status(500).json({ error: error.message });
     }
 });

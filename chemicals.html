@@ -149,6 +149,7 @@
                         <button class="crop-btn" data-crop="milo">Milo/Sorghum</button>
                         <button class="crop-btn" data-crop="millet">Millet</button>
                         <button class="crop-btn" data-crop="fallow">Summer Fallow</button>
+                        <button class="crop-btn" data-crop="fieldpeas">Field Peas</button>
                     </div>
                 </div>
 
@@ -237,6 +238,10 @@
                         <div class="crop-book-card" onclick="showRecipesForCrop('fallow')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
                             <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Summer Fallow</div>
                             <div style="color:#666; font-size:0.9rem;" id="fallowProgramCount">View programs</div>
+                        </div>
+                        <div class="crop-book-card" onclick="showRecipesForCrop('fieldpeas')" style="cursor:pointer; background:white; border:2px solid #e5e7eb; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
+                            <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">Field Peas</div>
+                            <div style="color:#666; font-size:0.9rem;" id="fieldpeasProgramCount">View programs</div>
                         </div>
                         <div class="crop-book-card" onclick="document.querySelector('.option-tab[data-option=buildrecipe]').click()" style="cursor:pointer; background:#f0f7ef; border:2px dashed #2d5a27; border-radius:12px; padding:24px; text-align:center; transition:all .2s;">
                             <div style="font-size:1.4rem; font-weight:700; color:#2d5a27; margin-bottom:8px;">+ Build Your Own</div>
@@ -1037,12 +1042,15 @@
                         },
                         {
                             name: 'Pass 2: At-Planting / Pre-Emerge',
-                            timing: 'Mid May (at planting). Requires 1.5" rain or 15 days before milo emergence for dicamba.',
+                            timing: 'Mid May. Apply after seed germination but before crop emergence. Dicamba must be applied in this window — after germination, before emergence — to avoid crop injury.',
                             truckRouteDate: 'Early May',
                             chemicals: [
-                                { productName: 'S-Metolachlor (Dual II Magnum)', rate: 1.33, rateUnit: 'pt/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 38.00 },
-                                { productName: 'Meso 4SC', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 48.25 },
-                                { productName: 'Dicamba 49.8% SL', rate: 4, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 28.25 }
+                                { productName: 'S-Metolachlor (Dual II Magnum)', rate: 1.33, rateUnit: 'pt/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Meso 4SC', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Atrazine 4L', rate: 1, rateUnit: 'qt/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Dicamba 49.8% SL', rate: 6, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
                     ]
@@ -1217,6 +1225,38 @@
                                 { productName: 'XSATE Glyphosate 53.8%', rate: 28, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
                                 { productName: 'Sulfentrazone 39.6% SC', rate: 8, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
                                 { productName: 'Rancor 4F', rate: 10, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
+                            ]
+                        }
+                    ]
+                },
+                // FIELD PEA PROGRAMS
+                {
+                    _id: 'fieldpeas-1',
+                    name: 'Field Pea Pre-Emerge Program',
+                    description: 'Pre-emerge weed control for field peas. Apply at planting before pea emergence. Proven on this crop in NE Colorado.',
+                    crop: 'fieldpeas',
+                    type: 'recommended',
+                    badge: 'Proven program',
+                    groundType: 'Field pea ground with annual grass and broadleaf pressure. Medium to heavy textured soils preferred for sulfentrazone. Avoid coarse sands or soils with pH above 7.5.',
+                    rotationRestrictions: 'Sulfentrazone: 18 months to corn/sorghum. Wheat: 4 months. Soybeans: 12 months. Check full label for your planned rotation.',
+                    grazingRestrictions: 'Do not graze treated areas or cut for hay for 28 days after application.',
+                    precautions: [
+                        'SULFENTRAZONE — 18-month rotation restriction to corn and sorghum. Safe to wheat the following fall at labeled rates.',
+                        'S-METOLACHLOR (Dual II Magnum) — labeled for field peas. No seed safener required for peas.',
+                        'Confirm your field pea variety tolerance with your seed rep before application.',
+                        'Activation requires rainfall or irrigation within 7 days for best residual control.',
+                        'Avoid sandy soils or pH above 7.5 — sulfentrazone binding is reduced and crop injury risk increases.'
+                    ],
+                    applications: [
+                        {
+                            name: 'Pass 1: Pre-Emerge',
+                            timing: 'At planting — apply before pea emergence. Works in the soil ahead of germinating weeds.',
+                            truckRouteDate: 'Early May',
+                            chemicals: [
+                                { productName: 'Sulfentrazone 39.6% SC', rate: 6, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'S-Metolachlor (Dual II Magnum)', rate: 21, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 },
+                                { productName: 'XSATE Glyphosate 53.8%', rate: 21, rateUnit: 'fl oz/acre', packSize: 'Shuttle (265 gal)', unit: 'gal', unitsPerPack: 265, price: 0 },
                                 { productName: 'Hydrovant fA', rate: 1.28, rateUnit: 'fl oz/acre', packSize: '2x2.5 gal', unit: 'gal', unitsPerPack: 5, price: 0 }
                             ]
                         }
@@ -1551,7 +1591,7 @@
         function showRecipesForCrop(crop) {
             document.getElementById('recipeBookCropCards').style.display = 'none';
             document.getElementById('recipeBookProgramList').style.display = 'block';
-            const cropNames = { corn: 'Corn', milo: 'Sorghum / Milo', wheat: 'Wheat', millet: 'Millet', fallow: 'Summer Fallow' };
+            const cropNames = { corn: 'Corn', milo: 'Sorghum / Milo', wheat: 'Wheat', millet: 'Millet', fallow: 'Summer Fallow', fieldpeas: 'Field Peas' };
             document.getElementById('selectedCropTitle').textContent = (cropNames[crop] || crop) + ' Programs';
             renderPrograms(crop);
         }
@@ -1564,7 +1604,7 @@
         }
 
         function updateCropProgramCounts() {
-            const crops = ['corn', 'milo', 'wheat', 'millet', 'fallow'];
+            const crops = ['corn', 'milo', 'wheat', 'millet', 'fallow', 'fieldpeas'];
             crops.forEach(crop => {
                 const count = (programs || []).filter(p => p.crop === crop).length;
                 const el = document.getElementById(crop + 'ProgramCount');
@@ -1620,7 +1660,11 @@
                     <p class="program-desc">${prog.description}</p>
                     ${costPerAcreHTML}
                     ${prog.groundType ? `<div style="background:#f0f7ef; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.88rem; color:#2d5a27; border-left:3px solid #2d5a27;"><strong>Best For:</strong> ${prog.groundType}</div>` : ''}
-                    <div style="background:#fffbeb; padding:8px 12px; border-radius:6px; margin-bottom:12px; font-size:0.8rem; color:#92400e; border-left:3px solid #f59e0b;"><strong>Scout 14-21 days after application.</strong> Adjust rates based on soil type, organic matter, and actual weed pressure. Label is the law.</div>
+                    <div style="background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:12px 16px; margin-bottom:12px; font-size:0.82rem; color:#92400e;">
+                        <div style="font-weight:700; margin-bottom:4px;">&#9888; Important Notice</div>
+                        <div>These spray programs are based on proven practices for this crop and region. Always consult a Certified Crop Adviser (CCA) before application. AcreProfit LLC makes no warranty of fitness for a particular purpose. All applications are at the sole risk of the applicator. Read and follow all label directions. Label is the law.</div>
+                        <div style="margin-top:6px; font-weight:600;">Scout 14-21 days after application. Adjust rates based on soil type, organic matter, and actual weed pressure.</div>
+                    </div>
                     ${Array.isArray(prog.precautions) && prog.precautions.length > 0 ? `
                     <div style="background:#fff3cd; border:1px solid #ffc107; border-radius:8px; padding:12px 16px; margin-bottom:12px; color:#856404;">
                         <div style="font-weight:700; margin-bottom:8px; color:#dc3545;">Program Precautions</div>
