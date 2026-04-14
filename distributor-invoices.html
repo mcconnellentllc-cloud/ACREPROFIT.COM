@@ -263,9 +263,8 @@
         document.addEventListener('DOMContentLoaded', async () => {
             document.getElementById('userName').textContent = user.name;
 
-            // Set default due date (30 days from now)
+            // Set default due date (due upon receipt = today)
             const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 30);
             document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
             updatePreviewDueDate();
 
@@ -697,7 +696,6 @@
             document.getElementById('invoiceNotes').value = '';
 
             const dueDate = new Date();
-            dueDate.setDate(dueDate.getDate() + 30);
             document.getElementById('dueDate').value = dueDate.toISOString().split('T')[0];
 
             document.getElementById('customerInfo').style.display = 'none';
