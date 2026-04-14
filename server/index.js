@@ -2430,6 +2430,168 @@ async function autoGenerateInvoiceForPaidOrder(order) {
     }
 }
 
+// ============ RUP SALE RECORD AUTO-CREATION (I5) ============
+// Colorado + FIFRA require a record of every Restricted Use Pesticide sale to a
+// licensed applicator, maintained for at least 2 years. Lifecycle:
+//   order placed with RUP item -> RupSaleRecord(status='pending_verification')
+//   payment clears            -> status='completed', saleDate = payment date
+//   order cancelled/archived  -> status='cancelled' (never deleted - audit trail)
+// Detection is always via the Chemical.isRestrictedUse schema field.
+
+// Helper: return [{item, chemical}] pairs for every RUP item on an order
+async function getRupItemsForOrder(order) {
+    if (!order?.items?.length) return [];
+    const chemicalIds = order.items.map(i => i.chemicalId).filter(Boolean);
+    if (chemicalIds.length === 0) return [];
+    const rupChems = await Chemical.find({
+        _id: { $in: chemicalIds },
+        isRestrictedUse: true
+    }).lean();
+    if (rupChems.length === 0) return [];
+    const rupChemMap = {};
+    rupChems.forEach(c => { rupChemMap[c._id.toString()] = c; });
+    return order.items
+        .filter(i => i.chemicalId && rupChemMap[i.chemicalId.toString()])
+        .map(i => ({ item: i, chemical: rupChemMap[i.chemicalId.toString()] }));
+}
+
+// Auto-create RupSaleRecord(s) for every RUP item on an order.
+// Idempotent - skips any (orderId, chemicalId) pair that already has a non-cancelled record.
+// Never throws - logs and returns on failure.
+async function autoCreateRupRecordsForOrder(order, opts = {}) {
+    try {
+        if (!order) return [];
+        const status = opts.status || 'pending_verification';
+        const rupPairs = await getRupItemsForOrder(order);
+        if (rupPairs.length === 0) return [];
+
+        const customer = await User.findById(order.userId).lean();
+        if (!customer) {
+            console.error(`autoCreateRupRecords: customer not found for order ${order._id}`);
+            return [];
+        }
+
+        const created = [];
+        for (const { item, chemical } of rupPairs) {
+            // Idempotency - one active record per (orderId, chemicalId)
+            const existing = await RupSaleRecord.findOne({
+                orderId: order._id,
+                chemicalId: chemical._id,
+                status: { $ne: 'cancelled' }
+            });
+            if (existing) continue;
+
+            // Pick whichever license the customer has verified (private or commercial)
+            const hasPrivate = customer.privateApplicatorLicense?.hasLicense;
+            const license = hasPrivate
+                ? customer.privateApplicatorLicense
+                : customer.commercialApplicatorLicense;
+            const licenseType = hasPrivate ? 'private' : 'commercial';
+
+            if (!license?.licenseNumber || !license?.state) {
+                // Should not happen - validateRupCompliance blocks orders without a valid license.
+                // If we're here, something upstream is broken - log and skip this item.
+                console.warn(`autoCreateRupRecords: customer ${customer._id} missing license data - skipping ${chemical.productName}`);
+                continue;
+            }
+
+            const totalUnits = (item.quantity || 0) * (chemical.unitsPerPack || 1);
+            const unitPrice = item.unitPrice || chemical.sellPrice || 0;
+            const totalAmount = Math.round(totalUnits * unitPrice * 100) / 100;
+            const requiredCerts = chemical.requiredCertifications || [];
+
+            const record = new RupSaleRecord({
+                saleDate: new Date(),
+                orderNumber: order.orderNumber,
+                orderId: order._id,
+                sellerId: order.representativeId || order.createdBy,
+                sellerName: order.representativeName || '',
+                purchaserId: customer._id,
+                purchaserName: customer.name,
+                purchaserAddress: customer.address || {},
+                purchaserPhone: customer.phone,
+                purchaserEmail: customer.email,
+                applicatorLicenseType: licenseType,
+                applicatorLicenseNumber: license.licenseNumber,
+                applicatorLicenseState: license.state,
+                applicatorLicenseExpiration: license.expirationDate,
+                applicatorCertificationCategories: license.certificationCategories || [],
+                licenseVerificationMethod: 'document_on_file',
+                licenseVerifiedBy: license.verifiedBy,
+                licenseVerifiedAt: license.verifiedAt,
+                licenseDocumentUrl: license.licenseDocumentUrl,
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                epaRegistrationNumber: chemical.epaRegistrationNumber || 'UNKNOWN',
+                activeIngredient: Array.isArray(chemical.activeIngredients) ? chemical.activeIngredients[0] : '',
+                signalWord: chemical.signalWord,
+                quantity: totalUnits,
+                unit: chemical.unit,
+                packSize: chemical.packSize,
+                totalAmount,
+                paraquatCertRequired: requiredCerts.includes('paraquat_training'),
+                paraquatCertVerified: customer.paraquatCertification?.completed === true,
+                paraquatCertNumber: customer.paraquatCertification?.certificateNumber,
+                paraquatCertDate: customer.paraquatCertification?.completionDate,
+                dicambaCertRequired: requiredCerts.includes('dicamba_training'),
+                dicambaCertVerified: customer.dicambaCertification?.completed === true,
+                dicambaCertYear: customer.dicambaCertification?.trainingYear,
+                status,
+                createdBy: order.createdBy || order.representativeId || null
+            });
+
+            await record.save();
+            created.push(record);
+            console.log(`RupSaleRecord created (${status}) for order ${order._id} product ${chemical.productName}`);
+        }
+        return created;
+    } catch (err) {
+        console.error(`autoCreateRupRecords error for order ${order?._id}:`, err.message);
+        return [];
+    }
+}
+
+// Promote pending_verification records to completed once payment clears.
+// If no pending records exist but the order has RUP items (e.g., record creation
+// previously failed), create them directly as 'completed' so we never ship RUP
+// product without a record.
+async function promoteRupRecordsToCompleted(order) {
+    try {
+        if (!order?._id) return;
+        const result = await RupSaleRecord.updateMany(
+            { orderId: order._id, status: 'pending_verification' },
+            { $set: { status: 'completed', saleDate: order.paidAt || new Date(), updatedAt: new Date() } }
+        );
+        if (result.modifiedCount > 0) {
+            console.log(`RupSaleRecords promoted to completed for order ${order._id}: ${result.modifiedCount}`);
+            return;
+        }
+        // No pending records - fallback: create as completed if RUP items exist on this order
+        const rupPairs = await getRupItemsForOrder(order);
+        if (rupPairs.length > 0) {
+            await autoCreateRupRecordsForOrder(order, { status: 'completed' });
+        }
+    } catch (err) {
+        console.error(`promoteRupRecords error for order ${order?._id}:`, err.message);
+    }
+}
+
+// Cancel any non-cancelled records tied to this order. Never delete - audit trail.
+async function cancelRupRecordsForOrder(order) {
+    try {
+        if (!order?._id) return;
+        const result = await RupSaleRecord.updateMany(
+            { orderId: order._id, status: { $ne: 'cancelled' } },
+            { $set: { status: 'cancelled', updatedAt: new Date() } }
+        );
+        if (result.modifiedCount > 0) {
+            console.log(`RupSaleRecords cancelled for order ${order._id}: ${result.modifiedCount}`);
+        }
+    } catch (err) {
+        console.error(`cancelRupRecords error for order ${order?._id}:`, err.message);
+    }
+}
+
 // Helper: Update inventory when receiving a PO
 async function receiveInventory({ chemicalId, productName, packSize, unit, quantity, unitCost, location, purchaseOrderId, poNumber, lotNumber, supplierName, userId, session }) {
     const invQuery = Inventory.findOne({ chemicalId, location: location || 'main' });
@@ -6160,6 +6322,7 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
 
         // Auto-generate invoice now that payment has cleared (idempotent)
         await autoGenerateInvoiceForPaidOrder(order);
+        await promoteRupRecordsToCompleted(order);
 
         res.json({ message: 'Payment recorded', order });
     } catch (error) {
@@ -6228,8 +6391,9 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 await order.save();
                 console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
 
-                // Auto-generate invoice now that payment has cleared (idempotent)
+                // Auto-generate invoice + promote pending RUP records (both idempotent)
                 await autoGenerateInvoiceForPaidOrder(order);
+                await promoteRupRecordsToCompleted(order);
 
                 // Send payment confirmation email to customer
                 try {
@@ -6297,8 +6461,10 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 await order.save();
                 console.log(`ACH charge confirmed for order ${orderId}`);
 
-                // Auto-generate invoice now that payment has cleared (idempotent - payment_intent.succeeded usually fires first)
+                // Auto-generate invoice + promote pending RUP records (both idempotent -
+                // payment_intent.succeeded usually fires first)
                 await autoGenerateInvoiceForPaidOrder(order);
+                await promoteRupRecordsToCompleted(order);
             }
         }
     }
@@ -6381,7 +6547,7 @@ app.post('/api/chemicals/seed', authMiddleware, adminMiddleware, async (req, res
 
             // CPD-only products
             { productName: 'Glufosinate', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 16.00, sellPrice: 0, category: 'herbicide' },
-            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 15.25, sellPrice: 0, category: 'herbicide', isRUP: true, notes: 'Restricted Use Pesticide - requires certification' },
+            { productName: 'Paraquat', packSize: 'Shuttle', unit: 'gal', unitsPerPack: 265, costPrice: 15.25, sellPrice: 0, category: 'herbicide', isRestrictedUse: true, requiredCertifications: ['private_applicator', 'paraquat_training'], notes: 'Restricted Use Pesticide - requires certification + Paraquat training' },
             { productName: 'Mesotrione', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 48.25, sellPrice: 0, category: 'herbicide' },
             { productName: 'Clethodim', packSize: '2x2.5', unit: 'gal', unitsPerPack: 5, costPrice: 33.50, sellPrice: 0, category: 'herbicide' },
             { productName: 'Clethodim', packSize: '135', unit: 'gal', unitsPerPack: 135, costPrice: 33.00, sellPrice: 0, category: 'herbicide' },
@@ -8628,6 +8794,9 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             });
         }
 
+        // I5: create pending_verification RupSaleRecords for any RUP items on this order
+        await autoCreateRupRecordsForOrder(order, { status: 'pending_verification' });
+
         res.status(201).json(order);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -8846,6 +9015,9 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
         });
 
         await order.save();
+
+        // I5: create pending_verification RupSaleRecords for any RUP items on this order
+        await autoCreateRupRecordsForOrder(order, { status: 'pending_verification' });
 
         // Audit log margin adjustments or discount code usage
         if (applyMarginAdjust !== 0 || discountType) {
@@ -9145,6 +9317,11 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
         order.updatedAt = new Date();
         await order.save();
 
+        // I5: cancel any RupSaleRecords tied to this order when it's cancelled/archived
+        if (status === 'cancelled' || status === 'archived') {
+            await cancelRupRecordsForOrder(order);
+        }
+
         // Auto-create ledger entry when order is delivered
         if (status === 'delivered' && order.representativeId) {
             const existingEntry = await LedgerEntry.findOne({
@@ -9222,6 +9399,9 @@ app.put('/api/chemical-orders/:id/archive', authMiddleware, adminMiddleware, asy
         order.status = 'archived';
         order.updatedAt = new Date();
         await order.save();
+
+        // I5: cancel RupSaleRecords tied to this archived order
+        await cancelRupRecordsForOrder(order);
 
         res.json({ message: 'Order archived successfully', order });
     } catch (error) {
@@ -15193,6 +15373,33 @@ connectDB().then(async () => {
             }
         }
     } catch (e) { console.error('Flumioxazin inventory fix error:', e.message); }
+
+    // Paraquat RUP flag migration — original seed used isRUP (not a schema field)
+    // so Mongoose dropped it silently. Production Paraquat docs had no
+    // isRestrictedUse flag and no requiredCertifications, meaning the RUP
+    // compliance check never fired on them. Backfill any existing Paraquat
+    // records and verify the flag is set so I5 auto-creation catches them.
+    try {
+        const paraquatResult = await Chemical.updateMany(
+            {
+                productName: /paraquat/i,
+                $or: [
+                    { isRestrictedUse: { $ne: true } },
+                    { requiredCertifications: { $size: 0 } },
+                    { requiredCertifications: { $exists: false } }
+                ]
+            },
+            {
+                $set: {
+                    isRestrictedUse: true,
+                    requiredCertifications: ['private_applicator', 'paraquat_training']
+                }
+            }
+        );
+        if (paraquatResult.modifiedCount > 0) {
+            console.log(`Paraquat RUP flag migration: fixed ${paraquatResult.modifiedCount} record(s)`);
+        }
+    } catch (e) { console.error('Paraquat RUP flag migration error:', e.message); }
 
     // Add Rancor 4F (Metribuzin 4F) - JABCO Invoice 1622, SO# 2131: 180 gal @ $45.50
     try {
