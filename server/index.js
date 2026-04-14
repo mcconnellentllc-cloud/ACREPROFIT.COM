@@ -5051,14 +5051,14 @@ app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
         }
 
         // Get order count and recent orders
-        const orders = await Order.find({ userId: customer._id })
+        const orders = await ChemicalOrder.find({ userId: customer._id })
             .sort({ createdAt: -1 })
             .limit(10);
 
         res.json({
             ...customer.toObject(),
             orders,
-            orderCount: await Order.countDocuments({ userId: customer._id })
+            orderCount: await ChemicalOrder.countDocuments({ userId: customer._id })
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -5173,7 +5173,7 @@ app.get('/api/admin/customers/:customerId/orders', authMiddleware, adminMiddlewa
             return res.status(403).json({ error: 'Access denied' });
         }
 
-        const orders = await Order.find({ userId: customer._id })
+        const orders = await ChemicalOrder.find({ userId: customer._id })
             .populate('representativeId', 'name email')
             .sort({ createdAt: -1 });
 
