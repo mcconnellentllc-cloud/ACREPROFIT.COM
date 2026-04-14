@@ -1361,6 +1361,7 @@ const sprayProgramSchema = new mongoose.Schema({
     applications: [{
         name: String, // e.g., "Burndown", "Pre-emergent", "Post-emergent"
         timing: String, // e.g., "14 days before planting", "At planting", "V4-V6"
+        deliveryWindow: String, // When product needs to arrive at rep location (e.g., "Late March", "Early May")
         chemicals: [{
             chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
             productName: String,
@@ -1368,9 +1369,17 @@ const sprayProgramSchema = new mongoose.Schema({
             rateUnit: String, // oz/acre, pt/acre, qt/acre, gal/acre, lb/acre
             packSize: String,
             unit: String,
+            isAdjuvant: { type: Boolean, default: false }, // Flag adjuvants for cost and auto-calc handling
             notes: String // e.g., "Adjust based on weed pressure"
         }]
     }],
+
+    // Program-level safety callouts - distinct from the per-chemical-derived
+    // rotationRestrictions / grazingRestrictions. Use for agronomic requirements
+    // that apply to the program as a whole (seed treatment requirements, timing
+    // windows, runoff advisories, etc). Rendered as a bulleted warning list on
+    // the program detail view.
+    precautions: [String],
 
     // Cost estimate per acre (calculated)
     estimatedCostPerAcre: Number,
