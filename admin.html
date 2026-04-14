@@ -5122,6 +5122,9 @@
                         <button class="btn btn-sm ${needsPricing && inventory > 0 ? 'btn-primary' : 'btn-outline'}" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins" ${needsPricing && inventory > 0 ? 'style="background:#dc2626; border-color:#dc2626; animation: pulse 2s infinite;"' : ''}>
                             ${needsPricing && inventory > 0 ? 'Set Price' : 'Edit'}
                         </button>
+                        <button class="btn btn-sm" style="background:#dc2626; color:white; border-color:#dc2626; margin-left:4px;" onclick="deleteProduct('${p._id}', '${p.productName}')">
+                            Delete
+                        </button>
                     </td>
                 </tr>
                 `;
@@ -5224,6 +5227,24 @@
 
         function closeEditProductModal() {
             document.getElementById('editProductModal').style.display = 'none';
+        }
+
+        async function deleteProduct(productId, productName) {
+            if (!confirm(`Delete "${productName}"? This cannot be undone.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/chemicals/${productId}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+                });
+                const data = await res.json();
+                if (res.ok) {
+                    loadProducts();
+                } else {
+                    alert('Delete failed: ' + (data.error || 'Unknown error'));
+                }
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
         }
 
         function calcEditPricePreview() {
