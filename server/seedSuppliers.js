@@ -54,7 +54,7 @@ const SUPPLIERS = [
         name: 'CPD Sales',
         email: 'cpd@acreprofit.com',
         phone: '',
-        bidEligible: true,
+        bidEligible: false, // Tier-2 supplier (CPD -> JABCO -> AcreProfit). Not a direct AP supplier.
         aliases: ['Crop Protect Direct', 'cpd']
     }
 ];
