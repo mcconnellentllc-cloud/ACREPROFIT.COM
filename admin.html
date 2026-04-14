@@ -271,16 +271,12 @@
                     <div class="tab-header-actions">
                         <a href="/chemical-docs.html" target="_blank" class="btn btn-outline btn-sm">View All Labels & SDS</a>
                         <div class="filters">
-                            <select id="orderStatusFilter">
-                                <option value="">All Status</option>
-                                <option value="pending">Order Created</option>
-                                <option value="payment_pending">Payment Pending</option>
-                                <option value="payment_secured">Payment Secured</option>
-                                <option value="manufacturer_ordered">Ordered from Mfg</option>
-                                <option value="bol_assigned">BOL Assigned</option>
-                                <option value="shipped">Shipped</option>
+                            <select id="orderStatusFilter" onchange="renderOrdersTable()">
+                                <option value="active" selected>Active Orders</option>
+                                <option value="all">All Orders</option>
+                                <option value="draft">Drafts</option>
                                 <option value="delivered">Delivered</option>
-                                <option value="signed_off">Signed Off</option>
+                                <option value="cancelled">Cancelled / Archived</option>
                             </select>
                         </div>
                     </div>
@@ -292,14 +288,16 @@
                     <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
                         <select id="bulkStatusSelect" style="padding: 8px 12px; border-radius: 6px; border: none; background: white;">
                             <option value="">Change Status To...</option>
-                            <option value="pending">Order Created</option>
+                            <option value="submitted">Ordered (pooling with other orders)</option>
+                            <option value="confirmed">Order Confirmed</option>
                             <option value="payment_pending">Payment Pending</option>
                             <option value="payment_secured">Payment Secured</option>
-                            <option value="manufacturer_ordered">Ordered from Mfg</option>
-                            <option value="bol_assigned">BOL Assigned</option>
-                            <option value="shipped">Shipped</option>
+                            <option value="ordered_from_supplier">Ordered from Supplier</option>
+                            <option value="received">Received at Warehouse</option>
+                            <option value="ready_for_pickup">Ready for Pickup</option>
                             <option value="delivered">Delivered</option>
-                            <option value="signed_off">Delivery Signed Off</option>
+                            <option value="cancelled">Cancelled</option>
+                            <option value="archived">Archived</option>
                         </select>
                         <button class="btn btn-sm" onclick="applyBulkStatus()" style="background: white; color: #166534; font-weight: 600;">Apply</button>
                         <button class="btn btn-sm" onclick="clearSelection()" style="background: transparent; color: white; border: 1px solid white;">Clear Selection</button>
@@ -4061,6 +4059,93 @@
             window.location.href = '/dashboard.html';
         });
 
+        // Orders tab — status helpers
+
+        // Maps raw ChemicalOrder/Order enum values → farmer-friendly labels.
+        // Mirrors the mapping in my-orders.html:138 so admin + farmer see the
+        // same wording. If we keep duplicating this, extract into app.js later.
+        const ADMIN_ORDER_STATUS_LABEL = {
+            draft:                 'Draft (not submitted)',
+            submitted:             'Ordered (pooling)',
+            confirmed:             'Confirmed',
+            ordered_from_supplier: 'Ordered from Supplier',
+            received:              'Received at Warehouse',
+            ready_for_pickup:      'Ready for Pickup',
+            delivered:             'Delivered',
+            cancelled:             'Cancelled',
+            archived:              'Archived',
+            payment_pending:       'Payment Pending',
+            payment_secured:       'Payment Secured',
+            // Legacy Order-only values kept for any un-migrated docs
+            pending:               'Pending (legacy)',
+            shipped:               'Shipped (legacy)'
+        };
+        function friendlyOrderStatus(raw) {
+            return ADMIN_ORDER_STATUS_LABEL[(raw || '').toLowerCase()] || raw || 'Unknown';
+        }
+
+        // Decides whether an order matches the current filter dropdown selection.
+        // Active = the "needs attention / in flight" bucket. Excludes terminal states.
+        function matchesOrderFilter(order, filter) {
+            const s = (order.status || '').toLowerCase();
+            switch (filter) {
+                case 'all':       return true;
+                case 'draft':     return s === 'draft';
+                case 'delivered': return s === 'delivered';
+                case 'cancelled': return s === 'cancelled' || s === 'archived';
+                case 'active':
+                default:
+                    return ['submitted', 'confirmed', 'ordered_from_supplier', 'received',
+                            'ready_for_pickup', 'payment_pending', 'payment_secured',
+                            'pending'].includes(s);  // 'pending' kept for any legacy docs
+            }
+        }
+
+        // Renders the Orders tab table from the global allOrders array, applying
+        // the orderStatusFilter dropdown. Called from loadDashboardData after fetch,
+        // and from the filter dropdown onchange handler.
+        function renderOrdersTable() {
+            const tbody = document.getElementById('ordersTableBody');
+            const filterVal = document.getElementById('orderStatusFilter')?.value || 'active';
+            const filtered = (allOrders || []).filter(o => matchesOrderFilter(o, filterVal));
+
+            if (!filtered.length) {
+                tbody.innerHTML = `<tr><td colspan="8" class="empty" style="text-align:center; padding:24px; color:var(--text-muted);">No orders match the "${filterVal}" filter</td></tr>`;
+                return;
+            }
+
+            tbody.innerHTML = filtered.map(order => {
+                const s = order.status || '';
+                return `
+                    <tr>
+                        <td><input type="checkbox" class="order-checkbox" data-order-id="${order._id}" onchange="updateBulkSelection()"></td>
+                        <td>${new Date(order.createdAt).toLocaleDateString()}</td>
+                        <td>${order.userId?.name || 'Unknown'}</td>
+                        <td>${order.crop || order.sprayParams?.crop || '-'}${order.program ? ' / ' + order.program : ''}</td>
+                        <td>${(order.acres || order.totalAcres)?.toLocaleString() || '-'}</td>
+                        <td>$${(order.totalCost || order.total || 0).toLocaleString()}</td>
+                        <td><span class="order-status status-${s}">${friendlyOrderStatus(s)}</span></td>
+                        <td style="display: flex; gap: 8px; align-items: center;">
+                            <button class="btn btn-sm btn-outline" onclick="openOrderEditModal('${order._id}')">Edit</button>
+                            <select class="status-select" data-order-id="${order._id}">
+                                <option value="draft" ${s === 'draft' ? 'selected' : ''}>Draft</option>
+                                <option value="submitted" ${s === 'submitted' ? 'selected' : ''}>Ordered (pooling)</option>
+                                <option value="confirmed" ${s === 'confirmed' ? 'selected' : ''}>Confirmed</option>
+                                <option value="payment_pending" ${s === 'payment_pending' ? 'selected' : ''}>Payment Pending</option>
+                                <option value="payment_secured" ${s === 'payment_secured' ? 'selected' : ''}>Payment Secured</option>
+                                <option value="ordered_from_supplier" ${s === 'ordered_from_supplier' ? 'selected' : ''}>Ordered from Supplier</option>
+                                <option value="received" ${s === 'received' ? 'selected' : ''}>Received at Warehouse</option>
+                                <option value="ready_for_pickup" ${s === 'ready_for_pickup' ? 'selected' : ''}>Ready for Pickup</option>
+                                <option value="delivered" ${s === 'delivered' ? 'selected' : ''}>Delivered</option>
+                                <option value="cancelled" ${s === 'cancelled' ? 'selected' : ''}>Cancelled</option>
+                                <option value="archived" ${s === 'archived' ? 'selected' : ''}>Archived</option>
+                            </select>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
         // Load dashboard data
         async function loadDashboardData() {
             try {
@@ -4072,7 +4157,9 @@
 
                 // Update stats
                 document.getElementById('totalOrdersCount').textContent = orders.length;
-                document.getElementById('pendingOrders').textContent = orders.filter(o => o.status === 'pending').length;
+                // "Needs attention" bucket: submitted (awaiting confirmation) + payment_pending.
+                // Legacy 'pending' kept as fallback for any un-migrated legacy Order docs.
+                document.getElementById('pendingOrders').textContent = orders.filter(o => ['submitted', 'payment_pending', 'pending'].includes(o.status)).length;
 
                 const totalRevenue = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
                 document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toLocaleString();
@@ -4089,32 +4176,10 @@
                     </div>
                 `).join('') : '<p class="empty">No orders yet</p>';
 
-                // Orders table
-                allOrders = orders; // Store for editing
-                document.getElementById('ordersTableBody').innerHTML = orders.length ? orders.map(order => `
-                    <tr>
-                        <td><input type="checkbox" class="order-checkbox" data-order-id="${order._id}" onchange="updateBulkSelection()"></td>
-                        <td>${new Date(order.createdAt).toLocaleDateString()}</td>
-                        <td>${order.userId?.name || 'Unknown'}</td>
-                        <td>${order.crop}${order.program ? ' / ' + order.program : ''}</td>
-                        <td>${order.acres?.toLocaleString()}</td>
-                        <td>$${order.totalCost?.toLocaleString() || '0'}</td>
-                        <td><span class="order-status status-${order.status}">${order.status}</span></td>
-                        <td style="display: flex; gap: 8px; align-items: center;">
-                            <button class="btn btn-sm btn-outline" onclick="openOrderEditModal('${order._id}')">Edit</button>
-                            <select class="status-select" data-order-id="${order._id}">
-                                <option value="pending" ${order.status === 'pending' ? 'selected' : ''}>Order Created</option>
-                                <option value="payment_pending" ${order.status === 'payment_pending' ? 'selected' : ''}>Payment Pending</option>
-                                <option value="payment_secured" ${order.status === 'payment_secured' ? 'selected' : ''}>Payment Secured</option>
-                                <option value="manufacturer_ordered" ${order.status === 'manufacturer_ordered' ? 'selected' : ''}>Ordered from Mfg</option>
-                                <option value="bol_assigned" ${order.status === 'bol_assigned' ? 'selected' : ''}>BOL Assigned</option>
-                                <option value="shipped" ${order.status === 'shipped' ? 'selected' : ''}>Shipped</option>
-                                <option value="delivered" ${order.status === 'delivered' ? 'selected' : ''}>Delivered</option>
-                                <option value="signed_off" ${order.status === 'signed_off' ? 'selected' : ''}>Delivery Signed Off</option>
-                            </select>
-                        </td>
-                    </tr>
-                `).join('') : '<tr><td colspan="8" class="empty">No orders yet</td></tr>';
+                // Orders table - rendered through renderOrdersTable() so the filter
+                // dropdown (onchange) can re-render without re-fetching.
+                allOrders = orders;
+                renderOrdersTable();
 
                 // Load customers
                 const customersRes = await fetch(`${API_URL}/api/admin/customers`, {
