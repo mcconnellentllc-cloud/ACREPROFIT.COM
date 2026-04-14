@@ -2920,7 +2920,7 @@ async function seedMarch2026PurchaseOrders() {
                 subtotal: 76617.00,
                 freight: 0,
                 totalCost: 76617.00,
-                status: 'confirmed',
+                status: 'received',
                 orderDate: new Date('2026-03-30'),
                 notes: 'Billed to: Kyle McConnell'
             });
@@ -3020,7 +3020,7 @@ async function seedMarch2026PurchaseOrders() {
                 subtotal: 93445.00,
                 freight: 0,
                 totalCost: 93445.00,
-                status: 'confirmed',
+                status: 'received',
                 orderDate: new Date('2026-03-30'),
                 notes: 'Billed to: Ty Mollohan'
             });
@@ -3075,7 +3075,7 @@ async function seedMarch2026PurchaseOrders() {
                 subtotal: 53000.00,
                 freight: 0,
                 totalCost: 53000.00,
-                status: 'confirmed',
+                status: 'received',
                 orderDate: new Date('2026-03-30'),
                 notes: 'Billed to: Ty Mollohan'
             });
@@ -11557,6 +11557,71 @@ app.post('/api/admin/inventory/backfill', authMiddleware, adminMiddleware, async
         res.json({ message: 'Inventory backfill completed. Check server logs for details.' });
     } catch (error) {
         res.status(500).json({ error: error.message });
+    }
+});
+
+// One-time: receive March 2026 PO inventory into stock
+// Safe to run multiple times - skips products already received
+app.post('/api/admin/backfill-march-2026-inventory', authMiddleware, superAdminMiddleware, async (req, res) => {
+    const TARGET_POS = ['JABCO-SO2129', 'SIMS-103850', 'SIMS-103849'];
+    const results = { received: [], skipped: [], errors: [] };
+
+    const session = await mongoose.startSession();
+    try {
+        await session.withTransaction(async () => {
+            for (const poNumber of TARGET_POS) {
+                const po = await PurchaseOrder.findOne({ poNumber }).session(session);
+                if (!po) {
+                    results.errors.push({ poNumber, error: 'PO not found' });
+                    continue;
+                }
+
+                for (const item of po.items) {
+                    // Idempotency check - skip if inventory already exists for this chemical
+                    const existing = await Inventory.findOne({ chemicalId: item.chemicalId, location: 'main' }).session(session);
+                    if (existing && existing.quantityOnHand > 0) {
+                        results.skipped.push({ poNumber, product: item.productName, qty: existing.quantityOnHand });
+                        continue;
+                    }
+
+                    await receiveInventory({
+                        chemicalId: item.chemicalId,
+                        productName: item.productName,
+                        packSize: item.packSize,
+                        unit: item.unit,
+                        quantity: item.quantityOrdered,
+                        unitCost: item.pricePerUnit,
+                        location: 'main',
+                        purchaseOrderId: po._id,
+                        poNumber: po.poNumber,
+                        supplierName: po.supplier?.name || '',
+                        userId: req.user._id,
+                        session
+                    });
+
+                    results.received.push({ poNumber, product: item.productName, qty: item.quantityOrdered, cost: item.pricePerUnit });
+                }
+
+                // Mark PO as received
+                po.status = 'received';
+                po.receivedDate = new Date();
+                await po.save({ session });
+            }
+        });
+
+        res.json({
+            message: 'March 2026 inventory backfill complete',
+            summary: {
+                received: results.received.length,
+                skipped: results.skipped.length,
+                errors: results.errors.length
+            },
+            results
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message, partial: results });
+    } finally {
+        session.endSession();
     }
 });
 
