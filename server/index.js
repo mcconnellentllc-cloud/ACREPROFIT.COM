@@ -1,6 +1,8 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -36,12 +38,71 @@ const app = express();
 // Initialize Stripe (will be configured per-request for Connect)
 const stripe = process.env.STRIPE_SECRET_KEY ? new Stripe(process.env.STRIPE_SECRET_KEY) : null;
 const PORT = process.env.PORT || 3001;
-const JWT_SECRET = process.env.JWT_SECRET || 'acreprofit-secret-key-change-in-production';
 
-// Middleware
-app.use(cors());
+// S6: JWT_SECRET must be explicitly set - no silent fallback to a known string
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET) {
+    console.error('FATAL: JWT_SECRET environment variable is required. Refusing to start.');
+    process.exit(1);
+}
+
+// S3: helmet sets common security headers (HSTS, X-Content-Type-Options,
+// X-Frame-Options, Referrer-Policy, etc). CSP disabled because this server
+// returns JSON not HTML - CSP is enforced by the static frontend host.
+app.use(helmet({ contentSecurityPolicy: false }));
+
+// S5: CORS whitelist. Browser requests from any other origin are rejected.
+// No-origin requests (Stripe webhooks, curl, server-to-server) are allowed.
+const allowedOrigins = [
+    'https://acreprofit.com',
+    'https://www.acreprofit.com',
+    'https://acreprofit-com.onrender.com'
+];
+if (process.env.NODE_ENV !== 'production') {
+    allowedOrigins.push(
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:8080',
+        'http://127.0.0.1:3000',
+        'http://127.0.0.1:8080'
+    );
+}
+app.use(cors({
+    origin: (origin, cb) => {
+        if (!origin) return cb(null, true);                 // non-browser / same-origin
+        if (allowedOrigins.includes(origin)) return cb(null, true);
+        console.warn(`CORS blocked origin: ${origin}`);
+        cb(new Error('Not allowed by CORS'));
+    },
+    credentials: true
+}));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// S4: rate limiters for authentication endpoints. Brute-force protection -
+// applied per-IP. Webhook, order, and read routes are not limited.
+const loginLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000,
+    max: 10,                                                // 10 attempts / 15 min / IP
+    message: { error: 'Too many login attempts. Please try again in 15 minutes.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+const signupLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,                                                 // 5 signups / hour / IP
+    message: { error: 'Too many signup attempts. Please try again in an hour.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
+const passwordResetLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000,
+    max: 5,                                                 // 5 reset requests / hour / IP
+    message: { error: 'Too many password reset attempts. Please try again in an hour.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -3977,7 +4038,7 @@ app.post('/api/admin/reset-admins', async (req, res) => {
 
 // ---- AUTH ROUTES ----
 
-app.post('/api/auth/signup', async (req, res) => {
+app.post('/api/auth/signup', signupLimiter, async (req, res) => {
     try {
         const { name, email, password, phone, address, farm, crops, representativeId } = req.body;
 
@@ -4035,7 +4096,7 @@ app.post('/api/auth/signup', async (req, res) => {
     }
 });
 
-app.post('/api/auth/login', async (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
     try {
         const { email, password } = req.body;
 
@@ -4114,7 +4175,7 @@ const createEmailTransporter = () => {
 };
 
 // Request password reset
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => {
     try {
         const { email } = req.body;
 
@@ -4205,7 +4266,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
 });
 
 // Reset password with token
-app.post('/api/auth/reset-password', async (req, res) => {
+app.post('/api/auth/reset-password', passwordResetLimiter, async (req, res) => {
     try {
         const { token, password } = req.body;
 
