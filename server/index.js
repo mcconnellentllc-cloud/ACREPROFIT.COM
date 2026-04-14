@@ -1800,6 +1800,8 @@ const supplierBidSheetSchema = new mongoose.Schema({
         contactEmail: String,
         contactPhone: String,
         invitedAt: Date,
+        emailedAt: Date,              // Set when bid invitation email actually sent
+        lastEmailError: String,       // Populated on send failure or placeholder-email skip
         status: {
             type: String,
             enum: ['invited', 'viewed', 'responded', 'declined', 'no_response'],
@@ -14766,7 +14768,9 @@ app.put('/api/admin/bid-sheets/:id/suppliers', authMiddleware, adminMiddleware, 
     }
 });
 
-// Send bid sheet to suppliers (mark as sent)
+// Send bid sheet to suppliers - actually emails each invited supplier with the
+// bid request. Skips placeholder @acreprofit.com emails (Sims until Kyle sources
+// a real contact). Partial success: one failed email doesn't abort the batch.
 app.put('/api/admin/bid-sheets/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const bidSheet = await SupplierBidSheet.findById(req.params.id);
@@ -14775,24 +14779,150 @@ app.put('/api/admin/bid-sheets/:id/send', authMiddleware, adminMiddleware, async
             return res.status(404).json({ error: 'Bid sheet not found' });
         }
 
-        if (bidSheet.invitedSuppliers.length === 0) {
+        if (!bidSheet.invitedSuppliers || bidSheet.invitedSuppliers.length === 0) {
             return res.status(400).json({ error: 'No suppliers invited to bid' });
+        }
+
+        // Freshen contact info from the supplier User doc in case email/name
+        // drifted since the bid sheet was created
+        const supplierIds = bidSheet.invitedSuppliers
+            .map(s => s.supplierId)
+            .filter(Boolean);
+        const freshSuppliers = supplierIds.length > 0
+            ? await User.find({ _id: { $in: supplierIds }, role: 'supplier' })
+                .select('email name companyName bidEligible')
+                .lean()
+            : [];
+        const freshMap = {};
+        freshSuppliers.forEach(s => { freshMap[s._id.toString()] = s; });
+
+        // Build the bid items block once - same HTML used in every supplier email
+        const itemsHtml = (bidSheet.items || []).map(i => `
+            <tr>
+                <td style="padding:8px; border-bottom:1px solid #eee;"><strong>${i.productName}</strong></td>
+                <td style="padding:8px; border-bottom:1px solid #eee;">${i.packSize || '-'}</td>
+                <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${i.quantityNeeded || 0} ${i.unit || ''}</td>
+                <td style="padding:8px; border-bottom:1px solid #eee; color:#666; font-size:0.9em;">${i.notes || ''}</td>
+            </tr>
+        `).join('');
+
+        const responseDueStr = bidSheet.responseDueDate
+            ? new Date(bidSheet.responseDueDate).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+            : '7 days from now';
+        const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+
+        const transporter = createEmailTransporter();
+        const sendResults = { sent: 0, skipped: 0, failed: 0, details: [] };
+
+        for (const invited of bidSheet.invitedSuppliers) {
+            // Use freshest email from supplier User doc when available
+            const fresh = invited.supplierId ? freshMap[invited.supplierId.toString()] : null;
+            const email = (fresh?.email || invited.contactEmail || '').toLowerCase().trim();
+            const displayName = fresh?.companyName || invited.supplierName || 'Supplier';
+
+            // Placeholder-email skip: any @acreprofit.com address means mail
+            // forwarding isn't set up for this supplier yet. Mark as skipped
+            // rather than sending mail that will never route anywhere.
+            if (!email || email.endsWith('@acreprofit.com')) {
+                invited.lastEmailError = 'skipped: placeholder or missing email';
+                sendResults.skipped++;
+                sendResults.details.push({ supplier: displayName, result: 'skipped', reason: 'placeholder email' });
+                console.warn(`Bid ${bidSheet.bidNumber}: skipped ${displayName} - ${invited.lastEmailError}`);
+                continue;
+            }
+
+            if (!transporter) {
+                invited.lastEmailError = 'skipped: email transporter not configured (SMTP env vars missing)';
+                sendResults.skipped++;
+                sendResults.details.push({ supplier: displayName, result: 'skipped', reason: 'SMTP not configured' });
+                continue;
+            }
+
+            const mailBody = `
+                <div style="font-family: Arial, sans-serif; max-width: 680px; margin: 0 auto;">
+                    <div style="background:#2d5a27; color:white; padding:18px 24px;">
+                        <h1 style="margin:0; font-size:1.4rem;">Acre Profit — Bid Request</h1>
+                        <div style="font-size:0.95rem; opacity:0.9; margin-top:4px;">${bidSheet.bidNumber} · ${bidSheet.title}</div>
+                    </div>
+                    <div style="padding:20px 24px; background:#f9f9f9;">
+                        <p>Hi ${displayName},</p>
+                        <p>We're pooling orders across our farmers and requesting quotes on the following products.
+                        ${bidSheet.description ? `<br><em>${bidSheet.description}</em>` : ''}</p>
+
+                        <div style="background:#fff; padding:14px; border-radius:6px; margin:16px 0;">
+                            <div style="font-weight:700; color:#2d5a27; margin-bottom:8px;">Please respond by: ${responseDueStr}</div>
+                            <div style="color:#666; font-size:0.9em;">Reply to this email with your per-unit pricing, availability, lead time, and any freight/payment terms.</div>
+                        </div>
+
+                        <table style="width:100%; border-collapse:collapse; background:#fff; margin-bottom:16px;">
+                            <thead>
+                                <tr style="background:#f1f5f0;">
+                                    <th style="padding:10px; text-align:left; border-bottom:2px solid #2d5a27;">Product</th>
+                                    <th style="padding:10px; text-align:left; border-bottom:2px solid #2d5a27;">Pack Size</th>
+                                    <th style="padding:10px; text-align:right; border-bottom:2px solid #2d5a27;">Quantity Needed</th>
+                                    <th style="padding:10px; text-align:left; border-bottom:2px solid #2d5a27;">Notes</th>
+                                </tr>
+                            </thead>
+                            <tbody>${itemsHtml}</tbody>
+                        </table>
+
+                        <p style="color:#666; font-size:0.9em;">
+                            Questions: reply to this email or contact ${req.user.name || 'our team'} directly.<br>
+                            Acre Profit · ${frontendUrl}
+                        </p>
+                    </div>
+                </div>
+            `;
+
+            try {
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
+                    to: email,
+                    subject: `Bid Request ${bidSheet.bidNumber} — ${bidSheet.title}`,
+                    html: mailBody
+                });
+                invited.emailedAt = new Date();
+                invited.lastEmailError = undefined;
+                sendResults.sent++;
+                sendResults.details.push({ supplier: displayName, result: 'sent', email });
+                console.log(`Bid ${bidSheet.bidNumber} sent to ${displayName} at ${email}`);
+            } catch (err) {
+                invited.lastEmailError = err.message;
+                sendResults.failed++;
+                sendResults.details.push({ supplier: displayName, result: 'failed', reason: err.message });
+                console.error(`Bid ${bidSheet.bidNumber}: send failed for ${displayName}: ${err.message}`);
+            }
+
+            invited.invitedAt = invited.invitedAt || new Date();
         }
 
         bidSheet.status = 'sent';
         bidSheet.sentAt = new Date();
-        bidSheet.invitedSuppliers.forEach(s => {
-            s.invitedAt = new Date();
-        });
         bidSheet.updatedAt = new Date();
         bidSheet.updatedBy = req.user._id;
+        // Mongoose's nested array change detection is unreliable when modifying
+        // sub-document fields in a loop. Force the dirty flag to guarantee writes.
+        bidSheet.markModified('invitedSuppliers');
 
         await bidSheet.save();
 
-        // TODO: Send emails to suppliers with bid request details
+        await logAudit({
+            action: 'bid_sheet_sent',
+            req,
+            entityType: 'SupplierBidSheet',
+            entityId: bidSheet._id,
+            entityRef: bidSheet.bidNumber,
+            reason: `Sent bid ${bidSheet.bidNumber} to suppliers`,
+            after: sendResults
+        });
 
-        res.json({ message: 'Bid sheet sent to suppliers', bidSheet });
+        res.json({
+            message: `Bid sheet ${bidSheet.bidNumber} processed: ${sendResults.sent} sent, ${sendResults.skipped} skipped, ${sendResults.failed} failed`,
+            results: sendResults,
+            bidSheet
+        });
     } catch (error) {
+        console.error('Bid sheet send error:', error);
         res.status(400).json({ error: error.message });
     }
 });
