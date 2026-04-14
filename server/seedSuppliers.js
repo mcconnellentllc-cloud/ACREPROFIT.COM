@@ -32,8 +32,8 @@ const SUPPLIERS = [
     {
         supplierCode: 'SIMS',
         companyName: 'Sims Fertilizer & Chemical',
-        name: 'Sims Sales',
-        email: 'sims@acreprofit.com',
+        name: 'Sam Sims',
+        email: 'samsimsfarm@gmail.com', // Sam Sims — direct contact
         phone: '',
         bidEligible: true,
         aliases: ['Sims Fertilizer & Chemical', 'Sims', 'sims']
