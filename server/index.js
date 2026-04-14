@@ -13427,11 +13427,20 @@ app.get('/api/admin/sync-prices/status', authMiddleware, adminMiddleware, async 
 // ============ PURCHASE ORDER DOCUMENT UPLOADS ============
 
 // Configure multer for file uploads
-const poDocumentsPath = path.join(__dirname, '..', 'purchase-orders');
+// S7: UPLOAD_DIR points at a Render persistent disk mount in production
+// (e.g. /var/data/purchase-orders). Falls back to a repo-root relative path
+// for local dev. License uploads go to a sibling dir - route not wired yet,
+// but the directory is pre-created so the future upload endpoint just drops in.
+const poDocumentsPath = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'purchase-orders');
+const licensesPath = process.env.LICENSES_UPLOAD_DIR || path.join(path.dirname(poDocumentsPath), 'licenses');
 
-// Ensure upload directory exists
-if (!fs.existsSync(poDocumentsPath)) {
-    fs.mkdirSync(poDocumentsPath, { recursive: true });
+// Ensure upload directories exist
+for (const dir of [poDocumentsPath, licensesPath]) {
+    try {
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    } catch (e) {
+        console.error(`Failed to create upload dir ${dir}: ${e.message}`);
+    }
 }
 
 let uploadPO;
