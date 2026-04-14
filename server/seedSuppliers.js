@@ -24,7 +24,7 @@ const SUPPLIERS = [
         supplierCode: 'JABCO',
         companyName: 'JABCO LLC',
         name: 'JABCO Sales',
-        email: 'jabco@acreprofit.com',  // Placeholder - mail forwarding rule at Office 365
+        email: 'jeff@cropprotectdirect.com', // Jeff Novak — JABCO point of contact
         phone: '',
         bidEligible: true,
         aliases: ['Jabco', 'jabco', 'JABCO LLC']
@@ -82,12 +82,18 @@ async function initializeSuppliers(User, Chemical) {
             }
 
             // --- Step 2: Find or create supplier User doc ---
-            const existing = await User.findOne({ email: spec.email.toLowerCase() });
+            // Lookup by supplierCode (authoritative identifier that never changes).
+            // Using email would break the upsert pattern when the email gets
+            // updated via the seed - subsequent runs wouldn't find the existing
+            // record by the new email, would try to create a duplicate, and hit
+            // the supplierCode uniqueness constraint.
+            const existing = await User.findOne({ supplierCode: spec.supplierCode, role: 'supplier' });
             let supplier;
 
             if (existing) {
-                // Sync drift on role / companyName / supplierCode / bidEligible.
-                // Never touches password.
+                // Sync drift on role / companyName / name / email / bidEligible.
+                // Never touches password. supplierCode is the lookup key so it
+                // cannot drift by definition.
                 let changed = false;
                 if (existing.role !== 'supplier') {
                     existing.role = 'supplier';
@@ -97,8 +103,12 @@ async function initializeSuppliers(User, Chemical) {
                     existing.companyName = spec.companyName;
                     changed = true;
                 }
-                if (existing.supplierCode !== spec.supplierCode) {
-                    existing.supplierCode = spec.supplierCode;
+                if (existing.name !== spec.name) {
+                    existing.name = spec.name;
+                    changed = true;
+                }
+                if (existing.email !== spec.email.toLowerCase()) {
+                    existing.email = spec.email.toLowerCase();
                     changed = true;
                 }
                 if (existing.bidEligible !== spec.bidEligible) {
