@@ -2403,10 +2403,13 @@
                                                     const id = String(cand.catalogEntry._id);
                                                     const isChosen = id === chosenId;
                                                     const packLabel = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
+                                                    const supplierPrefix = cand.catalogEntry.sourceSupplier
+                                                        ? `<strong>${cand.catalogEntry.sourceSupplier}</strong> — `
+                                                        : '';
                                                     return `
                                                     <label style="display:contents; cursor:pointer;">
                                                         <input type="radio" name="pack-${rowKey}" value="${id}" ${isChosen ? 'checked' : ''} onchange="selectPack('${(item.name || '').replace(/'/g, "\\'")}', '${id}')" style="cursor:pointer;">
-                                                        <span style="font-weight:${isChosen ? '700' : '400'};">${packLabel}</span>
+                                                        <span style="font-weight:${isChosen ? '700' : '400'};">${supplierPrefix}${packLabel}</span>
                                                         <span style="color:#6b7280;">${cand.qty} × ${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'} = ${cand.totalOrdered.toFixed(1)} ${cand.catalogEntry.unit || 'gl'}</span>
                                                         <span style="color:${cand.overage > 10 ? '#dc2626' : '#6b7280'};">${cand.overage > 0.1 ? `+${cand.overage.toFixed(1)} over` : 'exact'}</span>
                                                         <span style="font-weight:600; color:#2d5a27;">$${cand.totalCost.toFixed(2)}</span>
