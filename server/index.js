@@ -7160,6 +7160,7 @@ app.get('/api/chemicals/available', async (req, res) => {
             return {
                 _id: c._id,
                 productName: c.productName,
+                sourceSupplier: c.sourceSupplier,
                 activeIngredients: (c.activeIngredients || []).map(ai => ({
                     name: ai.name,
                     percentage: ai.percentage
@@ -7169,6 +7170,7 @@ app.get('/api/chemicals/available', async (req, res) => {
                 unit: c.unit,
                 unitsPerPack: c.unitsPerPack,
                 sellPrice: c.sellPrice,
+                priceIsSpeculated: c.priceIsSpeculated === true,
                 defaultRate: c.defaultRate,
                 rateUnit: c.rateUnit,
                 signalWord: c.signalWord,
