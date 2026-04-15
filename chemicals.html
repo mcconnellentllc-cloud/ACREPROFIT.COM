@@ -464,6 +464,11 @@
         // means the farmer consciously picked a different pack size for that
         // product. Cleared when a new program is selected.
         let userPackChoices = new Map();
+        // Tank + carrier volume inputs for per-load mix planning. Session-local,
+        // exposed on window for the per-load sheet to consume in a later commit.
+        let tankSizeGal = 0;
+        let gpaCarrier = 0;
+        window._loadConfig = { tankSizeGal: 0, gpaCarrier: 0 };
 
         // ============ SMART PACKAGE BREAKDOWN CALCULATOR ============
         // Package sizes available for most chemicals
@@ -2103,6 +2108,56 @@
             calculateProgramOrder();
         }
 
+        // Update tank + carrier-volume state from the inputs and render the
+        // load-count readout. Called on every oninput and after each full
+        // calculateProgramOrder() render (since recalc wipes the DOM).
+        function updateLoadConfig() {
+            tankSizeGal = parseFloat(document.getElementById('loadTankSize')?.value) || 0;
+            gpaCarrier = parseFloat(document.getElementById('loadGpaCarrier')?.value) || 0;
+            window._loadConfig = { tankSizeGal, gpaCarrier };
+
+            const readout = document.getElementById('loadReadout');
+            if (!readout) return;
+
+            const acres = parseFloat(document.getElementById('programAcres')?.value) ||
+                          parseFloat(document.getElementById('cropAcres')?.value) || 0;
+
+            if (tankSizeGal > 0 && gpaCarrier > 0 && acres > 0) {
+                const acresPerLoad = tankSizeGal / gpaCarrier;
+                const fullLoads = Math.floor(acres / acresPerLoad);
+                const remainderAcres = acres - (fullLoads * acresPerLoad);
+                const remainderWater = remainderAcres * gpaCarrier;
+                const totalLoads = remainderAcres > 0.01 ? fullLoads + 1 : fullLoads;
+
+                readout.style.display = 'block';
+                readout.innerHTML = `
+                    <div style="display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin-bottom:${remainderAcres > 0.01 ? '12px' : '0'};">
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem; font-weight:800; color:#2d5a27;">${totalLoads}</div>
+                            <div style="font-size:0.8rem; color:#666;">Total Loads</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem; font-weight:800; color:#2d5a27;">${acresPerLoad.toFixed(1)}</div>
+                            <div style="font-size:0.8rem; color:#666;">Acres / Load</div>
+                        </div>
+                        <div style="text-align:center;">
+                            <div style="font-size:1.8rem; font-weight:800; color:#2d5a27;">${tankSizeGal.toLocaleString()}</div>
+                            <div style="font-size:0.8rem; color:#666;">Gal / Load</div>
+                        </div>
+                    </div>
+                    ${remainderAcres > 0.01 ? `
+                    <div style="background:#fffbeb; border:1px solid #f59e0b; border-radius:6px; padding:10px 14px; font-size:0.875rem; color:#92400e;">
+                        <strong>Final load (Load ${totalLoads}):</strong> ${remainderAcres.toFixed(1)} acres — ${remainderWater.toFixed(0)} gal water (partial tank)
+                    </div>` : `
+                    <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:6px; padding:10px 14px; font-size:0.875rem; color:#166534;">
+                        <strong>Clean split</strong> — all ${totalLoads} loads are full tanks. No partial load.
+                    </div>`}
+                `;
+            } else {
+                readout.style.display = 'none';
+            }
+        }
+
         function calculateProgramOrder() {
             const acres = parseFloat(document.getElementById('programAcres').value) || 0;
             const sprayVolume = parseFloat(document.getElementById('sprayVolume').value) || 10;
@@ -2457,6 +2512,27 @@
                         </tfoot>
                     </table>
 
+                    <div class="load-config-section" style="margin:24px 0; padding:20px; background:#f8faf8; border:2px solid #e5e7eb; border-radius:12px;">
+                        <h3 style="margin:0 0 6px 0; color:#2d5a27; font-size:1.05rem;">🚜 Tank & Load Planning</h3>
+                        <p style="margin:0 0 16px 0; color:#666; font-size:0.875rem;">Optional — drives your per-load mix sheet. Leave blank if you're only ordering chemical.</p>
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.875rem;">Sprayer Tank Size (gal)</label>
+                                <input type="number" id="loadTankSize" placeholder="e.g., 1000" min="1"
+                                    style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:8px; font-size:1rem;"
+                                    oninput="updateLoadConfig()">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.875rem;">Carrier Volume (gal/acre)</label>
+                                <input type="number" id="loadGpaCarrier" placeholder="e.g., 10" min="1" step="0.5"
+                                    style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:8px; font-size:1rem;"
+                                    oninput="updateLoadConfig()">
+                            </div>
+                        </div>
+                        <div id="loadReadout" style="display:none; background:#fff; border:1px solid #d1fae5; border-radius:8px; padding:16px;">
+                        </div>
+                    </div>
+
                     ${Object.values(totalsByChemical).some(i => i.priceIsSpeculated) ? `
                     <div style="background:#fffbeb; border:2px solid #f59e0b; border-radius:8px; padding:14px 18px; margin:16px 0; display:flex; gap:12px; align-items:flex-start;">
                         <span style="font-size:1.3rem;">⚠️</span>
@@ -2676,6 +2752,19 @@
                 ${bidSheetHTML}
             `;
             resultsDiv.style.display = 'block';
+
+            // Restore tank/GPA inputs — pack selector recalc wipes the DOM
+            // for the totals section, including the Tank & Load Planning block.
+            if (tankSizeGal > 0) {
+                const tankInput = document.getElementById('loadTankSize');
+                if (tankInput) tankInput.value = tankSizeGal;
+            }
+            if (gpaCarrier > 0) {
+                const gpaInput = document.getElementById('loadGpaCarrier');
+                if (gpaInput) gpaInput.value = gpaCarrier;
+            }
+            if (tankSizeGal > 0 || gpaCarrier > 0) updateLoadConfig();
+
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
         }
 
