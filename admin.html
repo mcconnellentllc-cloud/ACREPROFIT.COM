@@ -664,9 +664,12 @@
                         <button class="btn btn-outline" onclick="toggleEditMode()">Edit Customer</button>
                         <button class="btn btn-primary" id="placeOrderBtn" onclick="goToAdminOrder()">Place Order</button>
                     </div>
-                    <div class="customer-modal-actions" id="editActions" style="display: none;">
-                        <button class="btn btn-outline" onclick="cancelEdit()">Cancel</button>
-                        <button class="btn btn-primary" onclick="saveCustomer()">Save Changes</button>
+                    <div class="customer-modal-actions" id="editActions" style="display: none; justify-content: space-between;">
+                        <button id="customerArchiveBtn" class="btn btn-sm" style="display:none;" onclick="handleCustomerArchiveClick()">Archive</button>
+                        <div style="display:flex; gap:8px; margin-left:auto;">
+                            <button class="btn btn-outline" onclick="cancelEdit()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveCustomer()">Save Changes</button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4495,6 +4498,12 @@
                     body: JSON.stringify({ archive })
                 });
                 if (res.ok) {
+                    // Close the customer modal if it's open (button now lives
+                    // inside the Edit Customer modal, not on the grid card).
+                    const modal = document.getElementById('customerModal');
+                    if (modal && modal.style.display !== 'none') {
+                        closeCustomerModal();
+                    }
                     loadCustomers();
                 } else {
                     const err = await res.json();
@@ -4544,12 +4553,6 @@
             const repBadgeColor = repName ? '#2d5a27' : '#9ca3af';
             const safeName = (c.name || '').replace(/'/g, "\\'");
             const initials = (c.name || '??').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase();
-            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
-            const isSuperadmin = currentUser.role === 'superadmin';
-            const archiveBtn = isSuperadmin ? `
-                        <button class="btn btn-sm ${c.isActive === false ? 'btn-success' : 'btn-danger'}" onclick="archiveCustomer('${c._id}', ${c.isActive !== false})" style="font-size:0.75rem;">
-                            ${c.isActive === false ? 'Reactivate' : 'Archive'}
-                        </button>` : '';
             return `
                 <div class="customer-card" data-customer-id="${c._id}">
                     <div class="customer-avatar">${initials}</div>
@@ -4566,7 +4569,6 @@
                         <button class="btn btn-sm btn-outline" onclick="viewCustomer('${c._id}')">View Details</button>
                         <button class="btn btn-sm btn-outline" onclick="resetCustomerPassword('${c._id}', '${c.email}')" style="color:#d97706; border-color:#d97706;">Reset Password</button>
                         <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${safeName}')">Place Order</button>
-                        ${archiveBtn}
                     </div>
                 </div>
             `;
@@ -4738,7 +4740,36 @@
             }).join('') : '<p class="empty">No invoices yet</p>';
 
             document.getElementById('modalCustomerInvoices').innerHTML = invoicesHtml;
+
+            // Archive/Reactivate button — superadmin only, lives on editActions bar.
+            // Label + color flip based on current customer.isActive state.
+            const archiveBtn = document.getElementById('customerArchiveBtn');
+            if (archiveBtn) {
+                const viewerUser = JSON.parse(localStorage.getItem('user') || '{}');
+                if (viewerUser.role === 'superadmin') {
+                    const isArchived = customer.isActive === false;
+                    archiveBtn.style.display = 'inline-block';
+                    archiveBtn.textContent = isArchived ? 'Reactivate' : 'Archive';
+                    archiveBtn.style.background = isArchived ? '#059669' : '#dc3545';
+                    archiveBtn.style.color = 'white';
+                    archiveBtn.style.border = 'none';
+                    archiveBtn.dataset.archive = isArchived ? 'false' : 'true';
+                } else {
+                    archiveBtn.style.display = 'none';
+                }
+            }
+
             document.getElementById('customerModal').style.display = 'flex';
+        }
+
+        // Called from the Archive/Reactivate button on the customer modal's
+        // editActions bar. Reads the dataset flag set in showCustomerModal()
+        // and routes through the existing archiveCustomer() helper so the
+        // PUT + confirm + refresh flow stays in one place.
+        function handleCustomerArchiveClick() {
+            if (!selectedCustomer) return;
+            const archive = document.getElementById('customerArchiveBtn').dataset.archive === 'true';
+            archiveCustomer(selectedCustomer._id, archive);
         }
 
         // Close customer modal
