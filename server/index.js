@@ -159,6 +159,7 @@ const userSchema = new mongoose.Schema({
         enum: ['customer', 'admin', 'superadmin', 'supplier', 'distributor'],
         default: 'customer'
     },
+    isActive: { type: Boolean, default: true },
     // Supplier-specific fields
     companyName: String, // For suppliers - company/business name
     bidEligible: { type: Boolean, default: true }, // Include in Price Mining bid sheets. false = direct-purchase only (e.g. Corbet/Hydrovant)
@@ -4097,6 +4098,14 @@ app.post('/api/auth/login', loginLimiter, async (req, res) => {
             return res.status(401).json({ error: 'Invalid email or password' });
         }
 
+        // isActive === false check (not !isActive) so existing docs
+        // without the field (undefined) are not blocked
+        if (user.isActive === false) {
+            return res.status(403).json({
+                error: 'This account has been archived. Contact your rep or support to reactivate.'
+            });
+        }
+
         const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: '30d' });
 
         // Build user response based on role
@@ -5000,6 +5009,12 @@ app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res
         const { search } = req.query;
         let query = { role: 'customer' };
 
+        // Hide archived customers by default.
+        // Superadmin can pass ?includeArchived=true to see them.
+        if (req.query.includeArchived !== 'true' || req.user.role !== 'superadmin') {
+            query.isActive = { $ne: false };
+        }
+
         // If not superadmin, only show their own customers
         if (isDistributor(req.user)) {
             query.representative = req.user._id;
@@ -5101,6 +5116,25 @@ async function findOrderInEitherCollection(query) {
     }
     return null;
 }
+
+// Archive / unarchive a customer (superadmin only)
+app.put('/api/admin/customers/:id/archive', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const { archive } = req.body; // true = archive, false = unarchive
+        const customer = await User.findOne({ _id: req.params.id, role: 'customer' });
+        if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+        customer.isActive = archive === true ? false : true;
+        await customer.save();
+
+        res.json({
+            message: archive ? 'Customer archived' : 'Customer reactivated',
+            customer: { _id: customer._id, name: customer.name, isActive: customer.isActive }
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
 
 // Get single customer details (admin only)
 app.get('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, async (req, res) => {

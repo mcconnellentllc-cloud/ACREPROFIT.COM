@@ -404,6 +404,10 @@
                     <h2 id="customersTabTitle">My Customers</h2>
                     <div class="tab-header-actions">
                         <button class="btn btn-primary" onclick="openAddCustomerModal()">+ Add Customer</button>
+                        <label id="showArchivedWrapper" style="display:none; align-items:center; gap:6px; font-size:0.875rem; color:#666; cursor:pointer;">
+                            <input type="checkbox" id="showArchivedCustomers" onchange="loadCustomers()" style="width:15px; height:15px; cursor:pointer;">
+                            Show archived
+                        </label>
                         <div class="search-box">
                             <input type="text" id="customerSearch" placeholder="Search customers...">
                         </div>
@@ -4182,14 +4186,7 @@
                 renderOrdersTable();
 
                 // Load customers
-                const customersRes = await fetch(`${API_URL}/api/admin/customers`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                const customers = await customersRes.json();
-                allCustomers = customers;
-
-                document.getElementById('totalCustomers').textContent = customers.length;
-                renderCustomers(customers);
+                await loadCustomers();
 
             } catch (error) {
                 console.error('Error loading dashboard:', error);
@@ -4449,6 +4446,52 @@
             }
         }
 
+        // Fetch customers list from server. Superadmin's "Show archived"
+        // checkbox appends ?includeArchived=true; server ignores the flag for
+        // non-superadmin callers. Sets allCustomers, renders the grid, and
+        // reveals the archived toggle label when the current user is a superadmin.
+        async function loadCustomers() {
+            try {
+                const showArchived = document.getElementById('showArchivedCustomers')?.checked;
+                const url = `${API_URL}/api/admin/customers${showArchived ? '?includeArchived=true' : ''}`;
+                const res = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load customers');
+                const customers = await res.json();
+                allCustomers = customers;
+                const totalCustomersEl = document.getElementById('totalCustomers');
+                if (totalCustomersEl) totalCustomersEl.textContent = customers.length;
+                renderCustomers(customers);
+
+                // Reveal the "Show archived" toggle only for superadmins.
+                const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+                const wrapper = document.getElementById('showArchivedWrapper');
+                if (wrapper) wrapper.style.display = currentUser.role === 'superadmin' ? 'flex' : 'none';
+            } catch (err) {
+                console.error('loadCustomers error:', err);
+            }
+        }
+
+        async function archiveCustomer(customerId, archive) {
+            if (!confirm(`${archive ? 'Archive' : 'Reactivate'} this customer? ${archive ? 'They will not be able to log in until reactivated.' : ''}`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/customers/${customerId}/archive`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ archive })
+                });
+                if (res.ok) {
+                    loadCustomers();
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + err.error);
+                }
+            } catch (err) {
+                alert('Error archiving customer.');
+            }
+        }
+
         // Render customers grid
         async function resetCustomerPassword(userId, email) {
             const newPassword = prompt(`Reset password for ${email}.\n\nEnter new password (minimum 6 characters):`);
@@ -4488,6 +4531,12 @@
             const repBadgeColor = repName ? '#2d5a27' : '#9ca3af';
             const safeName = (c.name || '').replace(/'/g, "\\'");
             const initials = (c.name || '??').split(' ').map(n => n[0] || '').join('').slice(0, 2).toUpperCase();
+            const currentUser = JSON.parse(localStorage.getItem('user') || '{}');
+            const isSuperadmin = currentUser.role === 'superadmin';
+            const archiveBtn = isSuperadmin ? `
+                        <button class="btn btn-sm ${c.isActive === false ? 'btn-success' : 'btn-danger'}" onclick="archiveCustomer('${c._id}', ${c.isActive !== false})" style="font-size:0.75rem;">
+                            ${c.isActive === false ? 'Reactivate' : 'Archive'}
+                        </button>` : '';
             return `
                 <div class="customer-card" data-customer-id="${c._id}">
                     <div class="customer-avatar">${initials}</div>
@@ -4504,6 +4553,7 @@
                         <button class="btn btn-sm btn-outline" onclick="viewCustomer('${c._id}')">View Details</button>
                         <button class="btn btn-sm btn-outline" onclick="resetCustomerPassword('${c._id}', '${c.email}')" style="color:#d97706; border-color:#d97706;">Reset Password</button>
                         <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${safeName}')">Place Order</button>
+                        ${archiveBtn}
                     </div>
                 </div>
             `;
