@@ -12372,11 +12372,12 @@ app.post('/api/admin/seed-milo-program', authMiddleware, superAdminMiddleware, a
         // Link chemicals to their catalog IDs where possible (for cost calculations)
         for (const app of miloProgram.applications) {
             for (const chem of app.chemicals) {
-                const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit').lean();
+                const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit unitsPerPack').lean();
                 if (catalogMatch) {
                     chem.chemicalId = catalogMatch._id;
                     chem.packSize = catalogMatch.packSize;
                     chem.unit = catalogMatch.unit;
+                    chem.unitsPerPack = catalogMatch.unitsPerPack;
                 }
             }
         }
@@ -12447,11 +12448,12 @@ app.post('/api/admin/seed-field-pea-program', authMiddleware, superAdminMiddlewa
         // Link chemicals to catalog (same pattern as seed-milo-program).
         for (const app of program.applications) {
             for (const chem of app.chemicals) {
-                const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit').lean();
+                const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit unitsPerPack').lean();
                 if (catalogMatch) {
                     chem.chemicalId = catalogMatch._id;
                     chem.packSize = catalogMatch.packSize;
                     chem.unit = catalogMatch.unit;
+                    chem.unitsPerPack = catalogMatch.unitsPerPack;
                 }
             }
         }
