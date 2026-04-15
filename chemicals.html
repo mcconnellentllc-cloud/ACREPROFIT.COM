@@ -651,7 +651,8 @@
                 if (response.ok) {
                     const serverPrograms = await response.json();
                     // Use demo programs if server returns empty array
-                    programs = (serverPrograms && serverPrograms.length > 0) ? serverPrograms : getDemoPrograms();
+                    const programList = Array.isArray(serverPrograms) ? serverPrograms : (serverPrograms?.programs || []);
+                    programs = programList.length > 0 ? programList : getDemoPrograms();
                 } else {
                     programs = getDemoPrograms();
                 }
