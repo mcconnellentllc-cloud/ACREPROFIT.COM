@@ -1857,7 +1857,9 @@
 
             // Add listeners for real-time Hydrovant calculation
             document.getElementById('programAcres').addEventListener('input', updateHydrovant);
+            document.getElementById('programAcres').addEventListener('input', updateLoadConfig);
             document.getElementById('sprayVolume').addEventListener('input', updateHydrovant);
+            document.getElementById('sprayVolume').addEventListener('input', updateLoadConfig);
             updateHydrovant();
 
             section.scrollIntoView({ behavior: 'smooth' });
@@ -2113,7 +2115,11 @@
         // calculateProgramOrder() render (since recalc wipes the DOM).
         function updateLoadConfig() {
             tankSizeGal = parseFloat(document.getElementById('loadTankSize')?.value) || 0;
-            gpaCarrier = parseFloat(document.getElementById('loadGpaCarrier')?.value) || 0;
+            // GPA comes from the existing spray volume input (program flow uses
+            // #sprayVolume; direct-selection flow uses #cropGPA). No duplicate
+            // input needed — single source of truth for carrier volume.
+            gpaCarrier = parseFloat(document.getElementById('sprayVolume')?.value) ||
+                         parseFloat(document.getElementById('cropGPA')?.value) || 0;
             window._loadConfig = { tankSizeGal, gpaCarrier };
 
             const readout = document.getElementById('loadReadout');
@@ -2515,19 +2521,12 @@
                     <div class="load-config-section" style="margin:24px 0; padding:20px; background:#f8faf8; border:2px solid #e5e7eb; border-radius:12px;">
                         <h3 style="margin:0 0 6px 0; color:#2d5a27; font-size:1.05rem;">🚜 Tank & Load Planning</h3>
                         <p style="margin:0 0 16px 0; color:#666; font-size:0.875rem;">Optional — drives your per-load mix sheet. Leave blank if you're only ordering chemical.</p>
-                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
-                            <div>
-                                <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.875rem;">Sprayer Tank Size (gal)</label>
-                                <input type="number" id="loadTankSize" placeholder="e.g., 1000" min="1"
-                                    style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:8px; font-size:1rem;"
-                                    oninput="updateLoadConfig()">
-                            </div>
-                            <div>
-                                <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.875rem;">Carrier Volume (gal/acre)</label>
-                                <input type="number" id="loadGpaCarrier" placeholder="e.g., 10" min="1" step="0.5"
-                                    style="width:100%; padding:10px; border:2px solid #e5e7eb; border-radius:8px; font-size:1rem;"
-                                    oninput="updateLoadConfig()">
-                            </div>
+                        <div style="margin-bottom:16px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.875rem;">Sprayer Tank Size (gal)</label>
+                            <input type="number" id="loadTankSize" placeholder="e.g., 1000" min="1"
+                                style="width:260px; padding:10px; border:2px solid #e5e7eb; border-radius:8px; font-size:1rem;"
+                                oninput="updateLoadConfig()">
+                            <div style="font-size:0.8rem; color:#6b7280; margin-top:4px;">Carrier volume comes from your Spray Volume input above.</div>
                         </div>
                         <div id="loadReadout" style="display:none; background:#fff; border:1px solid #d1fae5; border-radius:8px; padding:16px;">
                         </div>
@@ -2759,11 +2758,8 @@
                 const tankInput = document.getElementById('loadTankSize');
                 if (tankInput) tankInput.value = tankSizeGal;
             }
-            if (gpaCarrier > 0) {
-                const gpaInput = document.getElementById('loadGpaCarrier');
-                if (gpaInput) gpaInput.value = gpaCarrier;
-            }
-            if (tankSizeGal > 0 || gpaCarrier > 0) updateLoadConfig();
+            // gpaCarrier reads from #sprayVolume / #cropGPA — no separate input to restore
+            if (tankSizeGal > 0) updateLoadConfig();
 
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
         }
