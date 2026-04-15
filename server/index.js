@@ -12403,16 +12403,12 @@ app.post('/api/admin/seed-milo-program', authMiddleware, superAdminMiddleware, a
 });
 
 // Seed Field Pea Pre-Emerge program. Single-pass pre-emerge weed control for
-// field peas. Applied at planting before pea emergence. Idempotent: returns the
-// existing doc if the program is already seeded.
+// field peas. Applied at planting before pea emergence. Idempotent: updates
+// the existing doc in-place via Object.assign (same pattern as seed-milo-program)
+// so re-runs pick up spec changes — including unitsPerPack backfill.
 app.post('/api/admin/seed-field-pea-program', authMiddleware, superAdminMiddleware, async (req, res) => {
     try {
-        const existing = await SprayProgram.findOne({ name: 'Field Pea Pre-Emerge Program' });
-        if (existing) {
-            return res.json({ message: 'Field Pea program already exists', program: existing });
-        }
-
-        const program = new SprayProgram({
+        const programSpec = {
             name: 'Field Pea Pre-Emerge Program',
             crop: 'fieldpeas',
             description: 'Pre-emerge weed control for field peas. Apply at planting before pea emergence. Proven on this crop in NE Colorado.',
@@ -12441,12 +12437,12 @@ app.post('/api/admin/seed-field-pea-program', authMiddleware, superAdminMiddlewa
             ],
             rotationRestrictions: 'Corn/Sorghum: 18 months after sulfentrazone. Wheat: 4 months. Soybeans: 12 months. Always check the full sulfentrazone label for your planned rotation.',
             grazingRestrictions: 'Do not graze treated areas or cut for hay for 28 days after sulfentrazone application.',
-            groundType: 'Field pea ground with annual grass and broadleaf pressure. Medium to heavy textured soils preferred for sulfentrazone. Avoid coarse sands or high-pH soils.',
-            createdBy: req.user._id
-        });
+            groundType: 'Field pea ground with annual grass and broadleaf pressure. Medium to heavy textured soils preferred for sulfentrazone. Avoid coarse sands or high-pH soils.'
+        };
 
         // Link chemicals to catalog (same pattern as seed-milo-program).
-        for (const app of program.applications) {
+        // Mutates programSpec.applications in place before save/assign.
+        for (const app of programSpec.applications) {
             for (const chem of app.chemicals) {
                 const catalogMatch = await Chemical.findOne({ productName: chem.productName }).select('_id packSize unit unitsPerPack').lean();
                 if (catalogMatch) {
@@ -12458,8 +12454,20 @@ app.post('/api/admin/seed-field-pea-program', authMiddleware, superAdminMiddlewa
             }
         }
 
+        const existing = await SprayProgram.findOne({ name: programSpec.name });
+        if (existing) {
+            Object.assign(existing, programSpec);
+            existing.updatedAt = new Date();
+            await existing.save();
+            return res.json({ message: 'Field Pea program updated', id: existing._id, program: existing });
+        }
+
+        const program = new SprayProgram({
+            ...programSpec,
+            createdBy: req.user._id
+        });
         await program.save();
-        res.json({ message: 'Field Pea Pre-Emerge Program seeded successfully', program });
+        res.json({ message: 'Field Pea Pre-Emerge Program seeded successfully', id: program._id, program });
     } catch (error) {
         console.error('seed-field-pea-program error:', error);
         res.status(500).json({ error: error.message });
