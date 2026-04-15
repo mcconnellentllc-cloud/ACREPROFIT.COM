@@ -2022,7 +2022,8 @@
                             packSize: chemItem.packSize,
                             unitsPerPack,
                             unit,
-                            price
+                            price,
+                            priceIsSpeculated: catalogMatch?.priceIsSpeculated === true
                         };
                     }
                     totalsByChemical[key].totalNeeded += totalNeeded;
@@ -2196,7 +2197,12 @@
                                             ${breakdown.overage > 0.1 ? `<span class="overage">(+${breakdown.overage.toFixed(1)} extra)</span>` : ''}
                                         </div>
                                     </td>
-                                    <td class="cost-col"><strong>$${actualCost.toFixed(2)}</strong></td>
+                                    <td class="cost-col">
+                                        ${item.priceIsSpeculated
+                                            ? `<strong style="color:#d97706;">~$${actualCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;" title="Estimated price">est.</span>`
+                                            : `<strong>$${actualCost.toFixed(2)}</strong>`
+                                        }
+                                    </td>
                                 </tr>
                             `}).join('')}
                             ${(() => {
@@ -2235,6 +2241,15 @@
                             </tr>
                         </tfoot>
                     </table>
+
+                    ${Object.values(totalsByChemical).some(i => i.priceIsSpeculated) ? `
+                    <div style="background:#fffbeb; border:2px solid #f59e0b; border-radius:8px; padding:14px 18px; margin:16px 0; display:flex; gap:12px; align-items:flex-start;">
+                        <span style="font-size:1.3rem;">⚠️</span>
+                        <div>
+                            <div style="font-weight:700; color:#92400e; margin-bottom:4px;">Estimated Pricing</div>
+                            <div style="color:#78350f; font-size:0.9rem;">Some prices are estimated based on current market rates and are subject to change. Final price confirmed when your order is placed.</div>
+                        </div>
+                    </div>` : ''}
 
                     ${(() => {
                         // Check if all products in the order are in stock

@@ -496,6 +496,7 @@ const chemicalSchema = new mongoose.Schema({
     adminPrice: { type: Number }, // Tier 2: Cost + admin margin dollars (per unit)
     marginDollars: { type: Number, default: 0 }, // Rep margin $ - dollar amount added to admin price
     sellPrice: { type: Number, required: true }, // Tier 3: Retail price - what customer pays (per unit)
+    priceIsSpeculated: { type: Boolean, default: false }, // true = estimated price, not confirmed by PO
     // Legacy fields (kept for backward compatibility)
     adminMargin: { type: Number, default: 0 }, // Legacy: Admin margin % (no longer used)
     regularMargin: { type: Number, default: 0 }, // Legacy: Regular margin %
@@ -2792,31 +2793,42 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
     const chemQuery = Chemical.findById(chemicalId);
     if (session) chemQuery.session(session);
     const chemical = await chemQuery;
-    if (chemical && unitCost !== chemical.costPrice) {
-        const oldCost = chemical.costPrice;
-        chemical.costPrice = unitCost;
-        chemical.adminPrice = Math.round((unitCost + (chemical.adminMarginDollars || 0)) * 100) / 100;
-        chemical.sellPrice = Math.round((chemical.adminPrice + (chemical.marginDollars || 0)) * 100) / 100;
-        chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
-        chemical.priceDate = new Date();
-        chemical.updatedAt = new Date();
-        await chemical.save({ session });
+    if (chemical) {
+        // Clear speculation flag on any PO receive — price is now confirmed
+        if (chemical.priceIsSpeculated === true) {
+            chemical.priceIsSpeculated = false;
+            chemical.priceDate = new Date();
+            chemical.updatedAt = new Date();
+            await chemical.save({ session });
+            console.log(`Speculation cleared: ${productName} — PO ${poNumber || 'manual'} landed`);
+        }
 
-        await ChemicalPriceHistory.create([{
-            chemicalId: chemical._id,
-            productName: chemical.productName,
-            sourceSupplier: chemical.sourceSupplier,
-            packSize: chemical.packSize,
-            unit: chemical.unit,
-            costPrice: unitCost,
-            previousCostPrice: oldCost,
-            adminPrice: chemical.adminPrice,
-            sellPrice: chemical.sellPrice,
-            priceVersion: `PO-${poNumber || 'manual'}`,
-            notes: `Cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)} via ${poNumber || 'receive'}. Margins unchanged.`
-        }], { session });
+        if (unitCost !== chemical.costPrice) {
+            const oldCost = chemical.costPrice;
+            chemical.costPrice = unitCost;
+            chemical.adminPrice = Math.round((unitCost + (chemical.adminMarginDollars || 0)) * 100) / 100;
+            chemical.sellPrice = Math.round((chemical.adminPrice + (chemical.marginDollars || 0)) * 100) / 100;
+            chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
+            chemical.priceDate = new Date();
+            chemical.updatedAt = new Date();
+            await chemical.save({ session });
 
-        console.log(`Price auto-updated: ${productName} cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)}, sell $${chemical.sellPrice.toFixed(2)} (margins unchanged)`);
+            await ChemicalPriceHistory.create([{
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                sourceSupplier: chemical.sourceSupplier,
+                packSize: chemical.packSize,
+                unit: chemical.unit,
+                costPrice: unitCost,
+                previousCostPrice: oldCost,
+                adminPrice: chemical.adminPrice,
+                sellPrice: chemical.sellPrice,
+                priceVersion: `PO-${poNumber || 'manual'}`,
+                notes: `Cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)} via ${poNumber || 'receive'}. Margins unchanged.`
+            }], { session });
+
+            console.log(`Price auto-updated: ${productName} cost $${oldCost.toFixed(2)} → $${unitCost.toFixed(2)}, sell $${chemical.sellPrice.toFixed(2)} (margins unchanged)`);
+        }
     }
 
     return { inventory, transaction, batch };
@@ -7469,7 +7481,7 @@ app.post('/api/chemicals', authMiddleware, adminMiddleware, async (req, res) => 
 app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { productName, sourceSupplier, manufacturer, costPrice, adminPrice, sellPrice, adminMarginDollars, marginDollars, priceVersion, notes, equivalentProduct, isActive, availableForOrder,
-                category, crops, defaultRate, rateUnit, unitsPerPack, packSize, unit, epaRegistrationNumber, signalWord } = req.body;
+                category, crops, defaultRate, rateUnit, unitsPerPack, packSize, unit, epaRegistrationNumber, signalWord, priceIsSpeculated } = req.body;
 
         const chemical = await Chemical.findById(req.params.id);
         if (!chemical) {
@@ -7527,6 +7539,7 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
         if (unit !== undefined) chemical.unit = unit;
         if (epaRegistrationNumber !== undefined) chemical.epaRegistrationNumber = epaRegistrationNumber;
         if (signalWord !== undefined) chemical.signalWord = signalWord;
+        if (priceIsSpeculated !== undefined) chemical.priceIsSpeculated = priceIsSpeculated;
 
         chemical.updatedAt = new Date();
         await chemical.save();
