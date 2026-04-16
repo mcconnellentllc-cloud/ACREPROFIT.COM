@@ -554,6 +554,12 @@
                                 <p class="empty">No invoices yet</p>
                             </div>
                         </div>
+                        <div class="customer-quotes-section" style="margin-top:20px;">
+                            <h3>Program Quotes</h3>
+                            <div id="modalCustomerQuotes" class="customer-orders-list">
+                                <p class="empty">No quotes yet</p>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- Edit Mode -->
@@ -665,7 +671,10 @@
                         <button class="btn btn-primary" id="placeOrderBtn" onclick="goToAdminOrder()">Place Order</button>
                     </div>
                     <div class="customer-modal-actions" id="editActions" style="display: none; justify-content: space-between;">
-                        <button id="customerArchiveBtn" class="btn btn-sm" style="display:none;" onclick="handleCustomerArchiveClick()">Archive</button>
+                        <div style="display:flex; gap:8px;">
+                            <button id="resetPasswordBtn" class="btn btn-sm btn-outline" style="display:none; color:#d97706; border-color:#d97706;" onclick="resetPasswordFromModal()">Reset Password</button>
+                            <button id="customerArchiveBtn" class="btn btn-sm" style="display:none;" onclick="handleCustomerArchiveClick()">Archive</button>
+                        </div>
                         <div style="display:flex; gap:8px; margin-left:auto;">
                             <button class="btn btn-outline" onclick="cancelEdit()">Cancel</button>
                             <button class="btn btn-primary" onclick="saveCustomer()">Save Changes</button>
@@ -4489,6 +4498,81 @@
             }
         }
 
+        function createQuoteForCustomer(customerId, customerName) {
+            localStorage.setItem('actAsCustomerId', customerId);
+            localStorage.setItem('actAsCustomerName', customerName);
+            window.location.href = 'chemicals.html';
+        }
+
+        function resetPasswordFromModal() {
+            if (!selectedCustomer) return;
+            resetCustomerPassword(selectedCustomer._id, selectedCustomer.email);
+        }
+
+        async function loadCustomerQuotes(customerId) {
+            const quotesDiv = document.getElementById('modalCustomerQuotes');
+            if (!quotesDiv) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/quotes/customer/${customerId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) { quotesDiv.innerHTML = '<p class="empty">Could not load quotes</p>'; return; }
+                const quotes = await res.json();
+                if (!quotes.length) { quotesDiv.innerHTML = '<p class="empty">No quotes yet</p>'; return; }
+                const statusColors = { draft: '#fef9c3', sent: '#dbeafe', converted: '#dcfce7', expired: '#fee2e2', declined: '#fee2e2' };
+                const statusText = { draft: '#854d0e', sent: '#1e40af', converted: '#166534', expired: '#991b1b', declined: '#991b1b' };
+                quotesDiv.innerHTML = quotes.map(q => `
+                    <div style="padding:12px; border:1px solid #e5e7eb; border-radius:8px; margin-bottom:8px;">
+                        <div style="display:flex; justify-content:space-between; align-items:start; margin-bottom:6px;">
+                            <div>
+                                <strong>${q.quoteNumber || ''}</strong> — ${q.programName || 'Custom Quote'}
+                                <span style="margin-left:8px; font-size:0.8rem; color:#666;">${q.totalAcres || 0} acres</span>
+                            </div>
+                            <span style="font-size:0.8rem; padding:2px 8px; border-radius:4px; background:${statusColors[q.status] || '#f3f4f6'}; color:${statusText[q.status] || '#374151'};">${q.status}</span>
+                        </div>
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <div style="font-size:0.85rem; color:#666;">
+                                $${(q.total || 0).toLocaleString()} · ${new Date(q.createdAt).toLocaleDateString()}
+                                · Expires ${new Date(q.expiresAt).toLocaleDateString()}
+                            </div>
+                            ${q.status === 'sent' ? `
+                            <button class="btn btn-sm btn-primary" onclick="convertQuoteToInvoice('${q._id}')">
+                                Create Invoice
+                            </button>` : ''}
+                            ${q.status === 'converted' && q.convertedToInvoiceId ? `
+                            <span style="font-size:0.8rem; color:#059669; font-weight:600;">Invoice created</span>` : ''}
+                        </div>
+                    </div>
+                `).join('');
+            } catch (err) {
+                quotesDiv.innerHTML = '<p class="empty">Error loading quotes</p>';
+            }
+        }
+
+        async function convertQuoteToInvoice(quoteId) {
+            if (!confirm('Create an invoice from this quote and send to customer?')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/quotes/${quoteId}/convert`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
+                if (res.ok) {
+                    alert('Invoice created successfully.');
+                    if (selectedCustomer) {
+                        loadCustomerQuotes(selectedCustomer._id);
+                    }
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + err.error);
+                }
+            } catch (err) {
+                alert('Error creating invoice.');
+            }
+        }
+
         async function archiveCustomer(customerId, archive) {
             if (!confirm(`${archive ? 'Archive' : 'Reactivate'} this customer? ${archive ? 'They will not be able to log in until reactivated.' : ''}`)) return;
             try {
@@ -4567,7 +4651,7 @@
                     </div>
                     <div class="customer-actions">
                         <button class="btn btn-sm btn-outline" onclick="viewCustomer('${c._id}')">View Details</button>
-                        <button class="btn btn-sm btn-outline" onclick="resetCustomerPassword('${c._id}', '${c.email}')" style="color:#d97706; border-color:#d97706;">Reset Password</button>
+                        <button class="btn btn-sm" style="background:#059669; color:white; border:none;" onclick="createQuoteForCustomer('${c._id}', '${safeName}')">Create Quote</button>
                         <button class="btn btn-sm btn-primary" onclick="quickActAsCustomer('${c._id}', '${safeName}')">Place Order</button>
                     </div>
                 </div>
@@ -4740,6 +4824,14 @@
             }).join('') : '<p class="empty">No invoices yet</p>';
 
             document.getElementById('modalCustomerInvoices').innerHTML = invoicesHtml;
+            loadCustomerQuotes(customer._id);
+
+            // Reset Password button — visible for admin/superadmin in edit mode.
+            const resetBtn = document.getElementById('resetPasswordBtn');
+            if (resetBtn) {
+                const viewerUser = JSON.parse(localStorage.getItem('user') || '{}');
+                resetBtn.style.display = ['admin', 'superadmin', 'distributor'].includes(viewerUser.role) ? 'inline-block' : 'none';
+            }
 
             // Archive/Reactivate button — superadmin only, lives on editActions bar.
             // Label + color flip based on current customer.isActive state.
