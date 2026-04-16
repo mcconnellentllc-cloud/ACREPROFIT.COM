@@ -2128,6 +2128,7 @@
             const acres = parseFloat(document.getElementById('programAcres')?.value) ||
                           parseFloat(document.getElementById('cropAcres')?.value) || 0;
 
+            renderLoadSheet();
             if (tankSizeGal > 0 && gpaCarrier > 0 && acres > 0) {
                 const acresPerLoad = tankSizeGal / gpaCarrier;
                 const fullLoads = Math.floor(acres / acresPerLoad);
@@ -2162,6 +2163,172 @@
             } else {
                 readout.style.display = 'none';
             }
+        }
+
+        // EPA tank-mix order: 1=dry → 7=DRA (Hydrovant always last).
+        // Falls through to 3 (Solutions) for anything ambiguous — matches
+        // the common case for AcreProfit's catalog (SL products dominate).
+        function getMixOrder(chem) {
+            if (chem.isAdjuvant || (chem.productName || '').toLowerCase().includes('hydrovant')) return 7;
+            const name = (chem.productName || '').toLowerCase();
+            const unit = (chem.unit || '').toLowerCase();
+            const rateUnit = (chem.rateUnit || '').toLowerCase();
+            if (name.includes('wdg') || name.includes(' df') || name.includes(' dg') ||
+                (rateUnit.includes('oz') && (unit.includes('lb') || rateUnit.includes('lb')))) return 1;
+            if (name.includes('atrazine') || name.includes('4l') || name.includes('meso') ||
+                name.includes('4sc') || name.includes('flowable')) return 2;
+            if (name.includes('glyphosate') || name.includes('dicamba') ||
+                name.includes('sl') || name.includes('paraquat')) return 3;
+            return 3; // default: treat as SL
+        }
+
+        // Per-load product amount + display unit for a given chemical and acreage.
+        // Hydrovant returns null — caller calculates % v/v from tank/remainder water.
+        function calcProductPerLoad(chem, acres) {
+            const rate = chem.rate ?? chem.suggestedRate ?? 0;
+            const rateUnit = (chem.rateUnit || '').toLowerCase();
+            const unit = (chem.unit || '').toLowerCase();
+
+            if (chem.isAdjuvant || (chem.productName || '').toLowerCase().includes('hydrovant')) {
+                return null;
+            }
+
+            if (unit.includes('lb') || (rateUnit.includes('oz/acre') && unit.includes('lb'))) {
+                const oz = rate * acres;
+                if (oz >= 16) return { amount: (oz / 16).toFixed(2), displayUnit: 'lb' };
+                return { amount: oz.toFixed(1), displayUnit: 'oz' };
+            }
+            if (rateUnit.includes('pt')) {
+                return { amount: ((rate * acres) / 8).toFixed(2), displayUnit: 'gal' };
+            }
+            if (rateUnit.includes('qt')) {
+                return { amount: ((rate * acres) / 4).toFixed(2), displayUnit: 'gal' };
+            }
+            if (rateUnit.includes('fl oz') || rateUnit.includes('oz')) {
+                const gal = (rate * acres) / 128;
+                if (gal < 1) return { amount: (rate * acres).toFixed(1), displayUnit: 'fl oz' };
+                return { amount: gal.toFixed(2), displayUnit: 'gal' };
+            }
+            if (rateUnit.includes('gal')) {
+                return { amount: (rate * acres).toFixed(2), displayUnit: 'gal' };
+            }
+            return { amount: (rate * acres).toFixed(2), displayUnit: chem.unit || '' };
+        }
+
+        // Per-load mix sheet. One table per application (Pass 1, Pass 2, ...)
+        // Water row first (implicit) → products sorted by EPA mix order →
+        // Hydrovant row last (always mix order 7). Partial final load column
+        // renders amber when acreage doesn't divide evenly into the tank.
+        function renderLoadSheet() {
+            const loadSheetDiv = document.getElementById('loadSheetSection');
+            if (!loadSheetDiv) return;
+
+            if (!tankSizeGal || !gpaCarrier || !selectedProgram) {
+                loadSheetDiv.style.display = 'none';
+                return;
+            }
+
+            const acres = parseFloat(document.getElementById('programAcres')?.value) ||
+                          parseFloat(document.getElementById('cropAcres')?.value) || 0;
+            if (acres <= 0) { loadSheetDiv.style.display = 'none'; return; }
+
+            const acresPerLoad = tankSizeGal / gpaCarrier;
+            const fullLoads = Math.floor(acres / acresPerLoad);
+            const remainderAcres = parseFloat((acres - fullLoads * acresPerLoad).toFixed(4));
+            const hasPartial = remainderAcres > 0.01;
+            const totalLoads = hasPartial ? fullLoads + 1 : fullLoads;
+            const passes = selectedProgram.applications || [];
+
+            let html = `
+                <div style="margin:24px 0; padding:20px; background:#f8faf8; border:2px solid #2d5a27; border-radius:12px;">
+                    <h3 style="margin:0 0 4px 0; color:#2d5a27; font-size:1.1rem;">📋 Per-Load Mix Sheet</h3>
+                    <p style="margin:0 0 20px 0; color:#666; font-size:0.85rem;">
+                        ${selectedProgram.name} — ${acres} acres — ${totalLoads} loads
+                        (Tank: ${tankSizeGal.toLocaleString()} gal | ${gpaCarrier} gal/acre | ${acresPerLoad.toFixed(1)} acres/load)
+                    </p>
+            `;
+
+            passes.forEach((pass, passIdx) => {
+                const chems = [...(pass.chemicals || [])].sort((a, b) => getMixOrder(a) - getMixOrder(b));
+                const isHydro = c => c.isAdjuvant || (c.productName || '').toLowerCase().includes('hydrovant');
+                const hydrovant = chems.find(isHydro);
+                const nonHydro = chems.filter(c => !isHydro(c));
+
+                html += `
+                    <div style="margin-bottom:28px;">
+                        <div style="font-weight:700; color:#2d5a27; font-size:1rem; margin-bottom:12px; padding-bottom:6px; border-bottom:2px solid #d1fae5;">
+                            ${pass.name || `Pass ${passIdx + 1}`}
+                            <span style="font-weight:400; color:#666; font-size:0.85rem; margin-left:8px;">${pass.timing || ''}</span>
+                        </div>
+                        <div style="overflow-x:auto;">
+                        <table style="width:100%; border-collapse:collapse; font-size:0.875rem;">
+                            <thead>
+                                <tr style="background:#2d5a27; color:white;">
+                                    <th style="padding:8px 12px; text-align:left;">Mix Order</th>
+                                    <th style="padding:8px 12px; text-align:left;">Product</th>
+                                    <th style="padding:8px 12px; text-align:center;">Rate/Acre</th>
+                                    ${Array.from({length: fullLoads}, (_, i) =>
+                                        `<th style="padding:8px 12px; text-align:center; white-space:nowrap;">Load ${i+1}<br><span style="font-weight:400; font-size:0.75rem;">${acresPerLoad.toFixed(1)} ac</span></th>`
+                                    ).join('')}
+                                    ${hasPartial ? `<th style="padding:8px 12px; text-align:center; white-space:nowrap; background:#92400e;">Load ${totalLoads} ⚠<br><span style="font-weight:400; font-size:0.75rem;">${remainderAcres.toFixed(1)} ac</span></th>` : ''}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr style="background:#f0f7ef;">
+                                    <td style="padding:8px 12px; color:#666; font-size:0.8rem;">—</td>
+                                    <td style="padding:8px 12px; font-weight:600; color:#2d5a27;">💧 Water</td>
+                                    <td style="padding:8px 12px; text-align:center; color:#666;">${gpaCarrier} gal/acre</td>
+                                    ${Array.from({length: fullLoads}, () =>
+                                        `<td style="padding:8px 12px; text-align:center; font-weight:700;">${tankSizeGal.toLocaleString()} gal</td>`
+                                    ).join('')}
+                                    ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; background:#fffbeb;">${(remainderAcres * gpaCarrier).toFixed(0)} gal</td>` : ''}
+                                </tr>
+                                ${nonHydro.map((chem, idx) => {
+                                    const mixOrder = getMixOrder(chem);
+                                    const rate = chem.rate ?? chem.suggestedRate ?? 0;
+                                    const rateDisplay = `${rate} ${chem.rateUnit || ''}`;
+                                    const rowBg = idx % 2 === 0 ? '#fff' : '#f9fafb';
+                                    const fullAmt = calcProductPerLoad(chem, acresPerLoad);
+                                    const partAmt = calcProductPerLoad(chem, remainderAcres);
+                                    return `
+                                    <tr style="background:${rowBg};">
+                                        <td style="padding:8px 12px; text-align:center;">
+                                            <span style="background:#2d5a27; color:white; border-radius:50%; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">${mixOrder}</span>
+                                        </td>
+                                        <td style="padding:8px 12px; font-weight:600;">${chem.productName}</td>
+                                        <td style="padding:8px 12px; text-align:center; color:#666;">${rateDisplay}</td>
+                                        ${Array.from({length: fullLoads}, () =>
+                                            `<td style="padding:8px 12px; text-align:center; font-weight:700;">${fullAmt ? fullAmt.amount + ' ' + fullAmt.displayUnit : '—'}</td>`
+                                        ).join('')}
+                                        ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; background:#fffbeb;">${partAmt ? partAmt.amount + ' ' + partAmt.displayUnit : '—'}</td>` : ''}
+                                    </tr>`;
+                                }).join('')}
+                                ${hydrovant ? (() => {
+                                    const hydroFull = (tankSizeGal * 0.001).toFixed(2);
+                                    const hydroPart = (remainderAcres * gpaCarrier * 0.001).toFixed(2);
+                                    return `
+                                    <tr style="background:#f0fdf4; border-top:2px solid #86efac;">
+                                        <td style="padding:8px 12px; text-align:center;">
+                                            <span style="background:#059669; color:white; border-radius:50%; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">7</span>
+                                        </td>
+                                        <td style="padding:8px 12px; font-weight:700; color:#059669;">⚗ ${hydrovant.productName} <span style="font-weight:400; font-size:0.78rem; color:#666;">(add last)</span></td>
+                                        <td style="padding:8px 12px; text-align:center; color:#666;">0.1% v/v</td>
+                                        ${Array.from({length: fullLoads}, () =>
+                                            `<td style="padding:8px 12px; text-align:center; font-weight:700; color:#059669;">${hydroFull} gal</td>`
+                                        ).join('')}
+                                        ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; color:#059669; background:#fffbeb;">${hydroPart} gal</td>` : ''}
+                                    </tr>`;
+                                })() : ''}
+                            </tbody>
+                        </table>
+                        </div>
+                    </div>
+                `;
+            });
+
+            html += `</div>`;
+            loadSheetDiv.innerHTML = html;
+            loadSheetDiv.style.display = 'block';
         }
 
         function calculateProgramOrder() {
@@ -2532,6 +2699,8 @@
                         </div>
                     </div>
 
+                    <div id="loadSheetSection" style="display:none;"></div>
+
                     ${Object.values(totalsByChemical).some(i => i.priceIsSpeculated) ? `
                     <div style="background:#fffbeb; border:2px solid #f59e0b; border-radius:8px; padding:14px 18px; margin:16px 0; display:flex; gap:12px; align-items:flex-start;">
                         <span style="font-size:1.3rem;">⚠️</span>
@@ -2760,6 +2929,7 @@
             }
             // gpaCarrier reads from #sprayVolume / #cropGPA — no separate input to restore
             if (tankSizeGal > 0) updateLoadConfig();
+            renderLoadSheet();
 
             resultsDiv.scrollIntoView({ behavior: 'smooth' });
         }
