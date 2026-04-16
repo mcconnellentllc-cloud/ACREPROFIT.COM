@@ -4606,7 +4606,7 @@
 
         // Render customers grid
         async function resetCustomerPassword(userId, email) {
-            const newPassword = prompt(`Reset password for ${email}.\n\nEnter new password (minimum 6 characters):`);
+            const newPassword = await promptDialog(`Reset password for ${email}.\n\nEnter new password (minimum 6 characters):`);
             if (!newPassword) return;
             if (newPassword.length < 6) {
                 toast('Password must be at least 6 characters', 'error');
@@ -6485,11 +6485,11 @@
         // Track items being added to a new quote
         let pendingQuoteItems = [];
 
-        function addToPreorderQuote(productId, productName, packSize, unit) {
+        async function addToPreorderQuote(productId, productName, packSize, unit) {
             // Check if already in pending items
             const existing = pendingQuoteItems.find(i => i.productId === productId);
             if (existing) {
-                const qty = prompt(`${productName} is already in your quote with ${existing.quantity} ${unit}.\nEnter new quantity (or cancel to keep current):`, existing.quantity);
+                const qty = await promptDialog(`${productName} is already in your quote with ${existing.quantity} ${unit}.\nEnter new quantity (or cancel to keep current):`, existing.quantity);
                 if (qty !== null && !isNaN(parseInt(qty)) && parseInt(qty) > 0) {
                     existing.quantity = parseInt(qty);
                     showPendingQuoteBar();
@@ -6497,7 +6497,7 @@
                 return;
             }
 
-            const qty = prompt(`How many ${unit} of ${productName} do you need?`, '1');
+            const qty = await promptDialog(`How many ${unit} of ${productName} do you need?`, '1');
             if (qty !== null && !isNaN(parseInt(qty)) && parseInt(qty) > 0) {
                 pendingQuoteItems.push({
                     productId,
@@ -6546,10 +6546,10 @@
         async function submitPendingQuote() {
             if (!pendingQuoteItems.length) return;
 
-            const customerName = prompt('Enter customer name for this quote:');
+            const customerName = await promptDialog('Enter customer name for this quote:');
             if (!customerName) return;
 
-            const notes = prompt('Any special notes or delivery requirements? (optional)') || '';
+            const notes = await promptDialog('Any special notes or delivery requirements? (optional)') || '';
 
             try {
                 const items = pendingQuoteItems.map(i => ({
@@ -6736,7 +6736,7 @@
 
                 const pricedItems = [];
                 for (const item of quote.items) {
-                    const price = prompt(`Enter sell price per ${item.unit || 'unit'} for:\n${item.productName} (${item.packSize || 'N/A'})\nQuantity: ${item.quantityNeeded}`, item.sellPrice || '0');
+                    const price = await promptDialog(`Enter sell price per ${item.unit || 'unit'} for:\n${item.productName} (${item.packSize || 'N/A'})\nQuantity: ${item.quantityNeeded}`, item.sellPrice || '0');
                     if (price === null) return; // Cancelled
 
                     pricedItems.push({
@@ -6795,12 +6795,12 @@
             }
         }
 
-        function openCreateQuoteModal() {
+        async function openCreateQuoteModal() {
             // Simplified quote creation - could be expanded to a full modal
-            const customerName = prompt('Customer name:');
+            const customerName = await promptDialog('Customer name:');
             if (!customerName) return;
 
-            const products = prompt('Enter products (one per line, format: ProductName, Quantity, Unit)\nExample:\nGlyphosate 4+, 100, gal\nAtrazine 4L, 50, gal');
+            const products = await promptDialog('Enter products (one per line, format: ProductName, Quantity, Unit)\nExample:\nGlyphosate 4+, 100, gal\nAtrazine 4L, 50, gal');
             if (!products) return;
 
             const items = products.split('\n').map(line => {
@@ -7276,13 +7276,13 @@
         }
 
         async function recordSupplierBid(bidId) {
-            const supplierName = prompt('Supplier name:');
+            const supplierName = await promptDialog('Supplier name:');
             if (!supplierName) return;
 
-            const totalBid = prompt('Total bid amount (including freight):');
+            const totalBid = await promptDialog('Total bid amount (including freight):');
             if (!totalBid) return;
 
-            const freight = prompt('Freight cost (or 0):', '0');
+            const freight = await promptDialog('Freight cost (or 0):', '0');
 
             try {
                 // Get the bid sheet to know item count
@@ -7374,7 +7374,7 @@
                     `${i + 1}. ${b.supplierName} - $${b.totalBid?.toLocaleString() || 0}`
                 ).join('\n');
 
-                const choice = prompt(`Select winning supplier:\n\n${options}\n\nEnter number (1-${sheet.supplierBids.length}):`);
+                const choice = await promptDialog(`Select winning supplier:\n\n${options}\n\nEnter number (1-${sheet.supplierBids.length}):`);
                 if (!choice) return;
 
                 const idx = parseInt(choice) - 1;
@@ -9223,7 +9223,7 @@
         }
 
         async function verifyLicense(userId, status) {
-            const licenseType = prompt('Enter license type: private or commercial', 'private');
+            const licenseType = await promptDialog('Enter license type: private or commercial', 'private');
             if (!licenseType) return;
 
             try {
@@ -9475,12 +9475,12 @@
             }
         }
 
-        function openAddReminderModal() {
-            const title = prompt('Reminder title:');
+        async function openAddReminderModal() {
+            const title = await promptDialog('Reminder title:');
             if (!title) return;
 
-            const description = prompt('Description (optional):');
-            const dueDate = prompt('Due date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
+            const description = await promptDialog('Description (optional):');
+            const dueDate = await promptDialog('Due date (YYYY-MM-DD):', new Date().toISOString().split('T')[0]);
             if (!dueDate) return;
 
             addReminder(title, description, dueDate);
@@ -9953,8 +9953,8 @@
             }
         }
 
-        function payCommission(repId) {
-            const amount = prompt('Enter payment amount:');
+        async function payCommission(repId) {
+            const amount = await promptDialog('Enter payment amount:');
             if (!amount) return;
 
             // TODO: Record payment via API
