@@ -4839,6 +4839,104 @@ Acre Profit Group Purchasing`;
                 grid-template-columns: 1fr 1fr;
             }
         }
+
+        /* ============ PRINT LAYOUT ============
+         * Applied by window.print() from the "Print Order Summary" button
+         * at chemicals.html:2840. Keeps only the results pane visible
+         * (order totals + tank/load planning + per-load mix sheet).
+         * Strips color for ink-friendly output. Page-breaks between
+         * applications (passes) so each load table fits its own page.
+         * A signature line is appended at the end of each pass header
+         * for applicator record-keeping. */
+        @media print {
+            /* Hide chrome + anything that isn't the spray program output */
+            .navbar,
+            nav,
+            .footer,
+            footer,
+            .options-container,
+            .option-tabs,
+            .crop-grid,
+            .crop-selection,
+            #directSection,
+            #recipebookSection,
+            #recipeBookCropCards,
+            #programAcresSection,
+            .form-actions,
+            .btn,
+            button,
+            #chemicalRatesConfig,
+            .bid-sheet-section,
+            .truck-route-table,
+            .order-totals-section .pack-options-toggle,
+            .pack-options-row,
+            .load-config-section input,
+            .load-config-section label,
+            .load-config-section p,
+            .pack-options-toggle,
+            .payment-deadline-box {
+                display: none !important;
+            }
+
+            /* Strip color from every rendered block so it prints crisply */
+            body, html {
+                background: white !important;
+                color: black !important;
+                font-size: 11pt;
+            }
+            #programResults,
+            .order-totals-section,
+            .load-config-section,
+            #loadSheetSection,
+            .spray-sheet {
+                background: white !important;
+                border: 1px solid #000 !important;
+                box-shadow: none !important;
+                page-break-inside: avoid;
+            }
+            #programResults h2 {
+                font-size: 16pt;
+                margin-bottom: 4px;
+            }
+            table {
+                border-collapse: collapse;
+                width: 100%;
+                font-size: 10pt;
+            }
+            table th, table td {
+                border: 1px solid #000 !important;
+                background: white !important;
+                color: black !important;
+                padding: 4px 8px !important;
+            }
+            /* Strip backgrounds from every row variant used on screen */
+            tr[style*="background"] {
+                background: white !important;
+            }
+            td[style*="background"], th[style*="background"] {
+                background: white !important;
+            }
+
+            /* One page per pass in the per-load mix sheet */
+            #loadSheetSection > div > div {
+                page-break-before: always;
+                page-break-inside: avoid;
+            }
+            #loadSheetSection > div > div:first-child {
+                page-break-before: auto;
+            }
+
+            /* Signature line at the end of each pass block */
+            #loadSheetSection > div > div::after {
+                content: "Applicator initials: ____________    Load #: ______    Date: __________";
+                display: block;
+                margin-top: 24pt;
+                padding-top: 8pt;
+                border-top: 1px solid #000;
+                font-size: 10pt;
+                font-style: italic;
+            }
+        }
     </style>
 </body>
 </html>
