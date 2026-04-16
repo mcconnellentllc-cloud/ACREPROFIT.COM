@@ -3585,7 +3585,7 @@
         async function archiveEditOrder() {
             if (!currentEditingOrder) return;
 
-            if (!confirm('Are you sure you want to archive this order? It will be removed from active orders but can still be viewed.')) {
+            if (!await confirmDialog('Are you sure you want to archive this order? It will be removed from active orders but can still be viewed.', {danger: true, ok: 'Yes, archive'})) {
                 return;
             }
 
@@ -3622,7 +3622,7 @@
                 return;
             }
 
-            if (!confirm('Are you sure you want to PERMANENTLY delete this order? This action cannot be undone!')) {
+            if (!await confirmDialog('Are you sure you want to PERMANENTLY delete this order? This action cannot be undone!', {danger: true, ok: 'Yes, delete'})) {
                 return;
             }
 
@@ -3985,7 +3985,7 @@
             const editId = document.getElementById('supplierEditId').value;
             const supplierCode = document.getElementById('supplierCodeInput').value;
             if (!editId) return;
-            if (!confirm(`Delete supplier "${supplierCode}" FOREVER?\n\nAll chemicals currently linked to this supplier will have their supplierId cleared. This cannot be undone.`)) return;
+            if (!await confirmDialog(`Delete supplier "${supplierCode}" FOREVER?\n\nAll chemicals currently linked to this supplier will have their supplierId cleared. This cannot be undone.`, {danger: true, ok: 'Yes, delete'})) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/suppliers/${editId}`, {
@@ -4448,7 +4448,7 @@
                 'signed_off': 'Delivery Signed Off'
             };
 
-            if (!confirm(`Update ${selectedOrderIds.length} order(s) to "${statusLabels[status]}"?`)) {
+            if (!await confirmDialog(`Update ${selectedOrderIds.length} order(s) to "${statusLabels[status]}"?`)) {
                 return;
             }
 
@@ -4556,7 +4556,7 @@
         }
 
         async function convertQuoteToInvoice(quoteId) {
-            if (!confirm('Create an invoice from this quote and send to customer?')) return;
+            if (!await confirmDialog('Create an invoice from this quote and send to customer?')) return;
             try {
                 const res = await fetch(`${API_URL}/api/admin/quotes/${quoteId}/convert`, {
                     method: 'POST',
@@ -4580,7 +4580,7 @@
         }
 
         async function archiveCustomer(customerId, archive) {
-            if (!confirm(`${archive ? 'Archive' : 'Reactivate'} this customer? ${archive ? 'They will not be able to log in until reactivated.' : ''}`)) return;
+            if (!await confirmDialog(`${archive ? 'Archive' : 'Reactivate'} this customer? ${archive ? 'They will not be able to log in until reactivated.' : ''}`, {danger: true, ok: 'Yes, archive'})) return;
             try {
                 const res = await fetch(`${API_URL}/api/admin/customers/${customerId}/archive`, {
                     method: 'PUT',
@@ -5122,7 +5122,7 @@
         async function archiveOrder() {
             if (!currentOrder) return;
 
-            if (!confirm('Are you sure you want to archive this order? It will be removed from active orders but can still be viewed.')) {
+            if (!await confirmDialog('Are you sure you want to archive this order? It will be removed from active orders but can still be viewed.', {danger: true, ok: 'Yes, archive'})) {
                 return;
             }
 
@@ -5168,7 +5168,7 @@
                 return;
             }
 
-            if (!confirm('Are you sure you want to PERMANENTLY delete this order? This action cannot be undone!')) {
+            if (!await confirmDialog('Are you sure you want to PERMANENTLY delete this order? This action cannot be undone!', {danger: true, ok: 'Yes, delete'})) {
                 return;
             }
 
@@ -5288,7 +5288,7 @@
                 return;
             }
 
-            if (!confirm(`Send invoice to ${customerEmail}?`)) {
+            if (!await confirmDialog(`Send invoice to ${customerEmail}?`)) {
                 return;
             }
 
@@ -5956,7 +5956,7 @@
         }
 
         async function archiveProduct(productId, productName) {
-            if (!confirm(`Archive "${productName}"? It will be hidden from the customer catalog but all order and inventory history is preserved. You can unarchive it anytime.`)) return;
+            if (!await confirmDialog(`Archive "${productName}"? It will be hidden from the customer catalog but all order and inventory history is preserved. You can unarchive it anytime.`, {danger: true, ok: 'Yes, archive'})) return;
             try {
                 const res = await fetch(`${API_URL}/api/chemicals/${productId}/archive`, {
                     method: 'POST',
@@ -5991,7 +5991,7 @@
         }
 
         async function deleteProduct(productId, productName) {
-            if (!confirm(`Permanently delete "${productName}"? This cannot be undone. Every order and inventory reference to this product will become orphaned.`)) return;
+            if (!await confirmDialog(`Permanently delete "${productName}"? This cannot be undone. Every order and inventory reference to this product will become orphaned.`, {danger: true, ok: 'Yes, delete'})) return;
             try {
                 const res = await fetch(`${API_URL}/api/chemicals/${productId}`, {
                     method: 'DELETE',
@@ -6180,7 +6180,7 @@
 
         // Bulk import CPD products with their cost prices
         async function importCPDProducts() {
-            if (!confirm('This will import all CPD products with 3-tier pricing:\n\n• Cost = Supplier price\n• Admin = Cost + 10% (Acre Profit margin)\n• Retail = Admin + 15% (Rep commission)\n\nContinue?')) {
+            if (!await confirmDialog('This will import all CPD products with 3-tier pricing:\n\n• Cost = Supplier price\n• Admin = Cost + 10% (Acre Profit margin)\n• Retail = Admin + 15% (Rep commission)\n\nContinue?')) {
                 return;
             }
 
@@ -6262,7 +6262,7 @@
 
         // Bulk import Sims products
         async function importSimsProducts() {
-            if (!confirm('This will import Sims products with 3-tier pricing:\n\n• Cost = Sims supplier price\n• Admin = Cost + $0.10/unit (Acre Profit margin)\n• Retail = Admin + $0.15/unit (Rep commission)\n\nPrices will be marked with today\'s date.\nProducts over 30 days old will show STALE warning.\n\nContinue?')) {
+            if (!await confirmDialog('This will import Sims products with 3-tier pricing:\n\n• Cost = Sims supplier price\n• Admin = Cost + $0.10/unit (Acre Profit margin)\n• Retail = Admin + $0.15/unit (Rep commission)\n\nPrices will be marked with today\'s date.\nProducts over 30 days old will show STALE warning.\n\nContinue?')) {
                 return;
             }
 
@@ -6758,7 +6758,7 @@
                 });
 
                 if (updateRes.ok) {
-                    if (confirm('Pricing saved! Send quote to customer now?')) {
+                    if (await confirmDialog('Pricing saved! Send quote to customer now?')) {
                         await fetch(`${API_URL}/api/admin/quote-requests/${quoteId}/send`, {
                             method: 'PUT',
                             headers: { 'Authorization': `Bearer ${token}` }
@@ -6775,7 +6775,7 @@
         }
 
         async function convertQuoteToOrder(quoteId) {
-            if (!confirm('Convert this accepted quote to an order?')) return;
+            if (!await confirmDialog('Convert this accepted quote to an order?')) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/quote-requests/${quoteId}/convert-to-order`, {
@@ -7254,7 +7254,7 @@
         }
 
         async function sendBidSheet(bidId) {
-            if (!confirm('Send this bid sheet to all invited suppliers?')) return;
+            if (!await confirmDialog('Send this bid sheet to all invited suppliers?')) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/send`, {
@@ -7408,7 +7408,7 @@
         }
 
         async function createPOFromBid(bidId) {
-            if (!confirm('Create a Purchase Order from the awarded bid?')) return;
+            if (!await confirmDialog('Create a Purchase Order from the awarded bid?')) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}/create-po`, {
@@ -8603,7 +8603,7 @@
         }
 
         async function deletePODocument(docId) {
-            if (!confirm('Delete this document?')) return;
+            if (!await confirmDialog('Delete this document?', {danger: true, ok: 'Confirm'})) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/purchase-orders/${currentPO._id}/documents/${docId}`, {
@@ -9010,7 +9010,7 @@
         }
 
         async function deleteSplit(splitId) {
-            if (!confirm('Are you sure you want to delete this split? Quantities will be returned to the purchase order.')) return;
+            if (!await confirmDialog('Are you sure you want to delete this split? Quantities will be returned to the purchase order.', {danger: true, ok: 'Confirm'})) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/purchase-order-splits/${splitId}`, {
@@ -10498,7 +10498,7 @@
         // Filter inventory
         // Backfill inventory from received POs
         async function backfillInventory() {
-            if (!confirm('This will populate inventory from all received Purchase Orders that are missing inventory records. Continue?')) return;
+            if (!await confirmDialog('This will populate inventory from all received Purchase Orders that are missing inventory records. Continue?')) return;
             try {
                 const res = await fetch(`${API_URL}/api/admin/inventory/backfill`, {
                     method: 'POST',
@@ -10652,7 +10652,7 @@
 
         // Sync all products to inventory
         async function syncProductsToInventory() {
-            if (!confirm('This will create inventory records for all products that don\'t have one yet. Continue?')) {
+            if (!await confirmDialog('This will create inventory records for all products that don\'t have one yet. Continue?')) {
                 return;
             }
 
@@ -11020,7 +11020,7 @@
 
         // Delete inventory item
         async function deleteInventory(id) {
-            if (!confirm('Are you sure you want to delete this inventory item?')) return;
+            if (!await confirmDialog('Are you sure you want to delete this inventory item?', {danger: true, ok: 'Confirm'})) return;
 
             try {
                 const res = await fetch(`${API_URL}/api/inventory/${id}`, {
