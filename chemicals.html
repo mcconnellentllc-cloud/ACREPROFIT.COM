@@ -2783,44 +2783,26 @@
 
                     ${(['admin','superadmin','distributor'].includes(userData.role) || window.actingAsCustomerId) ? `
                     <div style="background:#fff7ed; border:1px dashed #d97706; padding:14px 18px; border-radius:8px; margin:16px 0;">
-                        <div style="font-weight:700; color:#92400e; margin-bottom:4px;">Distributor Controls</div>
-                        <div style="color:#92400e; font-size:0.85rem; margin-bottom:10px;">Adjust margins for this order only. Catalog prices stay the same.</div>
+                        <div style="font-weight:700; color:#92400e; margin-bottom:10px;">Discount Code</div>
 
-                        <div style="margin-bottom:12px;">
-                            <div style="font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:6px;">Quick apply:</div>
-                            <div style="display:flex; gap:8px; flex-wrap:wrap;">
-                                <button type="button" onclick="document.getElementById('programDiscountCode').value='NoDistMarg'; document.getElementById('programMarginAdjustment').value=''; updateProgramMarginPreview();" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
-                                    No Distributor Margin
-                                </button>
-                                <button type="button" onclick="document.getElementById('programDiscountCode').value='AtcostAP'; document.getElementById('programMarginAdjustment').value=''; updateProgramMarginPreview();" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
-                                    At Cost (No Markup)
-                                </button>
-                                <button type="button" onclick="document.getElementById('programDiscountCode').value=''; document.getElementById('programMarginAdjustment').value=''; document.getElementById('programMarginAdjustmentReason').value=''; updateProgramMarginPreview();" style="background:white; color:#6b7280; border:1px solid #6b7280; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
-                                    Clear
-                                </button>
-                            </div>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+                            <button type="button" onclick="document.getElementById('programDiscountCode').value='NoDistMarg'; updateProgramMarginPreview();" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                No Distributor Margin
+                            </button>
+                            <button type="button" onclick="document.getElementById('programDiscountCode').value='AtcostAP'; updateProgramMarginPreview();" style="background:white; color:#92400e; border:1px solid #d97706; padding:6px 12px; border-radius:4px; font-weight:600; cursor:pointer; font-size:0.85rem;">
+                                At Cost (No Markup)
+                            </button>
                         </div>
 
-                        <div style="margin-bottom:10px;">
-                            <label style="display:block; font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:4px;">Discount Code (optional)</label>
-                            <input type="text" id="programDiscountCode" placeholder="NoDistMarg / AtcostAP" style="width:100%; padding:8px; border:1px solid #d97706; border-radius:4px;" oninput="updateProgramMarginPreview()">
-                        </div>
+                        <input type="text" id="programDiscountCode" placeholder="Enter discount code" style="width:100%; padding:8px; border:1px solid #d97706; border-radius:4px;" oninput="updateProgramMarginPreview()">
 
-                        <div>
-                            <div style="font-weight:600; color:#92400e; font-size:0.85rem; margin-bottom:6px;">Or adjust distributor margin per unit (this order only):</div>
-                            <div style="display:flex; gap:8px; align-items:center;">
-                                <span style="color:#92400e;">$</span>
-                                <input type="number" id="programMarginAdjustment" step="0.01" placeholder="0.00 (negative to reduce, positive to increase)" style="flex:1; padding:8px; border:1px solid #d97706; border-radius:4px;" oninput="updateProgramMarginPreview()">
-                                <span style="color:#92400e; font-size:0.85rem;">per unit</span>
-                            </div>
-                            <input type="text" id="programMarginAdjustmentReason" placeholder="Reason (e.g., 'Volume discount', 'Long-time customer')" style="width:100%; margin-top:8px; padding:8px; border:1px solid #d97706; border-radius:4px;">
-                        </div>
+                        <!-- Kept as hidden inputs so submitProgramOrder reads 0 / '' -->
+                        <!-- without the per-unit margin UI. Server-side code path -->
+                        <!-- remains intact; UI is discount-code only. -->
+                        <input type="hidden" id="programMarginAdjustment" value="">
+                        <input type="hidden" id="programMarginAdjustmentReason" value="">
 
                         <div id="programMarginPreview" style="display:none; margin-top:12px; padding:10px; background:white; border:1px solid #d97706; border-radius:4px; color:#92400e; font-weight:600;"></div>
-
-                        <div style="color:#666; font-size:0.75rem; margin-top:10px; border-top:1px dashed #d97706; padding-top:8px;">
-                            All margin changes are logged in the audit trail with your name and reason.
-                        </div>
                     </div>
                     ` : ''}
 
