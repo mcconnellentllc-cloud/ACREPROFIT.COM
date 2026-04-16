@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="dialog.js"></script>
 </head>
 <body>
     <nav class="navbar admin-nav">
@@ -3387,7 +3388,7 @@
         async function openOrderEditModal(orderId) {
             const order = allOrders.find(o => o._id === orderId);
             if (!order) {
-                alert('Order not found');
+                toast('Order not found', 'error');
                 return;
             }
             currentEditingOrder = order;
@@ -3473,13 +3474,13 @@
             const unitInput = document.getElementById('orderProductUnit');
 
             if (!select.value) {
-                alert('Please select a product');
+                toast('Please select a product', 'error');
                 return;
             }
 
             const qty = parseFloat(qtyInput.value);
             if (!qty || qty <= 0) {
-                alert('Please enter a valid quantity');
+                toast('Please enter a valid quantity', 'error');
                 return;
             }
 
@@ -3572,12 +3573,12 @@
                     throw new Error(err.error || 'Failed to update order');
                 }
 
-                alert('Order updated successfully!');
+                toast('Order updated successfully', 'success');
                 closeOrderEditModal();
                 loadDashboardData(); // Reload orders
             } catch (error) {
                 console.error('Error saving order:', error);
-                alert('Error saving order: ' + error.message);
+                toast('Error saving order: ' + error.message, 'error');
             }
         }
 
@@ -3602,12 +3603,12 @@
                     throw new Error(errorData.error || 'Failed to archive order');
                 }
 
-                alert('Order archived successfully!');
+                toast('Order archived successfully', 'success');
                 closeOrderEditModal();
                 loadDashboardData();
             } catch (error) {
                 console.error('Error archiving order:', error);
-                alert('Error archiving order: ' + error.message);
+                toast('Error archiving order: ' + error.message, 'error');
             }
         }
 
@@ -3617,7 +3618,7 @@
             const isArchived = currentEditingOrder.status === 'archived' || currentEditingOrder.status === 'cancelled' || currentEditingOrder.status === 'draft';
 
             if (!isArchived) {
-                alert('You can only delete orders that are draft, archived, or cancelled. Please archive the order first.');
+                toast('You can only delete orders that are draft, archived, or cancelled. Please archive the order first.', 'error');
                 return;
             }
 
@@ -3638,12 +3639,12 @@
                     throw new Error(errorData.error || 'Failed to delete order');
                 }
 
-                alert('Order deleted successfully!');
+                toast('Order deleted successfully', 'success');
                 closeOrderEditModal();
                 loadDashboardData();
             } catch (error) {
                 console.error('Error deleting order:', error);
-                alert('Error deleting order: ' + error.message);
+                toast('Error deleting order: ' + error.message, 'error');
             }
         }
 
@@ -5108,7 +5109,7 @@
                 }
             } catch (error) {
                 console.error('Error saving order:', error);
-                alert('Error saving order: ' + error.message);
+                toast('Error saving order: ' + error.message, 'error');
             }
         }
 
@@ -5145,7 +5146,7 @@
                     throw new Error(errorData.error || 'Failed to archive order');
                 }
 
-                alert('Order archived successfully!');
+                toast('Order archived successfully', 'success');
                 closeOrderDetailModal();
                 if (selectedCustomer) {
                     viewCustomer(selectedCustomer._id);
@@ -5153,7 +5154,7 @@
                 loadDashboardData();
             } catch (error) {
                 console.error('Error archiving order:', error);
-                alert('Error archiving order: ' + error.message);
+                toast('Error archiving order: ' + error.message, 'error');
             }
         }
 
@@ -5163,7 +5164,7 @@
             const isArchived = currentOrder.status === 'archived' || currentOrder.status === 'cancelled' || currentOrder.status === 'draft';
 
             if (!isArchived) {
-                alert('You can only delete orders that are draft, archived, or cancelled. Please archive the order first.');
+                toast('You can only delete orders that are draft, archived, or cancelled. Please archive the order first.', 'error');
                 return;
             }
 
@@ -5190,7 +5191,7 @@
                     throw new Error(errorData.error || 'Failed to delete order');
                 }
 
-                alert('Order deleted successfully!');
+                toast('Order deleted successfully', 'success');
                 closeOrderDetailModal();
                 if (selectedCustomer) {
                     viewCustomer(selectedCustomer._id);
@@ -5198,7 +5199,7 @@
                 loadDashboardData();
             } catch (error) {
                 console.error('Error deleting order:', error);
-                alert('Error deleting order: ' + error.message);
+                toast('Error deleting order: ' + error.message, 'error');
             }
         }
 
