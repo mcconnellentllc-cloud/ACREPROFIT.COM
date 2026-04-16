@@ -15167,6 +15167,40 @@ app.get('/api/admin/bid-sheets/:id', authMiddleware, adminMiddleware, async (req
     }
 });
 
+// Update bid sheet items (draft only). Only quantityNeeded is mutable
+// — all other item fields are preserved. Blocks edits on any non-draft
+// status so suppliers can't have the contractual quantities shifted
+// under them after the sheet was sent.
+app.put('/api/admin/bid-sheets/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { items } = req.body;
+        const sheet = await SupplierBidSheet.findById(req.params.id);
+        if (!sheet) return res.status(404).json({ error: 'Bid sheet not found' });
+        if (sheet.status !== 'draft') {
+            return res.status(400).json({ error: 'Only draft bid sheets can be edited. Create a new bid sheet to change quantities after sending.' });
+        }
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'Items array required' });
+        }
+        // Only update quantityNeeded — preserve all other item fields
+        sheet.items = sheet.items.map((item) => {
+            const updated = items.find(i =>
+                (i._id && item._id && i._id.toString() === item._id.toString()) ||
+                i.productName === item.productName
+            );
+            if (updated && updated.quantityNeeded !== undefined) {
+                item.quantityNeeded = parseFloat(updated.quantityNeeded) || item.quantityNeeded;
+            }
+            return item;
+        });
+        sheet.updatedAt = new Date();
+        await sheet.save();
+        res.json({ message: 'Bid sheet updated', sheet });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // Add suppliers to bid sheet
 app.put('/api/admin/bid-sheets/:id/suppliers', authMiddleware, adminMiddleware, async (req, res) => {
     try {

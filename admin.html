@@ -6943,6 +6943,34 @@
             }
         }
 
+        async function saveBidSheetItems(sheetId) {
+            const inputs = document.querySelectorAll('[id^="bidQty_"]');
+            const items = Array.from(inputs).map(input => ({
+                productName: input.dataset.product,
+                _id: input.dataset.id,
+                quantityNeeded: parseFloat(input.value) || 0
+            }));
+            try {
+                const res = await fetch(`${API_URL}/api/admin/bid-sheets/${sheetId}`, {
+                    method: 'PUT',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ items })
+                });
+                if (res.ok) {
+                    alert('Bid sheet quantities saved.');
+                    viewBidSheet(sheetId); // refresh modal to show any server-side normalization
+                } else {
+                    const err = await res.json();
+                    alert('Error: ' + err.error);
+                }
+            } catch (err) {
+                alert('Error saving bid sheet.');
+            }
+        }
+
         async function viewBidSheet(bidId) {
             try {
                 const res = await fetch(`${API_URL}/api/admin/bid-sheets/${bidId}`, {
@@ -6950,8 +6978,24 @@
                 });
                 const sheet = await res.json();
 
-                const itemsList = sheet.items.map(i =>
-                    `<tr><td>${i.productName}</td><td>${i.packSize || '-'}</td><td>${i.quantityNeeded} ${i.unit || ''}</td></tr>`
+                const isDraft = sheet.status === 'draft';
+                const itemsList = sheet.items.map((i, idx) =>
+                    `<tr>
+                        <td>${i.productName}</td>
+                        <td>${i.packSize || '-'}</td>
+                        <td>
+                            ${isDraft
+                                ? `<div style="display:flex; align-items:center; gap:6px;">
+                                    <input type="number" id="bidQty_${idx}" value="${i.quantityNeeded}"
+                                        step="0.01" min="0"
+                                        style="width:90px; padding:4px 8px; border:1px solid #d97706; border-radius:4px; font-size:0.9rem;"
+                                        data-product="${i.productName}" data-id="${i._id || ''}">
+                                    <span style="color:#666; font-size:0.85rem;">${i.unit || ''}</span>
+                                   </div>`
+                                : `${i.quantityNeeded} ${i.unit || ''}`
+                            }
+                        </td>
+                    </tr>`
                 ).join('');
 
                 const suppliersList = sheet.invitedSuppliers.map(s =>
@@ -6983,7 +7027,11 @@
                         <span class="order-status" style="padding: 8px 16px;">${sheet.status.toUpperCase()}</span>
                     </div>
 
-                    <h3>Items Needed (${sheet.items.length})</h3>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                        <h3 style="margin:0;">Items Needed (${sheet.items.length})</h3>
+                        ${isDraft ? `<button class="btn btn-sm btn-primary" onclick="saveBidSheetItems('${sheet._id}')">Save Changes</button>` : ''}
+                    </div>
+                    ${isDraft ? `<div style="font-size:0.8rem; color:#92400e; margin-bottom:10px;">✏️ Draft — quantities are editable. Save before sending to suppliers.</div>` : ''}
                     <table class="admin-table" style="margin-bottom: 20px;">
                         <thead><tr><th>Product</th><th>Pack Size</th><th>Qty Needed</th></tr></thead>
                         <tbody>${itemsList}</tbody>
