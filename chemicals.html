@@ -2169,7 +2169,7 @@
         // Falls through to 3 (Solutions) for anything ambiguous — matches
         // the common case for AcreProfit's catalog (SL products dominate).
         function getMixOrder(chem) {
-            if (chem.isAdjuvant || (chem.productName || '').toLowerCase().includes('hydrovant')) return 7;
+            if (chem.isAdjuvant || (chem.productName || '').toLowerCase().includes('hydrovant')) return 0;
             const name = (chem.productName || '').toLowerCase();
             const unit = (chem.unit || '').toLowerCase();
             const rateUnit = (chem.rateUnit || '').toLowerCase();
@@ -2283,6 +2283,22 @@
                                     ).join('')}
                                     ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; background:#fffbeb;">${(remainderAcres * gpaCarrier).toFixed(0)} gal</td>` : ''}
                                 </tr>
+                                ${hydrovant ? (() => {
+                                    const hydroFull = (tankSizeGal * 0.001).toFixed(2);
+                                    const hydroPart = (remainderAcres * gpaCarrier * 0.001).toFixed(2);
+                                    return `
+                                    <tr style="background:#f0fdf4; border-bottom:2px solid #86efac;">
+                                        <td style="padding:8px 12px; text-align:center;">
+                                            <span style="background:#059669; color:white; border-radius:50%; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">${getMixOrder(hydrovant)}</span>
+                                        </td>
+                                        <td style="padding:8px 12px; font-weight:700; color:#059669;">⚗ ${hydrovant.productName} <span style="font-weight:400; font-size:0.78rem; color:#666;">(add to water first)</span></td>
+                                        <td style="padding:8px 12px; text-align:center; color:#666;">0.1% v/v</td>
+                                        ${Array.from({length: fullLoads}, () =>
+                                            `<td style="padding:8px 12px; text-align:center; font-weight:700; color:#059669;">${hydroFull} gal</td>`
+                                        ).join('')}
+                                        ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; color:#059669; background:#fffbeb;">${hydroPart} gal</td>` : ''}
+                                    </tr>`;
+                                })() : ''}
                                 ${nonHydro.map((chem, idx) => {
                                     const mixOrder = getMixOrder(chem);
                                     const rate = chem.rate ?? chem.suggestedRate ?? 0;
@@ -2303,22 +2319,6 @@
                                         ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; background:#fffbeb;">${partAmt ? partAmt.amount + ' ' + partAmt.displayUnit : '—'}</td>` : ''}
                                     </tr>`;
                                 }).join('')}
-                                ${hydrovant ? (() => {
-                                    const hydroFull = (tankSizeGal * 0.001).toFixed(2);
-                                    const hydroPart = (remainderAcres * gpaCarrier * 0.001).toFixed(2);
-                                    return `
-                                    <tr style="background:#f0fdf4; border-top:2px solid #86efac;">
-                                        <td style="padding:8px 12px; text-align:center;">
-                                            <span style="background:#059669; color:white; border-radius:50%; width:22px; height:22px; display:inline-flex; align-items:center; justify-content:center; font-size:0.75rem; font-weight:700;">7</span>
-                                        </td>
-                                        <td style="padding:8px 12px; font-weight:700; color:#059669;">⚗ ${hydrovant.productName} <span style="font-weight:400; font-size:0.78rem; color:#666;">(add last)</span></td>
-                                        <td style="padding:8px 12px; text-align:center; color:#666;">0.1% v/v</td>
-                                        ${Array.from({length: fullLoads}, () =>
-                                            `<td style="padding:8px 12px; text-align:center; font-weight:700; color:#059669;">${hydroFull} gal</td>`
-                                        ).join('')}
-                                        ${hasPartial ? `<td style="padding:8px 12px; text-align:center; font-weight:700; color:#059669; background:#fffbeb;">${hydroPart} gal</td>` : ''}
-                                    </tr>`;
-                                })() : ''}
                             </tbody>
                         </table>
                         </div>
