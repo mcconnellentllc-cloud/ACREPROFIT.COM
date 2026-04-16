@@ -2195,6 +2195,74 @@ invoiceSchema.index({ invoiceDate: -1 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 
+// ============ PROGRAM QUOTE MODEL ============
+// Snapshot of a spray program priced for a specific customer at a specific
+// acreage. Sent via email as a conversation-starter — farmer reviews, logs
+// in to build their own order OR replies and admin clicks "Create Invoice
+// & Collect Payment" on the customer card. Distinct from QuoteRequest
+// (price-mining off-catalog requests) and PriceMiningQuote (supplier bids).
+const programQuoteSchema = new mongoose.Schema({
+    quoteNumber: { type: String, unique: true }, // e.g., PQ-2026-00001
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+
+    programId: { type: mongoose.Schema.Types.ObjectId, ref: 'SprayProgram' },
+    programName: String,
+    crop: String,
+    totalAcres: Number,
+
+    // Snapshot of the items at quote time. Prices locked here so the farmer
+    // sees the same numbers in the email and on the customer card even if
+    // the catalog moves. Convert-to-Invoice re-reads these directly.
+    items: [{
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        productName: String,
+        packSize: String,
+        unit: String,
+        quantity: Number,
+        unitPrice: Number,
+        totalPrice: Number,
+        acres: Number,
+        rate: Number,
+        rateUnit: String,
+        calculatedAmount: Number
+    }],
+
+    subtotal: Number,
+    total: Number,
+    costPerAcre: Number,
+
+    sprayParams: {
+        gallonsPerAcre: Number,
+        tankSize: Number
+    },
+
+    status: {
+        type: String,
+        enum: ['draft', 'sent', 'converted', 'expired', 'declined'],
+        default: 'draft'
+    },
+    sentAt: Date,
+    convertedAt: Date,
+    convertedToInvoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
+    // Expiry = createdAt + 30 days unless overridden. Status transitions to
+    // 'expired' are a separate concern (cron/on-read check); not enforced here.
+    expiresAt: Date,
+
+    notes: String,
+
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+programQuoteSchema.index({ quoteNumber: 1 });
+programQuoteSchema.index({ customerId: 1 });
+programQuoteSchema.index({ status: 1 });
+programQuoteSchema.index({ createdAt: -1 });
+
+const ProgramQuote = mongoose.model('ProgramQuote', programQuoteSchema);
+
 // ============ CHEMICAL MIX RECIPE BOOK ============
 
 // Chemical Mix Model - "Recipe Book" for custom chemical cocktails
@@ -2404,6 +2472,14 @@ async function generateInvoiceNumber() {
     const year = new Date().getFullYear();
     const seq = await nextSequence(`invoice-${year}`);
     return `INV-${year}-${String(seq).padStart(5, '0')}`;
+}
+
+// Helper: Generate program-quote number. Same atomic sequence pattern as
+// invoices so concurrent quote creations never collide on the unique index.
+async function generateQuoteNumber() {
+    const year = new Date().getFullYear();
+    const seq = await nextSequence(`programQuote-${year}`);
+    return `PQ-${year}-${String(seq).padStart(5, '0')}`;
 }
 
 // Auto-generate an Invoice record when an order transitions to paid.
@@ -13409,6 +13485,243 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         }
     } catch (error) {
         console.error('Error sending invoice:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ PROGRAM QUOTE ROUTES ============
+// Create a program quote snapshot for a customer and send it via email.
+// Distributors can only quote their own customers. Admins/superadmins can
+// quote anyone. Quote is stored with status='sent' once the email leaves —
+// draft is a transient internal state used only if transporter is null.
+app.post('/api/admin/quotes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const {
+            customerId, programId, programName, crop, totalAcres,
+            items, subtotal, total, costPerAcre, sprayParams, notes
+        } = req.body;
+
+        if (!customerId || !Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'customerId and non-empty items[] required' });
+        }
+
+        const customer = await User.findById(customerId);
+        if (!customer || customer.role !== 'customer') {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Distributors scoped to their own customers
+        if (isDistributor(req.user) && String(customer.representative) !== String(req.user._id)) {
+            return res.status(403).json({ error: 'Customer is not assigned to you' });
+        }
+
+        const quoteNumber = await generateQuoteNumber();
+        const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+        const quote = new ProgramQuote({
+            quoteNumber,
+            customerId: customer._id,
+            createdBy: req.user._id,
+            representativeId: customer.representative || req.user._id,
+            programId: programId || null,
+            programName: programName || '',
+            crop: crop || '',
+            totalAcres: totalAcres || 0,
+            items: items.map(i => ({
+                chemicalId: i.chemicalId || null,
+                productName: i.productName || '',
+                packSize: i.packSize || '',
+                unit: i.unit || '',
+                quantity: i.quantity || 0,
+                unitPrice: i.unitPrice || 0,
+                totalPrice: i.totalPrice || (i.quantity || 0) * (i.unitPrice || 0),
+                acres: i.acres || 0,
+                rate: i.rate || 0,
+                rateUnit: i.rateUnit || '',
+                calculatedAmount: i.calculatedAmount || 0
+            })),
+            subtotal: subtotal || 0,
+            total: total || 0,
+            costPerAcre: costPerAcre || 0,
+            sprayParams: sprayParams || {},
+            notes: notes || '',
+            expiresAt,
+            status: 'draft'
+        });
+
+        await quote.save();
+
+        // Send the quote email. Same transporter pattern as password-reset
+        // (server/index.js:4259) — null transporter fails silently and the
+        // quote stays at status='draft' for manual resend.
+        const transporter = createEmailTransporter();
+        const loginUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/login.html`;
+        const expiresStr = expiresAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+
+        const itemsRows = quote.items.map(it => `
+            <tr>
+                <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb;">${it.productName}</td>
+                <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; text-align:center;">${it.rate || '—'} ${it.rateUnit || ''}</td>
+                <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; text-align:center;">${it.quantity} × ${it.packSize || ''}</td>
+                <td style="padding:10px 12px; border-bottom:1px solid #e5e7eb; text-align:right; font-weight:600;">$${(it.totalPrice || 0).toFixed(2)}</td>
+            </tr>
+        `).join('');
+
+        if (transporter && customer.email) {
+            try {
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    to: customer.email,
+                    subject: `Program Quote ${quote.quoteNumber} — ${quote.programName || 'AcreProfit'}`,
+                    html: `
+                        <div style="font-family:Arial,sans-serif; max-width:640px; margin:0 auto;">
+                            <div style="background:#2d5a27; padding:24px; text-align:center;">
+                                <h1 style="color:white; margin:0; font-size:22px;">Acre Profit</h1>
+                                <div style="color:rgba(255,255,255,0.85); font-size:13px; margin-top:4px;">Program Estimate</div>
+                            </div>
+                            <div style="padding:28px; background:#f9f9f9; color:#333; line-height:1.55;">
+                                <p>Hi ${customer.name.split(' ')[0]},</p>
+                                <p>Here's a program estimate for your <strong>${quote.crop || 'field'}</strong> acres based on standard rates. Prices are estimated and subject to change until your order is placed.</p>
+
+                                <div style="background:white; border:1px solid #e5e7eb; border-radius:8px; padding:16px; margin:16px 0;">
+                                    <div style="font-weight:700; color:#2d5a27; margin-bottom:4px;">${quote.programName || 'Custom program'}</div>
+                                    <div style="color:#666; font-size:13px;">${quote.totalAcres} acres · Quote #${quote.quoteNumber}</div>
+                                </div>
+
+                                <table width="100%" style="border-collapse:collapse; background:white; border:1px solid #e5e7eb; border-radius:8px; overflow:hidden;">
+                                    <thead>
+                                        <tr style="background:#2d5a27; color:white;">
+                                            <th style="padding:10px 12px; text-align:left;">Product</th>
+                                            <th style="padding:10px 12px; text-align:center;">Rate / Acre</th>
+                                            <th style="padding:10px 12px; text-align:center;">Qty</th>
+                                            <th style="padding:10px 12px; text-align:right;">Estimated Cost</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>${itemsRows}</tbody>
+                                    <tfoot>
+                                        <tr style="background:#f0f7ef; font-weight:700;">
+                                            <td colspan="3" style="padding:12px; text-align:right;">Estimated Total</td>
+                                            <td style="padding:12px; text-align:right; color:#2d5a27;">$${(quote.total || 0).toFixed(2)}</td>
+                                        </tr>
+                                        <tr style="background:#f0f7ef;">
+                                            <td colspan="3" style="padding:8px 12px; text-align:right; color:#666; font-size:13px;">Estimated Cost Per Acre</td>
+                                            <td style="padding:8px 12px; text-align:right; color:#2d5a27; font-weight:600;">$${(quote.costPerAcre || 0).toFixed(2)}</td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+
+                                <p style="margin-top:24px;">Want to adjust rates or quantities? <strong>Log in to AcreProfit to build your own order</strong> — you control the rates, we handle the sourcing.</p>
+
+                                <div style="text-align:center; margin:28px 0;">
+                                    <a href="${loginUrl}" style="background:#d4a017; color:white; padding:14px 28px; text-decoration:none; border-radius:6px; font-weight:bold; display:inline-block;">
+                                        Log In & Build Your Order
+                                    </a>
+                                </div>
+
+                                <p style="color:#666; font-size:13px;">Ready to order at these rates? Reply to this email or contact your rep.</p>
+                                <hr style="border:none; border-top:1px solid #ddd; margin:24px 0;">
+                                <p style="color:#999; font-size:12px;">Quote expires: ${expiresStr}. Prices subject to change.</p>
+                            </div>
+                        </div>
+                    `
+                });
+                quote.status = 'sent';
+                quote.sentAt = new Date();
+                await quote.save();
+            } catch (mailErr) {
+                console.error('Quote email send failed:', mailErr.message);
+                // Leave status='draft' so admin can resend from the customer card.
+            }
+        }
+
+        res.json({ quote });
+    } catch (error) {
+        console.error('POST /api/admin/quotes error:', error);
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// List program quotes for a customer. Distributors see only their own
+// customers' quotes; admins/superadmins see all.
+app.get('/api/admin/quotes/customer/:customerId', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const customer = await User.findById(req.params.customerId);
+        if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+        if (isDistributor(req.user) && String(customer.representative) !== String(req.user._id)) {
+            return res.status(403).json({ error: 'Customer is not assigned to you' });
+        }
+
+        const quotes = await ProgramQuote.find({ customerId: customer._id })
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json(quotes);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Convert a sent quote into an Invoice and trigger the existing invoice
+// flow. Quote items snapshot is copied verbatim — invoice re-computes
+// subtotal/total inline. Quote transitions to 'converted' with a pointer
+// to the new invoice for audit.
+app.post('/api/admin/quotes/:id/convert', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const quote = await ProgramQuote.findById(req.params.id);
+        if (!quote) return res.status(404).json({ error: 'Quote not found' });
+        if (quote.status === 'converted') {
+            return res.status(400).json({ error: 'Quote already converted', convertedToInvoiceId: quote.convertedToInvoiceId });
+        }
+
+        const customer = await User.findById(quote.customerId);
+        if (!customer) return res.status(404).json({ error: 'Customer not found' });
+
+        if (isDistributor(req.user) && String(customer.representative) !== String(req.user._id)) {
+            return res.status(403).json({ error: 'Customer is not assigned to you' });
+        }
+
+        const invoiceNumber = await generateInvoiceNumber();
+        const items = quote.items.map(it => ({
+            productName: it.productName,
+            description: it.productName,
+            quantity: it.quantity,
+            unitPrice: it.unitPrice,
+            totalPrice: (it.quantity || 0) * (it.unitPrice || 0)
+        }));
+        const subtotal = items.reduce((sum, it) => sum + (it.totalPrice || 0), 0);
+
+        // Representative: superadmin may override via body, else quote rep,
+        // else customer's rep, else the converter.
+        let repId = quote.representativeId || customer.representative || req.user._id;
+        if (req.user.role === 'superadmin' && req.body.representativeId) {
+            repId = req.body.representativeId;
+        }
+
+        const invoice = new Invoice({
+            invoiceNumber,
+            customerId: customer._id,
+            customerName: customer.name,
+            customerEmail: customer.email,
+            customerPhone: customer.phone,
+            customerAddress: customer.address,
+            representativeId: repId,
+            items,
+            subtotal,
+            discount: 0,
+            total: subtotal,
+            notes: `Converted from quote ${quote.quoteNumber}`,
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
+        });
+        await invoice.save();
+
+        quote.status = 'converted';
+        quote.convertedAt = new Date();
+        quote.convertedToInvoiceId = invoice._id;
+        await quote.save();
+
+        res.json({ invoice, quote });
+    } catch (error) {
+        console.error('POST /api/admin/quotes/:id/convert error:', error);
         res.status(400).json({ error: error.message });
     }
 });
