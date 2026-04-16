@@ -3888,7 +3888,7 @@
         function editSupplier(supplierId) {
             const s = loadedSuppliers.find(x => (x._id || x.id) === supplierId);
             if (!s) {
-                alert('Supplier not found in loaded list. Refresh and try again.');
+                toast('Supplier not found in loaded list. Refresh and try again.', 'error');
                 return;
             }
             document.getElementById('supplierModalTitle').textContent = `Edit Supplier: ${s.supplierCode || s.companyName}`;
@@ -3928,14 +3928,14 @@
             };
 
             if (!payload.name || !payload.companyName || !payload.email) {
-                alert('Name, company, and email are required.');
+                toast('Name, company, and email are required.', 'error');
                 return;
             }
 
             if (!isEdit) {
                 payload.supplierCode = document.getElementById('supplierCodeInput').value.trim().toUpperCase();
                 if (!payload.supplierCode) {
-                    alert('Supplier code is required (e.g. JABCO, SIMS).');
+                    toast('Supplier code is required (e.g. JABCO, SIMS).', 'error');
                     return;
                 }
                 // Password - use provided or auto-generate
@@ -3946,7 +3946,7 @@
                         .join('')
                         .replace(/[^a-z0-9]/g, '')
                         .slice(0, 12);
-                    alert(`Auto-generated initial password:\n\n${password}\n\nCopy this now — it will not be shown again.`);
+                    toast(`Auto-generated initial password:\n\n${password}\n\nCopy this now — it will not be shown again.`, 'info');
                 }
                 payload.password = password;
             }
@@ -3974,7 +3974,7 @@
                 closeSupplierModal();
                 loadSuppliers();
             } catch (err) {
-                alert('Save failed: ' + err.message);
+                toast('Save failed: ' + err.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Save';
@@ -3994,11 +3994,11 @@
                 });
                 const result = await res.json();
                 if (!res.ok) throw new Error(result.error || 'Delete failed');
-                alert(`${result.message}\n\nChemicals unlinked: ${result.chemicalsUnlinked || 0}`);
+                toast(`${result.message}\n\nChemicals unlinked: ${result.chemicalsUnlinked || 0}`, 'info');
                 closeSupplierModal();
                 loadSuppliers();
             } catch (err) {
-                alert('Delete failed: ' + err.message);
+                toast('Delete failed: ' + err.message, 'error');
             }
         }
 
@@ -4018,7 +4018,7 @@
                 }
                 loadSuppliers();
             } catch (err) {
-                alert('Toggle failed: ' + err.message);
+                toast('Toggle failed: ' + err.message, 'error');
             }
         }
 
@@ -4028,7 +4028,7 @@
                 supplierCode = s?.supplierCode || '';
             }
             if (!supplierCode) {
-                alert('Missing supplier code - cannot filter purchase orders.');
+                toast('Missing supplier code - cannot filter purchase orders.', 'error');
                 return;
             }
             // Jump to Purchase Orders tab with supplier filter pre-applied
@@ -4060,7 +4060,7 @@
 
         function editDistributor(distributorId) {
             // Future: Edit distributor
-            alert('Edit distributor: ' + distributorId);
+            toast('Edit distributor: ' + distributorId, 'info');
         }
 
         // Handle browser back/forward buttons
@@ -4428,12 +4428,12 @@
         async function applyBulkStatus() {
             const status = document.getElementById('bulkStatusSelect').value;
             if (!status) {
-                alert('Please select a status to apply');
+                toast('Please select a status to apply', 'error');
                 return;
             }
 
             if (selectedOrderIds.length === 0) {
-                alert('No orders selected');
+                toast('No orders selected', 'error');
                 return;
             }
 
@@ -4465,15 +4465,15 @@
                 const result = await res.json();
 
                 if (res.ok) {
-                    alert(`Successfully updated ${result.success.length} order(s)${result.failed.length > 0 ? `. ${result.failed.length} failed.` : ''}`);
+                    toast(`Successfully updated ${result.success.length} order(s)${result.failed.length > 0 ? `. ${result.failed.length} failed.` : ''}`, 'error');
                     clearSelection();
                     loadDashboard(); // Refresh the orders
                 } else {
-                    alert('Error: ' + result.error);
+                    toast('Error: ' + result.error, 'error');
                 }
             } catch (error) {
                 console.error('Bulk update error:', error);
-                alert('Failed to update orders');
+                toast('Failed to update orders', 'error');
             }
         }
 
@@ -4566,16 +4566,16 @@
                     }
                 });
                 if (res.ok) {
-                    alert('Invoice created successfully.');
+                    toast('Invoice created successfully.', 'success');
                     if (selectedCustomer) {
                         loadCustomerQuotes(selectedCustomer._id);
                     }
                 } else {
                     const err = await res.json();
-                    alert('Error: ' + err.error);
+                    toast('Error: ' + err.error, 'error');
                 }
             } catch (err) {
-                alert('Error creating invoice.');
+                toast('Error creating invoice.', 'error');
             }
         }
 
@@ -4597,10 +4597,10 @@
                     loadCustomers();
                 } else {
                     const err = await res.json();
-                    alert('Error: ' + err.error);
+                    toast('Error: ' + err.error, 'error');
                 }
             } catch (err) {
-                alert('Error archiving customer.');
+                toast('Error archiving customer.', 'error');
             }
         }
 
@@ -4609,7 +4609,7 @@
             const newPassword = prompt(`Reset password for ${email}.\n\nEnter new password (minimum 6 characters):`);
             if (!newPassword) return;
             if (newPassword.length < 6) {
-                alert('Password must be at least 6 characters');
+                toast('Password must be at least 6 characters', 'error');
                 return;
             }
             try {
@@ -4623,12 +4623,12 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(`Password reset successfully for ${email}`);
+                    toast(`Password reset successfully for ${email}`, 'success');
                 } else {
-                    alert('Error: ' + (data.error || 'Failed to reset password'));
+                    toast('Error: ' + (data.error || 'Failed to reset password'), 'error');
                 }
             } catch (e) {
-                alert('Error: ' + e.message);
+                toast('Error: ' + e.message, 'error');
             }
         }
 
@@ -4736,11 +4736,11 @@
                     selectedCustomer = customer;
                     showCustomerModal(customer);
                 } else {
-                    alert(customer.error || 'Error loading customer');
+                    toast(customer.error || 'Error loading customer', 'error');
                 }
             } catch (error) {
                 console.error('Error loading customer:', error);
-                alert('Error loading customer details');
+                toast('Error loading customer details', 'error');
             }
         }
 
@@ -4909,7 +4909,7 @@
                 document.getElementById('orderDetailModal').style.display = 'flex';
             } catch (error) {
                 console.error('Error loading order:', error);
-                alert('Error loading order details');
+                toast('Error loading order details', 'error');
             }
         }
 
@@ -5102,7 +5102,7 @@
                     throw new Error(errorData.error || 'Failed to save order');
                 }
 
-                alert('Order saved successfully!');
+                toast('Order saved successfully!', 'success');
                 // Refresh customer data if modal is open
                 if (selectedCustomer) {
                     viewCustomer(selectedCustomer._id);
@@ -5278,13 +5278,13 @@
 
         async function sendInvoiceEmail() {
             if (!currentOrder) {
-                alert('No order selected');
+                toast('No order selected', 'error');
                 return;
             }
 
             const customerEmail = currentOrder.contactInfo?.email || currentOrder.userId?.email;
             if (!customerEmail) {
-                alert('No customer email found. Please update customer information.');
+                toast('No customer email found. Please update customer information.', 'error');
                 return;
             }
 
@@ -5329,11 +5329,11 @@
                     throw new Error(err.error || 'Failed to send invoice');
                 }
 
-                alert('Invoice sent successfully to ' + customerEmail);
+                toast('Invoice sent successfully to ' + customerEmail, 'success');
                 closeInvoiceModal();
             } catch (error) {
                 console.error('Error sending invoice:', error);
-                alert('Error sending invoice: ' + error.message);
+                toast('Error sending invoice: ' + error.message, 'error');
             }
         }
 
@@ -5378,7 +5378,7 @@
             const representativeId = document.getElementById('addRepresentative').value;
 
             if (!name || !email) {
-                alert('Name and email are required');
+                toast('Name and email are required', 'error');
                 return;
             }
 
@@ -5397,14 +5397,14 @@
                     allCustomers.push(newCustomer);
                     renderCustomers(allCustomers);
                     closeAddCustomerModal();
-                    alert(`Customer "${name}" created successfully!\n\nLogin: ${email}\nPassword: ${password}`);
+                    toast(`Customer "${name}" created successfully!\n\nLogin: ${email}\nPassword: ${password}`, 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to create customer');
+                    toast(error.error || 'Failed to create customer', 'error');
                 }
             } catch (error) {
                 console.error('Error adding customer:', error);
-                alert('Error adding customer. Please try again.');
+                toast('Error adding customer. Please try again.', 'error');
             }
         }
 
@@ -5494,7 +5494,7 @@
 
                 // Check file size (max 5MB)
                 if (file.size > 5 * 1024 * 1024) {
-                    alert('Photo must be under 5MB');
+                    toast('Photo must be under 5MB', 'error');
                     return;
                 }
 
@@ -5576,7 +5576,7 @@
             const select = document.getElementById('modalReassignSelect');
             const distributorId = select.value;
             if (!distributorId) {
-                alert('Pick a distributor.');
+                toast('Pick a distributor.', 'error');
                 return;
             }
 
@@ -5606,7 +5606,7 @@
                 showCustomerModal(selectedCustomer);  // refresh the displayed rep name
                 renderCustomers(allCustomers);        // refresh the group-by-distributor grouping
             } catch (err) {
-                alert('Reassignment failed: ' + err.message);
+                toast('Reassignment failed: ' + err.message, 'error');
             } finally {
                 saveBtn.disabled = false;
                 saveBtn.textContent = originalText;
@@ -5636,7 +5636,7 @@
             };
 
             if (!name || !email) {
-                alert('Name and email are required');
+                toast('Name and email are required', 'error');
                 return;
             }
 
@@ -5665,14 +5665,14 @@
                     showCustomerModal(selectedCustomer);
                     cancelEdit();
 
-                    alert('Customer updated successfully!');
+                    toast('Customer updated successfully!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to update customer');
+                    toast(error.error || 'Failed to update customer', 'error');
                 }
             } catch (error) {
                 console.error('Error updating customer:', error);
-                alert('Error updating customer. Please try again.');
+                toast('Error updating customer. Please try again.', 'error');
             }
         }
 
@@ -5966,10 +5966,10 @@
                 if (res.ok) {
                     loadProducts();
                 } else {
-                    alert('Archive failed: ' + (data.error || 'Unknown error'));
+                    toast('Archive failed: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (err) {
-                alert('Archive failed: ' + err.message);
+                toast('Archive failed: ' + err.message, 'error');
             }
         }
 
@@ -5983,10 +5983,10 @@
                 if (res.ok) {
                     loadProducts();
                 } else {
-                    alert('Unarchive failed: ' + (data.error || 'Unknown error'));
+                    toast('Unarchive failed: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (err) {
-                alert('Unarchive failed: ' + err.message);
+                toast('Unarchive failed: ' + err.message, 'error');
             }
         }
 
@@ -6001,10 +6001,10 @@
                 if (res.ok) {
                     loadProducts();
                 } else {
-                    alert('Delete failed: ' + (data.error || 'Unknown error'));
+                    toast('Delete failed: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (err) {
-                alert('Delete failed: ' + err.message);
+                toast('Delete failed: ' + err.message, 'error');
             }
         }
 
@@ -6063,14 +6063,14 @@
                 if (res.ok) {
                     closeEditProductModal();
                     loadProducts();
-                    alert('Product margins updated successfully!');
+                    toast('Product margins updated successfully!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to update product');
+                    toast(error.error || 'Failed to update product', 'error');
                 }
             } catch (error) {
                 console.error('Error updating product:', error);
-                alert('Error updating product. Please try again.');
+                toast('Error updating product. Please try again.', 'error');
             }
         }
 
@@ -6143,7 +6143,7 @@
             const requiresApplicatorVerification = isRestrictedUse;
 
             if (!productName || !sourceSupplier || !packSize || !unit || isNaN(costPrice)) {
-                alert('Please fill in all required fields');
+                toast('Please fill in all required fields', 'error');
                 return;
             }
 
@@ -6167,14 +6167,14 @@
                 if (res.ok) {
                     closeAddProductModal();
                     loadProducts();
-                    alert(`Product "${productName}" added to the catalog!`);
+                    toast(`Product "${productName}" added to the catalog!`, 'info');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to add product');
+                    toast(error.error || 'Failed to add product', 'error');
                 }
             } catch (error) {
                 console.error('Error adding product:', error);
-                alert('Error adding product. Please try again.');
+                toast('Error adding product. Please try again.', 'error');
             }
         }
 
@@ -6239,21 +6239,21 @@
 
                 if (res.ok) {
                     const result = await res.json();
-                    alert(`Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}`);
+                    toast(`Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}`, 'success');
                     loadProducts();
                 } else {
                     const errorText = await res.text();
                     console.error('Import failed:', res.status, errorText);
                     try {
                         const error = JSON.parse(errorText);
-                        alert('Import failed (' + res.status + '): ' + (error.error || errorText));
+                        toast('Import failed (' + res.status + '): ' + (error.error || errorText), 'error');
                     } catch {
-                        alert('Import failed (' + res.status + '): ' + errorText);
+                        toast('Import failed (' + res.status + '): ' + errorText, 'error');
                     }
                 }
             } catch (error) {
                 console.error('Error importing products:', error);
-                alert('Error importing products: ' + error.message);
+                toast('Error importing products: ' + error.message, 'error');
             }
 
             btn.disabled = false;
@@ -6320,21 +6320,21 @@
 
                 if (res.ok) {
                     const result = await res.json();
-                    alert(`Sims Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}\n\nNote: Products with $0 cost need price quotes.`);
+                    toast(`Sims Import complete!\n\nCreated: ${result.summary.created}\nUpdated: ${result.summary.updated}\nUnchanged: ${result.summary.unchanged}\n\nNote: Products with $0 cost need price quotes.`, 'success');
                     loadProducts();
                 } else {
                     const errorText = await res.text();
                     console.error('Import failed:', res.status, errorText);
                     try {
                         const error = JSON.parse(errorText);
-                        alert('Import failed (' + res.status + '): ' + (error.error || errorText));
+                        toast('Import failed (' + res.status + '): ' + (error.error || errorText), 'error');
                     } catch {
-                        alert('Import failed (' + res.status + '): ' + errorText);
+                        toast('Import failed (' + res.status + '): ' + errorText, 'error');
                     }
                 }
             } catch (error) {
                 console.error('Error importing Sims products:', error);
-                alert('Error importing products: ' + error.message);
+                toast('Error importing products: ' + error.message, 'error');
             }
 
             btn.disabled = false;
@@ -6576,12 +6576,12 @@
                 if (!res.ok) throw new Error('Failed to create quote');
 
                 const quote = await res.json();
-                alert(`Quote ${quote.quoteNumber} created successfully!`);
+                toast(`Quote ${quote.quoteNumber} created successfully!`, 'success');
                 clearPendingQuote();
                 switchPreorderSubtab('quotes');
             } catch (error) {
                 console.error('Error creating quote:', error);
-                alert('Error creating quote. Please try again.');
+                toast('Error creating quote. Please try again.', 'error');
             }
         }
 
@@ -6720,7 +6720,7 @@
                     (i.isPriced ? ` @ $${i.sellPrice}/unit = $${i.totalPrice}` : ' - NOT PRICED')
                 ).join('\n');
 
-                alert(`Quote ${quote.quoteNumber}\nCustomer: ${quote.customerName || 'Unknown'}\nStatus: ${quote.status}\n\nItems:\n${itemsList}\n\n${quote.estimatedTotal ? 'Total: $' + quote.estimatedTotal.toLocaleString() : 'Total: Not yet priced'}`);
+                toast(`Quote ${quote.quoteNumber}\nCustomer: ${quote.customerName || 'Unknown'}\nStatus: ${quote.status}\n\nItems:\n${itemsList}\n\n${quote.estimatedTotal ? 'Total: $' + quote.estimatedTotal.toLocaleString() : 'Total: Not yet priced'}`, 'info');
             } catch (error) {
                 console.error('Error viewing quote:', error);
             }
@@ -6763,11 +6763,11 @@
                             method: 'PUT',
                             headers: { 'Authorization': `Bearer ${token}` }
                         });
-                        alert('Quote sent to customer!');
+                        toast('Quote sent to customer!', 'success');
                     }
                     loadQuoteRequests();
                 } else {
-                    alert('Failed to save pricing');
+                    toast('Failed to save pricing', 'error');
                 }
             } catch (error) {
                 console.error('Error pricing quote:', error);
@@ -6784,11 +6784,11 @@
                 });
 
                 if (res.ok) {
-                    alert('Quote converted to order successfully!');
+                    toast('Quote converted to order successfully!', 'success');
                     loadQuoteRequests();
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + error.error);
+                    toast('Failed: ' + error.error, 'error');
                 }
             } catch (error) {
                 console.error('Error converting quote:', error);
@@ -6813,7 +6813,7 @@
             }).filter(i => i.productName);
 
             if (items.length === 0) {
-                alert('No valid items entered');
+                toast('No valid items entered', 'info');
                 return;
             }
 
@@ -6830,14 +6830,14 @@
                 })
             }).then(res => {
                 if (res.ok) {
-                    alert('Quote request created!');
+                    toast('Quote request created!', 'success');
                     loadQuoteRequests();
                 } else {
-                    alert('Failed to create quote request');
+                    toast('Failed to create quote request', 'error');
                 }
             }).catch(err => {
                 console.error('Error:', err);
-                alert('Error creating quote request');
+                toast('Error creating quote request', 'error');
             });
         }
 
@@ -7050,7 +7050,7 @@
                 : allChecks;
 
             if (checks.length === 0) {
-                alert(isAddMode ? 'Pick at least one new supplier to add.' : 'Pick at least one supplier to invite.');
+                toast(isAddMode ? 'Pick at least one new supplier to add.' : 'Pick at least one supplier to invite.', 'error');
                 return;
             }
 
@@ -7076,15 +7076,15 @@
                     });
                     if (res.ok) {
                         closeBidSheetSupplierModal();
-                        alert(`${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'} added.`);
+                        toast(`${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'} added.`, 'success');
                         viewBidSheet(bidId);
                     } else {
                         const error = await res.json();
-                        alert('Failed: ' + (error.error || 'Unknown error'));
+                        toast('Failed: ' + (error.error || 'Unknown error'), 'error');
                     }
                 } catch (error) {
                     console.error('Error adding suppliers:', error);
-                    alert('Error adding suppliers.');
+                    toast('Error adding suppliers.', 'error');
                 } finally {
                     btn.disabled = false;
                     btn.textContent = originalText;
@@ -7095,7 +7095,7 @@
             // Create-mode path (unchanged logic, just flowing through)
             const title = document.getElementById('bidSheetTitleInput').value.trim();
             if (!title) {
-                alert('Please enter a title for this bid sheet.');
+                toast('Please enter a title for this bid sheet.', 'error');
                 return;
             }
 
@@ -7120,15 +7120,15 @@
                 if (res.ok) {
                     const bidSheet = await res.json();
                     closeBidSheetSupplierModal();
-                    alert(`Bid Sheet ${bidSheet.bidNumber} created with ${bidSheet.items.length} items, ${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'} invited.\n\nGo to Price Mining tab to send.`);
+                    toast(`Bid Sheet ${bidSheet.bidNumber} created with ${bidSheet.items.length} items, ${suppliers.length} supplier${suppliers.length === 1 ? '' : 's'} invited.\n\nGo to Price Mining tab to send.`, 'success');
                     navigateToTab('price-mining');
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + (error.error || 'Unknown error'));
+                    toast('Failed: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Error creating bid sheet:', error);
-                alert('Error creating bid sheet');
+                toast('Error creating bid sheet', 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = originalText;
@@ -7152,14 +7152,14 @@
                     body: JSON.stringify({ items })
                 });
                 if (res.ok) {
-                    alert('Bid sheet quantities saved.');
+                    toast('Bid sheet quantities saved.', 'success');
                     viewBidSheet(sheetId); // refresh modal to show any server-side normalization
                 } else {
                     const err = await res.json();
-                    alert('Error: ' + err.error);
+                    toast('Error: ' + err.error, 'error');
                 }
             } catch (err) {
-                alert('Error saving bid sheet.');
+                toast('Error saving bid sheet.', 'error');
             }
         }
 
@@ -7263,12 +7263,12 @@
                 });
 
                 if (res.ok) {
-                    alert('Bid sheet sent to suppliers!');
+                    toast('Bid sheet sent to suppliers!', 'success');
                     closeBidSheetModal();
                     loadBidSheets();
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + error.error);
+                    toast('Failed: ' + error.error, 'error');
                 }
             } catch (error) {
                 console.error('Error sending bid sheet:', error);
@@ -7317,12 +7317,12 @@
                 });
 
                 if (res.ok) {
-                    alert(`Bid from ${supplierName} recorded!`);
+                    toast(`Bid from ${supplierName} recorded!`, 'success');
                     viewBidSheet(bidId); // Refresh modal
                     loadBidSheets();
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + error.error);
+                    toast('Failed: ' + error.error, 'error');
                 }
             } catch (error) {
                 console.error('Error recording bid:', error);
@@ -7337,7 +7337,7 @@
                 const comparison = await res.json();
 
                 if (comparison.comparison.length === 0) {
-                    alert('No bids to compare yet');
+                    toast('No bids to compare yet', 'info');
                     return;
                 }
 
@@ -7352,7 +7352,7 @@
 
                 msg += `\nLowest: $${comparison.comparison[0].totalBid.toLocaleString()} from ${comparison.comparison[0].supplierName}`;
 
-                alert(msg);
+                toast(msg, 'info');
             } catch (error) {
                 console.error('Error comparing bids:', error);
             }
@@ -7366,7 +7366,7 @@
                 const sheet = await sheetRes.json();
 
                 if (sheet.supplierBids.length === 0) {
-                    alert('No bids to award');
+                    toast('No bids to award', 'info');
                     return;
                 }
 
@@ -7379,7 +7379,7 @@
 
                 const idx = parseInt(choice) - 1;
                 if (idx < 0 || idx >= sheet.supplierBids.length) {
-                    alert('Invalid selection');
+                    toast('Invalid selection', 'error');
                     return;
                 }
 
@@ -7395,12 +7395,12 @@
                 });
 
                 if (res.ok) {
-                    alert(`Bid awarded to ${winningBid.supplierName}!`);
+                    toast(`Bid awarded to ${winningBid.supplierName}!`, 'info');
                     closeBidSheetModal();
                     loadBidSheets();
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + error.error);
+                    toast('Failed: ' + error.error, 'error');
                 }
             } catch (error) {
                 console.error('Error awarding bid:', error);
@@ -7418,11 +7418,11 @@
 
                 if (res.ok) {
                     const result = await res.json();
-                    alert(`Purchase Order ${result.purchaseOrder.poNumber} created!`);
+                    toast(`Purchase Order ${result.purchaseOrder.poNumber} created!`, 'success');
                     loadBidSheets();
                 } else {
                     const error = await res.json();
-                    alert('Failed: ' + error.error);
+                    toast('Failed: ' + error.error, 'error');
                 }
             } catch (error) {
                 console.error('Error creating PO:', error);
@@ -7669,7 +7669,7 @@
             const notes = document.getElementById('ledgerEntryNotes').value.trim();
 
             if (!description || isNaN(amount) || amount <= 0) {
-                alert('Please fill in description and a positive amount');
+                toast('Please fill in description and a positive amount', 'error');
                 return;
             }
 
@@ -7677,7 +7677,7 @@
             if (userData.role === 'superadmin') {
                 representativeId = document.getElementById('ledgerEntryRep').value;
                 if (!representativeId) {
-                    alert('Please select a representative');
+                    toast('Please select a representative', 'error');
                     return;
                 }
             }
@@ -7695,14 +7695,14 @@
                 if (res.ok) {
                     closeAddLedgerModal();
                     loadLedger();
-                    alert('Ledger entry added!');
+                    toast('Ledger entry added!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to add entry');
+                    toast(error.error || 'Failed to add entry', 'error');
                 }
             } catch (error) {
                 console.error('Error adding ledger entry:', error);
-                alert('Error adding entry. Please try again.');
+                toast('Error adding entry. Please try again.', 'error');
             }
         }
 
@@ -7730,7 +7730,7 @@
             const notes = document.getElementById('editLedgerNotes').value.trim();
 
             if (!description || isNaN(amount) || amount <= 0) {
-                alert('Please fill in description and a positive amount');
+                toast('Please fill in description and a positive amount', 'error');
                 return;
             }
 
@@ -7747,14 +7747,14 @@
                 if (res.ok) {
                     closeEditLedgerModal();
                     loadLedger();
-                    alert('Ledger entry updated!');
+                    toast('Ledger entry updated!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to update entry');
+                    toast(error.error || 'Failed to update entry', 'error');
                 }
             } catch (error) {
                 console.error('Error updating ledger entry:', error);
-                alert('Error updating entry. Please try again.');
+                toast('Error updating entry. Please try again.', 'error');
             }
         }
 
@@ -7786,14 +7786,14 @@
                 if (res.ok) {
                     closeLedgerNoteModal();
                     loadLedger();
-                    alert('Note saved!');
+                    toast('Note saved!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to save note');
+                    toast(error.error || 'Failed to save note', 'error');
                 }
             } catch (error) {
                 console.error('Error saving note:', error);
-                alert('Error saving note. Please try again.');
+                toast('Error saving note. Please try again.', 'error');
             }
         }
 
@@ -7855,7 +7855,7 @@
             const notes = document.getElementById('cashDepositNotes').value.trim();
 
             if (!representativeId || !amount || amount <= 0 || !description) {
-                alert('Please fill in all required fields');
+                toast('Please fill in all required fields', 'error');
                 return;
             }
 
@@ -7883,9 +7883,9 @@
 
                 closeCashDepositModal();
                 loadLedger();
-                alert(`Cash deposit of $${amount.toFixed(2)} recorded`);
+                toast(`Cash deposit of $${amount.toFixed(2)} recorded`, 'success');
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             }
         }
 
@@ -7896,11 +7896,11 @@
             const notes = document.getElementById('paymentNotes').value.trim();
 
             if (!representativeId) {
-                alert('Please select a distributor');
+                toast('Please select a distributor', 'error');
                 return;
             }
             if (isNaN(amount) || amount <= 0) {
-                alert('Please enter a valid amount');
+                toast('Please enter a valid amount', 'error');
                 return;
             }
 
@@ -7928,14 +7928,14 @@
                 if (res.ok) {
                     closeRecordPaymentModal();
                     loadLedger();
-                    alert(`Payment of $${amount.toFixed(2)} to ${distName} recorded successfully!`);
+                    toast(`Payment of $${amount.toFixed(2)} to ${distName} recorded successfully!`, 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to record payment');
+                    toast(error.error || 'Failed to record payment', 'error');
                 }
             } catch (error) {
                 console.error('Error recording payment:', error);
-                alert('Error recording payment. Please try again.');
+                toast('Error recording payment. Please try again.', 'error');
             }
         }
 
@@ -8232,7 +8232,7 @@
         async function createPurchaseOrder() {
             const supplierName = document.getElementById('poSupplierName').value.trim();
             if (!supplierName) {
-                alert('Please enter a supplier name');
+                toast('Please enter a supplier name', 'error');
                 return;
             }
 
@@ -8249,7 +8249,7 @@
                 const price = parseFloat(row.querySelector('.po-item-price')?.value) || 0;
 
                 if (!chemicalId) {
-                    alert('Please select a product from the catalog for all items');
+                    toast('Please select a product from the catalog for all items', 'error');
                     return;
                 }
 
@@ -8265,7 +8265,7 @@
             }
 
             if (items.length === 0) {
-                alert('Please add at least one item');
+                toast('Please add at least one item', 'error');
                 return;
             }
 
@@ -8335,14 +8335,14 @@
 
                     closeCreatePOModal();
                     loadPurchaseOrders();
-                    alert('Purchase order created!');
+                    toast('Purchase order created!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to create purchase order');
+                    toast(error.error || 'Failed to create purchase order', 'error');
                 }
             } catch (error) {
                 console.error('Error creating PO:', error);
-                alert('Error creating purchase order');
+                toast('Error creating purchase order', 'error');
             }
         }
 
@@ -8407,7 +8407,7 @@
 
             } catch (error) {
                 console.error('Error loading PO detail:', error);
-                alert('Error loading purchase order details');
+                toast('Error loading purchase order details', 'error');
             }
         }
 
@@ -8419,12 +8419,12 @@
         // Open Receive Shipment Modal
         function openReceiveShipmentModal() {
             if (!currentPO) {
-                alert('No purchase order selected');
+                toast('No purchase order selected', 'info');
                 return;
             }
 
             if (currentPO.status === 'received' || currentPO.status === 'closed') {
-                alert('This PO has already been received');
+                toast('This PO has already been received', 'success');
                 return;
             }
 
@@ -8485,7 +8485,7 @@
             });
 
             if (items.length === 0) {
-                alert('Please enter a quantity to receive for at least one item.');
+                toast('Please enter a quantity to receive for at least one item.', 'error');
                 return;
             }
 
@@ -8508,18 +8508,18 @@
 
                 if (res.ok) {
                     const result = await res.json();
-                    alert(`Inventory received!\n\n${result.inventoryUpdates.map(u => `${u.productName}: +${u.quantityReceived}`).join('\n')}`);
+                    toast(`Inventory received!\n\n${result.inventoryUpdates.map(u => `${u.productName}: +${u.quantityReceived}`).join('\n')}`, 'success');
                     closeReceiveShipmentModal();
                     closePODetailModal();
                     loadPurchaseOrders();
                     if (allProducts.length > 0) loadProducts();
                 } else {
                     const error = await res.json();
-                    alert('Error receiving inventory: ' + (error.error || 'Unknown error'));
+                    toast('Error receiving inventory: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Error receiving shipment:', error);
-                alert('Error receiving inventory. Please try again.');
+                toast('Error receiving inventory. Please try again.', 'error');
             }
         }
 
@@ -8565,7 +8565,7 @@
 
         async function uploadPODocument(input) {
             if (!currentPO) {
-                alert('No purchase order selected');
+                toast('No purchase order selected', 'info');
                 return;
             }
 
@@ -8589,14 +8589,14 @@
                     const result = await res.json();
                     currentPO = result.purchaseOrder;
                     renderPODocuments();
-                    alert('Document uploaded successfully');
+                    toast('Document uploaded successfully', 'success');
                 } else {
                     const error = await res.json();
-                    alert('Upload failed: ' + (error.error || 'Unknown error'));
+                    toast('Upload failed: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Upload error:', error);
-                alert('Upload failed. Please try again.');
+                toast('Upload failed. Please try again.', 'error');
             }
 
             input.value = ''; // Reset input
@@ -8619,11 +8619,11 @@
                     renderPODocuments();
                 } else {
                     const error = await res.json();
-                    alert('Delete failed: ' + (error.error || 'Unknown error'));
+                    toast('Delete failed: ' + (error.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Delete error:', error);
-                alert('Delete failed. Please try again.');
+                toast('Delete failed. Please try again.', 'error');
             }
         }
 
@@ -8688,13 +8688,13 @@
                     document.getElementById('poDetailAdminFee').textContent = '$' + (fee).toLocaleString(undefined, { minimumFractionDigits: 2 });
                     document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
                     loadPurchaseOrders();
-                    alert('Admin fee applied successfully!');
+                    toast('Admin fee applied successfully!', 'success');
                 } else {
-                    alert('Error applying admin fee');
+                    toast('Error applying admin fee', 'error');
                 }
             } catch (error) {
                 console.error('Error applying admin fee:', error);
-                alert('Error applying admin fee');
+                toast('Error applying admin fee', 'error');
             }
         }
 
@@ -8742,7 +8742,7 @@
                     loadPurchaseOrders();
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to update price');
+                    toast(error.error || 'Failed to update price', 'error');
                 }
             } catch (error) {
                 console.error('Error updating price:', error);
@@ -8769,7 +8769,7 @@
                     loadPurchaseOrders();
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to update quantity');
+                    toast(error.error || 'Failed to update quantity', 'error');
                 }
             } catch (error) {
                 console.error('Error updating quantity:', error);
@@ -8932,7 +8932,7 @@
 
             const distributorId = document.getElementById('splitDistributor').value;
             if (!distributorId) {
-                alert('Please select a distributor');
+                toast('Please select a distributor', 'error');
                 return;
             }
 
@@ -8954,7 +8954,7 @@
             });
 
             if (items.length === 0) {
-                alert('Please allocate at least one item');
+                toast('Please allocate at least one item', 'error');
                 return;
             }
 
@@ -8979,14 +8979,14 @@
                     closeSplitModal();
                     openPODetail(currentPO._id); // Refresh
                     loadPurchaseOrders();
-                    alert('Split created successfully!');
+                    toast('Split created successfully!', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to create split');
+                    toast(error.error || 'Failed to create split', 'error');
                 }
             } catch (error) {
                 console.error('Error creating split:', error);
-                alert('Error creating split');
+                toast('Error creating split', 'error');
             }
         }
 
@@ -9021,10 +9021,10 @@
                 if (res.ok) {
                     openPODetail(currentPO._id); // Refresh
                     loadPurchaseOrders();
-                    alert('Split deleted');
+                    toast('Split deleted', 'success');
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to delete split');
+                    toast(error.error || 'Failed to delete split', 'error');
                 }
             } catch (error) {
                 console.error('Error deleting split:', error);
@@ -9237,14 +9237,14 @@
                 });
 
                 if (res.ok) {
-                    alert(`License ${status === 'verified' ? 'verified' : 'rejected'} successfully`);
+                    toast(`License ${status === 'verified' ? 'verified' : 'rejected'} successfully`, 'success');
                     loadComplianceDashboard();
                 } else {
                     const error = await res.json();
-                    alert(error.error || 'Failed to update license status');
+                    toast(error.error || 'Failed to update license status', 'error');
                 }
             } catch (error) {
-                alert('Error updating license status');
+                toast('Error updating license status', 'error');
             }
         }
 
@@ -9397,9 +9397,9 @@
 
                 if (!res.ok) throw new Error('Failed to save settings');
 
-                alert('Display settings saved successfully!');
+                toast('Display settings saved successfully!', 'success');
             } catch (error) {
-                alert('Error saving settings: ' + error.message);
+                toast('Error saving settings: ' + error.message, 'error');
             }
         }
 
@@ -9425,9 +9425,9 @@
 
                 if (!res.ok) throw new Error('Failed to save settings');
 
-                alert('Confidential settings saved successfully!');
+                toast('Confidential settings saved successfully!', 'success');
             } catch (error) {
-                alert('Error saving settings: ' + error.message);
+                toast('Error saving settings: ' + error.message, 'error');
             }
         }
 
@@ -9452,7 +9452,7 @@
                 // Reload settings to refresh reminders list
                 await loadCompanySettings();
             } catch (error) {
-                alert('Error updating reminder: ' + error.message);
+                toast('Error updating reminder: ' + error.message, 'error');
             }
         }
 
@@ -9471,7 +9471,7 @@
 
                 await loadCompanySettings();
             } catch (error) {
-                alert('Error dismissing reminder: ' + error.message);
+                toast('Error dismissing reminder: ' + error.message, 'error');
             }
         }
 
@@ -9506,7 +9506,7 @@
 
                 await loadCompanySettings();
             } catch (error) {
-                alert('Error adding reminder: ' + error.message);
+                toast('Error adding reminder: ' + error.message, 'error');
             }
         }
 
@@ -9532,14 +9532,14 @@
                 const result = await res.json();
 
                 if (res.ok) {
-                    alert(`Jabco/CPD Prices Loaded!\n\nNew products: ${result.summary?.created || 0}\nUpdated: ${result.summary?.alreadyExisted || 0}`);
+                    toast(`Jabco/CPD Prices Loaded!\n\nNew products: ${result.summary?.created || 0}\nUpdated: ${result.summary?.alreadyExisted || 0}`, 'success');
                     loadPricingData();
                 } else {
-                    alert('Error: ' + (result.error || 'Unknown error'));
+                    toast('Error: ' + (result.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Load error:', error);
-                alert('Load failed: ' + error.message);
+                toast('Load failed: ' + error.message, 'error');
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -9564,16 +9564,16 @@
                 const result = await res.json();
 
                 if (res.ok) {
-                    alert(`Price sync completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`);
+                    toast(`Price sync completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`, 'success');
                     loadPricingData();
                     loadProducts();
                     loadSyncStatus();
                 } else {
-                    alert('Sync error: ' + (result.error || 'Unknown error'));
+                    toast('Sync error: ' + (result.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
                 console.error('Sync error:', error);
-                alert('Sync failed: ' + error.message);
+                toast('Sync failed: ' + error.message, 'error');
             } finally {
                 btn.innerHTML = originalText;
                 btn.disabled = false;
@@ -9604,16 +9604,16 @@
                     const result = await res.json();
 
                     if (res.ok) {
-                        alert(`Price upload completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`);
+                        toast(`Price upload completed!\n\nProducts updated: ${result.productsUpdated}\nProducts added: ${result.productsAdded}\nSkipped: ${result.productsSkipped}`, 'success');
                         loadPricingData();
                         loadProducts();
                         loadSyncStatus();
                     } else {
-                        alert('Upload error: ' + (result.error || 'Unknown error'));
+                        toast('Upload error: ' + (result.error || 'Unknown error'), 'error');
                     }
                 } catch (error) {
                     console.error('Upload error:', error);
-                    alert('Upload failed: ' + error.message);
+                    toast('Upload failed: ' + error.message, 'error');
                 }
             };
 
@@ -9958,7 +9958,7 @@
             if (!amount) return;
 
             // TODO: Record payment via API
-            alert(`Recording $${amount} payment to ${repId}. This feature will be fully implemented with the ledger integration.`);
+            toast(`Recording $${amount} payment to ${repId}. This feature will be fully implemented with the ledger integration.`, 'info');
         }
 
         // ============ REP'S OWN COMMISSION VIEW ============
@@ -10275,7 +10275,7 @@
             const lowStockItems = allInventory.filter(item => item.lowStockThreshold && item.quantity <= item.lowStockThreshold);
 
             if (lowStockItems.length === 0) {
-                alert('No items currently need reordering.');
+                toast('No items currently need reordering.', 'error');
                 return;
             }
 
@@ -10323,14 +10323,14 @@
                     if (qtyInput) qtyInput.value = suggestedOrder;
                 }, 100);
             } else {
-                alert(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: $${(suggestedOrder * (item.costPerUnit || 0)).toFixed(2)}`);
+                toast(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: $${(suggestedOrder * (item.costPerUnit || 0)).toFixed(2)}`, 'info');
             }
         }
 
         // View inventory batches by PO
         async function viewInventoryBatches(chemicalId, productName) {
             if (!chemicalId) {
-                alert('No product ID available');
+                toast('No product ID available', 'info');
                 return;
             }
 
@@ -10425,7 +10425,7 @@
 
             } catch (error) {
                 console.error('Error loading batches:', error);
-                alert('Error loading batches: ' + error.message);
+                toast('Error loading batches: ' + error.message, 'error');
             }
         }
 
@@ -10486,7 +10486,7 @@
 
             } catch (error) {
                 console.error('Error loading history:', error);
-                alert('Error loading history: ' + error.message);
+                toast('Error loading history: ' + error.message, 'error');
             }
         }
 
@@ -10506,13 +10506,13 @@
                 });
                 const data = await res.json();
                 if (res.ok) {
-                    alert(data.message || 'Backfill completed!');
+                    toast(data.message || 'Backfill completed!', 'success');
                     loadInventory();
                 } else {
-                    alert('Error: ' + (data.error || 'Unknown error'));
+                    toast('Error: ' + (data.error || 'Unknown error'), 'error');
                 }
             } catch (error) {
-                alert('Error running backfill: ' + error.message);
+                toast('Error running backfill: ' + error.message, 'error');
             }
         }
 
@@ -10599,9 +10599,9 @@
             const toRepId = document.getElementById('transferToRep').value || undefined;
             const notes = document.getElementById('transferNotes').value;
 
-            if (!chemicalId) { alert('Please select a product'); return; }
-            if (quantity <= 0) { alert('Enter a valid quantity'); return; }
-            if (fromLocation === toLocation) { alert('From and To locations must be different'); return; }
+            if (!chemicalId) { toast('Please select a product', 'error'); return; }
+            if (quantity <= 0) { toast('Enter a valid quantity', 'error'); return; }
+            if (fromLocation === toLocation) { toast('From and To locations must be different', 'error'); return; }
 
             try {
                 const res = await fetch(`${API_URL}/api/admin/inventory/transfer`, {
@@ -10613,14 +10613,14 @@
                 if (res.ok) {
                     let msg = data.message;
                     if (data.transferValue > 0) msg += `\nLedger value: $${data.transferValue.toFixed(2)}`;
-                    alert(msg);
+                    toast(msg, 'info');
                     closeTransferModal();
                     loadInventory();
                 } else {
-                    alert('Error: ' + (data.error || 'Transfer failed'));
+                    toast('Error: ' + (data.error || 'Transfer failed'), 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             }
         }
 
@@ -10687,11 +10687,11 @@
                     message += `\n\nErrors (${result.errors.length}):\n${result.errors.map(e => `${e.name}: ${e.error}`).join('\n')}`;
                 }
 
-                alert(message);
+                toast(message, 'info');
                 loadInventory();
             } catch (error) {
                 console.error('Error syncing products:', error);
-                alert('Error syncing products: ' + error.message);
+                toast('Error syncing products: ' + error.message, 'error');
             }
         }
 
@@ -10788,7 +10788,7 @@
 
             // For new items, require chemical selection
             if (!editId && !chemicalId) {
-                alert('Please select a product from the catalog');
+                toast('Please select a product from the catalog', 'error');
                 return;
             }
 
@@ -10813,7 +10813,7 @@
                     if (res.ok) {
                         closeAddInventoryModal();
                         loadInventory();
-                        alert('Inventory added successfully!');
+                        toast('Inventory added successfully!', 'success');
                         return;
                     } else {
                         const err = await res.json();
@@ -10862,14 +10862,14 @@
                 if (res.ok) {
                     closeAddInventoryModal();
                     loadInventory();
-                    alert(editId ? 'Inventory updated!' : 'Inventory added!');
+                    toast(editId ? 'Inventory updated!' : 'Inventory added!', 'success');
                     return;
                 } else {
                     const err = await res.json().catch(() => ({}));
                     throw new Error(err.error || 'Failed to save inventory');
                 }
             } catch (error) {
-                alert('Error saving inventory: ' + error.message);
+                toast('Error saving inventory: ' + error.message, 'error');
             }
         }
 
@@ -10977,8 +10977,8 @@
             const reason = document.getElementById('adjustReason').value;
             const notes = document.getElementById('adjustNotes').value.trim();
 
-            if (!qty || qty <= 0) { alert('Enter a quantity greater than 0'); return; }
-            if (!reason) { alert('Select a reason for this adjustment'); return; }
+            if (!qty || qty <= 0) { toast('Enter a quantity greater than 0', 'error'); return; }
+            if (!reason) { toast('Select a reason for this adjustment', 'error'); return; }
 
             const quantityChange = adjustType === 'add' ? qty : -qty;
 
@@ -11009,9 +11009,9 @@
 
                 closeAdjustModal();
                 loadInventory();
-                alert(`Inventory ${adjustType === 'add' ? 'added' : 'removed'}: ${qty} units (${reason})`);
+                toast(`Inventory ${adjustType === 'add' ? 'added' : 'removed'}: ${qty} units (${reason})`, 'success');
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             } finally {
                 btn.disabled = false;
                 btn.textContent = 'Save Adjustment';
@@ -11035,7 +11035,7 @@
                     throw new Error(err.error || 'Failed to delete inventory item');
                 }
             } catch (error) {
-                alert('Error deleting inventory: ' + error.message);
+                toast('Error deleting inventory: ' + error.message, 'error');
             }
         }
 
