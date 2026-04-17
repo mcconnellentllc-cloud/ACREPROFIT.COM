@@ -54,6 +54,27 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
+// Email transport health check. In production we strongly prefer Resend over
+// SMTP because Microsoft 365 Security Defaults block SMTP basic auth. This
+// warns but does not fatal-exit - the SMTP fallback may still be intentional
+// during cutover, or a Gmail app-password setup is also acceptable.
+if (process.env.NODE_ENV === 'production') {
+    if (!process.env.RESEND_API_KEY) {
+        console.warn('================================================================');
+        console.warn('WARN: RESEND_API_KEY not set in production. Email send will fall');
+        console.warn('      back to SMTP/Gmail. Microsoft 365 Security Defaults will');
+        console.warn('      reject SMTP basic auth (535 5.7.139). Set RESEND_API_KEY.');
+        console.warn('================================================================');
+    }
+    if (process.env.EMAIL_TEST_MODE === 'true') {
+        console.warn('================================================================');
+        console.warn(`WARN: EMAIL_TEST_MODE=true in production. All mail will go to`);
+        console.warn(`      ${process.env.EMAIL_TEST_RECIPIENT || '(EMAIL_TEST_RECIPIENT unset - sends will fail)'}`);
+        console.warn('      Unset EMAIL_TEST_MODE before real customer sends.');
+        console.warn('================================================================');
+    }
+}
+
 // S3: helmet sets common security headers (HSTS, X-Content-Type-Options,
 // X-Frame-Options, Referrer-Policy, etc). CSP disabled because this server
 // returns JSON not HTML - CSP is enforced by the static frontend host.
@@ -84,6 +105,12 @@ app.use(cors({
     },
     credentials: true
 }));
+
+// Resend webhook needs the raw body for Svix HMAC signature verification,
+// so mount express.raw on its path BEFORE the global JSON parser below.
+// (The global parser short-circuits on paths where body has already been
+// consumed, so this is path-scoped and doesn't affect other routes.)
+app.use('/api/webhooks/resend', express.raw({ type: 'application/json', limit: '2mb' }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -4270,14 +4297,42 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
 
 // ---- PASSWORD RESET ROUTES ----
 
-// Create email transporter
-const createEmailTransporter = () => {
-    // Prefer Resend HTTP API when RESEND_API_KEY is set. Call sites use
-    // transporter.sendMail({ from, to, subject, html }); this shim matches
-    // that shape so none of the 10 call sites need to change.
+// EmailLog: audit trail for every transactional email attempt. Written by
+// the createEmailTransporter wrapper below on every sendMail() call so all
+// call sites are captured automatically. Bounce/complaint status updates
+// arrive via the Resend webhook at /api/webhooks/resend.
+const emailLogSchema = new mongoose.Schema({
+    to: { type: String, required: true, index: true },
+    from: String,
+    subject: String,
+    transport: { type: String, enum: ['resend', 'smtp', 'gmail'] },
+    status: {
+        type: String,
+        enum: ['sent', 'failed', 'delivered', 'bounced', 'complained'],
+        default: 'sent',
+        index: true
+    },
+    resendId: { type: String, index: true },
+    error: String,
+    // Set when EMAIL_TEST_MODE rerouted the recipient
+    testMode: { type: Boolean, default: false },
+    originalRecipient: String,
+    sentAt: { type: Date, default: Date.now, index: true },
+    updatedAt: Date
+});
+emailLogSchema.index({ sentAt: -1 });
+const EmailLog = mongoose.model('EmailLog', emailLogSchema);
+
+// Raw transport - returns a nodemailer-compatible transporter (or null).
+// Resend path returns a shim matching the nodemailer sendMail signature;
+// SMTP/Gmail paths return actual nodemailer transporters. Never called
+// directly by routes - always go through createEmailTransporter() which
+// wraps this with test-mode redirect and EmailLog audit.
+const createRawTransporter = () => {
     if (process.env.RESEND_API_KEY && Resend) {
         const resend = new Resend(process.env.RESEND_API_KEY);
         return {
+            _transport: 'resend',
             sendMail: async ({ from, to, subject, html }) => {
                 const { data, error } = await resend.emails.send({ from, to, subject, html });
                 if (error) {
@@ -4288,8 +4343,6 @@ const createEmailTransporter = () => {
             }
         };
     }
-    // Use environment variables for email configuration
-    // Supports Microsoft 365/Outlook, Gmail, SendGrid, or any SMTP service
     if (process.env.SMTP_HOST) {
         const config = {
             host: process.env.SMTP_HOST,
@@ -4307,19 +4360,72 @@ const createEmailTransporter = () => {
                 rejectUnauthorized: false
             };
         }
-        return nodemailer.createTransport(config);
+        const t = nodemailer.createTransport(config);
+        t._transport = 'smtp';
+        return t;
     }
-    // Default to Gmail if GMAIL_USER and GMAIL_APP_PASSWORD are set
     if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-        return nodemailer.createTransport({
+        const t = nodemailer.createTransport({
             service: 'gmail',
             auth: {
                 user: process.env.GMAIL_USER,
                 pass: process.env.GMAIL_APP_PASSWORD
             }
         });
+        t._transport = 'gmail';
+        return t;
     }
     return null;
+};
+
+// Public transporter. Wraps the raw transport with:
+//   1. EMAIL_TEST_MODE redirect - all outbound mail goes to EMAIL_TEST_RECIPIENT
+//      regardless of the original `to`. Throws if test mode is on but no
+//      recipient is configured (never silently default to an invented address).
+//   2. EmailLog audit write - one record per sendMail call, on both success
+//      and failure. Log write failures are swallowed so they never break the
+//      actual send or the caller's flow.
+// The returned object exposes the same sendMail({ from, to, subject, html })
+// shape the existing call sites use - no call site changes required.
+const createEmailTransporter = () => {
+    const raw = createRawTransporter();
+    if (!raw) return null;
+    const transport = raw._transport || 'smtp';
+    return {
+        sendMail: async (opts) => {
+            const testMode = process.env.EMAIL_TEST_MODE === 'true';
+            const originalRecipient = opts.to;
+            let to = opts.to;
+            if (testMode) {
+                const testTo = process.env.EMAIL_TEST_RECIPIENT;
+                if (!testTo) {
+                    throw new Error('EMAIL_TEST_MODE=true but EMAIL_TEST_RECIPIENT is not set - refusing to send to avoid accidental real delivery');
+                }
+                to = testTo;
+            }
+            const log = {
+                to,
+                from: opts.from,
+                subject: opts.subject,
+                transport,
+                testMode,
+                originalRecipient: testMode ? originalRecipient : undefined,
+                sentAt: new Date()
+            };
+            try {
+                const result = await raw.sendMail({ ...opts, to });
+                log.status = 'sent';
+                log.resendId = result?.messageId || result?.id || null;
+                EmailLog.create(log).catch(e => console.error('EmailLog write failed:', e.message));
+                return result;
+            } catch (err) {
+                log.status = 'failed';
+                log.error = String(err.message || err).slice(0, 1000);
+                EmailLog.create(log).catch(e => console.error('EmailLog write failed:', e.message));
+                throw err;
+            }
+        }
+    };
 };
 
 // Request password reset
@@ -6734,6 +6840,99 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
     }
 });
 
+// Resend webhook for email delivery status (delivered/bounced/complained).
+// Raw body is captured by the app.use at the top of the file (before
+// express.json) so req.body is a Buffer here. Signatures follow Svix format:
+//   - Secret looks like "whsec_<base64>"; the payload secret is the base64 part.
+//   - Header "svix-signature" is a space-separated list of "v1,<base64sig>"
+//     entries (a secret rotation may produce multiple; any match is valid).
+//   - Signature basis is `${svix-id}.${svix-timestamp}.${rawBody}` HMAC-SHA256
+//     with the decoded secret, base64-encoded.
+app.post('/api/webhooks/resend', async (req, res) => {
+    const secretEnv = process.env.RESEND_WEBHOOK_SECRET;
+    if (!secretEnv) {
+        console.error('[Resend webhook] RESEND_WEBHOOK_SECRET not set - rejecting');
+        return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
+
+    const svixId = req.headers['svix-id'];
+    const svixTimestamp = req.headers['svix-timestamp'];
+    const svixSignature = req.headers['svix-signature'];
+    if (!svixId || !svixTimestamp || !svixSignature) {
+        return res.status(401).json({ error: 'Missing Svix signature headers' });
+    }
+
+    // Reject timestamps skewed more than 5 minutes (replay attack window)
+    const now = Math.floor(Date.now() / 1000);
+    const ts = parseInt(svixTimestamp, 10);
+    if (!ts || Math.abs(now - ts) > 300) {
+        return res.status(401).json({ error: 'Timestamp outside tolerance window' });
+    }
+
+    const rawBody = Buffer.isBuffer(req.body) ? req.body.toString('utf8') : '';
+    if (!rawBody) {
+        return res.status(400).json({ error: 'Empty or non-raw body' });
+    }
+
+    const signedContent = `${svixId}.${svixTimestamp}.${rawBody}`;
+    const secretBase64 = secretEnv.startsWith('whsec_') ? secretEnv.slice(6) : secretEnv;
+    let secretBytes;
+    try {
+        secretBytes = Buffer.from(secretBase64, 'base64');
+    } catch (e) {
+        return res.status(500).json({ error: 'Malformed webhook secret' });
+    }
+
+    const expectedSig = crypto.createHmac('sha256', secretBytes).update(signedContent).digest('base64');
+    const expectedBuf = Buffer.from(expectedSig, 'base64');
+    const incomingSigs = String(svixSignature).split(' ').map(s => s.split(',')[1]).filter(Boolean);
+    const valid = incomingSigs.some(sig => {
+        try {
+            const sigBuf = Buffer.from(sig, 'base64');
+            return sigBuf.length === expectedBuf.length && crypto.timingSafeEqual(sigBuf, expectedBuf);
+        } catch {
+            return false;
+        }
+    });
+    if (!valid) {
+        return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    let event;
+    try {
+        event = JSON.parse(rawBody);
+    } catch (e) {
+        return res.status(400).json({ error: 'Invalid JSON' });
+    }
+
+    // Resend event types: email.sent, email.delivered, email.bounced,
+    // email.complained, email.delivery_delayed, email.opened, email.clicked
+    const resendId = event?.data?.email_id;
+    const recipient = Array.isArray(event?.data?.to) ? event.data.to[0] : event?.data?.to;
+    const statusMap = {
+        'email.delivered': 'delivered',
+        'email.bounced': 'bounced',
+        'email.complained': 'complained'
+    };
+    const newStatus = statusMap[event?.type];
+
+    if (newStatus && resendId) {
+        try {
+            await EmailLog.findOneAndUpdate(
+                { resendId },
+                { status: newStatus, updatedAt: new Date() }
+            );
+        } catch (e) {
+            console.error('[Resend webhook] EmailLog update failed:', e.message);
+        }
+        if (newStatus === 'bounced' || newStatus === 'complained') {
+            console.warn(`[Resend webhook] ${newStatus.toUpperCase()}: to=${recipient} resendId=${resendId}`);
+        }
+    }
+
+    res.json({ ok: true });
+});
+
 // Stripe webhook for payment confirmations (including ACH)
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -6802,12 +7001,12 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 // Send payment confirmation email to customer
                 try {
                     const customer = await User.findById(order.userId);
-                    const transporter = createTransporter();
+                    const transporter = createEmailTransporter();
                     if (transporter && customer?.email) {
                         const amount = (paymentIntent.amount / 100).toFixed(2);
                         const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
                         await transporter.sendMail({
-                            from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                             to: customer.email,
                             subject: `Payment Confirmed - Acre Profit`,
                             html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -9660,7 +9859,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                 ).join('');
 
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.GMAIL_USER,
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                     to: toEmail,
                     subject: `Order Confirmation - ${order.orderNumber} - Acre Profit`,
                     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -12942,6 +13141,51 @@ app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, a
         });
 
         res.json(products);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ EMAIL LOG API ENDPOINT ============
+
+// Paginated email audit log for admins. Filters: status (sent|failed|bounced|
+// complained|delivered), q (substring match on to/subject), from/to dates.
+// Superadmins see everything; non-superadmins see only logs where the `to`
+// address matches one of their customers' emails.
+app.get('/api/admin/email-log', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const skip = (page - 1) * limit;
+
+        const query = {};
+        if (req.query.status) query.status = req.query.status;
+        if (req.query.q) {
+            const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            query.$or = [{ to: rx }, { subject: rx }];
+        }
+        if (req.query.since) {
+            const d = new Date(req.query.since);
+            if (!isNaN(d)) query.sentAt = { ...(query.sentAt || {}), $gte: d };
+        }
+        if (req.query.until) {
+            const d = new Date(req.query.until);
+            if (!isNaN(d)) query.sentAt = { ...(query.sentAt || {}), $lte: d };
+        }
+
+        // Non-superadmin scoping - only logs addressed to their customers
+        if (req.user.role !== 'superadmin') {
+            const customers = await User.find({ representative: req.user._id }).select('email');
+            const emails = customers.map(c => c.email).filter(Boolean);
+            query.to = { $in: emails };
+        }
+
+        const [total, rows] = await Promise.all([
+            EmailLog.countDocuments(query),
+            EmailLog.find(query).sort({ sentAt: -1 }).skip(skip).limit(limit).lean()
+        ]);
+
+        res.json({ page, limit, total, rows });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

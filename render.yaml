@@ -26,6 +26,18 @@ services:
       # EMAIL_FROM must be on a Resend-verified domain (e.g. noreply@acreprofit.com).
       - key: RESEND_API_KEY
         sync: false
+      # Webhook signing secret from the Resend dashboard (starts with "whsec_").
+      # Required for /api/webhooks/resend to verify bounce/delivered callbacks.
+      - key: RESEND_WEBHOOK_SECRET
+        sync: false
+      # Test mode: when EMAIL_TEST_MODE=true, all outbound mail is redirected
+      # to EMAIL_TEST_RECIPIENT regardless of the actual recipient. Use this
+      # to sanity-check templates before real customer sends. Send throws if
+      # test mode is on but recipient is unset (no silent accidental delivery).
+      - key: EMAIL_TEST_MODE
+        value: "false"
+      - key: EMAIL_TEST_RECIPIENT
+        sync: false
       # Fallback: SMTP (used only if RESEND_API_KEY is unset).
       - key: SMTP_HOST
         value: smtp.office365.com

@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Acre Profit Email Audit Log">
+    <title>Email Log - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <style>
+        .email-log-filters { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; margin-bottom: 16px; }
+        .email-log-filters .field { display: flex; flex-direction: column; gap: 4px; }
+        .email-log-filters label { font-size: 12px; color: #555; font-weight: 600; }
+        .email-log-filters input, .email-log-filters select { padding: 6px 10px; border: 1px solid #ccc; border-radius: 6px; font-family: inherit; font-size: 14px; }
+        .email-log-table { width: 100%; border-collapse: collapse; background: #fff; }
+        .email-log-table th, .email-log-table td { padding: 8px 10px; text-align: left; border-bottom: 1px solid #eee; font-size: 14px; vertical-align: top; }
+        .email-log-table th { background: #f5f5f5; font-weight: 600; color: #444; }
+        .email-log-table tr:hover { background: #fafafa; }
+        .status-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+        .status-sent { background: #e8f4ff; color: #0366d6; }
+        .status-delivered { background: #dcfce7; color: #166534; }
+        .status-failed { background: #fee2e2; color: #991b1b; }
+        .status-bounced { background: #fef3c7; color: #92400e; }
+        .status-complained { background: #fce7f3; color: #9f1239; }
+        .muted { color: #888; font-size: 12px; }
+        .pagination-bar { display: flex; gap: 8px; align-items: center; margin-top: 16px; justify-content: space-between; }
+        .test-mode-flag { background: #fef3c7; color: #92400e; padding: 1px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 6px; }
+        .error-cell { font-family: ui-monospace, monospace; font-size: 12px; color: #991b1b; white-space: pre-wrap; word-break: break-word; max-width: 320px; }
+        .subject-cell { max-width: 360px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    </style>
+</head>
+<body>
+    <nav class="navbar admin-nav">
+        <div class="container">
+            <a href="/admin.html" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <div class="nav-center">
+                <a href="/admin.html" class="nav-back">&larr; Admin Panel</a>
+                <span class="nav-title">Email Log</span>
+            </div>
+            <div class="nav-right">
+                <span id="userName" class="nav-user"></span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="card">
+                <div class="card-header">
+                    <h2>Email Audit Log</h2>
+                    <p class="muted">Every outbound transactional email. Bounce/complaint status arrives via Resend webhook.</p>
+                </div>
+                <div class="card-body">
+                    <div class="email-log-filters">
+                        <div class="field">
+                            <label for="filterStatus">Status</label>
+                            <select id="filterStatus">
+                                <option value="">All</option>
+                                <option value="sent">Sent</option>
+                                <option value="delivered">Delivered</option>
+                                <option value="failed">Failed</option>
+                                <option value="bounced">Bounced</option>
+                                <option value="complained">Complained</option>
+                            </select>
+                        </div>
+                        <div class="field">
+                            <label for="filterQuery">Search (to or subject)</label>
+                            <input type="text" id="filterQuery" placeholder="gary@... or Invoice">
+                        </div>
+                        <div class="field">
+                            <label for="filterSince">Since</label>
+                            <input type="date" id="filterSince">
+                        </div>
+                        <div class="field">
+                            <label for="filterUntil">Until</label>
+                            <input type="date" id="filterUntil">
+                        </div>
+                        <button id="applyFilters" class="btn btn-primary btn-sm">Apply</button>
+                        <button id="clearFilters" class="btn btn-outline btn-sm">Clear</button>
+                        <button id="refreshBtn" class="btn btn-outline btn-sm">Refresh</button>
+                    </div>
+
+                    <div style="overflow-x: auto;">
+                        <table class="email-log-table">
+                            <thead>
+                                <tr>
+                                    <th>Sent</th>
+                                    <th>Status</th>
+                                    <th>To</th>
+                                    <th>Subject</th>
+                                    <th>Transport</th>
+                                    <th>Resend ID / Error</th>
+                                </tr>
+                            </thead>
+                            <tbody id="logTbody">
+                                <tr><td colspan="6" style="text-align:center; padding:20px; color:#888;">Loading&hellip;</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <div class="pagination-bar">
+                        <div id="paginationInfo" class="muted"></div>
+                        <div>
+                            <button id="prevPage" class="btn btn-outline btn-sm">&larr; Prev</button>
+                            <button id="nextPage" class="btn btn-outline btn-sm">Next &rarr;</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        const API_URL = 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('token');
+        const user = JSON.parse(localStorage.getItem('user') || '{}');
+
+        if (!token || !['admin', 'distributor', 'superadmin'].includes(user.role)) {
+            window.location.href = '/login.html';
+        }
+
+        let currentPage = 1;
+        const pageSize = 50;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            document.getElementById('userName').textContent = user.name || '';
+            document.getElementById('applyFilters').addEventListener('click', () => { currentPage = 1; loadLog(); });
+            document.getElementById('clearFilters').addEventListener('click', () => {
+                document.getElementById('filterStatus').value = '';
+                document.getElementById('filterQuery').value = '';
+                document.getElementById('filterSince').value = '';
+                document.getElementById('filterUntil').value = '';
+                currentPage = 1;
+                loadLog();
+            });
+            document.getElementById('refreshBtn').addEventListener('click', loadLog);
+            document.getElementById('prevPage').addEventListener('click', () => { if (currentPage > 1) { currentPage--; loadLog(); } });
+            document.getElementById('nextPage').addEventListener('click', () => { currentPage++; loadLog(); });
+            setupLogout();
+            loadLog();
+        });
+
+        async function loadLog() {
+            const params = new URLSearchParams({ page: currentPage, limit: pageSize });
+            const status = document.getElementById('filterStatus').value;
+            const q = document.getElementById('filterQuery').value.trim();
+            const since = document.getElementById('filterSince').value;
+            const until = document.getElementById('filterUntil').value;
+            if (status) params.set('status', status);
+            if (q) params.set('q', q);
+            if (since) params.set('since', since);
+            if (until) params.set('until', until);
+
+            const tbody = document.getElementById('logTbody');
+            tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#888;">Loading&hellip;</td></tr>';
+
+            try {
+                const res = await fetch(`${API_URL}/api/admin/email-log?${params.toString()}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load email log');
+                const data = await res.json();
+                renderLog(data);
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="6" style="text-align:center; padding:20px; color:#991b1b;">Error: ${escapeHtml(err.message)}</td></tr>`;
+            }
+        }
+
+        function renderLog(data) {
+            const tbody = document.getElementById('logTbody');
+            if (!data.rows || data.rows.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="6" style="text-align:center; padding:20px; color:#888;">No emails match these filters.</td></tr>';
+            } else {
+                tbody.innerHTML = data.rows.map(rowHtml).join('');
+            }
+
+            const info = document.getElementById('paginationInfo');
+            const start = (data.page - 1) * data.limit + 1;
+            const end = Math.min(start + data.rows.length - 1, data.total);
+            info.textContent = data.total === 0
+                ? '0 records'
+                : `Showing ${start}-${end} of ${data.total.toLocaleString()} records`;
+
+            document.getElementById('prevPage').disabled = data.page <= 1;
+            document.getElementById('nextPage').disabled = end >= data.total;
+        }
+
+        function rowHtml(r) {
+            const when = new Date(r.sentAt).toLocaleString();
+            const statusClass = `status-${r.status || 'sent'}`;
+            const testFlag = r.testMode ? `<span class="test-mode-flag" title="Original recipient: ${escapeHtml(r.originalRecipient || '')}">TEST</span>` : '';
+            const lastCell = r.status === 'failed' || r.error
+                ? `<div class="error-cell">${escapeHtml(r.error || '(no error message)')}</div>`
+                : (r.resendId ? `<code class="muted">${escapeHtml(r.resendId)}</code>` : '<span class="muted">&mdash;</span>');
+            return `
+                <tr>
+                    <td>${escapeHtml(when)}</td>
+                    <td><span class="status-badge ${statusClass}">${escapeHtml(r.status || 'sent')}</span></td>
+                    <td>${escapeHtml(r.to || '')}${testFlag}</td>
+                    <td class="subject-cell" title="${escapeHtml(r.subject || '')}">${escapeHtml(r.subject || '')}</td>
+                    <td>${escapeHtml(r.transport || '')}</td>
+                    <td>${lastCell}</td>
+                </tr>
+            `;
+        }
+
+        function escapeHtml(s) {
+            return String(s ?? '')
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function setupLogout() {
+            document.getElementById('logoutBtn').addEventListener('click', (e) => {
+                e.preventDefault();
+                localStorage.removeItem('token');
+                localStorage.removeItem('user');
+                window.location.href = '/login.html';
+            });
+        }
+    </script>
+</body>
+</html>
