@@ -91,6 +91,7 @@
             .no-print { display: none !important; }
         }
     </style>
+    <script src="dialog.js"></script>
 </head>
 <body>
     <nav class="navbar dashboard-navbar">
@@ -359,7 +360,7 @@
         }
 
         async function cancelOrder(orderId) {
-            if (!confirm('Are you sure you want to cancel this order?')) return;
+            if (!await confirmDialog('Are you sure you want to cancel this order?', {danger: true, ok: 'Yes, cancel order'})) return;
 
             try {
                 const response = await fetch(`${API_URL}/api/chemical-orders/${orderId}/submit`, {
@@ -373,7 +374,7 @@
                 if (!response.ok) throw new Error('Failed to cancel');
                 loadOrders();
             } catch (error) {
-                alert('Unable to cancel order through the site. Please contact us directly at contact@acreprofit.com or call your rep.');
+                toast('Unable to cancel order through the site. Please contact us directly at contact@acreprofit.com or call your rep.', 'error');
             }
         }
 

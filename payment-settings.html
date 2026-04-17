@@ -11,6 +11,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="https://js.stripe.com/v3/"></script>
+    <script src="dialog.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -247,10 +248,10 @@
                 if (result.url) {
                     window.location.href = result.url;
                 } else {
-                    alert(result.error || 'Failed to start Stripe setup');
+                    toast(result.error || 'Failed to start Stripe setup', 'error');
                 }
             } catch (error) {
-                alert('Error setting up Stripe: ' + error.message);
+                toast('Error setting up Stripe: ' + error.message, 'error');
             }
         });
 
@@ -308,13 +309,13 @@
                 });
 
                 if (response.ok) {
-                    alert('Check payment info saved!');
+                    toast('Check payment info saved!', 'success');
                 } else {
                     const result = await response.json();
-                    alert(result.error || 'Failed to save');
+                    toast(result.error || 'Failed to save', 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             }
         });
 
@@ -328,7 +329,7 @@
         // Add bank account
         document.getElementById('addBankAccount')?.addEventListener('click', async () => {
             if (!stripe) {
-                alert('Payment system is not configured. Please contact support.');
+                toast('Payment system is not configured. Please contact support.', 'error');
                 return;
             }
 
@@ -339,7 +340,7 @@
                 ? 'You chose to SAVE your bank account for future orders. Continue to link your bank?'
                 : 'You chose NOT to save your bank account. Continue to link your bank for this session?';
 
-            if (!confirm(confirmMsg)) return;
+            if (!await confirmDialog(confirmMsg)) return;
 
             try {
                 // Save preference first
@@ -404,11 +405,11 @@
                 }
 
                 // Success!
-                alert('Bank account linked successfully!' + (shouldSave ? ' It will be saved for future orders.' : ''));
+                toast('Bank account linked successfully!' + (shouldSave ? ' It will be saved for future orders.' : ''), 'success');
                 loadSavedPaymentMethods();
 
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             } finally {
                 const btn = document.getElementById('addBankAccount');
                 btn.disabled = false;
@@ -479,7 +480,7 @@
 
         // Remove single payment method
         async function removePaymentMethod(paymentMethodId) {
-            if (!confirm('Remove this bank account?')) return;
+            if (!await confirmDialog('Remove this bank account?')) return;
 
             try {
                 const response = await fetch(`${API_URL}/api/payments/methods/${paymentMethodId}`, {
@@ -491,16 +492,16 @@
                     loadSavedPaymentMethods();
                 } else {
                     const error = await response.json();
-                    alert(error.error || 'Failed to remove');
+                    toast(error.error || 'Failed to remove', 'error');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             }
         }
 
         // Remove all payment methods
         document.getElementById('removeAllBtn')?.addEventListener('click', async () => {
-            if (!confirm('Remove ALL saved payment methods? You will need to re-enter your bank info for future orders.')) return;
+            if (!await confirmDialog('Remove ALL saved payment methods? You will need to re-enter your bank info for future orders.', {danger: true, ok: 'Yes, remove all'})) return;
 
             try {
                 const response = await fetch(`${API_URL}/api/payments/methods`, {
@@ -513,10 +514,10 @@
                     document.getElementById('achStatusBadge').textContent = 'Not Set Up';
                     document.getElementById('achStatusBadge').classList.remove('status-active');
                     document.getElementById('savedMethodsCard').style.display = 'none';
-                    alert('All payment methods removed');
+                    toast('All payment methods removed', 'success');
                 }
             } catch (error) {
-                alert('Error: ' + error.message);
+                toast('Error: ' + error.message, 'error');
             }
         });
 
