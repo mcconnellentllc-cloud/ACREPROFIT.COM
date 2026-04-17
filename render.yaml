@@ -20,7 +20,13 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://acreprofit.com
-      # Email configuration (Microsoft 365 / Office 365)
+      # Email configuration
+      # Primary: Resend HTTP API (preferred - bypasses M365 Security Defaults).
+      # Set RESEND_API_KEY and createEmailTransporter() will use Resend.
+      # EMAIL_FROM must be on a Resend-verified domain (e.g. noreply@acreprofit.com).
+      - key: RESEND_API_KEY
+        sync: false
+      # Fallback: SMTP (used only if RESEND_API_KEY is unset).
       - key: SMTP_HOST
         value: smtp.office365.com
       - key: SMTP_PORT

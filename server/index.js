@@ -8,6 +8,14 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
+// Resend transactional email. Preferred over SMTP when RESEND_API_KEY is set
+// because Microsoft 365 Security Defaults block SMTP basic auth (535 5.7.139).
+let Resend;
+try {
+    Resend = require('resend').Resend;
+} catch (e) {
+    console.log('Resend SDK not installed. SMTP fallback only.');
+}
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -4264,6 +4272,22 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
 
 // Create email transporter
 const createEmailTransporter = () => {
+    // Prefer Resend HTTP API when RESEND_API_KEY is set. Call sites use
+    // transporter.sendMail({ from, to, subject, html }); this shim matches
+    // that shape so none of the 10 call sites need to change.
+    if (process.env.RESEND_API_KEY && Resend) {
+        const resend = new Resend(process.env.RESEND_API_KEY);
+        return {
+            sendMail: async ({ from, to, subject, html }) => {
+                const { data, error } = await resend.emails.send({ from, to, subject, html });
+                if (error) {
+                    const msg = error.message || (typeof error === 'string' ? error : JSON.stringify(error));
+                    throw new Error(`Resend send failed: ${msg}`);
+                }
+                return { messageId: data?.id };
+            }
+        };
+    }
     // Use environment variables for email configuration
     // Supports Microsoft 365/Outlook, Gmail, SendGrid, or any SMTP service
     if (process.env.SMTP_HOST) {
