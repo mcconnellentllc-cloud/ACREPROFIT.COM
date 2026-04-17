@@ -5217,7 +5217,8 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
             crops: crops || [],
             representativeId: representativeId || 'kyle', // String rep ID for pickup location
             representative: req.user._id, // ObjectId of admin who created
-            role: 'customer'
+            role: 'customer',
+            mustChangePassword: true
         });
 
         await user.save();
@@ -6438,13 +6439,14 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
         if (status === 'approved') {
             const existingUser = await User.findOne({ email: application.email.toLowerCase() });
             if (!existingUser) {
-                const tempPassword = 'Farm2026!'; // They should change this
+                const tempPassword = 'Farm2026!'; // Forced rotation on first login via mustChangePassword
                 await User.create({
                     name: `${application.firstName} ${application.lastName}`,
                     email: application.email,
                     password: tempPassword,
                     phone: application.phone,
-                    role: 'distributor'
+                    role: 'distributor',
+                    mustChangePassword: true
                 });
             }
         }
