@@ -8,6 +8,17 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
+// SendGrid transactional email. Preferred over SMTP when SENDGRID_API_KEY is
+// set because Microsoft 365 Security Defaults block SMTP basic auth
+// (535 5.7.139). Wrapped in try/catch so the app still boots if the dep
+// isn't installed (matches the pattern used for optional SharePoint deps).
+let sgMail;
+try {
+    sgMail = require('@sendgrid/mail');
+    if (process.env.SENDGRID_API_KEY) sgMail.setApiKey(process.env.SENDGRID_API_KEY);
+} catch (e) {
+    console.log('SendGrid SDK not installed. SMTP fallback only.');
+}
 const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
@@ -46,6 +57,27 @@ if (!JWT_SECRET) {
     process.exit(1);
 }
 
+// Email transport health check. In production we strongly prefer SendGrid
+// over SMTP because Microsoft 365 Security Defaults block SMTP basic auth.
+// Warns but does not fatal-exit - SMTP fallback may be intentional during
+// cutover and Gmail app-password is also acceptable.
+if (process.env.NODE_ENV === 'production') {
+    if (!process.env.SENDGRID_API_KEY) {
+        console.warn('================================================================');
+        console.warn('WARN: SENDGRID_API_KEY not set in production. Email send will');
+        console.warn('      fall back to SMTP/Gmail. Microsoft 365 Security Defaults');
+        console.warn('      will reject SMTP basic auth (535 5.7.139). Set the key.');
+        console.warn('================================================================');
+    }
+    if (process.env.EMAIL_TEST_MODE === 'true') {
+        console.warn('================================================================');
+        console.warn('WARN: EMAIL_TEST_MODE=true in production. All mail will go to');
+        console.warn(`      ${process.env.EMAIL_TEST_RECIPIENT || '(EMAIL_TEST_RECIPIENT unset - sends will fail)'}`);
+        console.warn('      Unset EMAIL_TEST_MODE before real customer sends.');
+        console.warn('================================================================');
+    }
+}
+
 // S3: helmet sets common security headers (HSTS, X-Content-Type-Options,
 // X-Frame-Options, Referrer-Policy, etc). CSP disabled because this server
 // returns JSON not HTML - CSP is enforced by the static frontend host.
@@ -76,6 +108,11 @@ app.use(cors({
     },
     credentials: true
 }));
+
+// SendGrid event webhook needs the raw body for ECDSA signature verification
+// over `timestamp + body`. Mount the raw parser path-scoped BEFORE the global
+// JSON parser below so req.body arrives as a Buffer on the webhook route.
+app.use('/api/webhooks/sendgrid', express.raw({ type: 'application/json', limit: '2mb' }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -4262,10 +4299,60 @@ app.post('/api/auth/change-password', authMiddleware, async (req, res) => {
 
 // ---- PASSWORD RESET ROUTES ----
 
-// Create email transporter
-const createEmailTransporter = () => {
-    // Use environment variables for email configuration
-    // Supports Microsoft 365/Outlook, Gmail, SendGrid, or any SMTP service
+// EmailLog: audit trail for every transactional email attempt. Written by
+// the createEmailTransporter wrapper below on every sendMail() call so all
+// call sites are captured automatically. Bounce/complaint status updates
+// arrive via the SendGrid event webhook at /api/webhooks/sendgrid.
+//
+// template/relatedEntityType/relatedEntityId are unused today because the
+// existing sendMail call sites don't pass them (we preserve call-site
+// compatibility). Kept in the schema so future work can populate them
+// without a migration.
+const emailLogSchema = new mongoose.Schema({
+    to: { type: String, required: true, index: true },
+    from: String,
+    subject: String,
+    transport: { type: String, enum: ['sendgrid', 'smtp', 'gmail'] },
+    status: {
+        type: String,
+        enum: ['sent', 'failed', 'delivered', 'bounced', 'complained'],
+        default: 'sent',
+        index: true
+    },
+    providerId: { type: String, index: true },
+    error: String,
+    template: String,
+    relatedEntityType: String,
+    relatedEntityId: mongoose.Schema.Types.ObjectId,
+    // Populated when EMAIL_TEST_MODE redirected the recipient
+    testMode: { type: Boolean, default: false },
+    originalRecipient: String,
+    sentAt: { type: Date, default: Date.now, index: true },
+    updatedAt: Date
+});
+emailLogSchema.index({ sentAt: -1 });
+const EmailLog = mongoose.model('EmailLog', emailLogSchema);
+
+// Raw transport - returns a nodemailer-compatible transporter (or null).
+// SendGrid path returns a shim matching the nodemailer sendMail signature;
+// SMTP/Gmail paths return actual nodemailer transporters. Never called
+// directly by routes - always go through createEmailTransporter() which
+// wraps this with test-mode redirect and EmailLog audit.
+const createRawTransporter = () => {
+    if (process.env.SENDGRID_API_KEY && sgMail) {
+        return {
+            _transport: 'sendgrid',
+            sendMail: async ({ from, to, subject, html }) => {
+                const [response] = await sgMail.send({ from, to, subject, html });
+                // SendGrid returns the short message id in the x-message-id
+                // header. The event webhook's sg_message_id is
+                // `<shortId>.<random>.<timestamp>` - we store the short id
+                // and prefix-match on incoming webhooks.
+                const messageId = response?.headers?.['x-message-id'] || null;
+                return { messageId };
+            }
+        };
+    }
     if (process.env.SMTP_HOST) {
         const config = {
             host: process.env.SMTP_HOST,
@@ -4283,19 +4370,72 @@ const createEmailTransporter = () => {
                 rejectUnauthorized: false
             };
         }
-        return nodemailer.createTransport(config);
+        const t = nodemailer.createTransport(config);
+        t._transport = 'smtp';
+        return t;
     }
-    // Default to Gmail if GMAIL_USER and GMAIL_APP_PASSWORD are set
     if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
-        return nodemailer.createTransport({
+        const t = nodemailer.createTransport({
             service: 'gmail',
             auth: {
                 user: process.env.GMAIL_USER,
                 pass: process.env.GMAIL_APP_PASSWORD
             }
         });
+        t._transport = 'gmail';
+        return t;
     }
     return null;
+};
+
+// Public transporter. Wraps the raw transport with:
+//   1. EMAIL_TEST_MODE redirect - all outbound mail goes to EMAIL_TEST_RECIPIENT
+//      regardless of the original `to`. Throws if test mode is on but no
+//      recipient is configured (never silently default to an invented address).
+//   2. EmailLog audit write - one record per sendMail call, on both success
+//      and failure. Log write failures are swallowed so they never break the
+//      actual send or the caller's flow.
+// The returned object exposes the same sendMail({ from, to, subject, html })
+// shape the existing call sites use - no call site changes required.
+const createEmailTransporter = () => {
+    const raw = createRawTransporter();
+    if (!raw) return null;
+    const transport = raw._transport || 'smtp';
+    return {
+        sendMail: async (opts) => {
+            const testMode = process.env.EMAIL_TEST_MODE === 'true';
+            const originalRecipient = opts.to;
+            let to = opts.to;
+            if (testMode) {
+                const testTo = process.env.EMAIL_TEST_RECIPIENT;
+                if (!testTo) {
+                    throw new Error('EMAIL_TEST_MODE=true but EMAIL_TEST_RECIPIENT is not set - refusing to send to avoid accidental real delivery');
+                }
+                to = testTo;
+            }
+            const log = {
+                to,
+                from: opts.from,
+                subject: opts.subject,
+                transport,
+                testMode,
+                originalRecipient: testMode ? originalRecipient : undefined,
+                sentAt: new Date()
+            };
+            try {
+                const result = await raw.sendMail({ ...opts, to });
+                log.status = 'sent';
+                log.providerId = result?.messageId || result?.id || null;
+                EmailLog.create(log).catch(e => console.error('EmailLog write failed:', e.message));
+                return result;
+            } catch (err) {
+                log.status = 'failed';
+                log.error = String(err.message || err).slice(0, 1000);
+                EmailLog.create(log).catch(e => console.error('EmailLog write failed:', e.message));
+                throw err;
+            }
+        }
+    };
 };
 
 // Request password reset
@@ -6710,6 +6850,109 @@ app.post('/api/payments/check-received', authMiddleware, adminMiddleware, async 
     }
 });
 
+// SendGrid event webhook for email delivery status (delivered/bounce/
+// spamreport/dropped). Raw body is captured by the app.use at the top of
+// the file (before express.json) so req.body is a Buffer here.
+//
+// SendGrid signs requests with ECDSA on the P-256 curve, SHA-256 digest,
+// DER-encoded signature:
+//   - Header "X-Twilio-Email-Event-Webhook-Signature" is base64(DER-encoded
+//     ECDSA signature).
+//   - Header "X-Twilio-Email-Event-Webhook-Timestamp" is a unix-seconds
+//     string.
+//   - Signed payload is `${timestamp}${rawBody}` (bytes concatenated).
+//   - Public key comes from the SendGrid Mail Settings > Signed Event
+//     Webhook page in PEM form (`-----BEGIN PUBLIC KEY-----...`).
+//
+// Events arrive as a JSON array: [{event, email, sg_message_id, timestamp, ...}].
+// sg_message_id has the shape `<shortId>.<random>.<timestamp>`; the short id
+// is what we stored as EmailLog.providerId from the x-message-id response
+// header at send time, so we prefix-match to correlate.
+app.post('/api/webhooks/sendgrid', async (req, res) => {
+    const pubKeyEnv = process.env.SENDGRID_WEBHOOK_PUBLIC_KEY;
+    if (!pubKeyEnv) {
+        console.error('[SendGrid webhook] SENDGRID_WEBHOOK_PUBLIC_KEY not set - rejecting');
+        return res.status(500).json({ error: 'Webhook public key not configured' });
+    }
+
+    const sigB64 = req.headers['x-twilio-email-event-webhook-signature'];
+    const timestamp = req.headers['x-twilio-email-event-webhook-timestamp'];
+    if (!sigB64 || !timestamp) {
+        return res.status(401).json({ error: 'Missing SendGrid signature headers' });
+    }
+
+    // Reject timestamps skewed more than 10 minutes (replay defense).
+    const now = Math.floor(Date.now() / 1000);
+    const ts = parseInt(timestamp, 10);
+    if (!ts || Math.abs(now - ts) > 600) {
+        return res.status(401).json({ error: 'Timestamp outside tolerance window' });
+    }
+
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from('');
+    if (rawBody.length === 0) {
+        return res.status(400).json({ error: 'Empty or non-raw body' });
+    }
+
+    // SendGrid may store the public key with literal \n instead of newlines
+    // when set via some env-var UIs - normalize both forms.
+    const pubKeyPem = pubKeyEnv.includes('\n') ? pubKeyEnv : pubKeyEnv.replace(/\\n/g, '\n');
+
+    let valid = false;
+    try {
+        const pubKey = crypto.createPublicKey({ key: pubKeyPem, format: 'pem' });
+        const signedPayload = Buffer.concat([Buffer.from(String(timestamp), 'utf8'), rawBody]);
+        const sigBytes = Buffer.from(sigB64, 'base64');
+        valid = crypto.verify('sha256', signedPayload, { key: pubKey, dsaEncoding: 'der' }, sigBytes);
+    } catch (e) {
+        console.error('[SendGrid webhook] Signature verification threw:', e.message);
+        return res.status(500).json({ error: 'Signature verification error' });
+    }
+    if (!valid) {
+        return res.status(401).json({ error: 'Invalid signature' });
+    }
+
+    let events;
+    try {
+        events = JSON.parse(rawBody.toString('utf8'));
+    } catch (e) {
+        return res.status(400).json({ error: 'Invalid JSON' });
+    }
+    if (!Array.isArray(events)) events = [events];
+
+    // Event types we care about. SendGrid sends many (processed, open, click,
+    // unsubscribe, deferred, etc.) - we only update EmailLog for status
+    // transitions that matter for invoice delivery tracking.
+    const statusMap = {
+        'delivered': 'delivered',
+        'bounce': 'bounced',
+        'blocked': 'bounced',
+        'dropped': 'failed',
+        'spamreport': 'complained'
+    };
+
+    for (const ev of events) {
+        const newStatus = statusMap[ev?.event];
+        if (!newStatus) continue;
+        const sgMessageId = String(ev?.sg_message_id || '');
+        const shortId = sgMessageId.split('.')[0];
+        if (!shortId) continue;
+        try {
+            await EmailLog.findOneAndUpdate(
+                { providerId: shortId },
+                { status: newStatus, updatedAt: new Date() }
+            );
+        } catch (e) {
+            console.error('[SendGrid webhook] EmailLog update failed:', e.message);
+        }
+        if (newStatus === 'bounced' || newStatus === 'complained' || newStatus === 'failed') {
+            const reason = ev.reason || ev.response || '';
+            console.warn(`[SendGrid webhook] ${newStatus.toUpperCase()}: to=${ev.email} id=${shortId} reason=${reason}`);
+        }
+    }
+
+    res.json({ ok: true, processed: events.length });
+});
+
 // Stripe webhook for payment confirmations (including ACH)
 app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
     const sig = req.headers['stripe-signature'];
@@ -6778,12 +7021,12 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
                 // Send payment confirmation email to customer
                 try {
                     const customer = await User.findById(order.userId);
-                    const transporter = createTransporter();
+                    const transporter = createEmailTransporter();
                     if (transporter && customer?.email) {
                         const amount = (paymentIntent.amount / 100).toFixed(2);
                         const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
                         await transporter.sendMail({
-                            from: process.env.EMAIL_FROM || process.env.SMTP_USER,
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                             to: customer.email,
                             subject: `Payment Confirmed - Acre Profit`,
                             html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -9636,7 +9879,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                 ).join('');
 
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || process.env.SMTP_USER || process.env.GMAIL_USER,
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                     to: toEmail,
                     subject: `Order Confirmation - ${order.orderNumber} - Acre Profit`,
                     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -12918,6 +13161,51 @@ app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, a
         });
 
         res.json(products);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ EMAIL LOG API ENDPOINT ============
+
+// Paginated email audit log for admins. Filters: status, q (substring match
+// on to/subject), since/until date range. Superadmins see everything;
+// non-superadmins see only logs where the `to` address matches one of their
+// assigned customers' emails.
+app.get('/api/admin/email-log', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const page = Math.max(1, parseInt(req.query.page) || 1);
+        const limit = Math.min(200, Math.max(1, parseInt(req.query.limit) || 50));
+        const skip = (page - 1) * limit;
+
+        const query = {};
+        if (req.query.status) query.status = req.query.status;
+        if (req.query.q) {
+            const rx = new RegExp(String(req.query.q).replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'i');
+            query.$or = [{ to: rx }, { subject: rx }];
+        }
+        if (req.query.since) {
+            const d = new Date(req.query.since);
+            if (!isNaN(d)) query.sentAt = { ...(query.sentAt || {}), $gte: d };
+        }
+        if (req.query.until) {
+            const d = new Date(req.query.until);
+            if (!isNaN(d)) query.sentAt = { ...(query.sentAt || {}), $lte: d };
+        }
+
+        // Non-superadmin scoping - only logs addressed to their customers
+        if (req.user.role !== 'superadmin') {
+            const customers = await User.find({ representative: req.user._id }).select('email');
+            const emails = customers.map(c => c.email).filter(Boolean);
+            query.to = { $in: emails };
+        }
+
+        const [total, rows] = await Promise.all([
+            EmailLog.countDocuments(query),
+            EmailLog.find(query).sort({ sentAt: -1 }).skip(skip).limit(limit).lean()
+        ]);
+
+        res.json({ page, limit, total, rows });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

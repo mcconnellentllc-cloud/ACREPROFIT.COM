@@ -20,7 +20,27 @@ services:
         sync: false
       - key: FRONTEND_URL
         value: https://acreprofit.com
-      # Email configuration (Microsoft 365 / Office 365)
+      # Email configuration
+      # Primary: SendGrid API (preferred - bypasses M365 Security Defaults).
+      # Set SENDGRID_API_KEY and createEmailTransporter() will use SendGrid.
+      # EMAIL_FROM must be on a SendGrid domain-authenticated sender
+      # (acreprofit.com is already set up via s1/s2._domainkey CNAMEs).
+      - key: SENDGRID_API_KEY
+        sync: false
+      # PEM public key from SendGrid Mail Settings > Signed Event Webhook.
+      # Required for /api/webhooks/sendgrid to verify delivered/bounce events.
+      # Paste the full `-----BEGIN PUBLIC KEY-----...-----END PUBLIC KEY-----`
+      # block; literal \n escapes are also accepted.
+      - key: SENDGRID_WEBHOOK_PUBLIC_KEY
+        sync: false
+      # Test mode: when EMAIL_TEST_MODE=true, all outbound mail is redirected
+      # to EMAIL_TEST_RECIPIENT regardless of the actual recipient. Send throws
+      # if test mode is on but recipient is unset (no silent accidental delivery).
+      - key: EMAIL_TEST_MODE
+        value: "false"
+      - key: EMAIL_TEST_RECIPIENT
+        sync: false
+      # Fallback: SMTP (used only if SENDGRID_API_KEY is unset).
       - key: SMTP_HOST
         value: smtp.office365.com
       - key: SMTP_PORT
