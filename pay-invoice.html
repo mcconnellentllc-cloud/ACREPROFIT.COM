@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Redirecting to Payment - Acre Profit</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f5f0 0%, #e8f5e9 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #1a1a1a;
+        }
+        .card {
+            max-width: 480px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 48px 40px;
+            box-shadow: 0 10px 40px rgba(45, 90, 39, 0.15);
+            text-align: center;
+        }
+        .spinner {
+            width: 48px;
+            height: 48px;
+            margin: 0 auto 24px;
+            border: 4px solid #e8f5e9;
+            border-top-color: #2d5a27;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        h1 {
+            color: #2d5a27;
+            font-size: 22px;
+            margin-bottom: 12px;
+        }
+        p {
+            color: #444;
+            font-size: 14px;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        .error {
+            color: #991b1b;
+            margin-top: 16px;
+            padding: 12px;
+            background: #fee2e2;
+            border-radius: 8px;
+            font-size: 13px;
+            display: none;
+        }
+        .btn {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            background: #2d5a27;
+            color: #ffffff;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="spinner"></div>
+        <h1>Taking you to secure payment...</h1>
+        <p>You're being redirected to Stripe to complete your payment.</p>
+        <div class="error" id="error">
+            <p id="errorMessage">Unable to start payment.</p>
+            <a href="mailto:contact@acreprofit.com" class="btn">Contact Support</a>
+        </div>
+    </div>
+    <script>
+        const API_URL = 'https://acreprofit-com.onrender.com';
+        const invoiceId = new URLSearchParams(window.location.search).get('invoice');
+        const errorBox = document.getElementById('error');
+        const errorMessage = document.getElementById('errorMessage');
+
+        function showError(msg) {
+            errorMessage.textContent = msg;
+            errorBox.style.display = 'block';
+        }
+
+        if (!invoiceId) {
+            showError('No invoice specified. Please use the Pay Now link in your email.');
+        } else {
+            // The backend /pay-invoice/:id endpoint handles both path: 302 to
+            // Stripe hosted URL (regenerates session if expired). window.location
+            // follows the redirect natively.
+            window.location.replace(API_URL + '/pay-invoice/' + encodeURIComponent(invoiceId));
+        }
+    </script>
+</body>
+</html>
