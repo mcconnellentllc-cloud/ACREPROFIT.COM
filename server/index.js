@@ -435,6 +435,7 @@ const orderSchema = new mongoose.Schema({
         default: 'pending'
     },
     stripePaymentIntentId: String,
+    stripeCheckoutUrl: String, // Persisted so idempotent repeat-submits return the same Stripe URL
     checkNumber: String,
     checkReceivedDate: Date,
     paidAt: Date,
@@ -461,9 +462,20 @@ const orderSchema = new mongoose.Schema({
     quotedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     quoteResponse: String, // Admin's quote notes
 
+    // Idempotency key (scoped per-user via compound index below).
+    // Prevents duplicate orders from double-submits, network retries, or
+    // back-button resubmits. Client generates one UUID per cart; server
+    // returns the existing order on repeat submit instead of creating a new one.
+    idempotencyKey: { type: String, sparse: true },
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+// Scoped uniqueness: same idempotencyKey can exist across different users
+// (avoids cross-user UUID collision being a submit-blocker), but a given
+// user cannot have two orders with the same key.
+orderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 const Order = mongoose.model('Order', orderSchema);
 
@@ -12224,15 +12236,160 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
     try {
         const {
             acres, gpa, orderLines, hydrovant, orderStatus,
-            totalConfirmedPrice, crop, programName
+            crop, programName, idempotencyKey
         } = req.body;
 
         if (!acres || !orderLines || orderLines.length === 0) {
             return res.status(400).json({ error: 'Invalid order data' });
         }
 
-        // Build chemicals array for order
-        const chemicals = orderLines.map(line => ({
+        // Whitelist orderStatus — unexpected values shouldn't silently
+        // slip through the checkout-vs-quote branch below.
+        if (orderStatus && !['ready_for_checkout', 'quote_pending'].includes(orderStatus)) {
+            return res.status(400).json({ error: 'Invalid orderStatus' });
+        }
+
+        // Idempotent response builder — returns the existing order's state
+        // to the client. Uses stripeCheckoutUrl presence as the signal for
+        // a live Stripe session (vs quote_pending). Never relies on the
+        // orderStatus schema field since we don't explicitly set it on save.
+        const buildIdempotentResponse = (existing) => {
+            if (existing.stripeCheckoutUrl) {
+                return {
+                    success: true,
+                    orderStatus: 'checkout',
+                    checkoutUrl: existing.stripeCheckoutUrl,
+                    orderId: existing._id,
+                    idempotent: true
+                };
+            }
+            return {
+                success: true,
+                orderStatus: 'quote_pending',
+                orderId: existing._id,
+                idempotent: true,
+                message: existing.notes && existing.notes.startsWith('Card processing')
+                    ? 'Order received. Card processing is temporarily unavailable — we\'ll send you a payment link shortly.'
+                    : 'Quote request submitted. You will be contacted within 24 hours.'
+            };
+        };
+
+        // --- 1. Idempotency check ---
+        // If the client already submitted this cart (double-click, retry,
+        // back-button resubmit), return the existing order instead of
+        // creating a duplicate + double-reserving inventory.
+        if (idempotencyKey) {
+            const existing = await Order.findOne({
+                userId: req.user._id,
+                idempotencyKey
+            });
+            if (existing) {
+                return res.json(buildIdempotentResponse(existing));
+            }
+        }
+
+        // --- 2. Server-side price re-validation ---
+        // Never trust client-sent prices. Look up each confirmed line's
+        // chemical, compute authoritative price, overwrite the client value.
+        // console.warn on any delta — forensic signal for stale JS or tampering.
+        const chemicalIds = [
+            ...orderLines.map(l => l.chemicalId).filter(Boolean),
+            hydrovant?.chemicalId
+        ].filter(Boolean);
+
+        const chemicalDocs = chemicalIds.length > 0
+            ? await Chemical.find({ _id: { $in: chemicalIds } })
+                .select('_id productName sellPrice unitsPerPack isActive labelUrl sdsUrl')
+            : [];
+        const chemMap = {};
+        chemicalDocs.forEach(c => { chemMap[c._id.toString()] = c; });
+
+        const validatedLines = [];
+        for (const line of orderLines) {
+            if (!line.chemicalId) continue;
+            const chem = chemMap[line.chemicalId.toString()];
+            if (!chem) {
+                return res.status(400).json({
+                    error: `Product "${line.productName || 'unknown'}" is no longer available. Please recalculate.`
+                });
+            }
+            if (chem.isActive === false) {
+                return res.status(400).json({
+                    error: `Product "${chem.productName}" has been deactivated. Please recalculate.`
+                });
+            }
+
+            if (line.status === 'confirmed') {
+                const pkgSize = chem.unitsPerPack || line.packageSize || 1;
+                const pkgsNeeded = line.packagesNeeded;
+                const serverPricePerPackage = Math.round(chem.sellPrice * pkgSize * 100) / 100;
+                const serverLineTotal = Math.round(serverPricePerPackage * pkgsNeeded * 100) / 100;
+
+                // Forensic warn — never block, just log.
+                if (line.pricePerPackage != null &&
+                    Math.abs(line.pricePerPackage - serverPricePerPackage) >= 0.01) {
+                    console.warn('[submit-order] price mismatch', {
+                        userId: req.user._id.toString(),
+                        productName: chem.productName,
+                        clientPrice: line.pricePerPackage,
+                        serverPrice: serverPricePerPackage,
+                        deltaPercent: line.pricePerPackage > 0
+                            ? Math.round(((line.pricePerPackage - serverPricePerPackage) / line.pricePerPackage) * 10000) / 100
+                            : null,
+                        packagesNeeded: pkgsNeeded
+                    });
+                }
+
+                validatedLines.push({
+                    ...line,
+                    pricePerPackage: serverPricePerPackage,
+                    lineTotal: serverLineTotal
+                });
+            } else {
+                validatedLines.push({ ...line });
+            }
+        }
+
+        // Validate Hydrovant line the same way.
+        let validatedHydrovant = null;
+        if (hydrovant && hydrovant.chemicalId) {
+            const hvChem = chemMap[hydrovant.chemicalId.toString()];
+            if (!hvChem || hvChem.isActive === false) {
+                return res.status(400).json({
+                    error: 'Hydrovant is no longer available. Please recalculate.'
+                });
+            }
+            if (hydrovant.status === 'confirmed') {
+                const hvPkgSize = hvChem.unitsPerPack || hydrovant.packageSize || 2.5;
+                const hvPrice = Math.round(hvChem.sellPrice * hvPkgSize * 100) / 100;
+                const hvTotal = Math.round(hvPrice * hydrovant.packagesNeeded * 100) / 100;
+
+                if (hydrovant.pricePerPackage != null &&
+                    Math.abs(hydrovant.pricePerPackage - hvPrice) >= 0.01) {
+                    console.warn('[submit-order] price mismatch', {
+                        userId: req.user._id.toString(),
+                        productName: 'Hydrovant',
+                        clientPrice: hydrovant.pricePerPackage,
+                        serverPrice: hvPrice,
+                        deltaPercent: hydrovant.pricePerPackage > 0
+                            ? Math.round(((hydrovant.pricePerPackage - hvPrice) / hydrovant.pricePerPackage) * 10000) / 100
+                            : null,
+                        packagesNeeded: hydrovant.packagesNeeded
+                    });
+                }
+
+                validatedHydrovant = {
+                    ...hydrovant,
+                    pricePerPackage: hvPrice,
+                    lineTotal: hvTotal
+                };
+            } else {
+                validatedHydrovant = { ...hydrovant };
+            }
+        }
+
+        // --- 3. Build chemicals array from server-validated values ---
+        const chemicals = validatedLines.map(line => ({
             name: line.productName,
             chemicalId: line.chemicalId,
             rate: line.rate,
@@ -12247,120 +12404,260 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
             status: line.status
         }));
 
-        // Add Hydrovant if present
-        if (hydrovant) {
+        if (validatedHydrovant) {
             chemicals.push({
-                name: hydrovant.productName,
-                chemicalId: hydrovant.chemicalId,
+                name: validatedHydrovant.productName,
+                chemicalId: validatedHydrovant.chemicalId,
                 rate: 0.1,
                 rateUnit: '% v/v',
-                totalAmount: hydrovant.gallonsNeeded,
+                totalAmount: validatedHydrovant.gallonsNeeded,
                 totalUnit: 'gal',
-                packageSize: hydrovant.packageSize,
-                packageUnit: hydrovant.packageUnit,
-                packagesNeeded: hydrovant.packagesNeeded,
-                pricePerPackage: hydrovant.pricePerPackage,
-                totalPrice: hydrovant.lineTotal,
-                status: hydrovant.status,
+                packageSize: validatedHydrovant.packageSize,
+                packageUnit: validatedHydrovant.packageUnit,
+                packagesNeeded: validatedHydrovant.packagesNeeded,
+                pricePerPackage: validatedHydrovant.pricePerPackage,
+                totalPrice: validatedHydrovant.lineTotal,
+                status: validatedHydrovant.status,
                 isAutoAdded: true
             });
         }
 
-        if (orderStatus === 'ready_for_checkout') {
-            // All items confirmed — proceed to Stripe checkout
-            if (!stripe) {
-                return res.status(500).json({ error: 'Payment processing not configured' });
-            }
-
-            // Create or get Stripe customer
-            let customerId = req.user.stripeCustomerId;
-            if (!customerId) {
-                const customer = await stripe.customers.create({
-                    email: req.user.email,
-                    name: req.user.name,
-                    metadata: { userId: req.user._id.toString() }
-                });
-                customerId = customer.id;
-                await User.findByIdAndUpdate(req.user._id, { stripeCustomerId: customerId });
-            }
-
-            // Create line items for Stripe
-            const lineItems = chemicals
+        // Recompute total from overwritten server values — never trust client total.
+        const serverTotalConfirmedPrice = Math.round(
+            chemicals
                 .filter(c => c.status === 'confirmed' && c.totalPrice)
-                .map(c => ({
-                    price_data: {
-                        currency: 'usd',
-                        product_data: {
-                            name: c.name,
-                            description: `${c.packagesNeeded} x ${c.packageSize} ${c.packageUnit}`
-                        },
-                        unit_amount: Math.round(c.totalPrice * 100) // Stripe uses cents
-                    },
-                    quantity: 1
-                }));
+                .reduce((sum, c) => sum + c.totalPrice, 0) * 100
+        ) / 100;
 
-            // Create Stripe checkout session
-            const session = await stripe.checkout.sessions.create({
-                customer: customerId,
-                payment_method_types: ['card'],
-                line_items: lineItems,
-                mode: 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/order-success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/calculator`,
-                metadata: {
-                    userId: req.user._id.toString(),
-                    acres: acres.toString(),
-                    crop: crop || 'unknown'
+        // --- 4. Atomic: save order + reserve inventory for confirmed lines ---
+        let order;
+        const dbSession = await mongoose.startSession();
+        try {
+            await dbSession.withTransaction(async () => {
+                order = new Order({
+                    userId: req.user._id,
+                    representativeId: req.user.representative || req.user._id,
+                    crop: crop || 'unknown',
+                    program: programName || 'Custom Order',
+                    acres,
+                    gpa,
+                    chemicals,
+                    totalCost: serverTotalConfirmedPrice,
+                    costPerAcre: acres > 0 ? serverTotalConfirmedPrice / acres : 0,
+                    status: 'draft',
+                    paymentStatus: 'pending',
+                    idempotencyKey: idempotencyKey || undefined,
+                    notes: orderStatus === 'ready_for_checkout'
+                        ? undefined
+                        : 'Quote requested - some items need pricing'
+                });
+                await order.save({ session: dbSession });
+
+                // Reserve inventory for confirmed lines only — needs_quote
+                // lines don't touch inventory until they're quoted and accepted.
+                for (const c of chemicals) {
+                    if (c.status === 'confirmed' && c.chemicalId && c.packagesNeeded > 0) {
+                        await reserveInventory({
+                            chemicalId: c.chemicalId,
+                            quantity: c.packagesNeeded,
+                            location: 'main',
+                            orderId: order._id,
+                            orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                            userId: req.user._id,
+                            notes: 'Self-serve order',
+                            session: dbSession
+                        });
+                    }
                 }
             });
-
-            // Save order as draft with Stripe session
-            const order = new Order({
-                userId: req.user._id,
-                representativeId: req.user.representative || req.user._id,
-                crop: crop || 'unknown',
-                program: programName || 'Custom Order',
-                acres,
-                gpa,
-                chemicals,
-                totalCost: totalConfirmedPrice,
-                costPerAcre: acres > 0 ? totalConfirmedPrice / acres : 0,
-                status: 'draft',
-                paymentStatus: 'pending',
-                stripePaymentIntentId: session.payment_intent
+        } catch (txErr) {
+            await dbSession.endSession();
+            // Mongoose duplicate-key on idempotencyKey: another request with
+            // the same key raced and won. Return that order.
+            if (txErr.code === 11000 && idempotencyKey) {
+                const racedOrder = await Order.findOne({
+                    userId: req.user._id,
+                    idempotencyKey
+                });
+                if (racedOrder) {
+                    return res.json(buildIdempotentResponse(racedOrder));
+                }
+            }
+            console.error('Submit-order transaction failed - rolled back:', txErr.message);
+            return res.status(500).json({
+                error: 'Order could not be completed. No changes saved. Please try again.'
             });
+        }
+        await dbSession.endSession();
+
+        const transporter = createEmailTransporter();
+        const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        const confirmedItems = chemicals.filter(c => c.status === 'confirmed');
+        const needsQuoteItems = chemicals.filter(c => c.status === 'needs_quote');
+
+        // --- 5. Stripe path (only when all lines confirmed) ---
+        // On Stripe outage or failure, fall through to quote_pending so the
+        // customer's intent is preserved — admin can follow up with a
+        // manual payment link. Order + inventory reserve already committed.
+        if (orderStatus === 'ready_for_checkout') {
+            let checkoutSession = null;
+            let stripeFailureReason = null;
+
+            if (!stripe) {
+                stripeFailureReason = 'stripe not configured';
+            } else {
+                try {
+                    let customerId = req.user.stripeCustomerId;
+                    if (!customerId) {
+                        const stripeCustomer = await stripe.customers.create({
+                            email: req.user.email,
+                            name: req.user.name,
+                            metadata: { userId: req.user._id.toString() }
+                        });
+                        customerId = stripeCustomer.id;
+                        await User.findByIdAndUpdate(req.user._id, { stripeCustomerId: customerId });
+                    }
+
+                    const lineItems = chemicals
+                        .filter(c => c.status === 'confirmed' && c.totalPrice)
+                        .map(c => ({
+                            price_data: {
+                                currency: 'usd',
+                                product_data: {
+                                    name: c.name,
+                                    description: `${c.packagesNeeded} x ${c.packageSize} ${c.packageUnit}`
+                                },
+                                unit_amount: Math.round(c.totalPrice * 100)
+                            },
+                            quantity: 1
+                        }));
+
+                    checkoutSession = await stripe.checkout.sessions.create({
+                        customer: customerId,
+                        payment_method_types: ['card'],
+                        line_items: lineItems,
+                        mode: 'payment',
+                        success_url: `${frontendUrl}/order-success?session_id={CHECKOUT_SESSION_ID}`,
+                        cancel_url: `${frontendUrl}/calculator`,
+                        metadata: {
+                            userId: req.user._id.toString(),
+                            orderId: order._id.toString(),
+                            acres: acres.toString(),
+                            crop: crop || 'unknown'
+                        }
+                    });
+
+                    order.stripePaymentIntentId = checkoutSession.payment_intent;
+                    order.stripeCheckoutUrl = checkoutSession.url;
+                    await order.save();
+                } catch (stripeErr) {
+                    stripeFailureReason = stripeErr.message || 'stripe session creation failed';
+                    console.error('[submit-order] Stripe failure — falling through to quote_pending:', stripeFailureReason);
+                }
+            }
+
+            if (checkoutSession) {
+                // Success path — send customer + admin confirmation emails.
+                if (transporter) {
+                    try {
+                        const itemsList = confirmedItems.map(c =>
+                            `<li>${c.name} — ${c.packagesNeeded} × ${c.packageSize} ${c.packageUnit} — $${c.totalPrice?.toFixed(2) || '0.00'}</li>`
+                        ).join('');
+
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                            to: req.user.email,
+                            subject: `Order Confirmed — ${crop || 'Custom'} (${acres} acres)`,
+                            html: `
+                                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                                    <div style="background: #2d5a27; color: white; padding: 20px; text-align: center;">
+                                        <h1 style="margin: 0;">Acre Profit</h1>
+                                    </div>
+                                    <div style="padding: 20px; background: #f9f9f9;">
+                                        <h2>Order Confirmed</h2>
+                                        <p>Hi ${req.user.name},</p>
+                                        <p>Your order has been received and is proceeding to checkout. You'll complete payment via Stripe's secure checkout.</p>
+                                        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                                            <h3 style="margin-top: 0;">Order Details</h3>
+                                            <p><strong>Crop:</strong> ${crop || 'Custom'}</p>
+                                            <p><strong>Acres:</strong> ${acres}</p>
+                                            <p><strong>Total:</strong> $${serverTotalConfirmedPrice.toFixed(2)}</p>
+                                            <h4>Products:</h4>
+                                            <ul>${itemsList}</ul>
+                                        </div>
+                                        <p>Log in to your dashboard to view your order:</p>
+                                        <p><a href="${frontendUrl}/my-orders.html" style="background: #2d5a27; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View My Orders</a></p>
+                                    </div>
+                                </div>
+                            `
+                        });
+
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                            to: 'contact@acreprofit.com',
+                            subject: `New Self-Serve Order — ${req.user.name} — $${serverTotalConfirmedPrice.toFixed(2)}`,
+                            html: `
+                                <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+                                    <div style="background-color: #2d5a27; padding: 20px; text-align: center;">
+                                        <h1 style="color: white; margin: 0;">Self-Serve Order</h1>
+                                    </div>
+                                    <div style="padding: 30px; background-color: #f9f9f9;">
+                                        <h2>Customer</h2>
+                                        <p><strong>Name:</strong> ${req.user.name}</p>
+                                        <p><strong>Email:</strong> ${req.user.email}</p>
+                                        <p><strong>Phone:</strong> ${req.user.phone || 'Not provided'}</p>
+                                        <h2 style="margin-top: 20px;">Order</h2>
+                                        <p><strong>Crop:</strong> ${crop || 'Not specified'}</p>
+                                        <p><strong>Acres:</strong> ${acres}</p>
+                                        <p><strong>Total:</strong> $${serverTotalConfirmedPrice.toFixed(2)}</p>
+                                        <h3>Products</h3>
+                                        <ul>${itemsList}</ul>
+                                        <p style="margin-top: 20px; padding: 12px; background: #e8f5e9; border-radius: 4px;">
+                                            Customer is at Stripe checkout. Order ID: ${order._id}
+                                        </p>
+                                    </div>
+                                </div>
+                            `
+                        });
+                    } catch (emailErr) {
+                        console.error('[submit-order] Confirmation email failed:', emailErr.message);
+                        // Non-blocking — order success is not contingent on email.
+                    }
+                }
+
+                return res.json({
+                    success: true,
+                    orderStatus: 'checkout',
+                    checkoutUrl: checkoutSession.url,
+                    orderId: order._id
+                });
+            }
+
+            // Stripe fell through — convert to quote_pending with a payment note.
+            order.notes = 'Card processing temporarily unavailable — admin will send payment link';
+            order.status = 'quote_pending';
             await order.save();
+        }
 
-            return res.json({
-                success: true,
-                orderStatus: 'checkout',
-                checkoutUrl: session.url,
-                orderId: order._id
-            });
+        // --- 6. Quote-pending path (or Stripe fall-through) ---
+        // Notify admin and send customer a receipt acknowledging the request.
+        if (transporter) {
+            try {
+                const needsTable = needsQuoteItems.map(item => `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packageSize} ${item.packageUnit}</td>
+                    </tr>
+                `).join('');
 
-        } else {
-            // Has items needing quotes — save and notify admin
-            const order = new Order({
-                userId: req.user._id,
-                representativeId: req.user.representative || req.user._id,
-                crop: crop || 'unknown',
-                program: programName || 'Custom Order',
-                acres,
-                gpa,
-                chemicals,
-                totalCost: totalConfirmedPrice,
-                costPerAcre: acres > 0 ? totalConfirmedPrice / acres : 0,
-                status: 'draft',
-                paymentStatus: 'pending',
-                notes: 'Quote requested - some items need pricing'
-            });
-            await order.save();
-
-            // Send email notification to admin
-            const transporter = createEmailTransporter();
-            if (transporter) {
-                const needsQuoteItems = chemicals.filter(c => c.status === 'needs_quote');
-                const confirmedItems = chemicals.filter(c => c.status === 'confirmed');
+                const confirmedTable = confirmedItems.map(item => `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${item.totalPrice?.toFixed(2) || 'N/A'}</td>
+                    </tr>
+                `).join('');
 
                 await transporter.sendMail({
                     from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
@@ -12376,12 +12673,11 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                 <p><strong>Name:</strong> ${req.user.name}</p>
                                 <p><strong>Email:</strong> ${req.user.email}</p>
                                 <p><strong>Phone:</strong> ${req.user.phone || 'Not provided'}</p>
-
                                 <h2 style="color: #333; margin-top: 20px;">Order Details</h2>
                                 <p><strong>Crop:</strong> ${crop || 'Not specified'}</p>
                                 <p><strong>Acres:</strong> ${acres}</p>
                                 <p><strong>GPA:</strong> ${gpa}</p>
-
+                                ${needsQuoteItems.length > 0 ? `
                                 <h3 style="color: #c00; margin-top: 20px;">Items Needing Quote (${needsQuoteItems.length})</h3>
                                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                                     <tr style="background-color: #fdd;">
@@ -12389,15 +12685,9 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Packages Needed</th>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Size</th>
                                     </tr>
-                                    ${needsQuoteItems.map(item => `
-                                        <tr>
-                                            <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packageSize} ${item.packageUnit}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${needsTable}
                                 </table>
-
+                                ` : ''}
                                 ${confirmedItems.length > 0 ? `
                                 <h3 style="color: #2d5a27; margin-top: 20px;">Confirmed Items (${confirmedItems.length})</h3>
                                 <table style="width: 100%; border-collapse: collapse;">
@@ -12406,35 +12696,71 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Qty</th>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Price</th>
                                     </tr>
-                                    ${confirmedItems.map(item => `
-                                        <tr>
-                                            <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${item.totalPrice?.toFixed(2) || 'N/A'}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${confirmedTable}
                                 </table>
                                 <p style="text-align: right; font-weight: bold; margin-top: 10px;">
-                                    Confirmed Total: $${totalConfirmedPrice.toFixed(2)}
+                                    Confirmed Total: $${serverTotalConfirmedPrice.toFixed(2)}
                                 </p>
                                 ` : ''}
-
+                                ${order.notes ? `
+                                <p style="margin-top: 20px; padding: 12px; background: #fee; border-left: 4px solid #c00; border-radius: 4px;">
+                                    <strong>Note:</strong> ${order.notes}
+                                </p>
+                                ` : ''}
                                 <p style="margin-top: 30px; padding: 15px; background-color: #fff3cd; border-radius: 4px;">
-                                    <strong>Action Required:</strong> Please provide quotes for the items listed above and contact the customer.
+                                    <strong>Action Required:</strong> Please follow up with the customer. Order ID: ${order._id}
                                 </p>
                             </div>
                         </div>
                     `
                 });
-            }
 
-            return res.json({
-                success: true,
-                orderStatus: 'quote_pending',
-                orderId: order._id,
-                message: 'Quote request submitted. You will be contacted within 24 hours.'
-            });
+                // Customer acknowledgement — sets expectation.
+                const customerSubject = order.notes && order.notes.startsWith('Card processing')
+                    ? 'Order Received — Payment Link Coming Soon'
+                    : 'Quote Request Received';
+
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    to: req.user.email,
+                    subject: customerSubject,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: #2d5a27; color: white; padding: 20px; text-align: center;">
+                                <h1 style="margin: 0;">Acre Profit</h1>
+                            </div>
+                            <div style="padding: 20px; background: #f9f9f9;">
+                                <h2>${customerSubject}</h2>
+                                <p>Hi ${req.user.name},</p>
+                                ${order.notes && order.notes.startsWith('Card processing') ? `
+                                    <p>We've received your order, but card processing is temporarily unavailable. A member of our team will send you a secure payment link shortly.</p>
+                                ` : `
+                                    <p>We've received your request. A member of our team will review the items needing quotes and contact you within 24 hours.</p>
+                                `}
+                                <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                                    <p><strong>Crop:</strong> ${crop || 'Custom'}</p>
+                                    <p><strong>Acres:</strong> ${acres}</p>
+                                    ${confirmedItems.length > 0 ? `<p><strong>Confirmed Items Total:</strong> $${serverTotalConfirmedPrice.toFixed(2)}</p>` : ''}
+                                </div>
+                                <p>If you have questions in the meantime, reply to this email or contact your representative.</p>
+                            </div>
+                        </div>
+                    `
+                });
+            } catch (emailErr) {
+                console.error('[submit-order] Quote email failed:', emailErr.message);
+                // Non-blocking.
+            }
         }
+
+        return res.json({
+            success: true,
+            orderStatus: 'quote_pending',
+            orderId: order._id,
+            message: order.notes && order.notes.startsWith('Card processing')
+                ? 'Order received. Card processing is temporarily unavailable — we\'ll send you a payment link shortly.'
+                : 'Quote request submitted. You will be contacted within 24 hours.'
+        });
     } catch (error) {
         console.error('Submit order error:', error);
         res.status(400).json({ error: error.message });
