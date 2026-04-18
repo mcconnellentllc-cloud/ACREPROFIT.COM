@@ -14055,6 +14055,11 @@ app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware
 
         const amountPaid = Number(invoice.amountPaid || 0);
         const alreadyCredited = Number(invoice.creditedAmount || 0);
+        // Snapshot pre-mutation state for the AuditLog before/after fields.
+        // Read these up-front — invoice.paymentStatus is mutated below on
+        // full credits, and AuditLog must record the true pre-state.
+        const beforePaymentStatus = invoice.paymentStatus;
+        const beforeCreditedAmount = alreadyCredited;
         const remaining = Math.round((amountPaid - alreadyCredited) * 100) / 100;
         const roundedAmount = Math.round(amount * 100) / 100;
         if (roundedAmount > remaining) {
@@ -14134,7 +14139,7 @@ app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware
             entityId: creditNote._id,
             entityRef: creditNoteNumber,
             amount: roundedAmount,
-            before: { invoiceCreditedAmount: alreadyCredited, invoicePaymentStatus: invoice.paymentStatus === 'refunded' ? 'paid' : invoice.paymentStatus },
+            before: { invoiceCreditedAmount: beforeCreditedAmount, invoicePaymentStatus: beforePaymentStatus },
             after: { invoiceCreditedAmount: invoice.creditedAmount, creditNoteStatus: creditNote.status, refundMode },
             reason
         });
@@ -14143,8 +14148,14 @@ app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware
             try {
                 const transporter = createEmailTransporter();
                 if (transporter) {
+                    // Defensive: invoice.paymentMethod is a freeform String (no enum).
+                    // Current Stripe webhook writes 'stripe_ach' / 'stripe' consistently,
+                    // but admin endpoints and legacy data can produce bare values like
+                    // 'ach'. Match on substring so ACH is detected regardless of prefix.
+                    const pm = (invoice.paymentMethod || '').toLowerCase();
+                    const isAch = pm.includes('ach') || pm.includes('bank');
                     const settlementNote = refundMode === 'stripe'
-                        ? (invoice.paymentMethod === 'stripe_ach'
+                        ? (isAch
                             ? '<p>Funds will return to your bank account via ACH in 5–7 business days.</p>'
                             : '<p>Funds will return to your card in 5–10 business days, depending on your bank.</p>')
                         : '<p>Your representative will coordinate the refund with you directly.</p>';
