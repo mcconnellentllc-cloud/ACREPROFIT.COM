@@ -188,6 +188,14 @@
             <a class="btn-link" href="/my-orders.html">View My Invoices</a>
         </div>
 
+        <div id="voided" class="status error" style="display: none;">
+            <p id="voidedMessage">This invoice has been voided and no payment is due.</p>
+            <p style="margin-top: 8px; color: #666; font-size: 13px;">
+                If you have questions, please contact your representative.
+            </p>
+            <a class="btn-link" href="mailto:contact@acreprofit.com">Contact Support</a>
+        </div>
+
         <div id="chooser" style="display: none;">
             <div class="meta">
                 <div>
@@ -256,11 +264,13 @@
         const errorMessageEl = document.getElementById('errorMessage');
         const paidEl = document.getElementById('paid');
         const paidMessageEl = document.getElementById('paidMessage');
+        const voidedEl = document.getElementById('voided');
+        const voidedMessageEl = document.getElementById('voidedMessage');
         const chooserEl = document.getElementById('chooser');
         const stripeDisabledEl = document.getElementById('stripeDisabled');
 
         function showOnly(el) {
-            [loadingEl, errorEl, paidEl, chooserEl, stripeDisabledEl].forEach(e => {
+            [loadingEl, errorEl, paidEl, voidedEl, chooserEl, stripeDisabledEl].forEach(e => {
                 e.style.display = e === el ? '' : 'none';
             });
         }
@@ -288,6 +298,12 @@
                 if (data.paymentStatus === 'paid') {
                     paidMessageEl.textContent = 'Invoice ' + (data.invoiceNumber || '') + ' has already been paid.';
                     showOnly(paidEl);
+                    return;
+                }
+
+                if (data.status === 'voided') {
+                    voidedMessageEl.textContent = 'Invoice ' + (data.invoiceNumber || '') + ' has been voided and no payment is due.';
+                    showOnly(voidedEl);
                     return;
                 }
 

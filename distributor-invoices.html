@@ -220,6 +220,7 @@
                             <option value="sent">Sent</option>
                             <option value="paid">Paid</option>
                             <option value="overdue">Overdue</option>
+                            <option value="voided">Voided</option>
                         </select>
                     </div>
                 </div>
@@ -249,6 +250,29 @@
         <div style="background:#fff; max-width:720px; width:92%; max-height:90vh; overflow:auto; border-radius:8px; padding:24px; position:relative;">
             <button onclick="closeViewInvoice()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
             <div id="viewInvoiceContent">Loading...</div>
+        </div>
+    </div>
+
+    <!-- Void Invoice Modal -->
+    <div id="voidInvoiceModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; max-width:520px; width:92%; border-radius:8px; padding:24px; position:relative;">
+            <button onclick="closeVoidModal()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+            <h3 style="margin:0 0 4px 0; color:#991b1b;">Void Invoice</h3>
+            <p style="margin:0 0 16px 0; color:#666;">This cannot be undone. The invoice will be preserved for audit but will no longer accept payment.</p>
+            <div style="background:#fef2f2; border:1px solid #fecaca; border-radius:6px; padding:12px; margin-bottom:16px; font-size:0.9rem;">
+                <div><strong>Invoice:</strong> <span id="voidInvoiceNumber"></span></div>
+                <div><strong>Customer email:</strong> <span id="voidCustomerEmail">&mdash;</span></div>
+            </div>
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Reason (optional)</label>
+            <textarea id="voidReasonInput" class="form-control" rows="3" placeholder="e.g., created in error, duplicate, wrong customer" style="width:100%; margin-bottom:16px;"></textarea>
+            <label style="display:flex; align-items:center; gap:8px; margin-bottom:20px; cursor:pointer;">
+                <input type="checkbox" id="voidNotifyCustomer" checked>
+                <span>Send void notification email to customer</span>
+            </label>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button class="btn btn-outline" onclick="closeVoidModal()">Cancel</button>
+                <button class="btn btn-danger" id="confirmVoidBtn" onclick="submitVoid()">Void Invoice</button>
+            </div>
         </div>
     </div>
 
@@ -756,11 +780,13 @@
                     <td>${new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString()}</td>
                     <td>
                         <div class="action-buttons">
-                            ${inv.status !== 'sent' && inv.status !== 'paid' ?
+                            ${inv.status !== 'sent' && inv.status !== 'paid' && inv.status !== 'voided' ?
                                 `<button class="btn btn-sm btn-primary" onclick="sendInvoice('${inv._id}', '${inv.customerEmail || inv.customerId?.email}')">Send</button>` : ''}
                             <button class="btn btn-sm btn-outline" onclick="viewInvoice('${inv._id}')">View</button>
                             ${inv.status === 'draft' ?
                                 `<button class="btn btn-sm btn-danger" onclick="deleteInvoice('${inv._id}', '${inv.invoiceNumber}')">Delete</button>` : ''}
+                            ${['sent', 'viewed', 'overdue'].includes(inv.status) && inv.paymentStatus !== 'paid' ?
+                                `<button class="btn btn-sm btn-danger" onclick="openVoidModal('${inv._id}', '${(inv.invoiceNumber || '').replace(/'/g, '&#39;')}', '${(inv.customerEmail || inv.customerId?.email || '').replace(/'/g, '&#39;')}')">Void</button>` : ''}
                         </div>
                     </td>
                 </tr>
@@ -878,6 +904,52 @@
                 if (!res.ok) throw new Error(result.error || 'Delete failed');
                 loadInvoices();
             } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        let pendingVoidInvoiceId = null;
+
+        function openVoidModal(invoiceId, invoiceNumber, customerEmail) {
+            pendingVoidInvoiceId = invoiceId;
+            document.getElementById('voidInvoiceNumber').textContent = invoiceNumber || '';
+            document.getElementById('voidCustomerEmail').textContent = customerEmail || '—';
+            document.getElementById('voidReasonInput').value = '';
+            document.getElementById('voidNotifyCustomer').checked = true;
+            document.getElementById('confirmVoidBtn').disabled = false;
+            document.getElementById('confirmVoidBtn').textContent = 'Void Invoice';
+            document.getElementById('voidInvoiceModal').style.display = 'flex';
+        }
+
+        function closeVoidModal() {
+            document.getElementById('voidInvoiceModal').style.display = 'none';
+            pendingVoidInvoiceId = null;
+        }
+
+        async function submitVoid() {
+            if (!pendingVoidInvoiceId) return;
+            const reason = document.getElementById('voidReasonInput').value.trim();
+            const notifyCustomer = document.getElementById('voidNotifyCustomer').checked;
+            const btn = document.getElementById('confirmVoidBtn');
+            btn.disabled = true;
+            btn.textContent = 'Voiding...';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/invoices/${pendingVoidInvoiceId}/void`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ reason, notifyCustomer })
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Void failed');
+                closeVoidModal();
+                loadInvoices();
+                alert(`${result.message}${result.customerNotified ? '\nCustomer has been notified by email.' : ''}`);
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Void Invoice';
                 alert('Error: ' + err.message);
             }
         }
@@ -1359,6 +1431,7 @@
         .status-sent { background: #dbeafe; color: #1e40af; }
         .status-paid { background: #dcfce7; color: #166534; }
         .status-overdue { background: #fee2e2; color: #991b1b; }
+        .status-voided { background: #e5e7eb; color: #4b5563; text-decoration: line-through; opacity: 0.85; }
 
         .action-buttons {
             display: flex;
