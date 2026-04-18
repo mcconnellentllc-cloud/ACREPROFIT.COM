@@ -14139,8 +14139,9 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
                 ` : ''}
                 <p style="margin: 4px 0; color: #78350f; font-size: 14px;">Pay by check or manual ACH transfer:</p>
                 <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
-                    <p style="margin: 0; font-weight: 700;">Acre Profit LLC</p>
-                    <p style="margin: 4px 0; font-size: 14px; color: #666;">Contact your representative for ACH details or mail check to your pickup location.</p>
+                    <p style="margin: 0; font-weight: 700;">AcreProfit LLC</p>
+                    <p style="margin: 4px 0; font-size: 14px; color: #666;">34549 HWY 59</p>
+                    <p style="margin: 4px 0; font-size: 14px; color: #666;">Haxtun, CO 80731</p>
                 </div>
             </div>
             `}
