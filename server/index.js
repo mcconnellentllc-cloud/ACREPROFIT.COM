@@ -2200,6 +2200,11 @@ const invoiceSchema = new mongoose.Schema({
     stripeCheckoutSessionId: String,
     stripeHostedUrl: String,
     stripeCheckoutExpiresAt: Date,
+    // Card convenience fee (3.5%) applied when customer chose card at the
+    // Pay Now chooser page. $0 for ACH / check / unpaid. Dollars, matches
+    // invoice.total convention. invoice.total stays the original product
+    // amount so AR reports stay clean.
+    surchargeAmount: { type: Number, default: 0 },
 
     // Dates
     invoiceDate: { type: Date, default: Date.now },
@@ -7207,28 +7212,57 @@ async function handleCheckoutSessionCompleted(event) {
         return;
     }
 
-    const isACH = Array.isArray(session.payment_method_types) && session.payment_method_types.includes('us_bank_account');
+    // Detect the actual payment method from the PaymentIntent's latest
+    // charge, not from session.payment_method_types (that's the list of
+    // ALLOWED methods on the session, not the one the customer used).
+    let methodType = null;
+    if (session.payment_intent) {
+        try {
+            const pi = await stripe.paymentIntents.retrieve(session.payment_intent, {
+                expand: ['latest_charge.payment_method_details']
+            });
+            methodType = pi.latest_charge?.payment_method_details?.type || null;
+        } catch (piErr) {
+            console.error(`[stripe webhook] failed to retrieve PaymentIntent ${session.payment_intent}:`, piErr.message);
+        }
+    }
+    // Fallback to the method the customer picked on the chooser page.
+    if (!methodType) {
+        methodType = session.metadata?.paymentMethodChoice === 'card' ? 'card' : 'us_bank_account';
+    }
+    const isACH = methodType === 'us_bank_account';
+
+    const surchargeAmount = Number(session.metadata?.surchargeAmount || 0);
     const now = new Date();
 
     invoice.paymentStatus = 'paid';
     invoice.status = 'paid';
     invoice.amountPaid = invoice.total;
     invoice.amountDue = 0;
+    invoice.surchargeAmount = surchargeAmount;
     invoice.paidAt = now;
     invoice.paymentDate = now;
     invoice.paymentMethod = isACH ? 'stripe_ach' : 'stripe';
     invoice.stripePaymentIntentId = session.payment_intent || invoice.stripePaymentIntentId;
     invoice.updatedAt = now;
     await invoice.save();
-    console.log(`Invoice ${invoice.invoiceNumber} marked paid via Stripe Checkout (session ${session.id})`);
+    console.log(`Invoice ${invoice.invoiceNumber} marked paid via Stripe (${isACH ? 'ACH' : 'Card'}, session ${session.id}${surchargeAmount > 0 ? `, surcharge $${surchargeAmount.toFixed(2)}` : ''})`);
 
     // Receipt email to customer.
     try {
         const transporter = createEmailTransporter();
         const customerEmail = invoice.customerEmail;
         if (transporter && customerEmail) {
-            const amount = Number(invoice.total || 0).toFixed(2);
+            const invoiceAmount = Number(invoice.total || 0).toFixed(2);
+            const surchargeStr = surchargeAmount.toFixed(2);
+            const totalCharged = (Number(invoice.total || 0) + surchargeAmount).toFixed(2);
             const ordersUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
+            const breakdownHtml = surchargeAmount > 0 ? `
+                    <table style="margin: 12px 0; border-collapse: collapse;">
+                        <tr><td style="padding: 4px 16px 4px 0; color: #444;">Invoice total:</td><td style="padding: 4px 0; text-align: right;">$${invoiceAmount}</td></tr>
+                        <tr><td style="padding: 4px 16px 4px 0; color: #444;">Card convenience fee (3.5%):</td><td style="padding: 4px 0; text-align: right;">$${surchargeStr}</td></tr>
+                        <tr><td style="padding: 8px 16px 4px 0; color: #2d5a27; font-weight: 600; border-top: 1px solid #e0e0e0;">Total charged:</td><td style="padding: 8px 0 4px 0; text-align: right; font-weight: 600; border-top: 1px solid #e0e0e0;">$${totalCharged}</td></tr>
+                    </table>` : `<p>Amount received: <strong>$${invoiceAmount}</strong></p>`;
             await transporter.sendMail({
                 from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                 to: customerEmail,
@@ -7236,8 +7270,9 @@ async function handleCheckoutSessionCompleted(event) {
                 html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
                     <h2 style="color: #2d5a27;">Payment Received</h2>
                     <p>Hi ${invoice.customerName || 'Farmer'},</p>
-                    <p>Thank you — we've received your payment of <strong>$${amount}</strong> for invoice <strong>${invoice.invoiceNumber}</strong> via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
-                    <p>Your invoice is now marked <strong>PAID</strong>. Products are being prepared and you'll be notified when they're ready for pickup.</p>
+                    <p>Thank you — we've received your payment for invoice <strong>${invoice.invoiceNumber}</strong> via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
+                    ${breakdownHtml}
+                    <p style="margin-top: 18px;">Your invoice is now marked <strong>PAID</strong>. Products are being prepared and you'll be notified when they're ready for pickup.</p>
                     <p style="margin-top:18px;">View your invoices anytime: <a href="${ordersUrl}" style="color:#2d5a27; font-weight:600;">${ordersUrl}</a></p>
                     <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
                     <p style="color: #888; font-size: 0.9em;">Thank you for your business.<br>Questions? Contact your local representative or email contact@acreprofit.com.</p>
@@ -7253,16 +7288,22 @@ async function handleCheckoutSessionCompleted(event) {
     try {
         const transporter = createEmailTransporter();
         if (transporter) {
-            const amount = Number(invoice.total || 0).toFixed(2);
+            const invoiceAmount = Number(invoice.total || 0).toFixed(2);
+            const surchargeStr = surchargeAmount.toFixed(2);
+            const totalCharged = (Number(invoice.total || 0) + surchargeAmount).toFixed(2);
+            const methodLabel = isACH ? 'ACH' : 'Card';
+            const amountLine = surchargeAmount > 0
+                ? `$${invoiceAmount} invoice + $${surchargeStr} surcharge = $${totalCharged} charged (${methodLabel})`
+                : `$${invoiceAmount} (${methodLabel})`;
             await transporter.sendMail({
                 from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                 to: 'contact@acreprofit.com',
-                subject: `[PAID] Invoice ${invoice.invoiceNumber} - $${amount}`,
+                subject: `[PAID] Invoice ${invoice.invoiceNumber} - $${invoiceAmount} (${methodLabel})`,
                 html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
                     <h2 style="color: #2d5a27;">Invoice paid via Stripe</h2>
                     <p><strong>Invoice:</strong> ${invoice.invoiceNumber}</p>
                     <p><strong>Customer:</strong> ${invoice.customerName || '—'} (${invoice.customerEmail || '—'})</p>
-                    <p><strong>Amount:</strong> $${amount} ${isACH ? '(ACH)' : '(card)'}</p>
+                    <p><strong>Payment:</strong> ${amountLine}</p>
                     <p><strong>Stripe session:</strong> ${session.id}</p>
                     <p><strong>Stripe payment intent:</strong> ${session.payment_intent || '—'}</p>
                 </div>`
@@ -13730,12 +13771,19 @@ app.delete('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (re
     }
 });
 
-// Create (or refresh) a Stripe Checkout Session for the invoice's Pay Now
-// button. Idempotent-ish: if a live session already exists and isn't within
-// 30 min of expiring, return it as-is. Otherwise mint a new one and persist
-// the session id + hosted URL on the invoice. Caller decides when to call
-// (invoice send, /pay-invoice/:id click after expiry, manual refresh).
-async function ensureInvoiceCheckoutSession(invoice) {
+// Card payments carry a 3.5% convenience fee passed through to the
+// customer as a separate line item. ACH has no surcharge. Rate is a
+// constant so the chooser page and the mint path can't drift.
+const CARD_SURCHARGE_RATE = 0.035;
+
+// Mint a fresh Stripe Checkout Session for the invoice. Called from the
+// Pay Now chooser page once the customer has picked 'ach' or 'card'.
+// Always mints fresh (no reuse) because ACH and card sessions carry
+// different totals and allowed payment methods. Stores session id + hosted
+// URL on the invoice for informational tracking; webhook correlation is
+// via metadata.invoiceId, not via the stored ID.
+
+async function ensureInvoiceCheckoutSession(invoice, method) {
     if (!stripe) {
         throw new Error('Stripe not configured (STRIPE_SECRET_KEY missing)');
     }
@@ -13745,53 +13793,71 @@ async function ensureInvoiceCheckoutSession(invoice) {
     if (invoice.paymentStatus === 'paid') {
         return { session: null, url: null, alreadyPaid: true };
     }
-
-    // Reuse the existing session if it has >30 min of life left.
-    const now = Date.now();
-    const expires = invoice.stripeCheckoutExpiresAt ? new Date(invoice.stripeCheckoutExpiresAt).getTime() : 0;
-    if (invoice.stripeCheckoutSessionId && invoice.stripeHostedUrl && expires - now > 30 * 60 * 1000) {
-        return { session: null, url: invoice.stripeHostedUrl, reused: true };
+    if (method !== 'ach' && method !== 'card') {
+        throw new Error(`Invalid payment method: ${method}. Must be 'ach' or 'card'.`);
     }
 
     const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
-    const amountCents = Math.round(Number(invoice.total || 0) * 100);
+    const invoiceTotal = Number(invoice.total || 0);
+    const amountCents = Math.round(invoiceTotal * 100);
     if (!amountCents || amountCents < 50) {
         // Stripe minimum is $0.50. Guard against zero-total invoices.
         throw new Error(`Invoice total must be at least $0.50 to accept Stripe payment (got $${(amountCents / 100).toFixed(2)})`);
     }
 
-    // 23 hours out — Stripe caps session.expires_at at 24h; 23h leaves room
-    // for the email to sit in an inbox before the link goes stale. The
-    // regen path in /pay-invoice/:id papers over any real-world delay.
-    const expiresAt = Math.floor(now / 1000) + 23 * 60 * 60;
+    const surchargeCents = method === 'card'
+        ? Math.round(invoiceTotal * CARD_SURCHARGE_RATE * 100)
+        : 0;
+    const surchargeDollars = surchargeCents / 100;
 
-    const session = await stripe.checkout.sessions.create({
-        mode: 'payment',
-        payment_method_types: ['card', 'us_bank_account'],
-        customer_email: invoice.customerEmail || undefined,
-        client_reference_id: invoice._id.toString(),
-        expires_at: expiresAt,
-        line_items: [{
+    const lineItems = [{
+        quantity: 1,
+        price_data: {
+            currency: 'usd',
+            unit_amount: amountCents,
+            product_data: {
+                name: `Invoice ${invoice.invoiceNumber}`,
+                description: invoice.customerName ? `Acre Profit - ${invoice.customerName}` : 'Acre Profit'
+            }
+        }
+    }];
+    if (surchargeCents > 0) {
+        lineItems.push({
             quantity: 1,
             price_data: {
                 currency: 'usd',
-                unit_amount: amountCents,
+                unit_amount: surchargeCents,
                 product_data: {
-                    name: `Invoice ${invoice.invoiceNumber}`,
-                    description: invoice.customerName ? `Acre Profit - ${invoice.customerName}` : 'Acre Profit'
+                    name: 'Card processing fee',
+                    description: '3.5% convenience fee (waived on ACH bank transfers)'
                 }
             }
-        }],
-        metadata: {
-            invoiceId: invoice._id.toString(),
-            invoiceNumber: invoice.invoiceNumber || '',
-            customerId: invoice.customerId ? invoice.customerId.toString() : ''
-        },
+        });
+    }
+
+    const paymentMethodTypes = method === 'card' ? ['card'] : ['us_bank_account'];
+
+    // 23 hours out — Stripe caps session.expires_at at 24h.
+    const expiresAt = Math.floor(Date.now() / 1000) + 23 * 60 * 60;
+
+    const sharedMetadata = {
+        invoiceId: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber || '',
+        customerId: invoice.customerId ? invoice.customerId.toString() : '',
+        paymentMethodChoice: method,
+        surchargeAmount: surchargeDollars.toFixed(2)
+    };
+
+    const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: paymentMethodTypes,
+        customer_email: invoice.customerEmail || undefined,
+        client_reference_id: invoice._id.toString(),
+        expires_at: expiresAt,
+        line_items: lineItems,
+        metadata: sharedMetadata,
         payment_intent_data: {
-            metadata: {
-                invoiceId: invoice._id.toString(),
-                invoiceNumber: invoice.invoiceNumber || ''
-            }
+            metadata: sharedMetadata
         },
         success_url: `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}`,
         cancel_url: `${frontend}/invoice-cancel.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}`
@@ -13802,45 +13868,77 @@ async function ensureInvoiceCheckoutSession(invoice) {
     invoice.stripeCheckoutExpiresAt = new Date(session.expires_at * 1000);
     await invoice.save();
 
-    return { session, url: session.url, reused: false };
+    return { session, url: session.url };
 }
 
-// Admin-triggered checkout session creation / refresh. Primarily useful if
-// an invoice email was sent before Stripe was wired up, or the admin wants
-// a fresh URL to paste into a manual follow-up message. The /send route
-// and the public /pay-invoice/:id path also call ensureInvoiceCheckoutSession
-// on the fly so this endpoint is usually unnecessary.
+// Admin-triggered checkout session creation. Requires a method choice
+// (ach or card) since these produce different Stripe sessions with
+// different totals (card adds a 3.5% convenience fee).
 app.post('/api/admin/invoices/:id/checkout-session', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
-        const { url, alreadyPaid, reused } = await ensureInvoiceCheckoutSession(invoice);
+        const method = (req.body && req.body.method) || (req.query && req.query.method);
+        const { url, alreadyPaid } = await ensureInvoiceCheckoutSession(invoice, method);
         if (alreadyPaid) {
             return res.status(400).json({ error: 'Invoice is already paid' });
         }
-        res.json({ checkoutUrl: url, reused: !!reused });
+        res.json({ checkoutUrl: url });
     } catch (err) {
         console.error('[checkout-session]', err.message);
         res.status(400).json({ error: err.message });
     }
 });
 
-// Public redirect endpoint for the Pay Now button. Farmers click this from
-// the invoice email. We resolve to the current hosted Stripe URL and 302
-// them there; if the session has expired we regenerate transparently.
+// Public invoice fetch for the Pay Now chooser page. Returns only the
+// fields needed to display the choice and price. Invoice _id is a 24-char
+// Mongo ObjectId, same threat model as the email's Pay Now link.
+app.get('/api/public/invoice/:id', async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        const total = Number(invoice.total || 0);
+        const surchargeCard = Math.round(total * CARD_SURCHARGE_RATE * 100) / 100;
+        const totalWithCardSurcharge = Math.round((total + surchargeCard) * 100) / 100;
+        res.json({
+            invoiceNumber: invoice.invoiceNumber || '',
+            customerName: invoice.customerName || '',
+            total,
+            surchargeCard,
+            totalWithCardSurcharge,
+            surchargeRate: CARD_SURCHARGE_RATE,
+            paymentStatus: invoice.paymentStatus,
+            stripeEnabled: !!stripe
+        });
+    } catch (err) {
+        console.error('[public invoice]', err.message);
+        res.status(500).json({ error: 'Unable to fetch invoice' });
+    }
+});
+
+// Public Pay Now redirect. The email button sends customers to the
+// chooser page on the frontend; the chooser's ACH/Card links hit this
+// endpoint with ?method=ach|card. No method param → redirect back to the
+// chooser page (graceful fallback for direct links / old bookmarks).
 app.get('/pay-invoice/:id', async (req, res) => {
     try {
         const invoice = await Invoice.findById(req.params.id);
         if (!invoice) {
             return res.status(404).send('Invoice not found');
         }
+        const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
         if (invoice.paymentStatus === 'paid') {
-            const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
             return res.redirect(302, `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}&status=already-paid`);
         }
-        const { url } = await ensureInvoiceCheckoutSession(invoice);
+        const method = req.query.method;
+        if (method !== 'ach' && method !== 'card') {
+            return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
+        }
+        const { url } = await ensureInvoiceCheckoutSession(invoice, method);
         return res.redirect(302, url);
     } catch (err) {
         console.error('[pay-invoice]', err.message);
@@ -13894,23 +13992,14 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         const acres = order?.totalAcres || 0;
         const year = order?.year || new Date().getFullYear();
 
-        // Pre-create a Stripe Checkout Session so the Pay Now button in the
-        // email has a fresh hosted URL. Silent fail: if Stripe is unset or
-        // errors, we still send the invoice with the legacy check/ACH copy.
-        let payNowUrl = null;
-        if (stripe && invoice.paymentStatus !== 'paid') {
-            try {
-                const result = await ensureInvoiceCheckoutSession(invoice);
-                payNowUrl = result.url;
-            } catch (payErr) {
-                console.error(`[invoice send] could not mint checkout session for ${invoice.invoiceNumber}:`, payErr.message);
-            }
-        }
         const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
-        // Frontend is on a separate domain from the API; email goes through a
-        // static bouncer page on acreprofit.com that handles the hand-off to
-        // the backend /pay-invoice/:id redirect. Keeps the branded URL in the
-        // customer's inbox.
+        // Pay Now button sends customers to the chooser page on the frontend
+        // domain. The chooser fetches invoice totals and lets the customer
+        // pick ACH (free) or card (3.5% convenience fee); the session is
+        // minted on method selection, not here. Button shows only if Stripe
+        // is configured and the invoice isn't already paid — the chooser
+        // page handles stripe-unconfigured gracefully via stripeEnabled flag.
+        const showPayNow = !!stripe && invoice.paymentStatus !== 'paid';
         const payNowRedirectUrl = `${frontend}/pay-invoice.html?invoice=${invoice._id}`;
 
         // Build professional invoice email HTML
@@ -14041,10 +14130,10 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
             ` : `
             <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 20px; margin: 28px 0;">
                 <h4 style="margin: 0 0 12px 0; color: #92400e;">Payment Options</h4>
-                ${payNowUrl ? `
+                ${showPayNow ? `
                 <div style="text-align: center; margin: 16px 0 20px 0;">
                     <a href="${payNowRedirectUrl}" style="display: inline-block; background: #2d5a27; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;">Pay Now &rarr;</a>
-                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #78350f;">Secure payment by card or ACH bank transfer via Stripe</p>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #78350f;">You'll choose ACH (free) or card (3.5% convenience fee) on the next page. Secure payment via Stripe.</p>
                 </div>
                 <div style="text-align: center; color: #78350f; font-size: 13px; margin: 12px 0;">&mdash; or &mdash;</div>
                 ` : ''}
