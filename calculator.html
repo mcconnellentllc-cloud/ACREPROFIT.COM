@@ -500,6 +500,9 @@
         let acres = 0;
         let gpa = 10;
         let calculationResult = null;
+        let cartIdempotencyKey = null; // Generated when calculationResult is first populated;
+                                       // reused across Checkout and Request Quote on the same cart;
+                                       // reset when the customer recalculates (new cart = new window).
         let programs = [];
 
         // DOM Elements
@@ -779,6 +782,11 @@
                 if (!res.ok) throw new Error(result.error);
 
                 calculationResult = result;
+                // New calculation = new cart = new idempotency window. Reserved
+                // on submit so double-click / retry / back-button resubmit all
+                // return the same order instead of creating duplicates.
+                cartIdempotencyKey = (crypto.randomUUID && crypto.randomUUID()) ||
+                    ('cart-' + Date.now() + '-' + Math.random().toString(36).slice(2));
                 renderCalculationResult();
 
             } catch (err) {
@@ -875,7 +883,8 @@
                     body: JSON.stringify({
                         ...calculationResult,
                         crop: document.getElementById('programCrop').value,
-                        programName: selectedProgram?.name || 'Custom Order'
+                        programName: selectedProgram?.name || 'Custom Order',
+                        idempotencyKey: cartIdempotencyKey
                     })
                 });
 
@@ -884,6 +893,9 @@
 
                 if (result.checkoutUrl) {
                     window.location.href = result.checkoutUrl;
+                } else if (result.orderStatus === 'quote_pending') {
+                    // Stripe fell through — order saved as quote_pending.
+                    alert(result.message || 'Card processing is temporarily unavailable. We\'ll send you a payment link shortly.');
                 }
 
             } catch (err) {
@@ -912,7 +924,8 @@
                     body: JSON.stringify({
                         ...calculationResult,
                         crop: document.getElementById('programCrop').value,
-                        programName: selectedProgram?.name || 'Custom Order'
+                        programName: selectedProgram?.name || 'Custom Order',
+                        idempotencyKey: cartIdempotencyKey
                     })
                 });
 
