@@ -738,6 +738,7 @@ const auditLogSchema = new mongoose.Schema({
             'margin_change',
             'ledger_entry_edit',
             'password_reset',
+            'force_password_change',
             'role_change',
             'customer_created',
             'cash_deposit',
@@ -745,7 +746,14 @@ const auditLogSchema = new mongoose.Schema({
             'inventory_adjustment',
             'rup_block',
             'license_change',
-            'login_failure'
+            'login_failure',
+            'supplier_delete',
+            'invoice_delete',
+            'invoice_voided',
+            'credit_note_issued',
+            'credit_note_refund_completed',
+            'credit_note_refund_failed',
+            'bid_sheet_sent'
         ]
     },
     performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
