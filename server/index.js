@@ -435,6 +435,7 @@ const orderSchema = new mongoose.Schema({
         default: 'pending'
     },
     stripePaymentIntentId: String,
+    stripeCheckoutUrl: String, // Persisted so idempotent repeat-submits return the same Stripe URL
     checkNumber: String,
     checkReceivedDate: Date,
     paidAt: Date,
@@ -12242,6 +12243,37 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
             return res.status(400).json({ error: 'Invalid order data' });
         }
 
+        // Whitelist orderStatus — unexpected values shouldn't silently
+        // slip through the checkout-vs-quote branch below.
+        if (orderStatus && !['ready_for_checkout', 'quote_pending'].includes(orderStatus)) {
+            return res.status(400).json({ error: 'Invalid orderStatus' });
+        }
+
+        // Idempotent response builder — returns the existing order's state
+        // to the client. Uses stripeCheckoutUrl presence as the signal for
+        // a live Stripe session (vs quote_pending). Never relies on the
+        // orderStatus schema field since we don't explicitly set it on save.
+        const buildIdempotentResponse = (existing) => {
+            if (existing.stripeCheckoutUrl) {
+                return {
+                    success: true,
+                    orderStatus: 'checkout',
+                    checkoutUrl: existing.stripeCheckoutUrl,
+                    orderId: existing._id,
+                    idempotent: true
+                };
+            }
+            return {
+                success: true,
+                orderStatus: 'quote_pending',
+                orderId: existing._id,
+                idempotent: true,
+                message: existing.notes && existing.notes.startsWith('Card processing')
+                    ? 'Order received. Card processing is temporarily unavailable — we\'ll send you a payment link shortly.'
+                    : 'Quote request submitted. You will be contacted within 24 hours.'
+            };
+        };
+
         // --- 1. Idempotency check ---
         // If the client already submitted this cart (double-click, retry,
         // back-button resubmit), return the existing order instead of
@@ -12252,13 +12284,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                 idempotencyKey
             });
             if (existing) {
-                return res.json({
-                    success: true,
-                    orderStatus: existing.orderStatus === 'ready_for_checkout' ? 'checkout' : 'quote_pending',
-                    orderId: existing._id,
-                    idempotent: true,
-                    message: 'Order already submitted.'
-                });
+                return res.json(buildIdempotentResponse(existing));
             }
         }
 
@@ -12454,13 +12480,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                     idempotencyKey
                 });
                 if (racedOrder) {
-                    return res.json({
-                        success: true,
-                        orderStatus: racedOrder.orderStatus === 'ready_for_checkout' ? 'checkout' : 'quote_pending',
-                        orderId: racedOrder._id,
-                        idempotent: true,
-                        message: 'Order already submitted.'
-                    });
+                    return res.json(buildIdempotentResponse(racedOrder));
                 }
             }
             console.error('Submit-order transaction failed - rolled back:', txErr.message);
@@ -12528,6 +12548,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                     });
 
                     order.stripePaymentIntentId = checkoutSession.payment_intent;
+                    order.stripeCheckoutUrl = checkoutSession.url;
                     await order.save();
                 } catch (stripeErr) {
                     stripeFailureReason = stripeErr.message || 'stripe session creation failed';
