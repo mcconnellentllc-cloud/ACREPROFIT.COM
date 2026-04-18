@@ -114,6 +114,11 @@ app.use(cors({
 // JSON parser below so req.body arrives as a Buffer on the webhook route.
 app.use('/api/webhooks/sendgrid', express.raw({ type: 'application/json', limit: '2mb' }));
 
+// Stripe webhook: same pattern. stripe.webhooks.constructEvent() needs the
+// exact raw bytes to verify the HMAC-SHA256 signature header. Path-scoped so
+// the rest of the app keeps JSON parsing.
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json', limit: '2mb' }));
+
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
 
@@ -2186,7 +2191,15 @@ const invoiceSchema = new mongoose.Schema({
     },
     paymentMethod: String,
     paymentDate: Date,
+    paidAt: Date,
     stripePaymentIntentId: String,
+    // Stripe Checkout Session for the Pay Now email button. Created on invoice
+    // send (and regenerated if the hosted URL expires before customer clicks).
+    // stripeHostedUrl is what we embed in the email; session-id is what the
+    // webhook correlates back to this invoice via metadata.invoiceId.
+    stripeCheckoutSessionId: String,
+    stripeHostedUrl: String,
+    stripeCheckoutExpiresAt: Date,
 
     // Dates
     invoiceDate: { type: Date, default: Date.now },
@@ -2645,10 +2658,11 @@ async function autoGenerateInvoiceForPaidOrder(order) {
             paymentStatus: 'paid',
             paymentMethod: order.paymentMethod,
             paymentDate: order.paidAt || new Date(),
+            paidAt: order.paidAt || new Date(),
             stripePaymentIntentId: order.stripePaymentIntentId || null,
             status: 'paid',
             invoiceDate: new Date(),
-            dueDate: new Date(),
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             createdBy: order.createdBy || order.representativeId || null
         });
 
@@ -6955,8 +6969,61 @@ app.post('/api/webhooks/sendgrid', async (req, res) => {
     res.json({ ok: true, processed: events.length });
 });
 
-// Stripe webhook for payment confirmations (including ACH)
-app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+// Webhook event idempotency. Stripe may retry a webhook if our handler
+// times out or returns non-2xx, which previously could double-flip an order
+// to paid / double-auto-generate an invoice / double-send a receipt email.
+// One row per Stripe event.id, TTL-cleaned after 30 days. Unique index gives
+// us safe concurrent de-dupe even under parallel retry bursts.
+const webhookEventSchema = new mongoose.Schema({
+    provider: { type: String, required: true },
+    eventId: { type: String, required: true },
+    eventType: String,
+    status: { type: String, enum: ['received', 'processed', 'failed'], default: 'received' },
+    receivedAt: { type: Date, default: Date.now },
+    processedAt: Date
+});
+webhookEventSchema.index({ provider: 1, eventId: 1 }, { unique: true });
+webhookEventSchema.index({ receivedAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const WebhookEvent = mongoose.model('WebhookEvent', webhookEventSchema);
+
+// Claim an event for processing. Returns true if we should process, false if
+// the event has already been seen (handled or in-flight on another worker).
+// Race-safe via the unique (provider, eventId) index.
+async function claimWebhookEvent(provider, event) {
+    try {
+        await WebhookEvent.create({
+            provider,
+            eventId: event.id,
+            eventType: event.type
+        });
+        return true;
+    } catch (err) {
+        if (err.code === 11000) {
+            console.log(`[${provider} webhook] duplicate event ${event.id} (${event.type}) - skipping`);
+            return false;
+        }
+        throw err;
+    }
+}
+
+async function markWebhookProcessed(provider, eventId) {
+    await WebhookEvent.updateOne(
+        { provider, eventId },
+        { $set: { status: 'processed', processedAt: new Date() } }
+    );
+}
+
+async function markWebhookFailed(provider, eventId) {
+    await WebhookEvent.updateOne(
+        { provider, eventId },
+        { $set: { status: 'failed' } }
+    );
+}
+
+// Stripe webhook for payment confirmations. Raw-body parser is mounted
+// path-scoped at the top of the file (alongside SendGrid) so req.body is a
+// Buffer for signature verification.
+app.post('/api/webhooks/stripe', async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -6964,138 +7031,247 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
+        console.error('[stripe webhook] signature verification failed:', err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Helper to find order by ID
-    async function findOrder(orderId, orderType) {
-        if (orderType === 'chemical') {
-            return await ChemicalOrder.findById(orderId);
-        }
-        let order = await Order.findById(orderId);
-        if (!order) {
-            order = await ChemicalOrder.findById(orderId);
-        }
-        return order;
+    // Idempotency claim. If another delivery already processed this event.id,
+    // ack 200 immediately so Stripe stops retrying.
+    const claimed = await claimWebhookEvent('stripe', event);
+    if (!claimed) {
+        return res.json({ received: true, duplicate: true });
     }
 
-    // ACH payments go through processing state before succeeding
-    if (event.type === 'payment_intent.processing') {
-        const paymentIntent = event.data.object;
-        const orderId = paymentIntent.metadata.orderId;
-        const orderType = paymentIntent.metadata.orderType;
-
-        if (orderId) {
-            const order = await findOrder(orderId, orderType);
-            if (order) {
-                order.paymentStatus = 'processing';
-                order.paymentMethod = paymentIntent.payment_method_types?.includes('us_bank_account') ? 'stripe_ach' : order.paymentMethod;
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`ACH payment processing for order ${orderId}`);
-            }
-        }
+    try {
+        await dispatchStripeEvent(event);
+        await markWebhookProcessed('stripe', event.id);
+        res.json({ received: true });
+    } catch (err) {
+        await markWebhookFailed('stripe', event.id);
+        console.error(`[stripe webhook] handler failed for ${event.type} (${event.id}):`, err);
+        // Return 500 so Stripe retries. Next delivery will re-claim (the row
+        // flipped to 'failed' does not block re-entry because we upsert on
+        // claim via the unique index, but status !== 'processed' means we
+        // treat it as fresh. Simplest: delete the failed claim so retry
+        // succeeds.
+        await WebhookEvent.deleteOne({ provider: 'stripe', eventId: event.id, status: 'failed' });
+        res.status(500).json({ received: false });
     }
-
-    if (event.type === 'payment_intent.succeeded') {
-        const paymentIntent = event.data.object;
-        const orderId = paymentIntent.metadata.orderId;
-        const orderType = paymentIntent.metadata.orderType;
-        const isACH = paymentIntent.payment_method_types?.includes('us_bank_account');
-
-        if (orderId) {
-            const order = await findOrder(orderId, orderType);
-
-            if (order) {
-                order.paymentStatus = 'paid';
-                order.paidAt = new Date();
-                // Update status to payment_secured (matches admin workflow)
-                order.status = 'payment_secured';
-                order.paymentMethod = isACH ? 'stripe_ach' : (order.paymentMethod || 'stripe');
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
-
-                // Auto-generate invoice + promote pending RUP records (both idempotent)
-                await autoGenerateInvoiceForPaidOrder(order);
-                await promoteRupRecordsToCompleted(order);
-
-                // Send payment confirmation email to customer
-                try {
-                    const customer = await User.findById(order.userId);
-                    const transporter = createEmailTransporter();
-                    if (transporter && customer?.email) {
-                        const amount = (paymentIntent.amount / 100).toFixed(2);
-                        const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
-                        await transporter.sendMail({
-                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
-                            to: customer.email,
-                            subject: `Payment Confirmed - Acre Profit`,
-                            html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
-                                <h2 style="color: #2d5a27;">Payment Confirmed</h2>
-                                <p>Hi ${customer.name || 'Farmer'},</p>
-                                <p>Your payment of <strong>$${amount}</strong> has been received via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
-                                <p>Your order is now being processed. We'll notify you when your products are ready for pickup.</p>
-                                <p style="margin-top:18px;">View your invoice and order details: <a href="${invoiceUrl}" style="color:#2d5a27; font-weight:600;">${invoiceUrl}</a></p>
-                                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                                <p style="color: #888; font-size: 0.9em;">Thank you for choosing Acre Profit.<br>Questions? Contact your local representative.</p>
-                            </div>`
-                        });
-                        console.log(`Payment confirmation email sent to ${customer.email}`);
-                    }
-                } catch (emailErr) {
-                    console.error('Failed to send payment confirmation email:', emailErr.message);
-                }
-            }
-        }
-    }
-
-    if (event.type === 'payment_intent.payment_failed') {
-        const paymentIntent = event.data.object;
-        const orderId = paymentIntent.metadata.orderId;
-        const orderType = paymentIntent.metadata.orderType;
-
-        if (orderId) {
-            const order = await findOrder(orderId, orderType);
-
-            if (order) {
-                order.paymentStatus = 'failed';
-                order.status = 'payment_pending'; // Reset to payment pending
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`Payment failed for order ${orderId}`);
-            }
-        }
-    }
-
-    // Handle charge events for ACH (backup confirmation)
-    if (event.type === 'charge.succeeded') {
-        const charge = event.data.object;
-        const orderId = charge.metadata?.orderId;
-        const orderType = charge.metadata?.orderType;
-        const isACH = charge.payment_method_details?.type === 'us_bank_account';
-
-        if (orderId && isACH) {
-            const order = await findOrder(orderId, orderType);
-            if (order && order.paymentStatus !== 'paid') {
-                order.paymentStatus = 'paid';
-                order.paidAt = new Date();
-                order.status = 'payment_secured';
-                order.paymentMethod = 'stripe_ach';
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`ACH charge confirmed for order ${orderId}`);
-
-                // Auto-generate invoice + promote pending RUP records (both idempotent -
-                // payment_intent.succeeded usually fires first)
-                await autoGenerateInvoiceForPaidOrder(order);
-                await promoteRupRecordsToCompleted(order);
-            }
-        }
-    }
-
-    res.json({ received: true });
 });
+
+// Shared order lookup for webhook handlers. Legacy Order and ChemicalOrder
+// both live in this monolith; metadata.orderType disambiguates when present.
+async function findOrderForWebhook(orderId, orderType) {
+    if (!orderId) return null;
+    if (orderType === 'chemical') {
+        return await ChemicalOrder.findById(orderId);
+    }
+    let order = await Order.findById(orderId);
+    if (!order) {
+        order = await ChemicalOrder.findById(orderId);
+    }
+    return order;
+}
+
+async function dispatchStripeEvent(event) {
+    switch (event.type) {
+        case 'payment_intent.processing':
+            return await handlePaymentIntentProcessing(event);
+        case 'payment_intent.succeeded':
+            return await handlePaymentIntentSucceeded(event);
+        case 'payment_intent.payment_failed':
+            return await handlePaymentIntentFailed(event);
+        case 'charge.succeeded':
+            return await handleChargeSucceeded(event);
+        case 'checkout.session.completed':
+            return await handleCheckoutSessionCompleted(event);
+        default:
+            console.log(`[stripe webhook] unhandled event type ${event.type} (${event.id})`);
+    }
+}
+
+async function handlePaymentIntentProcessing(event) {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata.orderId;
+    const orderType = paymentIntent.metadata.orderType;
+    if (!orderId) return;
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order) return;
+    order.paymentStatus = 'processing';
+    order.paymentMethod = paymentIntent.payment_method_types?.includes('us_bank_account') ? 'stripe_ach' : order.paymentMethod;
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`ACH payment processing for order ${orderId}`);
+}
+
+async function handlePaymentIntentSucceeded(event) {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata.orderId;
+    const orderType = paymentIntent.metadata.orderType;
+    const isACH = paymentIntent.payment_method_types?.includes('us_bank_account');
+    if (!orderId) return;
+
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order) return;
+
+    order.paymentStatus = 'paid';
+    order.paidAt = new Date();
+    order.status = 'payment_secured';
+    order.paymentMethod = isACH ? 'stripe_ach' : (order.paymentMethod || 'stripe');
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
+
+    await autoGenerateInvoiceForPaidOrder(order);
+    await promoteRupRecordsToCompleted(order);
+
+    try {
+        const customer = await User.findById(order.userId);
+        const transporter = createEmailTransporter();
+        if (transporter && customer?.email) {
+            const amount = (paymentIntent.amount / 100).toFixed(2);
+            const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: customer.email,
+                subject: `Payment Confirmed - Acre Profit`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                    <h2 style="color: #2d5a27;">Payment Confirmed</h2>
+                    <p>Hi ${customer.name || 'Farmer'},</p>
+                    <p>Your payment of <strong>$${amount}</strong> has been received via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
+                    <p>Your order is now being processed. We'll notify you when your products are ready for pickup.</p>
+                    <p style="margin-top:18px;">View your invoice and order details: <a href="${invoiceUrl}" style="color:#2d5a27; font-weight:600;">${invoiceUrl}</a></p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="color: #888; font-size: 0.9em;">Thank you for choosing Acre Profit.<br>Questions? Contact your local representative.</p>
+                </div>`
+            });
+            console.log(`Payment confirmation email sent to ${customer.email}`);
+        }
+    } catch (emailErr) {
+        console.error('Failed to send payment confirmation email:', emailErr.message);
+    }
+}
+
+async function handlePaymentIntentFailed(event) {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata.orderId;
+    const orderType = paymentIntent.metadata.orderType;
+    if (!orderId) return;
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order) return;
+    order.paymentStatus = 'failed';
+    order.status = 'payment_pending';
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`Payment failed for order ${orderId}`);
+}
+
+async function handleChargeSucceeded(event) {
+    const charge = event.data.object;
+    const orderId = charge.metadata?.orderId;
+    const orderType = charge.metadata?.orderType;
+    const isACH = charge.payment_method_details?.type === 'us_bank_account';
+    if (!orderId || !isACH) return;
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order || order.paymentStatus === 'paid') return;
+    order.paymentStatus = 'paid';
+    order.paidAt = new Date();
+    order.status = 'payment_secured';
+    order.paymentMethod = 'stripe_ach';
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`ACH charge confirmed for order ${orderId}`);
+    await autoGenerateInvoiceForPaidOrder(order);
+    await promoteRupRecordsToCompleted(order);
+}
+
+// Pay Now: customer pays an admin-created Invoice via Stripe Checkout. No
+// underlying Order — invoice is the canonical record. metadata.invoiceId is
+// what we correlate back to.
+async function handleCheckoutSessionCompleted(event) {
+    const session = event.data.object;
+    const invoiceId = session.metadata?.invoiceId;
+    if (!invoiceId) {
+        console.log(`[stripe webhook] checkout.session.completed without invoiceId metadata (session ${session.id}) - ignoring`);
+        return;
+    }
+
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) {
+        console.warn(`[stripe webhook] invoice ${invoiceId} not found for session ${session.id}`);
+        return;
+    }
+
+    if (invoice.paymentStatus === 'paid') {
+        console.log(`[stripe webhook] invoice ${invoice.invoiceNumber} already paid - skipping`);
+        return;
+    }
+
+    const isACH = Array.isArray(session.payment_method_types) && session.payment_method_types.includes('us_bank_account');
+    const now = new Date();
+
+    invoice.paymentStatus = 'paid';
+    invoice.status = 'paid';
+    invoice.amountPaid = invoice.total;
+    invoice.amountDue = 0;
+    invoice.paidAt = now;
+    invoice.paymentDate = now;
+    invoice.paymentMethod = isACH ? 'stripe_ach' : 'stripe';
+    invoice.stripePaymentIntentId = session.payment_intent || invoice.stripePaymentIntentId;
+    invoice.updatedAt = now;
+    await invoice.save();
+    console.log(`Invoice ${invoice.invoiceNumber} marked paid via Stripe Checkout (session ${session.id})`);
+
+    // Receipt email to customer.
+    try {
+        const transporter = createEmailTransporter();
+        const customerEmail = invoice.customerEmail;
+        if (transporter && customerEmail) {
+            const amount = Number(invoice.total || 0).toFixed(2);
+            const ordersUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: customerEmail,
+                subject: `Payment Received - Invoice ${invoice.invoiceNumber}`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                    <h2 style="color: #2d5a27;">Payment Received</h2>
+                    <p>Hi ${invoice.customerName || 'Farmer'},</p>
+                    <p>Thank you — we've received your payment of <strong>$${amount}</strong> for invoice <strong>${invoice.invoiceNumber}</strong> via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
+                    <p>Your invoice is now marked <strong>PAID</strong>. Products are being prepared and you'll be notified when they're ready for pickup.</p>
+                    <p style="margin-top:18px;">View your invoices anytime: <a href="${ordersUrl}" style="color:#2d5a27; font-weight:600;">${ordersUrl}</a></p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="color: #888; font-size: 0.9em;">Thank you for your business.<br>Questions? Contact your local representative or email contact@acreprofit.com.</p>
+                </div>`
+            });
+            console.log(`Receipt email sent to ${customerEmail} for invoice ${invoice.invoiceNumber}`);
+        }
+    } catch (emailErr) {
+        console.error('Failed to send invoice receipt email:', emailErr.message);
+    }
+
+    // Admin notification.
+    try {
+        const transporter = createEmailTransporter();
+        if (transporter) {
+            const amount = Number(invoice.total || 0).toFixed(2);
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: 'contact@acreprofit.com',
+                subject: `[PAID] Invoice ${invoice.invoiceNumber} - $${amount}`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                    <h2 style="color: #2d5a27;">Invoice paid via Stripe</h2>
+                    <p><strong>Invoice:</strong> ${invoice.invoiceNumber}</p>
+                    <p><strong>Customer:</strong> ${invoice.customerName || '—'} (${invoice.customerEmail || '—'})</p>
+                    <p><strong>Amount:</strong> $${amount} ${isACH ? '(ACH)' : '(card)'}</p>
+                    <p><strong>Stripe session:</strong> ${session.id}</p>
+                    <p><strong>Stripe payment intent:</strong> ${session.payment_intent || '—'}</p>
+                </div>`
+            });
+        }
+    } catch (emailErr) {
+        console.error('Failed to send admin payment notification:', emailErr.message);
+    }
+}
 
 // Update representative's check payment info
 app.put('/api/representatives/check-info', authMiddleware, adminMiddleware, async (req, res) => {
@@ -13554,6 +13730,124 @@ app.delete('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (re
     }
 });
 
+// Create (or refresh) a Stripe Checkout Session for the invoice's Pay Now
+// button. Idempotent-ish: if a live session already exists and isn't within
+// 30 min of expiring, return it as-is. Otherwise mint a new one and persist
+// the session id + hosted URL on the invoice. Caller decides when to call
+// (invoice send, /pay-invoice/:id click after expiry, manual refresh).
+async function ensureInvoiceCheckoutSession(invoice) {
+    if (!stripe) {
+        throw new Error('Stripe not configured (STRIPE_SECRET_KEY missing)');
+    }
+    if (!invoice) {
+        throw new Error('Invoice required');
+    }
+    if (invoice.paymentStatus === 'paid') {
+        return { session: null, url: null, alreadyPaid: true };
+    }
+
+    // Reuse the existing session if it has >30 min of life left.
+    const now = Date.now();
+    const expires = invoice.stripeCheckoutExpiresAt ? new Date(invoice.stripeCheckoutExpiresAt).getTime() : 0;
+    if (invoice.stripeCheckoutSessionId && invoice.stripeHostedUrl && expires - now > 30 * 60 * 1000) {
+        return { session: null, url: invoice.stripeHostedUrl, reused: true };
+    }
+
+    const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
+    const amountCents = Math.round(Number(invoice.total || 0) * 100);
+    if (!amountCents || amountCents < 50) {
+        // Stripe minimum is $0.50. Guard against zero-total invoices.
+        throw new Error(`Invoice total must be at least $0.50 to accept Stripe payment (got $${(amountCents / 100).toFixed(2)})`);
+    }
+
+    // 23 hours out — Stripe caps session.expires_at at 24h; 23h leaves room
+    // for the email to sit in an inbox before the link goes stale. The
+    // regen path in /pay-invoice/:id papers over any real-world delay.
+    const expiresAt = Math.floor(now / 1000) + 23 * 60 * 60;
+
+    const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: ['card', 'us_bank_account'],
+        customer_email: invoice.customerEmail || undefined,
+        client_reference_id: invoice._id.toString(),
+        expires_at: expiresAt,
+        line_items: [{
+            quantity: 1,
+            price_data: {
+                currency: 'usd',
+                unit_amount: amountCents,
+                product_data: {
+                    name: `Invoice ${invoice.invoiceNumber}`,
+                    description: invoice.customerName ? `Acre Profit - ${invoice.customerName}` : 'Acre Profit'
+                }
+            }
+        }],
+        metadata: {
+            invoiceId: invoice._id.toString(),
+            invoiceNumber: invoice.invoiceNumber || '',
+            customerId: invoice.customerId ? invoice.customerId.toString() : ''
+        },
+        payment_intent_data: {
+            metadata: {
+                invoiceId: invoice._id.toString(),
+                invoiceNumber: invoice.invoiceNumber || ''
+            }
+        },
+        success_url: `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}`,
+        cancel_url: `${frontend}/invoice-cancel.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}`
+    });
+
+    invoice.stripeCheckoutSessionId = session.id;
+    invoice.stripeHostedUrl = session.url;
+    invoice.stripeCheckoutExpiresAt = new Date(session.expires_at * 1000);
+    await invoice.save();
+
+    return { session, url: session.url, reused: false };
+}
+
+// Admin-triggered checkout session creation / refresh. Primarily useful if
+// an invoice email was sent before Stripe was wired up, or the admin wants
+// a fresh URL to paste into a manual follow-up message. The /send route
+// and the public /pay-invoice/:id path also call ensureInvoiceCheckoutSession
+// on the fly so this endpoint is usually unnecessary.
+app.post('/api/admin/invoices/:id/checkout-session', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        const { url, alreadyPaid, reused } = await ensureInvoiceCheckoutSession(invoice);
+        if (alreadyPaid) {
+            return res.status(400).json({ error: 'Invoice is already paid' });
+        }
+        res.json({ checkoutUrl: url, reused: !!reused });
+    } catch (err) {
+        console.error('[checkout-session]', err.message);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Public redirect endpoint for the Pay Now button. Farmers click this from
+// the invoice email. We resolve to the current hosted Stripe URL and 302
+// them there; if the session has expired we regenerate transparently.
+app.get('/pay-invoice/:id', async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).send('Invoice not found');
+        }
+        if (invoice.paymentStatus === 'paid') {
+            const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
+            return res.redirect(302, `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}&status=already-paid`);
+        }
+        const { url } = await ensureInvoiceCheckoutSession(invoice);
+        return res.redirect(302, url);
+    } catch (err) {
+        console.error('[pay-invoice]', err.message);
+        res.status(500).send('Unable to start payment. Please contact your representative.');
+    }
+});
+
 // Send invoice to customer
 app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -13599,6 +13893,25 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         const crop = order?.programName || 'General';
         const acres = order?.totalAcres || 0;
         const year = order?.year || new Date().getFullYear();
+
+        // Pre-create a Stripe Checkout Session so the Pay Now button in the
+        // email has a fresh hosted URL. Silent fail: if Stripe is unset or
+        // errors, we still send the invoice with the legacy check/ACH copy.
+        let payNowUrl = null;
+        if (stripe && invoice.paymentStatus !== 'paid') {
+            try {
+                const result = await ensureInvoiceCheckoutSession(invoice);
+                payNowUrl = result.url;
+            } catch (payErr) {
+                console.error(`[invoice send] could not mint checkout session for ${invoice.invoiceNumber}:`, payErr.message);
+            }
+        }
+        const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        // Frontend is on a separate domain from the API; email goes through a
+        // static bouncer page on acreprofit.com that handles the hand-off to
+        // the backend /pay-invoice/:id redirect. Keeps the branded URL in the
+        // customer's inbox.
+        const payNowRedirectUrl = `${frontend}/pay-invoice.html?invoice=${invoice._id}`;
 
         // Build professional invoice email HTML
         const emailHtml = `
@@ -13672,7 +13985,7 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
                         <p style="margin: 0; font-weight: 700; font-size: 18px;">Acre Profit LLC</p>
                         <p style="margin: 4px 0; color: #666;">Agricultural Chemical Distribution</p>
                         <p style="margin: 4px 0; color: #666;">Haxtun, CO</p>
-                        <p style="margin: 4px 0; color: #666;">info@acreprofit.com</p>
+                        <p style="margin: 4px 0; color: #666;">contact@acreprofit.com</p>
                     </td>
                 </tr>
             </table>
@@ -13720,19 +14033,33 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
             </div>
 
             <!-- Payment Info -->
+            ${invoice.paymentStatus === 'paid' ? `
+            <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 28px 0; text-align: center;">
+                <h4 style="margin: 0 0 4px 0; color: #065f46; font-size: 20px;">PAID</h4>
+                <p style="margin: 4px 0; color: #047857; font-size: 14px;">Thank you — no further action needed.</p>
+            </div>
+            ` : `
             <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 20px; margin: 28px 0;">
-                <h4 style="margin: 0 0 8px 0; color: #92400e;">Payment Information</h4>
-                <p style="margin: 4px 0; color: #78350f; font-size: 14px;">Please make payment via check or ACH transfer:</p>
+                <h4 style="margin: 0 0 12px 0; color: #92400e;">Payment Options</h4>
+                ${payNowUrl ? `
+                <div style="text-align: center; margin: 16px 0 20px 0;">
+                    <a href="${payNowRedirectUrl}" style="display: inline-block; background: #2d5a27; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;">Pay Now &rarr;</a>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #78350f;">Secure payment by card or ACH bank transfer via Stripe</p>
+                </div>
+                <div style="text-align: center; color: #78350f; font-size: 13px; margin: 12px 0;">&mdash; or &mdash;</div>
+                ` : ''}
+                <p style="margin: 4px 0; color: #78350f; font-size: 14px;">Pay by check or manual ACH transfer:</p>
                 <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
                     <p style="margin: 0; font-weight: 700;">Acre Profit LLC</p>
                     <p style="margin: 4px 0; font-size: 14px; color: #666;">Contact your representative for ACH details or mail check to your pickup location.</p>
                 </div>
             </div>
+            `}
 
             <!-- Footer -->
             <div style="text-align: center; padding-top: 20px; border-top: 2px solid #e0e0e0;">
                 <p style="margin: 4px 0; color: #2d5a27; font-weight: 600;">Thank you for your business!</p>
-                <p style="margin: 4px 0; color: #666; font-size: 14px;">Questions? Contact us at info@acreprofit.com</p>
+                <p style="margin: 4px 0; color: #666; font-size: 14px;">Questions? Contact us at contact@acreprofit.com</p>
             </div>
         </div>
 

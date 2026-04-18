@@ -1,0 +1,117 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Payment Cancelled - Acre Profit</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Segoe UI', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f5f0 0%, #fef3c7 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            color: #1a1a1a;
+        }
+        .card {
+            max-width: 520px;
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 48px 40px;
+            box-shadow: 0 10px 40px rgba(146, 64, 14, 0.12);
+            text-align: center;
+        }
+        .icon {
+            width: 88px;
+            height: 88px;
+            margin: 0 auto 24px;
+            border-radius: 50%;
+            background: #fef3c7;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #92400e;
+            font-size: 48px;
+            font-weight: 700;
+        }
+        h1 {
+            color: #92400e;
+            font-size: 28px;
+            margin-bottom: 12px;
+        }
+        p.lead {
+            color: #444;
+            font-size: 16px;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        p.invoice {
+            color: #666;
+            font-size: 14px;
+            margin: 8px 0 24px;
+            padding: 12px 16px;
+            background: #fffbeb;
+            border-radius: 8px;
+            display: inline-block;
+        }
+        .actions {
+            margin-top: 12px;
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .btn {
+            display: inline-block;
+            padding: 12px 24px;
+            border-radius: 8px;
+            text-decoration: none;
+            font-weight: 600;
+            font-size: 14px;
+            transition: transform 0.1s ease;
+        }
+        .btn:hover { transform: translateY(-1px); }
+        .btn-primary { background: #2d5a27; color: #ffffff; }
+        .btn-secondary {
+            background: #ffffff;
+            color: #2d5a27;
+            border: 2px solid #2d5a27;
+        }
+        .footer {
+            margin-top: 32px;
+            color: #888;
+            font-size: 13px;
+            line-height: 1.5;
+        }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <div class="icon">!</div>
+        <h1>Payment Cancelled</h1>
+        <p class="lead">No problem — your invoice is still open and no payment was taken.</p>
+        <p class="invoice" id="invoiceLabel">Invoice</p>
+        <p class="lead">You can try again from the Pay Now link in your email, or pay by check via your representative.</p>
+        <div class="actions">
+            <a href="javascript:history.back()" class="btn btn-primary">Try Again</a>
+            <a href="/" class="btn btn-secondary">Back to Home</a>
+        </div>
+        <p class="footer">
+            Need help? Contact your representative or email
+            <a href="mailto:contact@acreprofit.com" style="color: #2d5a27;">contact@acreprofit.com</a>.
+        </p>
+    </div>
+    <script>
+        const invoice = new URLSearchParams(window.location.search).get('invoice');
+        const label = document.getElementById('invoiceLabel');
+        if (invoice) {
+            label.textContent = 'Invoice ' + invoice;
+        } else {
+            label.style.display = 'none';
+        }
+    </script>
+</body>
+</html>

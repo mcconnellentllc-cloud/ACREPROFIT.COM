@@ -877,7 +877,7 @@
                                 <p class="customer-name">Acre Profit LLC</p>
                                 <p>Agricultural Chemical Distribution</p>
                                 <p>Haxtun, CO</p>
-                                <p>info@acreprofit.com</p>
+                                <p>contact@acreprofit.com</p>
                             </div>
                         </div>
 
@@ -944,7 +944,7 @@
                         <!-- Footer -->
                         <div class="invoice-footer">
                             <p>Thank you for your business!</p>
-                            <p class="small">Questions? Contact us at info@acreprofit.com</p>
+                            <p class="small">Questions? Contact us at contact@acreprofit.com</p>
                         </div>
                     </div>
 
@@ -4370,7 +4370,7 @@
                 const newStatus = e.target.value;
 
                 try {
-                    await fetch(`${API_URL}/api/orders/${orderId}/status`, {
+                    const response = await fetch(`${API_URL}/api/admin/orders/${orderId}/status`, {
                         method: 'PUT',
                         headers: {
                             'Content-Type': 'application/json',
@@ -4378,6 +4378,9 @@
                         },
                         body: JSON.stringify({ status: newStatus })
                     });
+                    if (!response.ok) {
+                        console.error('Status update failed:', response.status, await response.text());
+                    }
                 } catch (error) {
                     console.error('Error updating status:', error);
                 }
