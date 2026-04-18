@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Redirecting to Payment - Acre Profit</title>
+    <title>Choose Payment Method - Acre Profit</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -17,87 +17,304 @@
             color: #1a1a1a;
         }
         .card {
-            max-width: 480px;
+            max-width: 560px;
+            width: 100%;
             background: #ffffff;
             border-radius: 16px;
-            padding: 48px 40px;
+            padding: 40px 36px;
             box-shadow: 0 10px 40px rgba(45, 90, 39, 0.15);
+        }
+        .header {
+            text-align: center;
+            padding-bottom: 24px;
+            border-bottom: 1px solid #e0e0e0;
+            margin-bottom: 28px;
+        }
+        .brand {
+            color: #2d5a27;
+            font-size: 14px;
+            letter-spacing: 2px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        h1 {
+            color: #1a1a1a;
+            font-size: 22px;
+            font-weight: 700;
+        }
+        .meta {
+            display: flex;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 28px;
+            padding: 16px;
+            background: #f5f5f0;
+            border-radius: 10px;
+            font-size: 14px;
+        }
+        .meta .label {
+            color: #666;
+            text-transform: uppercase;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .meta .value {
+            color: #1a1a1a;
+            font-weight: 600;
+        }
+        .option {
+            display: block;
+            width: 100%;
+            padding: 20px;
+            margin-bottom: 14px;
+            border: 2px solid #e0e0e0;
+            border-radius: 12px;
+            background: #ffffff;
+            text-decoration: none;
+            color: inherit;
+            cursor: pointer;
+            transition: border-color 0.15s ease, transform 0.1s ease, box-shadow 0.15s ease;
+        }
+        .option:hover {
+            border-color: #2d5a27;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 16px rgba(45, 90, 39, 0.12);
+        }
+        .option-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            gap: 12px;
+        }
+        .option-title {
+            font-size: 17px;
+            font-weight: 700;
+            color: #2d5a27;
+            margin-bottom: 4px;
+        }
+        .option-sub {
+            font-size: 13px;
+            color: #666;
+        }
+        .option-price {
+            font-size: 20px;
+            font-weight: 700;
+            color: #1a1a1a;
+            white-space: nowrap;
+        }
+        .option-price .tag {
+            display: block;
+            font-size: 11px;
+            font-weight: 500;
+            color: #059669;
+            text-align: right;
+            margin-top: 2px;
+        }
+        .option.card .tag {
+            color: #92400e;
+        }
+        .disclosure {
+            margin-top: 20px;
+            padding: 14px 16px;
+            background: #fffbeb;
+            border: 1px solid #fcd34d;
+            border-radius: 8px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #78350f;
+        }
+        .status {
+            padding: 24px;
             text-align: center;
         }
+        .status.error {
+            color: #991b1b;
+        }
+        .status.paid {
+            color: #065f46;
+            font-weight: 600;
+        }
+        .btn-link {
+            display: inline-block;
+            margin-top: 16px;
+            color: #2d5a27;
+            font-weight: 600;
+            text-decoration: none;
+        }
         .spinner {
-            width: 48px;
-            height: 48px;
-            margin: 0 auto 24px;
+            width: 40px;
+            height: 40px;
+            margin: 0 auto 16px;
             border: 4px solid #e8f5e9;
             border-top-color: #2d5a27;
             border-radius: 50%;
             animation: spin 0.8s linear infinite;
         }
-        @keyframes spin {
-            to { transform: rotate(360deg); }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .footer {
+            margin-top: 28px;
+            padding-top: 20px;
+            border-top: 1px solid #e0e0e0;
+            text-align: center;
+            color: #888;
+            font-size: 12px;
         }
-        h1 {
+        .footer a {
             color: #2d5a27;
-            font-size: 22px;
-            margin-bottom: 12px;
-        }
-        p {
-            color: #444;
-            font-size: 14px;
-            line-height: 1.6;
-            margin-bottom: 8px;
-        }
-        .error {
-            color: #991b1b;
-            margin-top: 16px;
-            padding: 12px;
-            background: #fee2e2;
-            border-radius: 8px;
-            font-size: 13px;
-            display: none;
-        }
-        .btn {
-            display: inline-block;
-            margin-top: 16px;
-            padding: 12px 24px;
-            border-radius: 8px;
-            background: #2d5a27;
-            color: #ffffff;
             text-decoration: none;
-            font-weight: 600;
-            font-size: 14px;
         }
     </style>
 </head>
 <body>
     <div class="card">
-        <div class="spinner"></div>
-        <h1>Taking you to secure payment...</h1>
-        <p>You're being redirected to Stripe to complete your payment.</p>
-        <div class="error" id="error">
-            <p id="errorMessage">Unable to start payment.</p>
-            <a href="mailto:contact@acreprofit.com" class="btn">Contact Support</a>
+        <div class="header">
+            <div class="brand">ACRE PROFIT</div>
+            <h1>Choose how to pay</h1>
+        </div>
+
+        <div id="loading" class="status">
+            <div class="spinner"></div>
+            <p>Loading invoice...</p>
+        </div>
+
+        <div id="error" class="status error" style="display: none;">
+            <p id="errorMessage">Unable to load invoice.</p>
+            <a class="btn-link" href="mailto:contact@acreprofit.com">Contact Support</a>
+        </div>
+
+        <div id="paid" class="status paid" style="display: none;">
+            <p id="paidMessage">This invoice has already been paid.</p>
+            <a class="btn-link" href="/my-orders.html">View My Invoices</a>
+        </div>
+
+        <div id="chooser" style="display: none;">
+            <div class="meta">
+                <div>
+                    <div class="label">Invoice</div>
+                    <div class="value" id="invoiceLabel">&mdash;</div>
+                </div>
+                <div>
+                    <div class="label">Customer</div>
+                    <div class="value" id="customerLabel">&mdash;</div>
+                </div>
+            </div>
+
+            <a class="option ach" id="achOption" href="#">
+                <div class="option-row">
+                    <div>
+                        <div class="option-title">Pay by ACH (bank transfer)</div>
+                        <div class="option-sub">Direct from your bank account &mdash; no fee</div>
+                    </div>
+                    <div class="option-price">
+                        <span id="achAmount">$0.00</span>
+                        <span class="tag">No fee</span>
+                    </div>
+                </div>
+            </a>
+
+            <a class="option card" id="cardOption" href="#">
+                <div class="option-row">
+                    <div>
+                        <div class="option-title">Pay by Card</div>
+                        <div class="option-sub">Visa, Mastercard, Amex, Discover</div>
+                    </div>
+                    <div class="option-price">
+                        <span id="cardAmount">$0.00</span>
+                        <span class="tag" id="cardFeeTag">+ $0.00 fee</span>
+                    </div>
+                </div>
+            </a>
+
+            <div class="disclosure">
+                ACH bank transfer is free. Card payments include a 3.5%
+                convenience fee to cover payment processing costs. You'll
+                be redirected to Stripe's secure checkout to complete payment.
+            </div>
+        </div>
+
+        <div id="stripeDisabled" class="status error" style="display: none;">
+            <p>Online payment is temporarily unavailable.</p>
+            <p style="margin-top: 8px; color: #666; font-size: 13px;">
+                Please contact your representative to pay by check or manual ACH.
+            </p>
+            <a class="btn-link" href="mailto:contact@acreprofit.com">Contact Support</a>
+        </div>
+
+        <div class="footer">
+            Questions? <a href="mailto:contact@acreprofit.com">contact@acreprofit.com</a>
         </div>
     </div>
+
     <script>
         const API_URL = 'https://acreprofit-com.onrender.com';
-        const invoiceId = new URLSearchParams(window.location.search).get('invoice');
-        const errorBox = document.getElementById('error');
-        const errorMessage = document.getElementById('errorMessage');
+        const params = new URLSearchParams(window.location.search);
+        const invoiceId = params.get('invoice');
 
-        function showError(msg) {
-            errorMessage.textContent = msg;
-            errorBox.style.display = 'block';
+        const loadingEl = document.getElementById('loading');
+        const errorEl = document.getElementById('error');
+        const errorMessageEl = document.getElementById('errorMessage');
+        const paidEl = document.getElementById('paid');
+        const paidMessageEl = document.getElementById('paidMessage');
+        const chooserEl = document.getElementById('chooser');
+        const stripeDisabledEl = document.getElementById('stripeDisabled');
+
+        function showOnly(el) {
+            [loadingEl, errorEl, paidEl, chooserEl, stripeDisabledEl].forEach(e => {
+                e.style.display = e === el ? '' : 'none';
+            });
         }
 
-        if (!invoiceId) {
-            showError('No invoice specified. Please use the Pay Now link in your email.');
-        } else {
-            // The backend /pay-invoice/:id endpoint handles both path: 302 to
-            // Stripe hosted URL (regenerates session if expired). window.location
-            // follows the redirect natively.
-            window.location.replace(API_URL + '/pay-invoice/' + encodeURIComponent(invoiceId));
+        function fmt(n) {
+            return '$' + Number(n || 0).toFixed(2);
         }
+
+        async function init() {
+            if (!invoiceId) {
+                errorMessageEl.textContent = 'No invoice specified. Please use the Pay Now link in your email.';
+                showOnly(errorEl);
+                return;
+            }
+            try {
+                const res = await fetch(API_URL + '/api/public/invoice/' + encodeURIComponent(invoiceId));
+                if (!res.ok) {
+                    const body = await res.json().catch(() => ({}));
+                    errorMessageEl.textContent = body.error || 'Invoice not found.';
+                    showOnly(errorEl);
+                    return;
+                }
+                const data = await res.json();
+
+                if (data.paymentStatus === 'paid') {
+                    paidMessageEl.textContent = 'Invoice ' + (data.invoiceNumber || '') + ' has already been paid.';
+                    showOnly(paidEl);
+                    return;
+                }
+
+                if (!data.stripeEnabled) {
+                    showOnly(stripeDisabledEl);
+                    return;
+                }
+
+                document.getElementById('invoiceLabel').textContent = data.invoiceNumber || '—';
+                document.getElementById('customerLabel').textContent = data.customerName || '—';
+                document.getElementById('achAmount').textContent = fmt(data.total);
+                document.getElementById('cardAmount').textContent = fmt(data.totalWithCardSurcharge);
+                document.getElementById('cardFeeTag').textContent = '+ ' + fmt(data.surchargeCard) + ' fee';
+
+                const achHref = API_URL + '/pay-invoice/' + encodeURIComponent(invoiceId) + '?method=ach';
+                const cardHref = API_URL + '/pay-invoice/' + encodeURIComponent(invoiceId) + '?method=card';
+                document.getElementById('achOption').setAttribute('href', achHref);
+                document.getElementById('cardOption').setAttribute('href', cardHref);
+
+                showOnly(chooserEl);
+            } catch (err) {
+                errorMessageEl.textContent = 'Unable to reach payment server. Please try again in a moment.';
+                showOnly(errorEl);
+            }
+        }
+
+        init();
     </script>
 </body>
 </html>
