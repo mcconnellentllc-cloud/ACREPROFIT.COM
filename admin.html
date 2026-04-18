@@ -5060,8 +5060,13 @@
             const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
 
             try {
-                // Determine if this is a ChemicalOrder (has orderNumber) or regular Order
-                const isChemicalOrder = currentOrder.orderNumber || currentOrder.items;
+                // Determine if this is a ChemicalOrder or regular Order.
+                // Prefer _sourceCollection (stamped by findOrdersInBothCollections);
+                // fall back to orderNumber for docs fetched via other endpoints
+                // (e.g. GET /api/chemical-orders/:id returns a raw ChemicalOrder
+                // without _sourceCollection). items[] can no longer be used as
+                // a shape discriminator since legacy orders now synthesize it.
+                const isChemicalOrder = currentOrder._sourceCollection === 'chemical' || !!currentOrder.orderNumber;
                 const endpoint = isChemicalOrder
                     ? `${API_URL}/api/chemical-orders/${currentOrder._id}`
                     : `${API_URL}/api/admin/orders/${currentOrder._id}`;
@@ -5130,8 +5135,9 @@
             }
 
             try {
-                // Determine if this is a ChemicalOrder or regular Order
-                const isChemicalOrder = currentOrder.orderNumber || currentOrder.items;
+                // Determine if this is a ChemicalOrder or regular Order.
+                // See explanation at the status-update call site above.
+                const isChemicalOrder = currentOrder._sourceCollection === 'chemical' || !!currentOrder.orderNumber;
                 const endpoint = isChemicalOrder
                     ? `${API_URL}/api/chemical-orders/${currentOrder._id}/archive`
                     : `${API_URL}/api/admin/orders/${currentOrder._id}/archive`;
@@ -5176,8 +5182,9 @@
             }
 
             try {
-                // Determine if this is a ChemicalOrder or regular Order
-                const isChemicalOrder = currentOrder.orderNumber || currentOrder.items;
+                // Determine if this is a ChemicalOrder or regular Order.
+                // See explanation at the status-update call site above.
+                const isChemicalOrder = currentOrder._sourceCollection === 'chemical' || !!currentOrder.orderNumber;
                 const endpoint = isChemicalOrder
                     ? `${API_URL}/api/chemical-orders/${currentOrder._id}`
                     : `${API_URL}/api/admin/orders/${currentOrder._id}`;
