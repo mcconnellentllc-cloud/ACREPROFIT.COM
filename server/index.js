@@ -2213,9 +2213,13 @@ const invoiceSchema = new mongoose.Schema({
     // Status
     status: {
         type: String,
-        enum: ['draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled'],
+        enum: ['draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled', 'voided'],
         default: 'draft'
     },
+    // Void audit (inline for fast UI read; AuditLog entry is the compliance trail).
+    voidedAt: Date,
+    voidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    voidReason: String,
 
     // Delivery info
     deliveryStatus: {
@@ -7209,6 +7213,13 @@ async function handleCheckoutSessionCompleted(event) {
 
     if (invoice.paymentStatus === 'paid') {
         console.log(`[stripe webhook] invoice ${invoice.invoiceNumber} already paid - skipping`);
+        return;
+    }
+
+    // Void guard: a voided invoice must never accept payment even if a stale
+    // Checkout Session completes (customer had the tab open when admin voided).
+    if (invoice.status === 'voided') {
+        console.warn(`[stripe webhook] invoice ${invoice.invoiceNumber} is voided - rejecting payment (session ${session.id}, payment_intent ${session.payment_intent || 'n/a'})`);
         return;
     }
 
@@ -13771,6 +13782,86 @@ app.delete('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (re
     }
 });
 
+// Void a sent or draft invoice. Unlike DELETE (which hard-deletes drafts only),
+// void preserves the record for audit and blocks any future Stripe payment
+// attempt. Never permitted on paid invoices — those require a Credit Note
+// (not yet implemented). amountPaid / amountDue are preserved as-is so a
+// partial-pay history is not erased.
+app.post('/api/admin/invoices/:id/void', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (invoice.status === 'voided') {
+            return res.status(400).json({ error: 'Invoice is already voided' });
+        }
+        if (invoice.paymentStatus === 'paid' || invoice.status === 'paid') {
+            return res.status(400).json({ error: 'Cannot void a paid invoice. Use a credit note instead.' });
+        }
+
+        const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason.trim() : '';
+        const notifyCustomer = req.body && req.body.notifyCustomer !== false; // default true
+        const before = { status: invoice.status, paymentStatus: invoice.paymentStatus };
+
+        const now = new Date();
+        invoice.status = 'voided';
+        invoice.voidedAt = now;
+        invoice.voidedBy = req.user._id;
+        invoice.voidReason = reason || undefined;
+        invoice.updatedAt = now;
+        await invoice.save();
+
+        await logAudit({
+            action: 'invoice_voided',
+            req,
+            entityType: 'Invoice',
+            entityId: invoice._id,
+            entityRef: invoice.invoiceNumber,
+            before,
+            after: { status: 'voided', voidedAt: now, voidedBy: req.user._id },
+            reason: reason || `Invoice voided by ${req.user.name}`
+        });
+
+        if (notifyCustomer && invoice.customerEmail) {
+            try {
+                const transporter = createEmailTransporter();
+                if (transporter) {
+                    const reasonBlock = reason
+                        ? `<p style="margin: 12px 0; color: #555;"><strong>Reason provided:</strong> ${reason.replace(/[<>]/g, '')}</p>`
+                        : '';
+                    await transporter.sendMail({
+                        from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                        to: invoice.customerEmail,
+                        subject: `Invoice ${invoice.invoiceNumber} has been voided`,
+                        html: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                                <h2 style="color: #2d5a27;">Invoice Voided</h2>
+                                <p>Hello ${invoice.customerName || 'there'},</p>
+                                <p>Invoice <strong>${invoice.invoiceNumber}</strong>${invoice.total ? ` for $${Number(invoice.total).toFixed(2)}` : ''} has been voided and <strong>no payment is due</strong>.</p>
+                                ${reasonBlock}
+                                <p>If you previously clicked the Pay Now link in the original invoice email, that link will no longer accept payment. If you have questions, reply to this email or contact your representative.</p>
+                                <p style="margin-top: 24px; color: #666; font-size: 13px;">Questions? Contact us at contact@acreprofit.com</p>
+                            </div>
+                        `
+                    });
+                }
+            } catch (emailErr) {
+                console.error('[invoice void] customer notification email failed (non-blocking):', emailErr.message);
+            }
+        }
+
+        res.json({
+            message: `Invoice ${invoice.invoiceNumber} voided`,
+            invoiceId: invoice._id,
+            customerNotified: Boolean(notifyCustomer && invoice.customerEmail)
+        });
+    } catch (error) {
+        console.error('[invoice void]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Card payments carry a 3.5% convenience fee passed through to the
 // customer as a separate line item. ACH has no surcharge. Rate is a
 // constant so the chooser page and the mint path can't drift.
@@ -13792,6 +13883,9 @@ async function ensureInvoiceCheckoutSession(invoice, method) {
     }
     if (invoice.paymentStatus === 'paid') {
         return { session: null, url: null, alreadyPaid: true };
+    }
+    if (invoice.status === 'voided') {
+        return { session: null, url: null, voided: true };
     }
     if (method !== 'ach' && method !== 'card') {
         throw new Error(`Invalid payment method: ${method}. Must be 'ach' or 'card'.`);
@@ -13881,9 +13975,12 @@ app.post('/api/admin/invoices/:id/checkout-session', authMiddleware, adminMiddle
             return res.status(404).json({ error: 'Invoice not found' });
         }
         const method = (req.body && req.body.method) || (req.query && req.query.method);
-        const { url, alreadyPaid } = await ensureInvoiceCheckoutSession(invoice, method);
+        const { url, alreadyPaid, voided } = await ensureInvoiceCheckoutSession(invoice, method);
         if (alreadyPaid) {
             return res.status(400).json({ error: 'Invoice is already paid' });
+        }
+        if (voided) {
+            return res.status(400).json({ error: 'Invoice has been voided' });
         }
         res.json({ checkoutUrl: url });
     } catch (err) {
@@ -13912,6 +14009,7 @@ app.get('/api/public/invoice/:id', async (req, res) => {
             totalWithCardSurcharge,
             surchargeRate: CARD_SURCHARGE_RATE,
             paymentStatus: invoice.paymentStatus,
+            status: invoice.status,
             stripeEnabled: !!stripe
         });
     } catch (err) {
@@ -13934,11 +14032,19 @@ app.get('/pay-invoice/:id', async (req, res) => {
         if (invoice.paymentStatus === 'paid') {
             return res.redirect(302, `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}&status=already-paid`);
         }
+        // Voided: bounce back to the chooser page, which renders a voided state
+        // from /api/public/invoice/:id instead of attempting to mint a session.
+        if (invoice.status === 'voided') {
+            return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
+        }
         const method = req.query.method;
         if (method !== 'ach' && method !== 'card') {
             return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
         }
-        const { url } = await ensureInvoiceCheckoutSession(invoice, method);
+        const { url, voided } = await ensureInvoiceCheckoutSession(invoice, method);
+        if (voided) {
+            return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
+        }
         return res.redirect(302, url);
     } catch (err) {
         console.error('[pay-invoice]', err.message);
