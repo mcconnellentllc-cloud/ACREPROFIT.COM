@@ -9846,6 +9846,53 @@ app.put('/api/admin/chemicals/:chemicalId/link-supplier/:supplierId', authMiddle
 // ---- CHEMICAL ORDER ROUTES ----
 
 // Create chemical order (customer)
+// PR-124: allowed rate units for program/order items. Anything not in this
+// set hits the 400 guard inside the route. Mirrors chemicals.html
+// calculateAmount accepted inputs. Add new units here + in
+// computeCanonicalAmount together.
+const ALLOWED_RATE_UNITS = new Set([
+    'fl oz/acre', 'oz/acre', 'pt/acre', 'qt/acre', 'lb/acre', 'gal/acre',
+    '% v/v', '%v/v', '%', 'lb/100gal'
+]);
+
+// PR-124: server-side volume calculator. Authoritative copy of the
+// chemicals.html calculateAmount math. Used to recompute order quantities
+// from rate/unit/acres/sprayVolume so stale-JS replay, tampered payloads,
+// and silent fall-through rateUnits can't push wrong volumes into
+// inventory reserve (the bug that made Hydrovant reserve 39 jugs for a
+// 1,926-acre order — see PR-124 / A-03).
+function computeCanonicalAmount(rate, rateUnit, acres, targetUnit, sprayVolume) {
+    const target = (targetUnit || 'gal').toLowerCase();
+    const unitNorm = (rateUnit || '').toLowerCase().replace(/\s+/g, '');
+    const gpa = sprayVolume || 10;
+
+    if (unitNorm === '%v/v' || unitNorm === '%') {
+        return acres * gpa * (rate / 100);
+    }
+    if (unitNorm === 'lb/100gal') {
+        return (acres * gpa / 100) * rate;
+    }
+
+    let totalNeeded = rate * acres;
+    if (target === 'gal' || target === 'gl') {
+        if (unitNorm.includes('floz') || unitNorm.startsWith('oz')) {
+            totalNeeded = totalNeeded / 128;
+        } else if (unitNorm.includes('pt')) {
+            totalNeeded = totalNeeded / 8;
+        } else if (unitNorm.includes('qt')) {
+            totalNeeded = totalNeeded / 4;
+        } else if (unitNorm === 'lb/acre') {
+            totalNeeded = totalNeeded / 10;
+        }
+        // gal/acre: no conversion
+    } else if (target === 'lb') {
+        if (unitNorm.startsWith('oz')) totalNeeded = totalNeeded / 16;
+    } else if (target === 'oz') {
+        if (unitNorm.includes('lb')) totalNeeded = totalNeeded * 16;
+    }
+    return totalNeeded;
+}
+
 app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
         const {
@@ -9931,6 +9978,52 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             const chemical = await Chemical.findById(item.chemicalId);
             if (!chemical) continue;
 
+            // PR-124: reject unknown rateUnits up front. Prevents silent
+            // fall-through (the '% v/v' / 'lb/100gal' bug family).
+            if (item.rateUnit && !ALLOWED_RATE_UNITS.has(item.rateUnit)) {
+                return res.status(400).json({
+                    error: `Unknown rateUnit "${item.rateUnit}" for product "${item.productName || chemical.productName}". ` +
+                           `Allowed: ${[...ALLOWED_RATE_UNITS].join(', ')}.`
+                });
+            }
+
+            // PR-124: recompute volume + quantity from authoritative inputs.
+            // Mirror of chemicals.html calculateAmount — never trust client
+            // values for inventory or charges.
+            const pkgSize = chemical.unitsPerPack || 1;
+            const itemAcres = item.acres || totalAcres || sprayParams?.acres || 0;
+            const serverAmount = item.rate && item.rateUnit && itemAcres
+                ? computeCanonicalAmount(
+                      item.rate, item.rateUnit, itemAcres,
+                      chemical.unit, sprayParams?.gallonsPerAcre
+                  )
+                : null;
+            const serverQuantity = serverAmount !== null
+                ? Math.ceil(serverAmount / pkgSize)
+                : item.quantity;
+
+            if (serverAmount !== null && item.calculatedAmount != null) {
+                const delta = Math.abs(serverAmount - item.calculatedAmount);
+                const deltaPct = item.calculatedAmount > 0
+                    ? (delta / item.calculatedAmount) * 100
+                    : 0;
+                if (deltaPct >= 5) {
+                    console.warn('[chemical-orders] volume mismatch', {
+                        userId: req.user._id.toString(),
+                        productName: chemical.productName,
+                        clientAmount: item.calculatedAmount,
+                        serverAmount: Math.round(serverAmount * 1000) / 1000,
+                        clientQuantity: item.quantity,
+                        serverQuantity,
+                        deltaPercent: Math.round(deltaPct * 100) / 100,
+                        rateUnit: item.rateUnit,
+                        rate: item.rate,
+                        acres: itemAcres,
+                        sprayVolume: sprayParams?.gallonsPerAcre || 10
+                    });
+                }
+            }
+
             // Determine base unit price from discount code
             let unitPrice = chemical.sellPrice;
             if (discountType === 'at_cost') {
@@ -9944,11 +10037,11 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
                 unitPrice = Math.max(chemical.costPrice || 0, unitPrice + applyMarginAdjust);
             }
 
-            const totalPrice = Math.round(item.quantity * unitPrice * 100) / 100;
+            const totalPrice = Math.round(serverQuantity * unitPrice * 100) / 100;
             subtotal += totalPrice;
 
             if (chemical.sellPrice) {
-                totalDiscount += (chemical.sellPrice - unitPrice) * item.quantity;
+                totalDiscount += (chemical.sellPrice - unitPrice) * serverQuantity;
             }
 
             orderItems.push({
@@ -9956,13 +10049,15 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
                 productName: chemical.productName,
                 packSize: chemical.packSize,
                 unit: chemical.unit,
-                quantity: item.quantity,
+                quantity: serverQuantity,
                 unitPrice,
                 totalPrice,
-                acres: item.acres,
+                acres: itemAcres,
                 rate: item.rate,
                 rateUnit: item.rateUnit,
-                calculatedAmount: item.calculatedAmount
+                calculatedAmount: serverAmount !== null
+                    ? Math.round(serverAmount * 1000) / 1000
+                    : item.calculatedAmount
             });
         }
 

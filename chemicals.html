@@ -1586,6 +1586,8 @@
         function calculateCropTotals() {
             const acres = parseFloat(document.getElementById('cropAcres').value) || 0;
             if (acres === 0) return;
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) ||
+                                parseFloat(document.getElementById('cropGPA')?.value) || 10;
 
             const resultsDiv = document.getElementById('cropCalculationResults');
             let hasResults = false;
@@ -1602,7 +1604,7 @@
                     const rateUnit = chem.rateUnit || 'oz/acre';
 
                     // Calculate total needed in base units
-                    let totalNeeded = calculateAmount(rate, rateUnit, acres, chem.unit);
+                    let totalNeeded = calculateAmount(rate, rateUnit, acres, chem.unit, sprayVolume);
 
                     const unitsPerPack = chem.unitsPerPack || 1;
                     const packages = Math.ceil(totalNeeded / unitsPerPack);
@@ -1678,34 +1680,46 @@
             }
         }
 
-        function calculateAmount(rate, rateUnit, acres, targetUnit) {
-            let totalNeeded = rate * acres;
+        function calculateAmount(rate, rateUnit, acres, targetUnit, sprayVolume = 10) {
             const target = (targetUnit || 'gal').toLowerCase();
-            const unit = (rateUnit || '').toLowerCase();
+            // Normalize: lowercase + strip spaces so '% v/v' and '%v/v' collapse.
+            const unitNorm = (rateUnit || '').toLowerCase().replace(/\s+/g, '');
 
-            // Convert to gallons (accept 'gal' or 'gl')
-            if (target === 'gal' || target === 'gl') {
-                if (unit.includes('fl oz') || unit === 'oz/acre' || unit.startsWith('oz')) {
-                    totalNeeded = totalNeeded / 128; // fl oz to gallons
-                } else if (unit.includes('pt')) {
-                    totalNeeded = totalNeeded / 8;
-                } else if (unit.includes('qt')) {
-                    totalNeeded = totalNeeded / 4;
-                } else if (unit.includes('lb')) {
-                    totalNeeded = totalNeeded / 10; // rough approx for liquid lb (varies)
-                }
-                // if already gal/acre, no conversion needed
+            // Water-volume-based rates. '% v/v' (Hydrovant, NIS) and 'lb/100gal'
+            // (AMS) scale with total water (acres × sprayVolume), not with acres
+            // alone. Missing these cases is the bug that made Hydrovant display
+            // 192.6 gal for 1,926 acres (should be 19.26 gal at 10 GPA).
+            if (unitNorm === '%v/v' || unitNorm === '%') {
+                return acres * sprayVolume * (rate / 100);
             }
-            // Convert to pounds
-            else if (target === 'lb') {
-                if (unit.startsWith('oz')) {
+            if (unitNorm === 'lb/100gal') {
+                return (acres * sprayVolume / 100) * rate;
+            }
+
+            // Per-acre rates — convert to target unit.
+            let totalNeeded = rate * acres;
+
+            if (target === 'gal' || target === 'gl') {
+                if (unitNorm.includes('floz') || unitNorm.startsWith('oz')) {
+                    totalNeeded = totalNeeded / 128; // fl oz / dry oz → gal
+                } else if (unitNorm.includes('pt')) {
+                    totalNeeded = totalNeeded / 8;
+                } else if (unitNorm.includes('qt')) {
+                    totalNeeded = totalNeeded / 4;
+                } else if (unitNorm === 'lb/acre') {
+                    totalNeeded = totalNeeded / 10; // liquid-lb rough approx
+                } else if (unitNorm === 'gal/acre') {
+                    // Explicit no-op: gal/acre already matches target.
+                } else {
+                    console.warn('[calculateAmount] unrecognized rateUnit for gal target:', rateUnit);
+                }
+            } else if (target === 'lb') {
+                if (unitNorm.startsWith('oz')) {
                     totalNeeded = totalNeeded / 16; // dry oz to lb
                 }
                 // if already lb/acre, no conversion
-            }
-            // Target is oz (for products sold in oz containers like Mivum)
-            else if (target === 'oz') {
-                if (unit.includes('lb')) {
+            } else if (target === 'oz') {
+                if (unitNorm.includes('lb')) {
                     totalNeeded = totalNeeded * 16; // lb to oz
                 }
                 // if already oz/acre, no conversion
@@ -2056,6 +2070,7 @@
 
         function updateChemicalTotals() {
             const acres = parseFloat(document.getElementById('programAcres').value) || 0;
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
 
             document.querySelectorAll('.rate-input').forEach(input => {
                 const productName = input.dataset.product;
@@ -2072,7 +2087,7 @@
 
                 if (chemInfo && acres > 0) {
                     const unit = chemInfo.unit || 'gl';
-                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit);
+                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit, sprayVolume);
                     const totalId = 'total-' + productName.replace(/[^a-zA-Z0-9]/g, '_');
                     const totalEl = document.getElementById(totalId);
                     if (totalEl) {
@@ -2382,7 +2397,7 @@
                     const priceMissing = !catalogMatch || !price;
 
                     // Calculate amount needed
-                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit);
+                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit, sprayVolume);
                     const packages = Math.ceil(totalNeeded / unitsPerPack);
                     const cost = packages * unitsPerPack * price;
 
@@ -2423,7 +2438,7 @@
                 customChemicals.filter(c => c.application === app.name).forEach(customChem => {
                     const unit = customChem.rateUnit.includes('gal') ? 'gl' :
                                 customChem.rateUnit.includes('lb') ? 'lb' : 'gl';
-                    const totalNeeded = calculateAmount(customChem.rate, customChem.rateUnit, acres, unit);
+                    const totalNeeded = calculateAmount(customChem.rate, customChem.rateUnit, acres, unit, sprayVolume);
 
                     sheetCustomChemicals.push({
                         name: customChem.productName,
@@ -3021,9 +3036,10 @@
 
         function copyBidSheetEmail() {
             const acres = parseFloat(document.getElementById('programAcres').value) || 0;
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
             const customChemList = Object.values(customChemicals.reduce((acc, c) => {
                 const unit = c.rateUnit.includes('gal') ? 'gl' : c.rateUnit.includes('lb') ? 'lb' : 'gl';
-                const totalNeeded = calculateAmount(c.rate, c.rateUnit, acres, unit);
+                const totalNeeded = calculateAmount(c.rate, c.rateUnit, acres, unit, sprayVolume);
                 const key = c.productName;
                 if (!acc[key]) {
                     acc[key] = { name: c.productName, totalNeeded: 0, packSize: c.packSize, unit };
@@ -3107,7 +3123,9 @@ Generated by AcreProfit.com`;
                     const chem = chemicals.find(c => c._id === chemId);
                     if (chem) {
                         const acres = parseFloat(document.getElementById('cropAcres').value) || 0;
-                        const totalNeeded = calculateAmount(rate, chem.rateUnit || 'oz/acre', acres, chem.unit);
+                        const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) ||
+                                            parseFloat(document.getElementById('cropGPA')?.value) || 10;
+                        const totalNeeded = calculateAmount(rate, chem.rateUnit || 'oz/acre', acres, chem.unit, sprayVolume);
                         const packages = Math.ceil(totalNeeded / (chem.unitsPerPack || 1));
                         addToOrder(chemId, packages, 'crop');
                     }
@@ -3200,6 +3218,7 @@ Generated by AcreProfit.com`;
                 preview.style.display = 'none';
                 return;
             }
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
 
             let originalTotal = 0;
             let adjustedTotal = 0;
@@ -3207,7 +3226,7 @@ Generated by AcreProfit.com`;
 
             selectedProgram.applications.forEach(app => {
                 app.chemicals.forEach(chemItem => {
-                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, chemItem.unit || 'gal');
+                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, chemItem.unit || 'gal', sprayVolume);
                     const packages = Math.ceil(totalNeeded / (chemItem.unitsPerPack || 250));
                     const catalogMatch = (window.allChemicalsForPricing || chemicals || []).find(c => {
                         const catalogName = (c.productName || c.name || '').toLowerCase().trim();
@@ -3335,10 +3354,11 @@ Generated by AcreProfit.com`;
                 return;
             }
 
+            const submitSprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
             const items = [];
             selectedProgram.applications.forEach(app => {
                 app.chemicals.forEach(chemItem => {
-                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, chemItem.unit || 'gal');
+                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, chemItem.unit || 'gal', submitSprayVolume);
 
                     // Look up chemicalId from loaded catalog so server can reserve inventory + calculate commissions
                     // Resolve the pack: farmer override wins, else algorithmic picker.
