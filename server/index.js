@@ -1321,6 +1321,7 @@ async function initializeCounters() {
 
         await seedOne(`chemicalOrder-${year}`, mongoose.model('ChemicalOrder'), 'orderNumber', `CO-${year}-`);
         await seedOne(`invoice-${year}`, mongoose.model('Invoice'), 'invoiceNumber', `INV-${year}-`);
+        await seedOne(`creditNote-${year}`, mongoose.model('CreditNote'), 'creditNoteNumber', `CN-${year}-`);
         await seedOne(`quoteRequest-${year}`, mongoose.model('QuoteRequest'), 'quoteNumber', `QR-${year}-`);
         await seedOne(`supplierBidSheet-${year}`, mongoose.model('SupplierBidSheet'), 'bidNumber', `BID-${year}-`);
     } catch (err) {
@@ -2192,6 +2193,9 @@ const invoiceSchema = new mongoose.Schema({
     // Payment tracking
     amountPaid: { type: Number, default: 0 },
     amountDue: Number,
+    // Sum of amounts on CreditNotes issued against this invoice. Denormalized
+    // for fast UI + report reads. Incremented by the credit note endpoint.
+    creditedAmount: { type: Number, default: 0 },
     paymentStatus: {
         type: String,
         enum: ['unpaid', 'partial', 'paid', 'refunded'],
@@ -2261,6 +2265,57 @@ invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ invoiceDate: -1 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
+
+// ============ CREDIT NOTE MODEL ============
+// Sibling ledger entry to Invoice. Invoice stays paid; CreditNote captures
+// the credit/refund as its own record. One Invoice → many CreditNotes.
+// Amount capped at (amountPaid - creditedAmount) by the endpoint so credits
+// can't exceed money actually received. Store credit against a future
+// invoice is out of scope v1.
+const creditNoteSchema = new mongoose.Schema({
+    creditNoteNumber: { type: String, unique: true }, // e.g., CN-2026-00001
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', required: true, index: true },
+    invoiceNumber: String, // denormalized for list views
+
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    customerName: String,
+    customerEmail: String,
+
+    amount: { type: Number, required: true, min: 0.01 },
+    reason: { type: String, required: true },
+
+    // 'stripe' calls stripe.refunds.create; 'record_only' is a ledger-only
+    // entry (check reversal, manual ACH, etc. handled out-of-band).
+    refundMode: { type: String, enum: ['stripe', 'record_only'], required: true },
+    status: {
+        type: String,
+        enum: ['issued', 'refund_pending', 'refund_completed', 'refund_failed', 'record_only'],
+        default: 'issued'
+    },
+
+    // Stripe refund tracking (populated when refundMode === 'stripe')
+    stripePaymentIntentId: String, // copied from invoice at issue time
+    stripeRefundId: { type: String, sparse: true, unique: true },
+    stripeRefundStatus: String, // Stripe's own status: pending/succeeded/failed/canceled
+    stripeFailureReason: String,
+    refundCompletedAt: Date,
+
+    // Customer notification
+    customerEmailSent: { type: Boolean, default: false },
+    customerEmailSentAt: Date,
+    customerEmailError: String,
+
+    // Audit
+    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    issuedByName: String,
+    issuedAt: { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+creditNoteSchema.index({ invoiceId: 1, createdAt: -1 });
+creditNoteSchema.index({ creditNoteNumber: 1 });
+
+const CreditNote = mongoose.model('CreditNote', creditNoteSchema);
 
 // ============ PROGRAM QUOTE MODEL ============
 // Snapshot of a spray program priced for a specific customer at a specific
@@ -2539,6 +2594,13 @@ async function generateInvoiceNumber() {
     const year = new Date().getFullYear();
     const seq = await nextSequence(`invoice-${year}`);
     return `INV-${year}-${String(seq).padStart(5, '0')}`;
+}
+
+// Helper: Generate credit note number (CN-YYYY-NNNNN)
+async function generateCreditNoteNumber() {
+    const year = new Date().getFullYear();
+    const seq = await nextSequence(`creditNote-${year}`);
+    return `CN-${year}-${String(seq).padStart(5, '0')}`;
 }
 
 // Helper: Generate program-quote number. Same atomic sequence pattern as
@@ -7102,6 +7164,10 @@ async function dispatchStripeEvent(event) {
             return await handleChargeSucceeded(event);
         case 'checkout.session.completed':
             return await handleCheckoutSessionCompleted(event);
+        case 'charge.refunded':
+            return await handleChargeRefunded(event);
+        case 'charge.refund.updated':
+            return await handleChargeRefundUpdated(event);
         default:
             console.log(`[stripe webhook] unhandled event type ${event.type} (${event.id})`);
     }
@@ -7331,6 +7397,90 @@ async function handleCheckoutSessionCompleted(event) {
     } catch (emailErr) {
         console.error('Failed to send admin payment notification:', emailErr.message);
     }
+}
+
+// Stripe refund webhook handlers. The refund is created synchronously when
+// the admin issues a stripe-mode CreditNote (stripe.refunds.create returns
+// the refund ID immediately and we store it on the CreditNote). These
+// handlers flip CreditNote status as the refund settles. ACH refunds stay
+// in 'refund_pending' for 5-7 business days; card refunds typically
+// complete within minutes.
+async function applyRefundToCreditNote(refund, fallbackAction) {
+    if (!refund || !refund.id) return;
+    const creditNote = await CreditNote.findOne({ stripeRefundId: refund.id });
+    if (!creditNote) {
+        console.log(`[stripe webhook] no CreditNote for refund ${refund.id} - ignoring`);
+        return;
+    }
+    // Idempotency: if we already recorded terminal state, don't re-process.
+    if (creditNote.status === 'refund_completed' || creditNote.status === 'refund_failed') {
+        return;
+    }
+
+    creditNote.stripeRefundStatus = refund.status;
+
+    if (refund.status === 'succeeded') {
+        creditNote.status = 'refund_completed';
+        creditNote.refundCompletedAt = new Date();
+        await creditNote.save();
+        await logAudit({
+            action: 'credit_note_refund_completed',
+            entityType: 'CreditNote',
+            entityId: creditNote._id,
+            entityRef: creditNote.creditNoteNumber,
+            amount: creditNote.amount,
+            after: { status: 'refund_completed', stripeRefundStatus: refund.status }
+        });
+    } else if (refund.status === 'failed' || refund.status === 'canceled') {
+        creditNote.status = 'refund_failed';
+        creditNote.stripeFailureReason = refund.failure_reason || refund.status;
+        await creditNote.save();
+        await logAudit({
+            action: 'credit_note_refund_failed',
+            entityType: 'CreditNote',
+            entityId: creditNote._id,
+            entityRef: creditNote.creditNoteNumber,
+            amount: creditNote.amount,
+            reason: refund.failure_reason || refund.status,
+            after: { status: 'refund_failed', stripeRefundStatus: refund.status }
+        });
+        // Refund failed → roll back invoice.creditedAmount so admin can retry
+        // with a different refund mode. The CreditNote record is preserved
+        // for audit but its amount no longer counts against the invoice.
+        try {
+            await Invoice.updateOne(
+                { _id: creditNote.invoiceId },
+                { $inc: { creditedAmount: -creditNote.amount } }
+            );
+        } catch (rollbackErr) {
+            console.error(`[stripe webhook] invoice creditedAmount rollback failed for CN ${creditNote.creditNoteNumber}:`, rollbackErr.message);
+        }
+    } else {
+        // Intermediate state (pending, requires_action) — just persist latest
+        // stripeRefundStatus without changing our internal status.
+        await creditNote.save();
+    }
+}
+
+async function handleChargeRefunded(event) {
+    const charge = event.data.object;
+    // charge.refunds.data is the list of refunds on this charge. The newest
+    // one is typically the trigger for this event.
+    const refunds = charge.refunds?.data || [];
+    if (!refunds.length) {
+        console.log(`[stripe webhook] charge.refunded with no refunds on charge ${charge.id} - ignoring`);
+        return;
+    }
+    for (const refund of refunds) {
+        await applyRefundToCreditNote(refund, 'charge.refunded');
+    }
+}
+
+async function handleChargeRefundUpdated(event) {
+    // charge.refund.updated fires as ACH refunds transition pending →
+    // succeeded/failed. event.data.object is the Refund itself.
+    const refund = event.data.object;
+    await applyRefundToCreditNote(refund, 'charge.refund.updated');
 }
 
 // Update representative's check payment info
@@ -13870,6 +14020,190 @@ app.post('/api/admin/invoices/:id/void', authMiddleware, adminMiddleware, async 
     }
 });
 
+// Issue a Credit Note against a paid invoice. Invoice stays paid; CreditNote
+// is a sibling ledger entry. Amount capped server-side at the remaining
+// uncredited balance so credits can never exceed money received. Stripe
+// refund mode calls stripe.refunds.create synchronously; webhook flips
+// CreditNote status on settlement. Record-only mode is terminal on issue.
+app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (invoice.status === 'voided') {
+            return res.status(400).json({ error: 'Cannot issue a credit note against a voided invoice' });
+        }
+        if (invoice.paymentStatus !== 'paid') {
+            return res.status(400).json({ error: 'Credit notes can only be issued against paid invoices' });
+        }
+
+        const amount = Number(req.body?.amount);
+        const reason = (typeof req.body?.reason === 'string') ? req.body.reason.trim() : '';
+        const refundMode = req.body?.refundMode;
+        const notifyCustomer = req.body?.notifyCustomer !== false; // default true
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Amount must be a positive number' });
+        }
+        if (!reason) {
+            return res.status(400).json({ error: 'Reason is required' });
+        }
+        if (refundMode !== 'stripe' && refundMode !== 'record_only') {
+            return res.status(400).json({ error: "refundMode must be 'stripe' or 'record_only'" });
+        }
+
+        const amountPaid = Number(invoice.amountPaid || 0);
+        const alreadyCredited = Number(invoice.creditedAmount || 0);
+        const remaining = Math.round((amountPaid - alreadyCredited) * 100) / 100;
+        const roundedAmount = Math.round(amount * 100) / 100;
+        if (roundedAmount > remaining) {
+            return res.status(400).json({
+                error: `Credit amount $${roundedAmount.toFixed(2)} exceeds remaining uncredited balance $${remaining.toFixed(2)}`
+            });
+        }
+
+        if (refundMode === 'stripe') {
+            if (!stripe) {
+                return res.status(400).json({ error: 'Stripe not configured — use record_only mode' });
+            }
+            if (!invoice.stripePaymentIntentId) {
+                return res.status(400).json({ error: 'No Stripe payment intent on invoice — use record_only mode' });
+            }
+        }
+
+        const creditNoteNumber = await generateCreditNoteNumber();
+        const creditNote = new CreditNote({
+            creditNoteNumber,
+            invoiceId: invoice._id,
+            invoiceNumber: invoice.invoiceNumber,
+            customerId: invoice.customerId,
+            customerName: invoice.customerName,
+            customerEmail: invoice.customerEmail,
+            amount: roundedAmount,
+            reason,
+            refundMode,
+            status: refundMode === 'record_only' ? 'record_only' : 'issued',
+            stripePaymentIntentId: invoice.stripePaymentIntentId,
+            issuedBy: req.user._id,
+            issuedByName: req.user.name
+        });
+
+        if (refundMode === 'stripe') {
+            try {
+                const refund = await stripe.refunds.create({
+                    payment_intent: invoice.stripePaymentIntentId,
+                    amount: Math.round(roundedAmount * 100),
+                    metadata: {
+                        creditNoteNumber,
+                        invoiceId: String(invoice._id),
+                        invoiceNumber: invoice.invoiceNumber || ''
+                    }
+                });
+                creditNote.stripeRefundId = refund.id;
+                creditNote.stripeRefundStatus = refund.status;
+                // ACH refunds return status='pending'; card usually 'succeeded' or 'pending'.
+                if (refund.status === 'succeeded') {
+                    creditNote.status = 'refund_completed';
+                    creditNote.refundCompletedAt = new Date();
+                } else {
+                    creditNote.status = 'refund_pending';
+                }
+            } catch (stripeErr) {
+                console.error('[credit note] stripe.refunds.create failed:', stripeErr.message);
+                return res.status(502).json({ error: `Stripe refund failed: ${stripeErr.message}` });
+            }
+        }
+
+        await creditNote.save();
+
+        // Increment invoice.creditedAmount. If cumulative credits reach the
+        // full amountPaid, flip paymentStatus to 'refunded' so filters/reports
+        // can surface fully-refunded invoices.
+        invoice.creditedAmount = Math.round((alreadyCredited + roundedAmount) * 100) / 100;
+        if (invoice.creditedAmount >= amountPaid - 0.005) {
+            invoice.paymentStatus = 'refunded';
+        }
+        invoice.updatedAt = new Date();
+        await invoice.save();
+
+        await logAudit({
+            action: 'credit_note_issued',
+            req,
+            entityType: 'CreditNote',
+            entityId: creditNote._id,
+            entityRef: creditNoteNumber,
+            amount: roundedAmount,
+            before: { invoiceCreditedAmount: alreadyCredited, invoicePaymentStatus: invoice.paymentStatus === 'refunded' ? 'paid' : invoice.paymentStatus },
+            after: { invoiceCreditedAmount: invoice.creditedAmount, creditNoteStatus: creditNote.status, refundMode },
+            reason
+        });
+
+        if (notifyCustomer && invoice.customerEmail) {
+            try {
+                const transporter = createEmailTransporter();
+                if (transporter) {
+                    const settlementNote = refundMode === 'stripe'
+                        ? (invoice.paymentMethod === 'stripe_ach'
+                            ? '<p>Funds will return to your bank account via ACH in 5–7 business days.</p>'
+                            : '<p>Funds will return to your card in 5–10 business days, depending on your bank.</p>')
+                        : '<p>Your representative will coordinate the refund with you directly.</p>';
+                    const safeReason = reason.replace(/[<>]/g, '');
+                    await transporter.sendMail({
+                        from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                        to: invoice.customerEmail,
+                        subject: `Credit issued on invoice ${invoice.invoiceNumber}`,
+                        html: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                                <h2 style="color: #2d5a27;">Credit Note Issued</h2>
+                                <p>Hello ${invoice.customerName || 'there'},</p>
+                                <p>A credit of <strong>$${roundedAmount.toFixed(2)}</strong> has been issued against invoice <strong>${invoice.invoiceNumber}</strong>.</p>
+                                <p><strong>Credit note:</strong> ${creditNoteNumber}<br>
+                                <strong>Reason:</strong> ${safeReason}</p>
+                                ${settlementNote}
+                                <p style="margin-top: 24px; color: #666; font-size: 13px;">Questions? Reply to this email or contact us at contact@acreprofit.com</p>
+                            </div>
+                        `
+                    });
+                    creditNote.customerEmailSent = true;
+                    creditNote.customerEmailSentAt = new Date();
+                    await creditNote.save();
+                }
+            } catch (emailErr) {
+                console.error('[credit note] customer email failed:', emailErr.message);
+                creditNote.customerEmailError = emailErr.message;
+                await creditNote.save();
+            }
+        }
+
+        res.json({
+            message: `Credit note ${creditNoteNumber} issued for $${roundedAmount.toFixed(2)}`,
+            creditNoteId: creditNote._id,
+            creditNoteNumber,
+            status: creditNote.status,
+            invoiceCreditedAmount: invoice.creditedAmount,
+            invoicePaymentStatus: invoice.paymentStatus,
+            customerNotified: Boolean(notifyCustomer && invoice.customerEmail && creditNote.customerEmailSent)
+        });
+    } catch (error) {
+        console.error('[credit note issue]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// List credit notes for an invoice (admin-only).
+app.get('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const notes = await CreditNote.find({ invoiceId: req.params.id })
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json({ creditNotes: notes });
+    } catch (error) {
+        console.error('[credit note list]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Card payments carry a 3.5% convenience fee passed through to the
 // customer as a separate line item. ACH has no surcharge. Rate is a
 // constant so the chooser page and the mint path can't drift.
@@ -13889,7 +14223,7 @@ async function ensureInvoiceCheckoutSession(invoice, method) {
     if (!invoice) {
         throw new Error('Invoice required');
     }
-    if (invoice.paymentStatus === 'paid') {
+    if (invoice.paymentStatus === 'paid' || invoice.paymentStatus === 'refunded') {
         return { session: null, url: null, alreadyPaid: true };
     }
     if (invoice.status === 'voided') {
@@ -14037,7 +14371,7 @@ app.get('/pay-invoice/:id', async (req, res) => {
             return res.status(404).send('Invoice not found');
         }
         const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
-        if (invoice.paymentStatus === 'paid') {
+        if (invoice.paymentStatus === 'paid' || invoice.paymentStatus === 'refunded') {
             return res.redirect(302, `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}&status=already-paid`);
         }
         // Voided: bounce back to the chooser page, which renders a voided state
