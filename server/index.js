@@ -5399,6 +5399,26 @@ function normalizeListOrder(doc, source) {
             o.totalCost = o.total || 0;
         }
     }
+    // Project a unified items[] shape so my-orders.html (and any other
+    // consumer of findOrdersInBothCollections) can render both collections
+    // with one template. Legacy Order stores line items in `chemicals[]`;
+    // ChemicalOrder already stores them in `items[]`.
+    // V1 scope: chemicals[] only. seeds[] and pivotBio[] deferred — self-
+    // serve calculator path doesn't populate them; add on demand.
+    if (source === 'legacy' && !Array.isArray(o.items)) {
+        o.items = (o.chemicals || []).map(c => ({
+            productName: c.name,
+            quantity: c.packagesNeeded,
+            unit: c.packageUnit || 'units',
+            totalPrice: c.totalPrice
+        }));
+    }
+    // Unified total field. Fixes a latent my-orders.html bug where
+    // `order.totalAmount` was read but existed on neither collection —
+    // the template only worked via the items.reduce() fallback.
+    if (o.totalAmount === undefined || o.totalAmount === null) {
+        o.totalAmount = o.totalCost || o.total || 0;
+    }
     o._sourceCollection = source;
     return o;
 }
@@ -10350,8 +10370,12 @@ app.get('/api/stripe/config', (req, res) => {
 // Get customer's chemical orders
 app.get('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
-        const orders = await ChemicalOrder.find({ userId: req.user._id })
-            .sort({ createdAt: -1 });
+        // Returns orders from BOTH collections (legacy Order + ChemicalOrder),
+        // scoped to this user. Before this unification, customers' legacy
+        // orders from the calculator submit path were invisible on my-orders.html.
+        // Route name kept for backward compatibility; proper rename deferred
+        // to a future cleanup PR with a redirect.
+        const { orders } = await findOrdersInBothCollections({ userId: req.user._id });
         res.json(orders);
     } catch (error) {
         res.status(400).json({ error: error.message });
