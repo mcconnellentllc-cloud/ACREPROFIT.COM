@@ -23,6 +23,9 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
+const mainchemRouter = require('./routes/admin/mainchem');
+const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
+
 // File upload handling
 let multer;
 try {
@@ -4239,6 +4242,11 @@ const supplierMiddleware = async (req, res, next) => {
     }
     next();
 };
+
+// Mount MAINCHEM admin router with scope-specific prefix. Narrow prefix keeps
+// superAdminMiddleware gate off the 38 inline /api/admin/* routes that rely
+// on the permissive adminMiddleware (admin/distributor/superadmin).
+app.use('/api/admin/mainchem', authMiddleware, superAdminMiddleware, mainchemRouter);
 
 // ============ ROUTES ============
 
@@ -9893,7 +9901,7 @@ function computeCanonicalAmount(rate, rateUnit, acres, targetUnit, sprayVolume) 
     return totalNeeded;
 }
 
-app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
+app.post('/api/chemical-orders', authMiddleware, rejectPendingChemicalOrders, async (req, res) => {
     try {
         const {
             items,
