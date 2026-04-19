@@ -60,6 +60,7 @@
                     <a href="/distributor-invoices.html" class="admin-tab" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">Invoicing</a>
                     <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
                     <a href="#price-mining" class="admin-tab" data-tab="price-mining" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">Price Mining</a>
+                    <span id="programsNav" style="display: none;"><a href="#programs" class="admin-tab" data-tab="programs" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white;">Programs</a></span>
 
                     <!-- AcreProfit Business Dropdown -->
                     <div class="admin-tab-dropdown">
@@ -3282,6 +3283,119 @@
                 </div>
             </div>
 
+            <!-- Programs Tab (superadmin only) -->
+            <div id="programsTab" class="tab-content">
+                <div class="tab-header">
+                    <div>
+                        <h2>Spray Programs</h2>
+                        <p class="tab-subtitle">Manage public suggestion programs shown to customers in the Build-a-Recipe flow.</p>
+                    </div>
+                    <button class="btn btn-primary" onclick="openProgramEditor()">+ New Program</button>
+                </div>
+
+                <div class="orders-table-wrapper" style="margin-top: 16px;">
+                    <table class="admin-table" id="programsTable">
+                        <thead>
+                            <tr>
+                                <th>Name</th>
+                                <th>Crop</th>
+                                <th>Tier</th>
+                                <th>Type</th>
+                                <th>Public</th>
+                                <th>Passes</th>
+                                <th>Active</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="programsTableBody">
+                            <tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">Loading programs...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Program Editor Modal -->
+                <div class="modal-overlay" id="programEditorModal" style="display:none;">
+                    <div class="modal-content" style="max-width: 920px; max-height: 92vh; overflow-y: auto;">
+                        <button class="modal-close" onclick="closeProgramEditor()">&times;</button>
+                        <h2 id="programEditorTitle" style="margin-bottom: 16px;">New Program</h2>
+                        <input type="hidden" id="programEditId">
+
+                        <div style="display:grid; grid-template-columns:2fr 1fr 1fr; gap:12px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Name *</label>
+                                <input type="text" id="programName" placeholder="Corn Dryland Standard" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Crop *</label>
+                                <input type="text" id="programCrop" placeholder="corn" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Tier</label>
+                                <select id="programTier" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                                    <option value="">—</option>
+                                    <option value="standard">Standard</option>
+                                    <option value="heavy">Heavy</option>
+                                    <option value="rotation">Rotation</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; margin-top:12px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Round Number</label>
+                                <input type="number" id="programRound" min="1" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Type</label>
+                                <select id="programType" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                                    <option value="suggestion">Suggestion</option>
+                                    <option value="template">Template</option>
+                                    <option value="custom">Custom</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Visibility</label>
+                                <label style="display:flex; align-items:center; gap:6px; padding:10px;"><input type="checkbox" id="programIsPublic"> Public</label>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Description</label>
+                            <textarea id="programDescription" rows="2" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);"></textarea>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-top:12px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Rotation Notes</label>
+                                <textarea id="programRotationNotes" rows="2" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);"></textarea>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:4px;">Grazing Notes</label>
+                                <textarea id="programGrazingNotes" rows="2" style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);"></textarea>
+                            </div>
+                        </div>
+
+                        <div style="margin-top:12px;">
+                            <label style="display:block; font-weight:600; margin-bottom:4px;">Ground Type</label>
+                            <input type="text" id="programGroundType" placeholder="Heavy soils, well-drained..." style="width:100%; padding:10px; border:2px solid var(--border); border-radius:var(--radius);">
+                        </div>
+
+                        <hr style="margin: 20px 0; border: none; border-top: 2px solid var(--border);">
+
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="margin:0;">Passes</h3>
+                            <button class="btn btn-outline" onclick="addPass()">+ Add Pass</button>
+                        </div>
+                        <div id="programPassesContainer"></div>
+
+                        <div class="customer-modal-actions" style="margin-top: 20px;">
+                            <button class="btn btn-outline" onclick="closeProgramEditor()">Cancel</button>
+                            <button class="btn btn-primary" onclick="saveProgram()">Save Program</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
         </div>
     </main>
 
@@ -3328,6 +3442,7 @@
             setDisplay('distributorsNav', 'block');
             setDisplay('suppliersNavTop', 'block');
             setDisplay('complianceNav', 'block');
+            setDisplay('programsNav', 'inline');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
@@ -11055,6 +11170,302 @@
 
         // Load inventory when inventory tab is clicked
         document.querySelector('[data-tab="inventory"]')?.addEventListener('click', loadInventory);
+
+        // ============ SPRAY PROGRAMS ADMIN (superadmin only) ============
+        // Uses /api/admin/spray-programs CRUD endpoints. Writes passes[]
+        // (v2 canonical); server pre-save hook mirrors to applications[]
+        // for existing frontend readers in chemicals.html + calculator.html.
+        let programsApprovedChemicals = [];
+
+        async function loadAdminPrograms() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/spray-programs`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                renderProgramsTable(data.programs || []);
+            } catch (err) {
+                console.error('loadAdminPrograms failed:', err);
+                document.getElementById('programsTableBody').innerHTML =
+                    `<tr><td colspan="8" style="text-align:center; padding:24px; color:#dc2626;">Failed to load programs: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderProgramsTable(programs) {
+            const body = document.getElementById('programsTableBody');
+            if (!programs.length) {
+                body.innerHTML = `<tr><td colspan="8" style="text-align:center; padding:24px; color:var(--text-muted);">No programs yet. Click "New Program" to create one.</td></tr>`;
+                return;
+            }
+            body.innerHTML = programs.map(p => {
+                const passCount = (p.passes?.length) || (p.applications?.length) || 0;
+                const active = (p.active !== false && p.isActive !== false);
+                return `
+                    <tr>
+                        <td><strong>${escapeHtml(p.name)}</strong></td>
+                        <td>${escapeHtml(p.crop || '')}</td>
+                        <td>${escapeHtml(p.tier || '—')}</td>
+                        <td>${escapeHtml(p.type || '—')}</td>
+                        <td>${p.isPublic ? 'Yes' : 'No'}</td>
+                        <td>${passCount}</td>
+                        <td>${active ? '<span style="color:#059669;">Active</span>' : '<span style="color:#dc2626;">Inactive</span>'}</td>
+                        <td>
+                            <button class="btn btn-outline" style="padding:6px 12px; font-size:13px;" onclick="openProgramEditor('${p._id}')">Edit</button>
+                            <button class="btn btn-outline" style="padding:6px 12px; font-size:13px; border-color:#dc2626; color:#dc2626;" onclick="deleteProgram('${p._id}', '${escapeHtml(p.name).replace(/'/g, '')}')">Delete</button>
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+        }
+
+        async function loadApprovedChemicalsForPicker() {
+            if (programsApprovedChemicals.length) return programsApprovedChemicals;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/spray-programs/_chemicals`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                programsApprovedChemicals = data.chemicals || [];
+                return programsApprovedChemicals;
+            } catch (err) {
+                console.error('loadApprovedChemicalsForPicker failed:', err);
+                return [];
+            }
+        }
+
+        async function openProgramEditor(programId) {
+            await loadApprovedChemicalsForPicker();
+            document.getElementById('programEditId').value = programId || '';
+            document.getElementById('programEditorTitle').textContent = programId ? 'Edit Program' : 'New Program';
+
+            if (programId) {
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/spray-programs/${programId}`, {
+                        headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                    });
+                    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                    const p = await res.json();
+                    document.getElementById('programName').value = p.name || '';
+                    document.getElementById('programCrop').value = p.crop || '';
+                    document.getElementById('programTier').value = p.tier || '';
+                    document.getElementById('programRound').value = p.roundNumber || '';
+                    document.getElementById('programType').value = p.type || 'suggestion';
+                    document.getElementById('programIsPublic').checked = !!p.isPublic;
+                    document.getElementById('programDescription').value = p.description || '';
+                    document.getElementById('programRotationNotes').value = p.rotationNotes || p.rotationRestrictions || '';
+                    document.getElementById('programGrazingNotes').value = p.grazingNotes || p.grazingRestrictions || '';
+                    document.getElementById('programGroundType').value = p.groundType || '';
+                    // Prefer passes[] (v2); fall back to applications[] for legacy docs.
+                    const passes = (p.passes?.length ? p.passes : (p.applications || []).map((a, i) => ({
+                        passNumber: i + 1, name: a.name, timing: a.timing, chemicals: a.chemicals || []
+                    })));
+                    renderPasses(passes);
+                } catch (err) {
+                    alert('Failed to load program: ' + err.message);
+                    return;
+                }
+            } else {
+                document.getElementById('programName').value = '';
+                document.getElementById('programCrop').value = '';
+                document.getElementById('programTier').value = '';
+                document.getElementById('programRound').value = '';
+                document.getElementById('programType').value = 'suggestion';
+                document.getElementById('programIsPublic').checked = false;
+                document.getElementById('programDescription').value = '';
+                document.getElementById('programRotationNotes').value = '';
+                document.getElementById('programGrazingNotes').value = '';
+                document.getElementById('programGroundType').value = '';
+                renderPasses([]);
+            }
+
+            document.getElementById('programEditorModal').style.display = 'flex';
+        }
+
+        function closeProgramEditor() {
+            document.getElementById('programEditorModal').style.display = 'none';
+        }
+
+        function renderPasses(passes) {
+            const container = document.getElementById('programPassesContainer');
+            container.innerHTML = '';
+            (passes || []).forEach((pass, i) => {
+                container.appendChild(buildPassRow(pass, i));
+            });
+        }
+
+        function addPass() {
+            const container = document.getElementById('programPassesContainer');
+            const i = container.children.length;
+            container.appendChild(buildPassRow({ passNumber: i + 1, name: '', timing: '', chemicals: [] }, i));
+        }
+
+        function buildPassRow(pass, idx) {
+            const div = document.createElement('div');
+            div.className = 'program-pass-row';
+            div.dataset.passIndex = idx;
+            div.style.cssText = 'border:2px solid var(--border); border-radius:var(--radius); padding:12px; margin-bottom:12px; background:#fafafa;';
+            div.innerHTML = `
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+                    <strong>Pass ${idx + 1}</strong>
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-color:#dc2626; color:#dc2626;" onclick="removePass(${idx})">Remove</button>
+                </div>
+                <div style="display:grid; grid-template-columns:2fr 2fr 1fr; gap:8px;">
+                    <input type="text" class="pass-name" placeholder="Pass name (e.g. Burndown)" value="${escapeHtml(pass.name || '')}" style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+                    <input type="text" class="pass-timing" placeholder="Timing (e.g. Pre-plant)" value="${escapeHtml(pass.timing || '')}" style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+                    <input type="number" class="pass-number" placeholder="#" min="1" value="${pass.passNumber || idx + 1}" style="padding:8px; border:1px solid var(--border); border-radius:4px;">
+                </div>
+                <div class="pass-chemicals" style="margin-top:10px;"></div>
+                <button class="btn btn-outline" style="padding:4px 10px; font-size:12px; margin-top:6px;" onclick="addChemicalRow(${idx})">+ Chemical</button>
+            `;
+            setTimeout(() => {
+                const chemsDiv = div.querySelector('.pass-chemicals');
+                (pass.chemicals || []).forEach(c => chemsDiv.appendChild(buildChemicalRow(c)));
+            }, 0);
+            return div;
+        }
+
+        function removePass(idx) {
+            const container = document.getElementById('programPassesContainer');
+            const row = container.querySelector(`[data-pass-index="${idx}"]`);
+            if (row) row.remove();
+            // Renumber remaining rows so indices stay contiguous.
+            Array.from(container.children).forEach((row, i) => {
+                row.dataset.passIndex = i;
+                const strong = row.querySelector('strong');
+                if (strong) strong.textContent = `Pass ${i + 1}`;
+                row.querySelectorAll('button').forEach(btn => {
+                    if (btn.textContent.trim() === 'Remove') btn.setAttribute('onclick', `removePass(${i})`);
+                    if (btn.textContent.trim() === '+ Chemical') btn.setAttribute('onclick', `addChemicalRow(${i})`);
+                });
+            });
+        }
+
+        function addChemicalRow(passIdx) {
+            const row = document.querySelector(`.program-pass-row[data-pass-index="${passIdx}"] .pass-chemicals`);
+            if (row) row.appendChild(buildChemicalRow({}));
+        }
+
+        function buildChemicalRow(c) {
+            const div = document.createElement('div');
+            div.className = 'chem-row';
+            div.style.cssText = 'display:grid; grid-template-columns:3fr 1fr 1fr auto; gap:6px; margin-bottom:6px; align-items:center;';
+
+            const options = programsApprovedChemicals.map(x => {
+                const selected = String(x._id) === String(c.chemicalId) ? 'selected' : '';
+                return `<option value="${x._id}" data-name="${escapeHtml(x.productName || x.tradeName || '')}" ${selected}>${escapeHtml(x.productName || x.tradeName || '(unnamed)')}${x.manufacturer ? ' — ' + escapeHtml(x.manufacturer) : ''}</option>`;
+            }).join('');
+
+            div.innerHTML = `
+                <select class="chem-id" style="padding:6px; border:1px solid var(--border); border-radius:4px;">
+                    <option value="">Select chemical…</option>
+                    ${options}
+                </select>
+                <input type="number" class="chem-rate" step="0.01" min="0" placeholder="Rate" value="${c.rate ?? c.suggestedRate ?? ''}" style="padding:6px; border:1px solid var(--border); border-radius:4px;">
+                <input type="text" class="chem-unit" placeholder="oz/acre" value="${escapeHtml(c.rateUnit || c.unit || '')}" style="padding:6px; border:1px solid var(--border); border-radius:4px;">
+                <button class="btn btn-outline" style="padding:4px 8px; font-size:11px; border-color:#dc2626; color:#dc2626;" onclick="this.parentElement.remove()">×</button>
+            `;
+            return div;
+        }
+
+        function collectPassesFromDom() {
+            const rows = document.querySelectorAll('#programPassesContainer .program-pass-row');
+            const passes = [];
+            rows.forEach((row, idx) => {
+                const chems = [];
+                row.querySelectorAll('.chem-row').forEach(cr => {
+                    const sel = cr.querySelector('.chem-id');
+                    const chemicalId = sel.value || null;
+                    const productName = sel.selectedOptions[0]?.dataset.name || null;
+                    const rate = parseFloat(cr.querySelector('.chem-rate').value) || null;
+                    const rateUnit = cr.querySelector('.chem-unit').value.trim() || null;
+                    if (!chemicalId && !productName) return;
+                    chems.push({ chemicalId, productName, rate, rateUnit });
+                });
+                passes.push({
+                    passNumber: parseInt(row.querySelector('.pass-number').value, 10) || idx + 1,
+                    name: row.querySelector('.pass-name').value.trim(),
+                    timing: row.querySelector('.pass-timing').value.trim(),
+                    chemicals: chems,
+                });
+            });
+            return passes;
+        }
+
+        async function saveProgram() {
+            const id = document.getElementById('programEditId').value;
+            const name = document.getElementById('programName').value.trim();
+            const crop = document.getElementById('programCrop').value.trim();
+            if (!name || !crop) {
+                alert('Name and crop are required.');
+                return;
+            }
+            const body = {
+                name,
+                crop,
+                tier: document.getElementById('programTier').value || null,
+                roundNumber: parseInt(document.getElementById('programRound').value, 10) || null,
+                type: document.getElementById('programType').value,
+                isPublic: document.getElementById('programIsPublic').checked,
+                description: document.getElementById('programDescription').value,
+                rotationNotes: document.getElementById('programRotationNotes').value,
+                grazingNotes: document.getElementById('programGrazingNotes').value,
+                groundType: document.getElementById('programGroundType').value,
+                passes: collectPassesFromDom(),
+            };
+
+            try {
+                const url = id
+                    ? `${API_URL}/api/admin/spray-programs/${id}`
+                    : `${API_URL}/api/admin/spray-programs`;
+                const res = await fetch(url, {
+                    method: id ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    },
+                    body: JSON.stringify(body),
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                closeProgramEditor();
+                loadAdminPrograms();
+            } catch (err) {
+                alert('Save failed: ' + err.message);
+            }
+        }
+
+        async function deleteProgram(id, name) {
+            if (!confirm(`Delete program "${name}"? This cannot be undone.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/spray-programs/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                });
+                if (!res.ok) {
+                    const err = await res.json().catch(() => ({}));
+                    throw new Error(err.error || `HTTP ${res.status}`);
+                }
+                loadAdminPrograms();
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        function escapeHtml(s) {
+            if (s == null) return '';
+            return String(s)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        document.querySelector('[data-tab="programs"]')?.addEventListener('click', loadAdminPrograms);
     </script>
 
     <style>
