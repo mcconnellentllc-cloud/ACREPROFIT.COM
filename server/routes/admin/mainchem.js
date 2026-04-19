@@ -23,11 +23,11 @@ const ChemicalImportLog = require('../../models/ChemicalImportLog');
 
 const router = express.Router();
 
-// Assumes requireSuperadmin middleware is applied upstream at mount point:
-//   app.use('/api/admin', authMiddleware, superAdminMiddleware, adminRouter);
-// which matches the existing pattern for admin routes in server/index.js.
+// Mounted at /api/admin/mainchem in server/index.js with authMiddleware +
+// superAdminMiddleware. Scope-specific prefix avoids gating the 38 inline
+// /api/admin/* routes that use the permissive adminMiddleware.
 
-router.post('/mainchem/import', async (req, res) => {
+router.post('/import', async (req, res) => {
   const sourceFile = 'mainchem-source.json';
   const sourcePath = path.join(__dirname, '..', '..', 'seed', sourceFile);
 
@@ -134,7 +134,7 @@ router.post('/mainchem/import', async (req, res) => {
 // GET /api/admin/mainchem/logs — list historical import runs
 // ?count=true returns just { totalLogs, unresolvedSkips } for the admin nav
 // badge — avoids shipping the full skippedRows payload on every nav render.
-router.get('/mainchem/logs', async (req, res) => {
+router.get('/logs', async (req, res) => {
   if (req.query.count === 'true') {
     const totalLogs = await ChemicalImportLog.countDocuments({});
     const agg = await ChemicalImportLog.aggregate([
@@ -157,7 +157,7 @@ router.get('/mainchem/logs', async (req, res) => {
 });
 
 // GET /api/admin/mainchem/logs/:id — full detail with skipped rows
-router.get('/mainchem/logs/:id', async (req, res) => {
+router.get('/logs/:id', async (req, res) => {
   const log = await ChemicalImportLog.findById(req.params.id).lean();
   if (!log) return res.status(404).json({ ok: false, error: 'log not found' });
   res.json({ ok: true, log });
@@ -166,7 +166,7 @@ router.get('/mainchem/logs/:id', async (req, res) => {
 // PATCH /api/admin/mainchem/logs/:id/skipped/:skipId/resolve
 // Admin marks a skipped row as resolved (typically after hand-creating the
 // Chemical doc via the main catalog editor).
-router.patch('/mainchem/logs/:id/skipped/:skipId/resolve', async (req, res) => {
+router.patch('/logs/:id/skipped/:skipId/resolve', async (req, res) => {
   const { resolvedChemicalId } = req.body;
   const log = await ChemicalImportLog.findById(req.params.id);
   if (!log) return res.status(404).json({ ok: false, error: 'log not found' });
@@ -181,7 +181,7 @@ router.patch('/mainchem/logs/:id/skipped/:skipId/resolve', async (req, res) => {
 });
 
 // PATCH /api/admin/mainchem/logs/:id/status
-router.patch('/mainchem/logs/:id/status', async (req, res) => {
+router.patch('/logs/:id/status', async (req, res) => {
   const { status } = req.body;
   if (!['complete', 'reviewed', 'resolved'].includes(status)) {
     return res.status(400).json({ ok: false, error: 'invalid status' });
