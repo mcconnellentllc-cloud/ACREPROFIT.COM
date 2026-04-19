@@ -1082,11 +1082,15 @@ const chemicalOrderSchema = new mongoose.Schema({
     receivedAt: Date,
     deliveredAt: Date,
 
-    // Spray application parameters (from Build a Recipe)
+    // Spray application parameters (from Build a Recipe).
+    // tankSize + totalCarrierGallons replaced nozzle* on the INPUT form
+    // (2026-04-19); nozzle* kept here so historical orders still hydrate.
     sprayParams: {
         gallonsPerAcre: Number,
-        nozzlePressure: Number, // PSI
-        nozzleType: String,     // e.g., AIXR, TTI, XR
+        tankSize: Number,             // gal — sprayer tank capacity, drives load count
+        totalCarrierGallons: Number,  // gal — total water for the job, drives Hydrovant 0.1% v/v
+        nozzlePressure: Number,       // PSI — legacy, pre-2026-04-19
+        nozzleType: String,           // legacy, pre-2026-04-19 (e.g., AIXR, TTI, XR)
         crop: String,
         acres: Number
     },

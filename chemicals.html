@@ -172,25 +172,20 @@
                             <small style="color:#666;">Typical: 10-20 gal/acre ground, 3-5 gal/acre aerial</small>
                         </div>
                         <div class="form-group">
-                            <label for="cropNozzlePressure">Recommended nozzle pressure</label>
+                            <label for="cropTankSize">Tank size <span style="color:#c00;">*</span></label>
                             <div class="input-with-suffix">
-                                <input type="number" id="cropNozzlePressure" min="10" max="80" step="1" placeholder="40" value="40">
-                                <span class="suffix">PSI</span>
+                                <input type="number" id="cropTankSize" min="1" step="any" placeholder="500" required>
+                                <span class="suffix">gal</span>
                             </div>
-                            <small style="color:#666;">Typical: 30-50 PSI for flat fan nozzles</small>
+                            <small id="cropLoadCountDisplay" style="color:#4a5568;">Drives load count.</small>
                         </div>
                         <div class="form-group">
-                            <label for="cropNozzleType">Nozzle type (optional)</label>
-                            <select id="cropNozzleType" style="padding:10px; border:2px solid var(--border); border-radius:6px; width:100%;">
-                                <option value="">Select nozzle type</option>
-                                <option value="AIXR">AIXR - Air Induction Extended Range</option>
-                                <option value="TTI">TTI - Turbo TeeJet Induction</option>
-                                <option value="XR">XR - Extended Range flat fan</option>
-                                <option value="AI">AI - Air Induction</option>
-                                <option value="TT">TT - Turbo TeeJet</option>
-                                <option value="DG">DG - Drift Guard</option>
-                                <option value="other">Other / Custom</option>
-                            </select>
+                            <label for="cropTotalCarrierGallons">Total carrier gallons <span style="color:#c00;">*</span></label>
+                            <div class="input-with-suffix">
+                                <input type="number" id="cropTotalCarrierGallons" min="1" step="any" placeholder="5000" required>
+                                <span class="suffix">gal</span>
+                            </div>
+                            <small style="color:#666;">Auto-fills from acres &times; GPA. Drives Hydrovant rate (0.1% v/v).</small>
                         </div>
                     </div>
                 </div>
@@ -1582,6 +1577,37 @@
         }
 
         document.getElementById('cropAcres')?.addEventListener('input', calculateCropTotals);
+
+        // Build-a-Recipe: tank size + total carrier gallons.
+        // Auto-fill carrier from acres*GPA unless farmer has edited it manually.
+        // Load count = ceil(carrier / tankSize), rendered inline.
+        function updateCropCarrierAutoFill() {
+            const acres = parseFloat(document.getElementById('cropAcres')?.value) || 0;
+            const gpa = parseFloat(document.getElementById('cropGPA')?.value) || 0;
+            const carrier = document.getElementById('cropTotalCarrierGallons');
+            if (!carrier || carrier.dataset.userEdited === 'true') return;
+            if (acres > 0 && gpa > 0) carrier.value = Math.round(acres * gpa);
+            updateCropLoadCount();
+        }
+        function updateCropLoadCount() {
+            const tank = parseFloat(document.getElementById('cropTankSize')?.value) || 0;
+            const carrier = parseFloat(document.getElementById('cropTotalCarrierGallons')?.value) || 0;
+            const out = document.getElementById('cropLoadCountDisplay');
+            if (!out) return;
+            if (tank <= 0 || carrier <= 0) { out.textContent = 'Drives load count.'; return; }
+            const loads = Math.ceil(carrier / tank);
+            const last = carrier - (loads - 1) * tank;
+            out.textContent = (last === tank || loads === 1)
+                ? `${loads} full load${loads === 1 ? '' : 's'} of ${tank} gal each`
+                : `${loads} loads (${loads - 1} full + 1 partial of ${Math.round(last)} gal)`;
+        }
+        document.getElementById('cropAcres')?.addEventListener('input', updateCropCarrierAutoFill);
+        document.getElementById('cropGPA')?.addEventListener('input', updateCropCarrierAutoFill);
+        document.getElementById('cropTankSize')?.addEventListener('input', updateCropLoadCount);
+        document.getElementById('cropTotalCarrierGallons')?.addEventListener('input', function () {
+            this.dataset.userEdited = 'true';
+            updateCropLoadCount();
+        });
 
         function calculateCropTotals() {
             const acres = parseFloat(document.getElementById('cropAcres').value) || 0;
@@ -3537,14 +3563,14 @@ Generated by AcreProfit.com`;
 
             // Capture spray application parameters from the Build a Recipe form
             const gpa = parseFloat(document.getElementById('cropGPA')?.value) || null;
-            const pressure = parseInt(document.getElementById('cropNozzlePressure')?.value) || null;
-            const nozzleType = document.getElementById('cropNozzleType')?.value || null;
+            const tankSize = parseFloat(document.getElementById('cropTankSize')?.value) || null;
+            const totalCarrierGallons = parseFloat(document.getElementById('cropTotalCarrierGallons')?.value) || null;
             const acres = parseFloat(document.getElementById('cropAcres')?.value) || null;
 
-            const sprayParams = (gpa || pressure || nozzleType) ? {
+            const sprayParams = (gpa || tankSize || totalCarrierGallons) ? {
                 gallonsPerAcre: gpa,
-                nozzlePressure: pressure,
-                nozzleType: nozzleType,
+                tankSize,
+                totalCarrierGallons,
                 crop: selectedCrop,
                 acres
             } : null;
