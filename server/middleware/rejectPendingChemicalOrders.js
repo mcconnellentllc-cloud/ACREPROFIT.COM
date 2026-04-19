@@ -31,8 +31,11 @@ async function rejectPendingChemicalOrders(req, res, next) {
 
   let chems;
   try {
+    // Select both tradeName (AI-first) and productName (legacy). The 51
+    // pre-backfill chemicals only have productName; MAINCHEM imports populate
+    // both. Display name falls back in order: tradeName -> productName -> id.
     chems = await Chemical.find({ _id: { $in: ids } })
-      .select('_id tradeName status')
+      .select('_id tradeName productName status')
       .lean();
   } catch (err) {
     return next(err);
@@ -46,7 +49,7 @@ async function rejectPendingChemicalOrders(req, res, next) {
       message: 'Order cannot be submitted — contains chemicals that are not yet approved.',
       offenders: offenders.map(c => ({
         chemicalId: c._id,
-        tradeName: c.tradeName,
+        tradeName: c.tradeName || c.productName || String(c._id),
         status: c.status,
       })),
     });

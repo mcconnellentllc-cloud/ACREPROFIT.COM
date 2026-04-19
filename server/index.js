@@ -530,197 +530,12 @@ const repCommissionSchema = new mongoose.Schema({
 
 const RepCommission = mongoose.model('RepCommission', repCommissionSchema);
 
-// Chemical Pricing Model
-const chemicalSchema = new mongoose.Schema({
-    // Product info
-    productName: { type: String, required: true }, // e.g., "Dicamba DMA", "LV 6"
-    sourceSupplier: { type: String, required: true }, // Where we buy from: "CPD", "Agri-Star"
-    manufacturer: { type: String }, // Who makes it (from label): "Red Eagle", "ADAMA Essentials"
-    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Link to supplier user account
-
-    // Category and crop info
-    category: { type: String, enum: ['herbicide', 'fungicide', 'insecticide', 'adjuvant', 'fertilizer', 'other'], default: 'herbicide' },
-    crops: [String], // Which crops this can be used on: ['corn', 'soybeans', 'wheat']
-
-    // Packaging
-    packSize: { type: String, required: true }, // e.g., "2x2.5", "Shuttle", "4x5", "20"
-    unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
-    unitsPerPack: { type: Number }, // e.g., 250 for a Shuttle (250 gal)
-
-    // Pricing - 3-tier pricing model with two dollar amount margins
-    costPrice: { type: Number, required: true }, // Tier 1: What we pay the supplier (per unit)
-    adminMarginDollars: { type: Number, default: 0 }, // Admin margin $ - dollar amount added to cost
-    adminPrice: { type: Number }, // Tier 2: Cost + admin margin dollars (per unit)
-    marginDollars: { type: Number, default: 0 }, // Rep margin $ - dollar amount added to admin price
-    sellPrice: { type: Number, required: true }, // Tier 3: Retail price - what customer pays (per unit)
-    priceIsSpeculated: { type: Boolean, default: false }, // true = estimated price, not confirmed by PO
-    // Legacy fields (kept for backward compatibility)
-    adminMargin: { type: Number, default: 0 }, // Legacy: Admin margin % (no longer used)
-    regularMargin: { type: Number, default: 0 }, // Legacy: Regular margin %
-    margin: { type: Number }, // Total margin: (sellPrice - costPrice) / sellPrice * 100
-
-    // Application info (for program building)
-    defaultRate: { type: Number }, // Default application rate
-    rateUnit: { type: String }, // e.g., "oz/acre", "pt/acre", "qt/acre"
-    minRate: { type: Number },
-    maxRate: { type: Number },
-
-    // Version/date tracking
-    priceDate: { type: Date, default: Date.now },
-    priceVersion: { type: String }, // Optional identifier like "2026-Q1" or "v1"
-
-    // Comparison/equivalent data
-    equivalentProduct: String, // Product name this is equivalent to
-    equivalentSupplier: String, // Supplier of equivalent product
-    notes: String, // e.g., "Formulation equiv -11%", "Need to get equivalents"
-
-    // ============ REGULATORY COMPLIANCE FIELDS ============
-
-    // EPA Registration (REQUIRED for all pesticides)
-    epaRegistrationNumber: String, // e.g., "524-579", "100-1623"
-
-    // Restriction Classification
-    isRestrictedUse: { type: Boolean, default: false }, // RUP flag
-    rupStates: [String], // States where this is classified as RUP (2-letter codes)
-
-    // Signal Word (EPA mandated - appears on label)
-    signalWord: {
-        type: String,
-        enum: ['DANGER', 'DANGER-POISON', 'WARNING', 'CAUTION', 'NONE'],
-        default: 'CAUTION'
-    },
-
-    // Hazard Classifications
-    hazardClassifications: [{
-        type: String,
-        enum: [
-            'acute_oral_toxicity',
-            'acute_dermal_toxicity',
-            'acute_inhalation_toxicity',
-            'eye_irritant',
-            'skin_irritant',
-            'skin_sensitizer',
-            'carcinogen',
-            'reproductive_toxin',
-            'environmental_hazard_aquatic',
-            'environmental_hazard_bees',
-            'groundwater_advisory'
-        ]
-    }],
-
-    // Required Certifications to Purchase
-    requiredCertifications: [{
-        type: String,
-        enum: [
-            'private_applicator',      // State private applicator license
-            'commercial_applicator',   // State commercial applicator license
-            'paraquat_training',       // EPA-mandated Paraquat training
-            'dicamba_training',        // Annual Dicamba OTT training
-            'fumigant_training'        // Soil fumigant training
-        ]
-    }],
-
-    // Safety Data Sheet (SDS)
-    sdsUrl: String,        // URL to SDS PDF
-    sdsRevisionDate: Date, // Last SDS revision
-
-    // EPA Label
-    labelUrl: String,      // URL to EPA-approved label PDF
-    labelRevisionDate: Date,
-
-    // State Registrations (pesticides must be registered in each state)
-    stateRegistrations: [{
-        state: { type: String, maxlength: 2 }, // Two-letter state code
-        registrationNumber: String,
-        expirationDate: Date,
-        isRestricted: { type: Boolean, default: false }, // RUP in this state
-        restrictions: String // State-specific restrictions
-    }],
-
-    // Active Ingredients (for reporting and compliance)
-    activeIngredients: [{
-        name: String,              // e.g., "Glyphosate", "Atrazine"
-        percentage: Number,        // e.g., 41.0
-        poundsPerGallon: Number,   // e.g., 4.17 lb AE/gal
-        casNumber: String          // Chemical Abstracts Service number
-    }],
-
-    // DOT Transportation / Storage
-    dotHazClass: String,           // DOT hazardous materials class (e.g., "6.1", "8")
-    unNumber: String,              // UN identification number (e.g., "UN2902")
-    packingGroup: String,          // I, II, or III
-    storageRequirements: String,   // Special storage instructions
-    shelfLifeMonths: Number,       // Product shelf life
-
-    // Manufacturer Information
-    manufacturer: String,          // e.g., "BASF", "Bayer", "Syngenta"
-    manufacturerAddress: String,
-    manufacturerPhone: String,     // Emergency contact
-    epaEstablishmentNumber: String, // EPA Est. No. on label
-
-    // Additional Compliance Flags
-    requiresApplicatorVerification: { type: Boolean, default: false }, // Must verify license before sale
-    requiresAnnualTraining: { type: Boolean, default: false },         // Requires annual training (Dicamba)
-    hasBuyerAgreement: { type: Boolean, default: false },              // Requires signed agreement
-    isGroundwaterAdvisory: { type: Boolean, default: false },          // Has groundwater advisory
-    hasBufferZoneRequirements: { type: Boolean, default: false },      // Has application buffer zones
-    bufferZoneDetails: String,
-
-    // Compliance Notes
-    complianceNotes: String, // Internal notes about compliance requirements
-
-    // Status
-    isActive: { type: Boolean, default: true },
-    availableForOrder: { type: Boolean, default: true },
-
-    // Metadata
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-// Calculate prices from dollar margin amounts before save
-chemicalSchema.pre('save', function(next) {
-    if (this.costPrice) {
-        // Use adminPrice if explicitly set, otherwise calculate from dollar margin
-        if (!this.adminPrice && this.adminMarginDollars !== undefined) {
-            this.adminPrice = Math.round((this.costPrice + (this.adminMarginDollars || 0)) * 100) / 100;
-        } else if (!this.adminPrice) {
-            // Fallback: admin price = cost price if no margin set
-            this.adminPrice = this.costPrice;
-        }
-
-        // Calculate adminMarginDollars from adminPrice if not explicitly set
-        if (this.adminMarginDollars === undefined || this.adminMarginDollars === null) {
-            this.adminMarginDollars = Math.round((this.adminPrice - this.costPrice) * 100) / 100;
-        }
-
-        // Calculate marginDollars from sellPrice and adminPrice if not explicitly set
-        if ((this.marginDollars === undefined || this.marginDollars === null) && this.sellPrice && this.adminPrice) {
-            this.marginDollars = Math.round((this.sellPrice - this.adminPrice) * 100) / 100;
-        }
-
-        // Calculate total margin percentage for reference
-        if (this.sellPrice && this.sellPrice > 0) {
-            this.margin = Math.round(((this.sellPrice - this.costPrice) / this.sellPrice) * 100 * 100) / 100;
-        }
-    }
-    next();
-});
-
-// Index for quick lookups
-chemicalSchema.index({ productName: 1, sourceSupplier: 1, packSize: 1 });
-chemicalSchema.index({ sourceSupplier: 1 });
-chemicalSchema.index({ supplierId: 1 });
-chemicalSchema.index({ category: 1 });
-chemicalSchema.index({ crops: 1 });
-chemicalSchema.index({ priceDate: -1 });
-// Compliance indexes
-chemicalSchema.index({ isRestrictedUse: 1 });
-chemicalSchema.index({ epaRegistrationNumber: 1 });
-chemicalSchema.index({ 'stateRegistrations.state': 1 });
-
-const Chemical = mongoose.model('Chemical', chemicalSchema);
+// Chemical catalog model — extracted to server/models/Chemical.js. The merged
+// schema unions the legacy pricing/compliance fields with the AI-first MAINCHEM
+// fields (status, tradeName, activeIngredients class/lbPerGal, etc.). Required
+// constraints on costPrice/sellPrice relaxed — pricing gate is now the
+// rejectPendingChemicalOrders middleware keyed on status !== 'approved'.
+const Chemical = require('./models/Chemical');
 
 // Chemical Price History Model (for tracking price changes over time)
 const chemicalPriceHistorySchema = new mongoose.Schema({
@@ -8039,6 +7854,20 @@ app.put('/api/chemicals/:id/distributor-margin', authMiddleware, async (req, res
         const chemical = await Chemical.findById(req.params.id);
         if (!chemical) return res.status(404).json({ error: 'Product not found' });
 
+        // MAINCHEM imports land with status='pending' and no pricing. This
+        // endpoint is outside the rejectPendingChemicalOrders middleware
+        // barrier, so without this guard undefined + marginDollars would
+        // silently save sellPrice as literal NaN.
+        if (chemical.adminPrice == null) {
+            return res.status(400).json({
+                ok: false,
+                error: 'product_missing_admin_price',
+                message: 'Cannot set distributor margin — product has no admin price. Admin must set cost and admin margin first.',
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+            });
+        }
+
         chemical.marginDollars = marginDollars;
         chemical.sellPrice = Math.round((chemical.adminPrice + marginDollars) * 100) / 100;
         chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
@@ -8075,6 +7904,19 @@ app.put('/api/chemicals/:id/admin-margin', authMiddleware, async (req, res) => {
 
         if (costPrice !== undefined) chemical.costPrice = costPrice;
         if (adminMarginDollars !== undefined) chemical.adminMarginDollars = adminMarginDollars;
+
+        // Same NaN gate as distributor-margin — costPrice is optional on the
+        // schema now, but this endpoint must have it to compute adminPrice.
+        // Admin can pass costPrice in the body to set it for the first time.
+        if (chemical.costPrice == null) {
+            return res.status(400).json({
+                ok: false,
+                error: 'product_missing_cost_price',
+                message: 'Cost price required — cannot calculate admin price without it. Pass costPrice in the request body or set it on the product first.',
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+            });
+        }
 
         // Recalculate prices
         chemical.adminPrice = Math.round((chemical.costPrice + chemical.adminMarginDollars) * 100) / 100;
@@ -12185,6 +12027,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
         }
 
         const orderLines = [];
+        const unpricedLines = [];
         let totalConfirmedPrice = 0;
         let hasNeedsQuote = false;
         let valorWarning = false;
@@ -12256,9 +12099,22 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             });
             const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
 
-            // Determine status
+            // Determine status. MAINCHEM imports land with no sellPrice
+            // (status='pending' until admin enters pricing). Don't NaN the
+            // quote line — surface them as 'unpriced' so UI can display
+            // "pricing pending" instead of showing literal NaN to farmers.
             let status, pricePerPackage, lineTotal;
-            if (onHandQuantity >= packagesNeeded) {
+            if (chemical.sellPrice == null) {
+                status = 'unpriced';
+                pricePerPackage = null;
+                lineTotal = null;
+                hasNeedsQuote = true;
+                unpricedLines.push({
+                    chemicalId: chemical._id,
+                    productName: chemical.productName,
+                    chemicalStatus: chemical.status || null,
+                });
+            } else if (onHandQuantity >= packagesNeeded) {
                 status = 'confirmed';
                 pricePerPackage = chemical.sellPrice * packageSize;
                 lineTotal = packagesNeeded * pricePerPackage;
@@ -12308,9 +12164,20 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 });
                 const hvOnHand = hvInventory ? hvInventory.quantityAvailable : 0;
 
-                const hvStatus = hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote';
+                // If Hydrovant itself is unpriced (pending MAINCHEM import),
+                // fall through to needs_quote rather than NaN-ing the line.
+                const hvUnpriced = hydrovant.sellPrice == null;
+                const hvStatus = hvUnpriced ? 'unpriced'
+                    : (hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote');
                 const hvPricePerPack = hvStatus === 'confirmed' ? (hydrovant.sellPrice * hvPackageSize) : null;
                 const hvLineTotal = hvStatus === 'confirmed' ? (hvPackagesNeeded * hvPricePerPack) : null;
+                if (hvUnpriced) {
+                    unpricedLines.push({
+                        chemicalId: hydrovant._id,
+                        productName: hydrovant.productName,
+                        chemicalStatus: hydrovant.status || null,
+                    });
+                }
 
                 if (hvStatus === 'confirmed' && hvLineTotal) {
                     totalConfirmedPrice += hvLineTotal;
@@ -12346,6 +12213,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             totalWaterVolume,
             orderLines,
             hydrovant: hydrovantLine,
+            unpriced: unpricedLines,
             valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
             orderStatus,
             totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
@@ -12426,10 +12294,37 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
 
         const chemicalDocs = chemicalIds.length > 0
             ? await Chemical.find({ _id: { $in: chemicalIds } })
-                .select('_id productName sellPrice unitsPerPack isActive labelUrl sdsUrl')
+                .select('_id productName sellPrice unitsPerPack isActive status labelUrl sdsUrl')
             : [];
         const chemMap = {};
         chemicalDocs.forEach(c => { chemMap[c._id.toString()] = c; });
+
+        // Belt-and-suspenders: reject the whole submit if any confirmed
+        // line references a chem with no sellPrice. The calculate endpoint
+        // marks these 'unpriced', but a stale client could still POST them
+        // as 'confirmed'. Without this guard the arithmetic below saves
+        // NaN line totals and the mismatch-check at line ~12271 doesn't
+        // catch NaN (it only compares client vs server numbers).
+        const unpricedConfirmed = [];
+        for (const line of orderLines) {
+            if (line.status !== 'confirmed' || !line.chemicalId) continue;
+            const chem = chemMap[line.chemicalId.toString()];
+            if (chem && chem.sellPrice == null) {
+                unpricedConfirmed.push({
+                    chemicalId: chem._id,
+                    productName: chem.productName,
+                    chemicalStatus: chem.status || null,
+                });
+            }
+        }
+        if (unpricedConfirmed.length > 0) {
+            return res.status(400).json({
+                ok: false,
+                error: 'order_contains_unpriced_chemicals',
+                message: 'Cannot submit — some confirmed lines reference products that are not yet priced. Admin must approve pricing first.',
+                unpriced: unpricedConfirmed,
+            });
+        }
 
         const validatedLines = [];
         for (const line of orderLines) {
@@ -12967,6 +12862,7 @@ app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) =
 // Helper function for order calculation (reusable)
 async function calculateOrder(acres, gpa, products) {
     const orderLines = [];
+    const unpricedLines = [];
     let totalConfirmedPrice = 0;
     let hasNeedsQuote = false;
     let valorWarning = false;
@@ -13003,7 +12899,17 @@ async function calculateOrder(acres, gpa, products) {
         const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
 
         let status, pricePerPackage, lineTotal;
-        if (onHandQuantity >= packagesNeeded) {
+        if (chemical.sellPrice == null) {
+            status = 'unpriced';
+            pricePerPackage = null;
+            lineTotal = null;
+            hasNeedsQuote = true;
+            unpricedLines.push({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                chemicalStatus: chemical.status || null,
+            });
+        } else if (onHandQuantity >= packagesNeeded) {
             status = 'confirmed';
             pricePerPackage = chemical.sellPrice * packageSize;
             lineTotal = packagesNeeded * pricePerPackage;
@@ -13044,12 +12950,24 @@ async function calculateOrder(acres, gpa, products) {
             const hvPkgs = Math.ceil(hvGallons / hvPkgSize);
             const hvInv = await Inventory.findOne({ chemicalId: hvChem._id, location: 'main' });
             const hvOnHand = hvInv ? hvInv.quantityAvailable : 0;
-            const hvStatus = hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote';
+            // Same unpriced guard as the inline endpoint — if Hydrovant itself
+            // has no sellPrice, fall through rather than NaN the line total.
+            const hvUnpriced = hvChem.sellPrice == null;
+            const hvStatus = hvUnpriced ? 'unpriced'
+                : (hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote');
             const hvPrice = hvStatus === 'confirmed' ? hvChem.sellPrice * hvPkgSize : null;
             const hvTotal = hvStatus === 'confirmed' ? hvPkgs * hvPrice : null;
 
             if (hvStatus === 'confirmed' && hvTotal) totalConfirmedPrice += hvTotal;
             else hasNeedsQuote = true;
+
+            if (hvUnpriced) {
+                unpricedLines.push({
+                    chemicalId: hvChem._id,
+                    productName: hvChem.productName,
+                    chemicalStatus: hvChem.status || null,
+                });
+            }
 
             hydrovant = {
                 chemicalId: hvChem._id,
@@ -13070,6 +12988,7 @@ async function calculateOrder(acres, gpa, products) {
         totalWaterVolume,
         orderLines,
         hydrovant,
+        unpriced: unpricedLines,
         valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
         orderStatus: hasNeedsQuote ? 'pending_quote' : 'ready_for_checkout',
         totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
