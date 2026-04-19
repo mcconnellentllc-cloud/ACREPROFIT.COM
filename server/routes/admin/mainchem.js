@@ -55,16 +55,27 @@ router.post('/import', async (req, res) => {
 
   for (const rec of (source.records || [])) {
     try {
+      // D3: match both tradeName (new) and productName (legacy) so a re-import
+      // finds pre-existing docs that admin created via the legacy UI under the
+      // old field name.
       const filter = {
-        tradeName: rec.tradeName,
-        manufacturer: rec.manufacturer || null,
+        $or: [
+          { tradeName: rec.tradeName, manufacturer: rec.manufacturer || null },
+          { productName: rec.tradeName, sourceSupplier: rec.manufacturer || null },
+        ],
       };
       const update = {
         $set: {
+          // D3: dual-name population — legacy fields (productName/packSize/unit)
+          // and AI-first fields (tradeName/pkg/uom) coexist. 451 existing
+          // references to legacy names continue to work.
           tradeName: rec.tradeName,
+          productName: rec.tradeName,
           manufacturer: rec.manufacturer || null,
           pkg: rec.pkg || null,
+          packSize: rec.pkg || null,
           uom: rec.uom || null,
+          unit: rec.uom || null,
           use: rec.use || null,
           control: rec.control || null,
           activeIngredients: rec.activeIngredients || [],
@@ -78,14 +89,15 @@ router.post('/import', async (req, res) => {
           updatedAt: new Date(),
         },
         $setOnInsert: {
-          // Approval state and audit-origin are admin-controlled decisions.
-          // They only get set on first-time insert — re-imports refresh
-          // pricing/concentration/MOA fields but respect admin decisions on
-          // status (e.g. rejecting a discontinued product) and audit origin
-          // (e.g. a farmer-suggested chemical later gaining a MAINCHEM entry
-          // keeps the suggester's userId, not overwritten to 'mainchem-import').
+          // D2: MAINCHEM imports land as 'pending'. Pricing (costPrice /
+          // sellPrice / adminPrice) is intentionally NOT set — admin enters
+          // pricing via the existing chemicals admin UI and then flips status
+          // to 'approved'. The rejectPendingChemicalOrders middleware blocks
+          // order submission until that promotion happens, which is the real
+          // pricing gate. Re-imports preserve admin's status/addedBy via
+          // $setOnInsert so this only fires on first-time insert.
           createdAt: new Date(),
-          status: 'approved',
+          status: 'pending',
           addedBy: 'mainchem-import',
         },
       };
