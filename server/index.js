@@ -9996,12 +9996,32 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             deliveryOption,
             deliveryAddress,
             marginAdjustment,
-            marginAdjustmentReason
+            marginAdjustmentReason,
+            customerId,
+            actingAsCustomerId
         } = req.body;
 
         // Only admin/distributor/superadmin can adjust margins
         const isAdminOrDistributor = ['admin', 'superadmin', 'distributor'].includes(req.user.role);
         const applyMarginAdjust = isAdminOrDistributor && marginAdjustment ? parseFloat(marginAdjustment) : 0;
+
+        // Acting-as customer: mirror the logic in POST /api/chemical-orders
+        // (line ~9780) so checkout-flow orders link to the intended customer
+        // under userId. Pre-fix, orderUserId was read at ~line 10060 without
+        // ever being declared — throwing ReferenceError on every call and
+        // silently 400'ing the endpoint since 2026-04-14. Accept both field
+        // names because checkout.html posts `customerId` and the other
+        // endpoint posts `actingAsCustomerId` — don't care which, first match wins.
+        const actingAsId = actingAsCustomerId || customerId || null;
+        let orderUserId = req.user._id;
+        let orderRepId = req.user.representative;
+        if (actingAsId && isAdminOrDistributor) {
+            const customer = await User.findById(actingAsId);
+            if (customer && customer.role === 'customer') {
+                orderUserId = customer._id;
+                orderRepId = req.user.role === 'distributor' ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
+            }
+        }
 
         // Freight: minimum $400 for delivery
         const freightCharge = deliveryOption === 'delivery' ? 400 : 0;
@@ -10152,10 +10172,12 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                 (marginAdjustmentReason ? ` - ${marginAdjustmentReason}` : '');
         }
 
-        // Create the order
+        // Create the order. userId = the customer when admin/distributor is
+        // acting-as; otherwise the authenticated user. representativeId stays
+        // the location-resolved rep unless acting-as overrode it above.
         const order = new ChemicalOrder({
-            userId: req.user._id,
-            representativeId: representativeId,
+            userId: orderUserId,
+            representativeId: orderRepId || representativeId,
             orderType: 'direct',
             items: orderItems,
             totalAcres: 0,
