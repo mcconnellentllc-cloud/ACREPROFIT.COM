@@ -132,7 +132,22 @@ router.post('/mainchem/import', async (req, res) => {
 });
 
 // GET /api/admin/mainchem/logs — list historical import runs
+// ?count=true returns just { totalLogs, unresolvedSkips } for the admin nav
+// badge — avoids shipping the full skippedRows payload on every nav render.
 router.get('/mainchem/logs', async (req, res) => {
+  if (req.query.count === 'true') {
+    const totalLogs = await ChemicalImportLog.countDocuments({});
+    const agg = await ChemicalImportLog.aggregate([
+      { $unwind: '$skippedRows' },
+      { $match: { 'skippedRows.resolved': false } },
+      { $count: 'total' },
+    ]);
+    return res.json({
+      ok: true,
+      totalLogs,
+      unresolvedSkips: agg[0]?.total || 0,
+    });
+  }
   const logs = await ChemicalImportLog.find({})
     .sort({ timestamp: -1 })
     .limit(50)

@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAINCHEM Import Logs - Admin | Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h1 { margin: 0; }
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.9rem; text-transform: uppercase; }
+        .stat-card .value { font-size: 2rem; font-weight: 700; color: #2d5a27; }
+        .stat-card .value.warn { color: #856404; }
+
+        .products-table { width: 100%; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .products-table th, .products-table td { padding: 1rem; text-align: left; border-bottom: 1px solid #eee; vertical-align: top; }
+        .products-table th { background: #1a1a2e; color: white; font-weight: 600; position: sticky; top: 0; }
+        .products-table tr:hover { background: #f9f9f9; }
+        .products-table .actions { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .products-table td code { background: #f5f5f5; padding: 0.1rem 0.4rem; border-radius: 4px; font-size: 0.85rem; }
+
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+        .status-badge { display: inline-block; padding: 0.25rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
+        .status-complete { background: #fff3cd; color: #856404; }
+        .status-reviewed { background: #cce5ff; color: #004085; }
+        .status-resolved { background: #d4edda; color: #155724; }
+
+        .reason-badge { display: inline-block; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; font-weight: 600; }
+        .reason-fertilizer_excluded { background: #e2e3e5; color: #383d41; }
+        .reason-missing_required_field { background: #f8d7da; color: #721c24; }
+        .reason-ai_concentration_unparseable { background: #fff3cd; color: #856404; }
+        .reason-premix_needs_review { background: #d1ecf1; color: #0c5460; }
+        .reason-duplicate_reg_number { background: #e2e3e5; color: #383d41; }
+
+        .resolved-yes { color: #155724; font-weight: 600; }
+        .resolved-no { color: #721c24; font-weight: 600; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; max-width: 700px; width: 90%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; }
+        .modal-header h2 { margin: 0; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+        .form-group input, .form-group textarea { width: 100%; padding: 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 1rem; }
+        .form-group small { color: #666; font-size: 0.85rem; }
+
+        .raw-data { background: #f8f9fa; padding: 1rem; border-radius: 8px; margin-top: 1rem; font-family: 'SF Mono', Menlo, monospace; font-size: 0.85rem; white-space: pre-wrap; word-break: break-word; max-height: 300px; overflow-y: auto; }
+
+        .summary-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; }
+        .summary-card .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
+        .summary-card .summary-item { }
+        .summary-card .summary-item label { display: block; color: #666; font-size: 0.8rem; text-transform: uppercase; margin-bottom: 0.25rem; }
+        .summary-card .summary-item .val { font-size: 1.25rem; font-weight: 600; color: #1a1a2e; }
+
+        .back-link { display: inline-flex; align-items: center; gap: 0.5rem; color: #2d5a27; text-decoration: none; font-weight: 600; margin-bottom: 1rem; }
+        .back-link:hover { text-decoration: underline; }
+
+        .filter-bar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+        .filter-bar select { padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 6px; }
+
+        .loading { text-align: center; padding: 3rem; color: #666; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+
+        @media (max-width: 768px) {
+            .products-table { display: block; overflow-x: auto; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin.html" class="nav-link">Admin</a>
+                <a href="/admin-inventory.html" class="nav-link">Inventory</a>
+                <a href="/admin-import-logs.html" class="nav-link active">Import Logs</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">Admin</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div id="message"></div>
+
+            <!-- LIST VIEW -->
+            <div id="listView">
+                <div class="admin-header">
+                    <h1>MAINCHEM Import Logs</h1>
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <h3>Total Runs</h3>
+                        <div class="value" id="statTotalRuns">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Unresolved Skips</h3>
+                        <div class="value warn" id="statUnresolved">0</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Last Run</h3>
+                        <div class="value" id="statLastRun" style="font-size: 1.1rem;">—</div>
+                    </div>
+                </div>
+
+                <div id="listContainer">
+                    <div class="loading">Loading import runs...</div>
+                </div>
+            </div>
+
+            <!-- DETAIL VIEW -->
+            <div id="detailView" style="display: none;">
+                <a href="#" class="back-link" onclick="showList(event)">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
+                    Back to list
+                </a>
+
+                <div class="admin-header">
+                    <h1 id="detailTitle">Import Run</h1>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary" id="markReviewedBtn" onclick="setLogStatus('reviewed')">Mark Reviewed</button>
+                        <button class="btn btn-primary" id="markResolvedBtn" onclick="setLogStatus('resolved')">Mark Resolved</button>
+                    </div>
+                </div>
+
+                <div class="summary-card" id="summaryCard"></div>
+
+                <div class="filter-bar">
+                    <label>Filter by reason:</label>
+                    <select id="reasonFilter" onchange="renderSkippedTable()">
+                        <option value="">All reasons</option>
+                        <option value="fertilizer_excluded">fertilizer_excluded</option>
+                        <option value="missing_required_field">missing_required_field</option>
+                        <option value="ai_concentration_unparseable">ai_concentration_unparseable</option>
+                        <option value="premix_needs_review">premix_needs_review</option>
+                        <option value="duplicate_reg_number">duplicate_reg_number</option>
+                    </select>
+                    <label>
+                        <input type="checkbox" id="hideResolved" onchange="renderSkippedTable()"> Hide resolved
+                    </label>
+                </div>
+
+                <div id="skippedContainer">
+                    <div class="loading">Loading skipped rows...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Resolve Modal -->
+    <div class="modal" id="resolveModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Resolve Skipped Row</h2>
+                <button class="close-btn" onclick="closeResolveModal()">&times;</button>
+            </div>
+            <div id="resolveContext" style="margin-bottom: 1rem;"></div>
+            <form id="resolveForm" onsubmit="submitResolve(event)">
+                <input type="hidden" id="resolveSkipId">
+                <div class="form-group">
+                    <label>Resolved Chemical ID (optional)</label>
+                    <input type="text" id="resolvedChemicalId" placeholder="e.g. 507f1f77bcf86cd799439011">
+                    <small>Mongo ObjectId of the Chemical you hand-created in the catalog to replace this skipped row. Leave blank if you're just marking reviewed.</small>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeResolveModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Mark Resolved</button>
+                </div>
+            </form>
+
+            <div class="raw-data" id="resolveRawData"></div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        let token = localStorage.getItem('acreprofit_token');
+        let logs = [];
+        let currentLog = null;
+
+        function checkAuth() {
+            const userStr = localStorage.getItem('acreprofit_user');
+            if (!token || !userStr) {
+                window.location.href = '/login.html';
+                return false;
+            }
+            const user = JSON.parse(userStr);
+            if (!['admin', 'superadmin'].includes(user.role)) {
+                window.location.href = '/dashboard.html';
+                return false;
+            }
+            document.getElementById('userName').textContent = user.name || user.email;
+            return true;
+        }
+
+        async function loadLogs() {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/mainchem/logs`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load import logs');
+                const data = await response.json();
+                logs = data.logs || [];
+                renderList();
+                updateStats();
+            } catch (error) {
+                document.getElementById('listContainer').innerHTML =
+                    `<div class="error-msg">Unable to load import logs. <button class="btn btn-sm btn-primary" onclick="loadLogs()">Retry</button></div>`;
+            }
+        }
+
+        function updateStats() {
+            document.getElementById('statTotalRuns').textContent = logs.length;
+            const unresolved = logs.reduce((acc, l) => acc + (l.skippedRows || []).filter(s => !s.resolved).length, 0);
+            document.getElementById('statUnresolved').textContent = unresolved;
+            if (logs.length > 0) {
+                const last = new Date(logs[0].timestamp);
+                document.getElementById('statLastRun').textContent = formatDate(last);
+            }
+        }
+
+        function renderList() {
+            if (logs.length === 0) {
+                document.getElementById('listContainer').innerHTML =
+                    '<p style="text-align: center; padding: 2rem; color: #666;">No import runs yet. POST to <code>/api/admin/mainchem/import</code> to run one.</p>';
+                return;
+            }
+
+            let html = `<table class="products-table">
+                <thead>
+                    <tr>
+                        <th>Date</th>
+                        <th>Source File</th>
+                        <th>Total</th>
+                        <th>Inserted</th>
+                        <th>Updated</th>
+                        <th>Skipped</th>
+                        <th>Unresolved</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            logs.forEach(log => {
+                const unresolved = (log.skippedRows || []).filter(s => !s.resolved).length;
+                const totalSkipped = (log.skippedRows || []).length;
+                html += `<tr>
+                    <td>${formatDate(new Date(log.timestamp))}</td>
+                    <td><code>${escapeHtml(log.sourceFile)}</code></td>
+                    <td>${log.totalRows}</td>
+                    <td>${log.insertedCount || 0}</td>
+                    <td>${log.updatedCount || 0}</td>
+                    <td>${totalSkipped}</td>
+                    <td>${unresolved > 0 ? `<span class="resolved-no">${unresolved}</span>` : '<span class="resolved-yes">0</span>'}</td>
+                    <td><span class="status-badge status-${log.status}">${log.status}</span></td>
+                    <td class="actions">
+                        <button class="btn btn-sm btn-primary" onclick="showDetail('${log._id}')">View</button>
+                    </td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('listContainer').innerHTML = html;
+        }
+
+        async function showDetail(logId) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/mainchem/logs/${logId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) throw new Error('Failed to load log detail');
+                const data = await response.json();
+                currentLog = data.log;
+                history.pushState({ logId }, '', `?logId=${logId}`);
+                renderDetail();
+            } catch (error) {
+                showMessage(error.message, 'error');
+            }
+        }
+
+        function renderDetail() {
+            document.getElementById('listView').style.display = 'none';
+            document.getElementById('detailView').style.display = 'block';
+            const log = currentLog;
+            document.getElementById('detailTitle').textContent = `Import Run — ${formatDate(new Date(log.timestamp))}`;
+
+            const unresolved = (log.skippedRows || []).filter(s => !s.resolved).length;
+            document.getElementById('summaryCard').innerHTML = `
+                <div class="summary-grid">
+                    <div class="summary-item"><label>Run ID</label><div class="val" style="font-size: 0.9rem;"><code>${escapeHtml(log.importRunId)}</code></div></div>
+                    <div class="summary-item"><label>Source</label><div class="val" style="font-size: 1rem;"><code>${escapeHtml(log.sourceFile)}</code></div></div>
+                    <div class="summary-item"><label>Imported By</label><div class="val" style="font-size: 1rem;">${escapeHtml(log.importedBy || '—')}</div></div>
+                    <div class="summary-item"><label>Total Rows</label><div class="val">${log.totalRows}</div></div>
+                    <div class="summary-item"><label>Inserted</label><div class="val">${log.insertedCount || 0}</div></div>
+                    <div class="summary-item"><label>Updated</label><div class="val">${log.updatedCount || 0}</div></div>
+                    <div class="summary-item"><label>Skipped</label><div class="val">${(log.skippedRows || []).length}</div></div>
+                    <div class="summary-item"><label>Unresolved</label><div class="val" style="color: ${unresolved > 0 ? '#856404' : '#155724'};">${unresolved}</div></div>
+                    <div class="summary-item"><label>Status</label><div class="val"><span class="status-badge status-${log.status}">${log.status}</span></div></div>
+                </div>
+            `;
+
+            updateStatusButtons();
+            renderSkippedTable();
+        }
+
+        function updateStatusButtons() {
+            const log = currentLog;
+            document.getElementById('markReviewedBtn').disabled = log.status === 'reviewed' || log.status === 'resolved';
+            document.getElementById('markResolvedBtn').disabled = log.status === 'resolved';
+        }
+
+        function renderSkippedTable() {
+            const log = currentLog;
+            const reasonFilter = document.getElementById('reasonFilter').value;
+            const hideResolved = document.getElementById('hideResolved').checked;
+            let rows = log.skippedRows || [];
+            if (reasonFilter) rows = rows.filter(r => r.reason === reasonFilter);
+            if (hideResolved) rows = rows.filter(r => !r.resolved);
+
+            if (rows.length === 0) {
+                document.getElementById('skippedContainer').innerHTML =
+                    '<p style="text-align: center; padding: 2rem; color: #666;">No skipped rows match the current filter.</p>';
+                return;
+            }
+
+            let html = `<table class="products-table">
+                <thead>
+                    <tr>
+                        <th>Row #</th>
+                        <th>Trade Name</th>
+                        <th>Reason</th>
+                        <th>Raw Data</th>
+                        <th>Resolved</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>`;
+
+            rows.forEach(r => {
+                const rawPreview = r.rawData ? JSON.stringify(r.rawData).slice(0, 80) : '—';
+                html += `<tr>
+                    <td>${r.rowIndex}</td>
+                    <td><strong>${escapeHtml(r.tradeName || '—')}</strong></td>
+                    <td><span class="reason-badge reason-${r.reason}">${r.reason}</span></td>
+                    <td><code>${escapeHtml(rawPreview)}${rawPreview.length >= 80 ? '…' : ''}</code></td>
+                    <td>${r.resolved
+                        ? `<span class="resolved-yes">Yes</span>${r.resolvedAt ? `<br><small>${formatDate(new Date(r.resolvedAt))}</small>` : ''}${r.resolvedChemicalId ? `<br><small><code>${escapeHtml(String(r.resolvedChemicalId))}</code></small>` : ''}`
+                        : '<span class="resolved-no">No</span>'
+                    }</td>
+                    <td class="actions">
+                        ${r.resolved
+                            ? '<button class="btn btn-sm btn-secondary" disabled>Resolved</button>'
+                            : `<button class="btn btn-sm btn-primary" onclick="openResolveModal('${r._id}')">Resolve</button>`
+                        }
+                    </td>
+                </tr>`;
+            });
+
+            html += '</tbody></table>';
+            document.getElementById('skippedContainer').innerHTML = html;
+        }
+
+        function openResolveModal(skipId) {
+            const skip = (currentLog.skippedRows || []).find(r => r._id === skipId);
+            if (!skip) return;
+            document.getElementById('resolveSkipId').value = skipId;
+            document.getElementById('resolvedChemicalId').value = '';
+            document.getElementById('resolveContext').innerHTML = `
+                <strong>Row #${skip.rowIndex}</strong> — ${escapeHtml(skip.tradeName || '—')}
+                <br><span class="reason-badge reason-${skip.reason}">${skip.reason}</span>
+            `;
+            document.getElementById('resolveRawData').textContent = JSON.stringify(skip.rawData || {}, null, 2);
+            document.getElementById('resolveModal').classList.add('active');
+        }
+
+        function closeResolveModal() {
+            document.getElementById('resolveModal').classList.remove('active');
+        }
+
+        async function submitResolve(e) {
+            e.preventDefault();
+            const skipId = document.getElementById('resolveSkipId').value;
+            const resolvedChemicalId = document.getElementById('resolvedChemicalId').value.trim() || undefined;
+            try {
+                const response = await fetch(`${API_URL}/api/admin/mainchem/logs/${currentLog._id}/skipped/${skipId}/resolve`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ resolvedChemicalId })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to resolve skipped row');
+                }
+                const data = await response.json();
+                // Patch the in-memory log row with the server response
+                const idx = currentLog.skippedRows.findIndex(r => r._id === skipId);
+                if (idx !== -1) currentLog.skippedRows[idx] = { ...currentLog.skippedRows[idx], ...data.skip };
+                showMessage('Row marked resolved', 'success');
+                closeResolveModal();
+                renderDetail();
+            } catch (error) {
+                showMessage(error.message, 'error');
+            }
+        }
+
+        async function setLogStatus(status) {
+            try {
+                const response = await fetch(`${API_URL}/api/admin/mainchem/logs/${currentLog._id}/status`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ status })
+                });
+                if (!response.ok) {
+                    const err = await response.json().catch(() => ({}));
+                    throw new Error(err.error || 'Failed to update status');
+                }
+                const data = await response.json();
+                currentLog = data.log;
+                showMessage(`Log marked ${status}`, 'success');
+                renderDetail();
+            } catch (error) {
+                showMessage(error.message, 'error');
+            }
+        }
+
+        function showList(e) {
+            if (e) e.preventDefault();
+            currentLog = null;
+            history.pushState({}, '', window.location.pathname);
+            document.getElementById('detailView').style.display = 'none';
+            document.getElementById('listView').style.display = 'block';
+            loadLogs();
+        }
+
+        function formatDate(d) {
+            if (!(d instanceof Date) || isNaN(d)) return '—';
+            return d.toLocaleString('en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        }
+
+        function escapeHtml(s) {
+            if (s === null || s === undefined) return '';
+            return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+        }
+
+        function showMessage(msg, type) {
+            const el = document.getElementById('message');
+            el.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${escapeHtml(msg)}</div>`;
+            setTimeout(() => el.innerHTML = '', 3000);
+        }
+
+        document.getElementById('logoutBtn').addEventListener('click', e => {
+            e.preventDefault();
+            localStorage.removeItem('acreprofit_token');
+            localStorage.removeItem('acreprofit_user');
+            window.location.href = '/';
+        });
+
+        window.addEventListener('popstate', () => {
+            const params = new URLSearchParams(window.location.search);
+            const logId = params.get('logId');
+            if (logId) {
+                showDetail(logId);
+            } else {
+                showList();
+            }
+        });
+
+        // Initialize
+        if (checkAuth()) {
+            const params = new URLSearchParams(window.location.search);
+            const logId = params.get('logId');
+            if (logId) {
+                loadLogs().then(() => showDetail(logId));
+            } else {
+                loadLogs();
+            }
+        }
+    </script>
+</body>
+</html>
