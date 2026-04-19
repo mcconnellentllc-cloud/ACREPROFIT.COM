@@ -24,6 +24,7 @@ const path = require('path');
 const fs = require('fs');
 
 const mainchemRouter = require('./routes/admin/mainchem');
+const sprayProgramsAdminRouter = require('./routes/admin/spray-programs');
 const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
 
 // File upload handling
@@ -1230,70 +1231,12 @@ async function createLedgerEntry({ representativeId, description, amount, type, 
     return entry;
 }
 
-// Spray Program Model (saved custom programs)
-// IMPORTANT: These are SUGGESTIONS only - each field requires its own evaluation
-const sprayProgramSchema = new mongoose.Schema({
-    name: { type: String, required: true }, // e.g., "Round 1 Corn Spray"
-    description: String,
-    roundNumber: { type: Number }, // Round 1, 2, 3, etc.
-
-    // Program type - NOTE: "suggestion" not "recommendation" (legal)
-    type: { type: String, enum: ['suggestion', 'custom', 'template'], default: 'suggestion' },
-    isPublic: { type: Boolean, default: false }, // Public programs visible to customers
-
-    // Target crop
-    crop: { type: String, required: true }, // corn, soybeans, wheat, etc.
-
-    // Disclaimer - required on all programs
-    disclaimer: {
-        type: String,
-        default: 'This is a suggestion only. Each field requires its own evaluation to determine if this chemical program will work for your specific conditions.'
-    },
-
-    // Program passes/applications (can have multiple chemicals per round)
-    applications: [{
-        name: String, // e.g., "Burndown", "Pre-emergent", "Post-emergent"
-        timing: String, // e.g., "14 days before planting", "At planting", "V4-V6"
-        deliveryWindow: String, // When product needs to arrive at rep location (e.g., "Late March", "Early May")
-        chemicals: [{
-            chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
-            productName: String,
-            suggestedRate: Number, // Use "suggested" not "recommended"
-            rateUnit: String, // oz/acre, pt/acre, qt/acre, gal/acre, lb/acre
-            packSize: String,
-            unit: String,
-            isAdjuvant: { type: Boolean, default: false }, // Flag adjuvants for cost and auto-calc handling
-            notes: String // e.g., "Adjust based on weed pressure"
-        }]
-    }],
-
-    // Program-level safety callouts - distinct from the per-chemical-derived
-    // rotationRestrictions / grazingRestrictions. Use for agronomic requirements
-    // that apply to the program as a whole (seed treatment requirements, timing
-    // windows, runoff advisories, etc). Rendered as a bulleted warning list on
-    // the program detail view.
-    precautions: [String],
-
-    // Cost estimate per acre (calculated)
-    estimatedCostPerAcre: Number,
-
-    // Auto-generated restriction fields
-    groundType: String, // Description of best ground/soil conditions for this program
-    rotationRestrictions: String, // Combined crop rotation restrictions from all chemicals
-    grazingRestrictions: String, // Combined grazing/forage restrictions from all chemicals
-
-    // Status
-    isActive: { type: Boolean, default: true },
-
-    // Owner
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-
-    // Metadata
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-const SprayProgram = mongoose.model('SprayProgram', sprayProgramSchema);
+// Spray Program Model — consolidated file schema at server/models/SprayProgram.js.
+// Path 2 merge (PR #132 pattern): single source of truth with pre-save mirror
+// hook that keeps passes[]<->applications[], rate<->suggestedRate,
+// active<->isActive, rotationNotes<->rotationRestrictions populated in both
+// directions. See header of that file for full notes.
+const SprayProgram = require('./models/SprayProgram');
 
 // ============ CHEMICAL RESTRICTION DATA ============
 // Maps active ingredients/product names to their known restrictions
@@ -4066,6 +4009,10 @@ const supplierMiddleware = async (req, res, next) => {
 // superAdminMiddleware gate off the 38 inline /api/admin/* routes that rely
 // on the permissive adminMiddleware (admin/distributor/superadmin).
 app.use('/api/admin/mainchem', authMiddleware, superAdminMiddleware, mainchemRouter);
+
+// Admin Programs editor — CRUD for SprayProgram docs, gated to superadmin
+// only. Same scope-specific prefix pattern as /api/admin/mainchem.
+app.use('/api/admin/spray-programs', authMiddleware, superAdminMiddleware, sprayProgramsAdminRouter);
 
 // ============ ROUTES ============
 
