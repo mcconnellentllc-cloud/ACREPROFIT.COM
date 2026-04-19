@@ -378,6 +378,93 @@
                     <button id="calculateProgram" class="btn btn-primary btn-lg btn-block">
                         Calculate Order & View Packaging
                     </button>
+
+                    <!-- Farmer Rating Widget (mounts when a named SprayProgram is selected) -->
+                    <div id="ratingsWidget" class="ratings-widget" style="display: none; margin-top: 24px;">
+                        <div class="ratings-summary">
+                            <div class="ratings-summary-main">
+                                <span class="ratings-avg-stars" id="ratingsAvgStars">—</span>
+                                <span class="ratings-stars-track" id="ratingsStarsTrack" aria-hidden="true">☆☆☆☆☆</span>
+                                <span class="ratings-count" id="ratingsCount">(0 ratings)</span>
+                            </div>
+                            <button type="button" class="btn btn-outline" id="leaveRatingBtn" onclick="openRatingModal()">Leave a rating</button>
+                        </div>
+                        <div class="ratings-distribution" id="ratingsDistribution"></div>
+                        <div class="ratings-list" id="ratingsList"></div>
+                    </div>
+                </div>
+
+                <!-- Rating Modal (shared by create + edit flows) -->
+                <div class="modal-overlay" id="ratingModalOverlay" style="display:none;">
+                    <div class="modal-content" id="ratingModalContent" style="max-width: 560px; max-height: 92vh; overflow-y: auto;">
+                        <button class="modal-close" onclick="closeRatingModal()">&times;</button>
+                        <h2 id="ratingModalTitle" style="margin-bottom: 16px;">Leave a rating</h2>
+                        <input type="hidden" id="ratingEditId">
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Your rating *</label>
+                            <div class="star-input" data-stars="0" id="ratingStarInput" style="font-size: 28px; cursor: pointer; user-select: none;">
+                                <span class="star" data-value="1">☆</span>
+                                <span class="star" data-value="2">☆</span>
+                                <span class="star" data-value="3">☆</span>
+                                <span class="star" data-value="4">☆</span>
+                                <span class="star" data-value="5">☆</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Comment</label>
+                            <textarea id="ratingComment" rows="3" maxlength="2000" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;"></textarea>
+                            <small style="color:#666;"><span id="ratingCommentCount">0</span>/2000</small>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:6px;">Crop</label>
+                                <select id="ratingCrop" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;">
+                                    <option value="">—</option>
+                                    <option value="corn">Corn</option>
+                                    <option value="milo">Milo</option>
+                                    <option value="wheat">Wheat</option>
+                                    <option value="soybean">Soybean</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:6px;">Season / Year</label>
+                                <select id="ratingSeasonYear" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;">
+                                    <option value="">—</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2023">2023</option>
+                                    <option value="2022">2022</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Weather conditions</label>
+                            <textarea id="ratingWeather" rows="2" maxlength="500" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;"></textarea>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Yield outcome</label>
+                            <textarea id="ratingYield" rows="2" maxlength="1000" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;"></textarea>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px; color:#888;">Photo upload</label>
+                            <button type="button" disabled title="Photo upload coming soon" style="padding:10px 14px; background:#eee; border:1px dashed #aaa; border-radius:6px; color:#888; cursor:not-allowed;">
+                                📷 Photo upload coming soon
+                            </button>
+                        </div>
+
+                        <div class="customer-modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                            <button type="button" class="btn btn-outline" onclick="closeRatingModal()">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="submitRating()">Submit rating</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="programResults" class="program-results" style="display: none;">
@@ -1891,6 +1978,10 @@
             document.getElementById('selectedProgramName').textContent = selectedProgram.name;
             document.getElementById('programResults').style.display = 'none';
             section.style.display = 'block';
+
+            // Ratings widget: only meaningful for persisted SprayProgram docs
+            // (template-xxx ids live in-memory only, not in DB).
+            loadRatingsForSelectedProgram();
 
             // Clear custom chemicals when selecting new program
             customChemicals = [];
@@ -3759,6 +3850,250 @@ Acre Profit Group Purchasing`;
             localStorage.removeItem('actingAsCustomer');
             window.location.href = '/admin.html#customers';
         }
+
+        // ============ FARMER RATINGS WIDGET ============
+        // Loads + renders ratings for the currently selected SprayProgram.
+        // Mounts into #ratingsWidget (a sibling of #calculateProgram inside
+        // #programAcresSection). No-op for hardcoded template-* programs.
+        let currentRatings = { summary: null, ratings: [], userHasRated: false };
+
+        function isPersistedProgramId(id) {
+            return id && typeof id === 'string' && !id.startsWith('template-');
+        }
+
+        async function loadRatingsForSelectedProgram() {
+            const widget = document.getElementById('ratingsWidget');
+            if (!widget) return;
+            if (!selectedProgram || !isPersistedProgramId(selectedProgram._id)) {
+                widget.style.display = 'none';
+                return;
+            }
+            widget.style.display = 'block';
+            document.getElementById('ratingsList').innerHTML = '<p style="color:#666;">Loading ratings…</p>';
+            try {
+                const res = await fetch(`${API_URL}/api/ratings/${selectedProgram._id}`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                currentRatings = {
+                    summary: data.summary,
+                    ratings: data.ratings || [],
+                    userHasRated: !!data.userHasRated,
+                };
+                renderRatingsWidget();
+            } catch (err) {
+                document.getElementById('ratingsList').innerHTML =
+                    `<p style="color:#c22;">Failed to load ratings: ${err.message}</p>`;
+            }
+        }
+
+        function renderRatingsWidget() {
+            const { summary, ratings, userHasRated } = currentRatings;
+            const avg = summary?.averageStars;
+            document.getElementById('ratingsAvgStars').textContent = avg != null ? avg.toFixed(1) + ' ★' : 'No ratings yet';
+            document.getElementById('ratingsStarsTrack').textContent =
+                avg != null ? '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg)) : '';
+            document.getElementById('ratingsCount').textContent = `(${summary?.count || 0} ratings)`;
+
+            const dist = document.getElementById('ratingsDistribution');
+            if (summary && summary.count > 0) {
+                dist.innerHTML = [5, 4, 3, 2, 1].map(n => {
+                    const row = summary.starDistribution.find(r => r.stars === n);
+                    const count = row?.count || 0;
+                    const pct = summary.count ? Math.round((count / summary.count) * 100) : 0;
+                    return `<div style="display:flex; align-items:center; gap:8px; font-size:13px; margin:2px 0;">
+                        <span style="width:30px; color:#666;">${n}★</span>
+                        <div style="flex:1; background:#eee; border-radius:4px; height:8px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:#f59e0b;"></div></div>
+                        <span style="width:28px; text-align:right; color:#666;">${count}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                dist.innerHTML = '';
+            }
+
+            const leaveBtn = document.getElementById('leaveRatingBtn');
+            leaveBtn.style.display = userHasRated ? 'none' : 'inline-block';
+
+            const currentUserId = window.__currentUserId || null;
+            document.getElementById('ratingsList').innerHTML = ratings.length
+                ? ratings.map(r => renderRatingRow(r, currentUserId)).join('')
+                : '<p style="color:#666; padding:12px 0;">No ratings yet. Be the first to share how this program worked on your ground.</p>';
+        }
+
+        function renderRatingRow(r, currentUserId) {
+            const isOwn = currentUserId && String(r.ratedBy) === String(currentUserId);
+            const stars = '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
+            const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '';
+            const ctxBits = [];
+            if (r.crop) ctxBits.push(escapeHtmlRating(r.crop));
+            if (r.seasonYear) ctxBits.push(String(r.seasonYear));
+            const ctx = ctxBits.length ? `<span style="color:#666;">· ${ctxBits.join(' · ')}</span>` : '';
+            const weatherYield = (r.weatherConditions || r.yieldOutcome)
+                ? `<details style="margin-top:6px; color:#444;"><summary style="cursor:pointer; color:#666;">Weather & yield</summary>
+                    ${r.weatherConditions ? `<div style="margin-top:4px;"><strong>Weather:</strong> ${escapeHtmlRating(r.weatherConditions)}</div>` : ''}
+                    ${r.yieldOutcome ? `<div style="margin-top:4px;"><strong>Yield:</strong> ${escapeHtmlRating(r.yieldOutcome)}</div>` : ''}
+                   </details>`
+                : '';
+            const ownActions = isOwn
+                ? `<div style="margin-top:8px; display:flex; gap:8px;">
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:12px;" onclick='openRatingModal(${JSON.stringify(r._id)})'>Edit</button>
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-color:#c22; color:#c22;" onclick='deleteOwnRating(${JSON.stringify(r._id)})'>Delete</button>
+                   </div>`
+                : '';
+            return `<div class="rating-row" style="border-top:1px solid #eee; padding:12px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+                    <div><span style="color:#f59e0b; font-size:16px;">${stars}</span> <strong>${escapeHtmlRating(r.ratedByName || 'Farmer')}</strong> ${ctx}</div>
+                    <div style="color:#888; font-size:12px;">${date}</div>
+                </div>
+                ${r.comment ? `<div style="margin-top:6px;">${escapeHtmlRating(r.comment)}</div>` : ''}
+                ${weatherYield}
+                ${ownActions}
+            </div>`;
+        }
+
+        function escapeHtmlRating(s) {
+            if (s == null) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Star-input click handler (delegated — one listener bound at init).
+        function initRatingStarInput() {
+            const widget = document.getElementById('ratingStarInput');
+            if (!widget) return;
+            widget.addEventListener('click', e => {
+                const star = e.target.closest('.star');
+                if (!star) return;
+                const value = parseInt(star.dataset.value, 10);
+                setRatingStars(value);
+            });
+            const commentEl = document.getElementById('ratingComment');
+            if (commentEl) {
+                commentEl.addEventListener('input', () => {
+                    document.getElementById('ratingCommentCount').textContent = commentEl.value.length;
+                });
+            }
+        }
+
+        function setRatingStars(value) {
+            const widget = document.getElementById('ratingStarInput');
+            widget.dataset.stars = String(value);
+            widget.querySelectorAll('.star').forEach(s => {
+                const v = parseInt(s.dataset.value, 10);
+                s.textContent = v <= value ? '★' : '☆';
+                s.style.color = v <= value ? '#f59e0b' : '#ccc';
+            });
+        }
+
+        function openRatingModal(editId) {
+            if (!selectedProgram || !isPersistedProgramId(selectedProgram._id)) return;
+            document.getElementById('ratingEditId').value = editId || '';
+            document.getElementById('ratingModalTitle').textContent = editId ? 'Edit your rating' : 'Leave a rating';
+
+            if (editId) {
+                const existing = currentRatings.ratings.find(r => String(r._id) === String(editId));
+                if (!existing) {
+                    alert('Rating not found.');
+                    return;
+                }
+                setRatingStars(existing.stars || 0);
+                document.getElementById('ratingComment').value = existing.comment || '';
+                document.getElementById('ratingCrop').value = existing.crop || '';
+                document.getElementById('ratingSeasonYear').value = existing.seasonYear || '';
+                document.getElementById('ratingWeather').value = existing.weatherConditions || '';
+                document.getElementById('ratingYield').value = existing.yieldOutcome || '';
+            } else {
+                setRatingStars(0);
+                document.getElementById('ratingComment').value = '';
+                document.getElementById('ratingCrop').value = selectedProgram.crop || '';
+                document.getElementById('ratingSeasonYear').value = '';
+                document.getElementById('ratingWeather').value = '';
+                document.getElementById('ratingYield').value = '';
+            }
+            document.getElementById('ratingCommentCount').textContent =
+                String(document.getElementById('ratingComment').value.length);
+            document.getElementById('ratingModalOverlay').style.display = 'flex';
+        }
+
+        function closeRatingModal() {
+            document.getElementById('ratingModalOverlay').style.display = 'none';
+        }
+
+        async function submitRating() {
+            const stars = parseInt(document.getElementById('ratingStarInput').dataset.stars, 10) || 0;
+            if (stars < 1 || stars > 5) {
+                alert('Please pick a star rating (1–5).');
+                return;
+            }
+            const editId = document.getElementById('ratingEditId').value;
+            const body = {
+                sprayProgramId: selectedProgram._id,
+                stars,
+                comment: document.getElementById('ratingComment').value,
+                crop: document.getElementById('ratingCrop').value || null,
+                seasonYear: document.getElementById('ratingSeasonYear').value || null,
+                weatherConditions: document.getElementById('ratingWeather').value,
+                yieldOutcome: document.getElementById('ratingYield').value,
+            };
+
+            try {
+                const url = editId ? `${API_URL}/api/ratings/${editId}` : `${API_URL}/api/ratings`;
+                const res = await fetch(url, {
+                    method: editId ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    if (res.status === 409) {
+                        alert('You have already rated this program. Edit your existing rating below.');
+                        closeRatingModal();
+                        loadRatingsForSelectedProgram();
+                        return;
+                    }
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+                closeRatingModal();
+                loadRatingsForSelectedProgram();
+            } catch (err) {
+                alert('Rating submit failed: ' + err.message);
+            }
+        }
+
+        async function deleteOwnRating(id) {
+            if (!confirm('Delete your rating?')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/ratings/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                loadRatingsForSelectedProgram();
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        // Cache current user id for own-rating detection (own-row edit/delete
+        // buttons). If /api/auth/me doesn't exist, best-effort decode fails
+        // silently — server is still authoritative on ownership.
+        async function primeCurrentUserId() {
+            try {
+                const res = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    window.__currentUserId = data?.user?._id || data?._id || null;
+                }
+            } catch (e) { /* best-effort; server enforces ownership */ }
+        }
+
+        initRatingStarInput();
+        primeCurrentUserId();
 
         initActingAs();
         loadChemicals();

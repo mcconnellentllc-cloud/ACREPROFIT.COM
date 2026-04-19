@@ -25,6 +25,8 @@ const fs = require('fs');
 
 const mainchemRouter = require('./routes/admin/mainchem');
 const sprayProgramsAdminRouter = require('./routes/admin/spray-programs');
+const ratingsRouter = require('./routes/ratings');
+const adminRatingsRouter = require('./routes/admin/ratings');
 const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
 
 // File upload handling
@@ -4013,6 +4015,14 @@ app.use('/api/admin/mainchem', authMiddleware, superAdminMiddleware, mainchemRou
 // Admin Programs editor — CRUD for SprayProgram docs, gated to superadmin
 // only. Same scope-specific prefix pattern as /api/admin/mainchem.
 app.use('/api/admin/spray-programs', authMiddleware, superAdminMiddleware, sprayProgramsAdminRouter);
+
+// Farmer rating endpoints. authMiddleware only — any logged-in role may
+// read and rate. Ownership + role checks live inside the router.
+app.use('/api/ratings', authMiddleware, ratingsRouter);
+
+// Superadmin moderation queue for ratings. Scope-specific prefix keeps the
+// strict superAdminMiddleware gate narrow.
+app.use('/api/admin/ratings', authMiddleware, superAdminMiddleware, adminRatingsRouter);
 
 // ============ ROUTES ============
 
