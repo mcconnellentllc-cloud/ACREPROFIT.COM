@@ -61,6 +61,7 @@
                     <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
                     <a href="#price-mining" class="admin-tab" data-tab="price-mining" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">Price Mining</a>
                     <span id="programsNav" style="display: none;"><a href="#programs" class="admin-tab" data-tab="programs" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white;">Programs</a></span>
+                    <span id="ratingsNav" style="display: none;"><a href="#ratings" class="admin-tab" data-tab="ratings" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white;">Ratings <span id="ratingsBadge" style="display:none; background:#dc2626; color:#fff; border-radius:999px; padding:0 6px; margin-left:4px; font-size:11px;"></span></a></span>
 
                     <!-- AcreProfit Business Dropdown -->
                     <div class="admin-tab-dropdown">
@@ -3283,6 +3284,40 @@
                 </div>
             </div>
 
+            <!-- Ratings Tab (superadmin only) -->
+            <div id="ratingsTab" class="tab-content">
+                <div class="tab-header">
+                    <div>
+                        <h2>Farmer Ratings</h2>
+                        <p class="tab-subtitle">Review, moderate, and moderate flagged ratings on spray programs.</p>
+                    </div>
+                    <div style="display:flex; gap:8px;">
+                        <button class="btn btn-outline" onclick="loadAdminRatings('all')">All</button>
+                        <button class="btn btn-outline" onclick="loadAdminRatings('flagged')" style="border-color:#dc2626; color:#dc2626;">Flagged</button>
+                        <button class="btn btn-outline" onclick="loadAdminRatings('hidden')">Hidden</button>
+                    </div>
+                </div>
+
+                <div class="orders-table-wrapper" style="margin-top: 16px;">
+                    <table class="admin-table" id="ratingsAdminTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Program</th>
+                                <th>Reviewer</th>
+                                <th>Stars</th>
+                                <th>Comment</th>
+                                <th>Status</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ratingsAdminTableBody">
+                            <tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">Loading ratings…</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
             <!-- Programs Tab (superadmin only) -->
             <div id="programsTab" class="tab-content">
                 <div class="tab-header">
@@ -3443,6 +3478,7 @@
             setDisplay('suppliersNavTop', 'block');
             setDisplay('complianceNav', 'block');
             setDisplay('programsNav', 'inline');
+            setDisplay('ratingsNav', 'inline');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
@@ -11466,6 +11502,121 @@
         }
 
         document.querySelector('[data-tab="programs"]')?.addEventListener('click', loadAdminPrograms);
+
+        // ============ ADMIN RATINGS MODERATION (superadmin only) ============
+        // Uses /api/admin/ratings. Provides list with filter (all/flagged/
+        // hidden), per-row hide/unhide, clear-flag, and hard-delete.
+        async function loadAdminRatings(filter) {
+            const body = document.getElementById('ratingsAdminTableBody');
+            const f = filter || 'all';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ratings?filter=${encodeURIComponent(f)}`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                renderAdminRatingsTable(data.ratings || []);
+                updateRatingsBadge(data.counts);
+            } catch (err) {
+                body.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:#dc2626;">Failed to load ratings: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderAdminRatingsTable(ratings) {
+            const body = document.getElementById('ratingsAdminTableBody');
+            if (!ratings.length) {
+                body.innerHTML = `<tr><td colspan="7" style="text-align:center; padding:24px; color:var(--text-muted);">No ratings in this filter.</td></tr>`;
+                return;
+            }
+            body.innerHTML = ratings.map(r => {
+                const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '';
+                const program = r.sprayProgramId?.name || '(unknown)';
+                const stars = '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
+                const status = [
+                    r.profanityFlagged ? '<span style="color:#dc2626;">Flagged</span>' : '',
+                    r.isHidden ? '<span style="color:#888;">Hidden</span>' : '',
+                ].filter(Boolean).join(' · ') || '<span style="color:#059669;">OK</span>';
+                const comment = escapeHtml((r.comment || '').slice(0, 160)) + ((r.comment || '').length > 160 ? '…' : '');
+                const actions = `
+                    ${r.isHidden
+                        ? `<button class="btn btn-outline" style="padding:4px 10px; font-size:12px;" onclick="adminUnhideRating('${r._id}')">Unhide</button>`
+                        : `<button class="btn btn-outline" style="padding:4px 10px; font-size:12px;" onclick="adminHideRating('${r._id}')">Hide</button>`}
+                    ${r.profanityFlagged ? `<button class="btn btn-outline" style="padding:4px 10px; font-size:12px;" onclick="adminClearFlag('${r._id}')">Clear flag</button>` : ''}
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-color:#dc2626; color:#dc2626;" onclick="adminDeleteRating('${r._id}')">Delete</button>
+                `;
+                return `<tr>
+                    <td>${date}</td>
+                    <td>${escapeHtml(program)}</td>
+                    <td>${escapeHtml(r.ratedByName || 'Farmer')}</td>
+                    <td style="color:#f59e0b;">${stars}</td>
+                    <td>${comment}</td>
+                    <td>${status}</td>
+                    <td>${actions}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function updateRatingsBadge(counts) {
+            const badge = document.getElementById('ratingsBadge');
+            if (!badge || !counts) return;
+            const total = (counts.flagged || 0) + (counts.hidden || 0);
+            if (total > 0) {
+                badge.style.display = 'inline-block';
+                badge.textContent = String(total);
+            } else {
+                badge.style.display = 'none';
+            }
+        }
+
+        async function adminHideRating(id) {
+            const reason = prompt('Reason for hiding (optional):') || null;
+            await adminPatchRating(id, 'hide', { reason });
+        }
+        async function adminUnhideRating(id) { await adminPatchRating(id, 'unhide', {}); }
+        async function adminClearFlag(id) { await adminPatchRating(id, 'clear-flag', {}); }
+        async function adminPatchRating(id, action, payload) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ratings/${id}/${action}`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    },
+                    body: JSON.stringify(payload || {}),
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                loadAdminRatings('all');
+            } catch (err) {
+                alert('Action failed: ' + err.message);
+            }
+        }
+
+        async function adminDeleteRating(id) {
+            if (!confirm('Permanently delete this rating? This cannot be undone.')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ratings/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                loadAdminRatings('all');
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        // Prime the nav badge on admin boot (cheap count-only endpoint).
+        async function primeRatingsBadge() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/ratings?count=true`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) updateRatingsBadge(await res.json());
+            } catch (e) { /* non-fatal */ }
+        }
+
+        document.querySelector('[data-tab="ratings"]')?.addEventListener('click', () => loadAdminRatings('all'));
+        if (document.getElementById('ratingsNav')) primeRatingsBadge();
     </script>
 
     <style>
