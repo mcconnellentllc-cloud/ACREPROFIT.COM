@@ -7854,6 +7854,20 @@ app.put('/api/chemicals/:id/distributor-margin', authMiddleware, async (req, res
         const chemical = await Chemical.findById(req.params.id);
         if (!chemical) return res.status(404).json({ error: 'Product not found' });
 
+        // MAINCHEM imports land with status='pending' and no pricing. This
+        // endpoint is outside the rejectPendingChemicalOrders middleware
+        // barrier, so without this guard undefined + marginDollars would
+        // silently save sellPrice as literal NaN.
+        if (chemical.adminPrice == null) {
+            return res.status(400).json({
+                ok: false,
+                error: 'product_missing_admin_price',
+                message: 'Cannot set distributor margin — product has no admin price. Admin must set cost and admin margin first.',
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+            });
+        }
+
         chemical.marginDollars = marginDollars;
         chemical.sellPrice = Math.round((chemical.adminPrice + marginDollars) * 100) / 100;
         chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
@@ -7890,6 +7904,19 @@ app.put('/api/chemicals/:id/admin-margin', authMiddleware, async (req, res) => {
 
         if (costPrice !== undefined) chemical.costPrice = costPrice;
         if (adminMarginDollars !== undefined) chemical.adminMarginDollars = adminMarginDollars;
+
+        // Same NaN gate as distributor-margin — costPrice is optional on the
+        // schema now, but this endpoint must have it to compute adminPrice.
+        // Admin can pass costPrice in the body to set it for the first time.
+        if (chemical.costPrice == null) {
+            return res.status(400).json({
+                ok: false,
+                error: 'product_missing_cost_price',
+                message: 'Cost price required — cannot calculate admin price without it. Pass costPrice in the request body or set it on the product first.',
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+            });
+        }
 
         // Recalculate prices
         chemical.adminPrice = Math.round((chemical.costPrice + chemical.adminMarginDollars) * 100) / 100;
@@ -12000,6 +12027,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
         }
 
         const orderLines = [];
+        const unpricedLines = [];
         let totalConfirmedPrice = 0;
         let hasNeedsQuote = false;
         let valorWarning = false;
@@ -12071,9 +12099,22 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             });
             const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
 
-            // Determine status
+            // Determine status. MAINCHEM imports land with no sellPrice
+            // (status='pending' until admin enters pricing). Don't NaN the
+            // quote line — surface them as 'unpriced' so UI can display
+            // "pricing pending" instead of showing literal NaN to farmers.
             let status, pricePerPackage, lineTotal;
-            if (onHandQuantity >= packagesNeeded) {
+            if (chemical.sellPrice == null) {
+                status = 'unpriced';
+                pricePerPackage = null;
+                lineTotal = null;
+                hasNeedsQuote = true;
+                unpricedLines.push({
+                    chemicalId: chemical._id,
+                    productName: chemical.productName,
+                    chemicalStatus: chemical.status || null,
+                });
+            } else if (onHandQuantity >= packagesNeeded) {
                 status = 'confirmed';
                 pricePerPackage = chemical.sellPrice * packageSize;
                 lineTotal = packagesNeeded * pricePerPackage;
@@ -12123,9 +12164,20 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 });
                 const hvOnHand = hvInventory ? hvInventory.quantityAvailable : 0;
 
-                const hvStatus = hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote';
+                // If Hydrovant itself is unpriced (pending MAINCHEM import),
+                // fall through to needs_quote rather than NaN-ing the line.
+                const hvUnpriced = hydrovant.sellPrice == null;
+                const hvStatus = hvUnpriced ? 'unpriced'
+                    : (hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote');
                 const hvPricePerPack = hvStatus === 'confirmed' ? (hydrovant.sellPrice * hvPackageSize) : null;
                 const hvLineTotal = hvStatus === 'confirmed' ? (hvPackagesNeeded * hvPricePerPack) : null;
+                if (hvUnpriced) {
+                    unpricedLines.push({
+                        chemicalId: hydrovant._id,
+                        productName: hydrovant.productName,
+                        chemicalStatus: hydrovant.status || null,
+                    });
+                }
 
                 if (hvStatus === 'confirmed' && hvLineTotal) {
                     totalConfirmedPrice += hvLineTotal;
@@ -12161,6 +12213,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             totalWaterVolume,
             orderLines,
             hydrovant: hydrovantLine,
+            unpriced: unpricedLines,
             valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
             orderStatus,
             totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
@@ -12241,10 +12294,37 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
 
         const chemicalDocs = chemicalIds.length > 0
             ? await Chemical.find({ _id: { $in: chemicalIds } })
-                .select('_id productName sellPrice unitsPerPack isActive labelUrl sdsUrl')
+                .select('_id productName sellPrice unitsPerPack isActive status labelUrl sdsUrl')
             : [];
         const chemMap = {};
         chemicalDocs.forEach(c => { chemMap[c._id.toString()] = c; });
+
+        // Belt-and-suspenders: reject the whole submit if any confirmed
+        // line references a chem with no sellPrice. The calculate endpoint
+        // marks these 'unpriced', but a stale client could still POST them
+        // as 'confirmed'. Without this guard the arithmetic below saves
+        // NaN line totals and the mismatch-check at line ~12271 doesn't
+        // catch NaN (it only compares client vs server numbers).
+        const unpricedConfirmed = [];
+        for (const line of orderLines) {
+            if (line.status !== 'confirmed' || !line.chemicalId) continue;
+            const chem = chemMap[line.chemicalId.toString()];
+            if (chem && chem.sellPrice == null) {
+                unpricedConfirmed.push({
+                    chemicalId: chem._id,
+                    productName: chem.productName,
+                    chemicalStatus: chem.status || null,
+                });
+            }
+        }
+        if (unpricedConfirmed.length > 0) {
+            return res.status(400).json({
+                ok: false,
+                error: 'order_contains_unpriced_chemicals',
+                message: 'Cannot submit — some confirmed lines reference products that are not yet priced. Admin must approve pricing first.',
+                unpriced: unpricedConfirmed,
+            });
+        }
 
         const validatedLines = [];
         for (const line of orderLines) {
@@ -12782,6 +12862,7 @@ app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) =
 // Helper function for order calculation (reusable)
 async function calculateOrder(acres, gpa, products) {
     const orderLines = [];
+    const unpricedLines = [];
     let totalConfirmedPrice = 0;
     let hasNeedsQuote = false;
     let valorWarning = false;
@@ -12818,7 +12899,17 @@ async function calculateOrder(acres, gpa, products) {
         const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
 
         let status, pricePerPackage, lineTotal;
-        if (onHandQuantity >= packagesNeeded) {
+        if (chemical.sellPrice == null) {
+            status = 'unpriced';
+            pricePerPackage = null;
+            lineTotal = null;
+            hasNeedsQuote = true;
+            unpricedLines.push({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                chemicalStatus: chemical.status || null,
+            });
+        } else if (onHandQuantity >= packagesNeeded) {
             status = 'confirmed';
             pricePerPackage = chemical.sellPrice * packageSize;
             lineTotal = packagesNeeded * pricePerPackage;
@@ -12859,12 +12950,24 @@ async function calculateOrder(acres, gpa, products) {
             const hvPkgs = Math.ceil(hvGallons / hvPkgSize);
             const hvInv = await Inventory.findOne({ chemicalId: hvChem._id, location: 'main' });
             const hvOnHand = hvInv ? hvInv.quantityAvailable : 0;
-            const hvStatus = hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote';
+            // Same unpriced guard as the inline endpoint — if Hydrovant itself
+            // has no sellPrice, fall through rather than NaN the line total.
+            const hvUnpriced = hvChem.sellPrice == null;
+            const hvStatus = hvUnpriced ? 'unpriced'
+                : (hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote');
             const hvPrice = hvStatus === 'confirmed' ? hvChem.sellPrice * hvPkgSize : null;
             const hvTotal = hvStatus === 'confirmed' ? hvPkgs * hvPrice : null;
 
             if (hvStatus === 'confirmed' && hvTotal) totalConfirmedPrice += hvTotal;
             else hasNeedsQuote = true;
+
+            if (hvUnpriced) {
+                unpricedLines.push({
+                    chemicalId: hvChem._id,
+                    productName: hvChem.productName,
+                    chemicalStatus: hvChem.status || null,
+                });
+            }
 
             hydrovant = {
                 chemicalId: hvChem._id,
@@ -12885,6 +12988,7 @@ async function calculateOrder(acres, gpa, products) {
         totalWaterVolume,
         orderLines,
         hydrovant,
+        unpriced: unpricedLines,
         valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
         orderStatus: hasNeedsQuote ? 'pending_quote' : 'ready_for_checkout',
         totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
