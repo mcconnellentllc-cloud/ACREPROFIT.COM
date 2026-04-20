@@ -49,7 +49,7 @@ router.get('/', async (req, res) => {
 router.get('/_chemicals', async (req, res) => {
   try {
     const chemicals = await Chemical.find({ status: 'approved' })
-      .select('_id productName tradeName manufacturer packSize pkg unit uom')
+      .select('_id productName tradeName manufacturer packSize pkg unit uom rateUnit defaultRate')
       .sort({ productName: 1 })
       .lean();
     res.json({ chemicals, count: chemicals.length });
