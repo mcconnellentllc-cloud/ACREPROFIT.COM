@@ -11383,26 +11383,65 @@
             if (row) row.appendChild(buildChemicalRow({}));
         }
 
+        // Rate-unit options for the Programs editor chemical rows. Keep in
+        // sync with the calculateAmount() switch in chemicals.html — any new
+        // unit here must also have a conversion branch there or it'll render
+        // as raw rate × acres.
+        const PROGRAM_RATE_UNIT_OPTIONS = [
+            'fl oz/acre',
+            'dry oz/acre',
+            'oz/acre',
+            'pt/acre',
+            'qt/acre',
+            'gal/acre',
+            'lb/acre',
+            '%v/v',
+            'lb/100gal',
+        ];
+
         function buildChemicalRow(c) {
             const div = document.createElement('div');
             div.className = 'chem-row';
-            div.style.cssText = 'display:grid; grid-template-columns:3fr 1fr 1fr auto; gap:6px; margin-bottom:6px; align-items:center;';
+            div.style.cssText = 'display:grid; grid-template-columns:3fr 1fr 1.2fr auto; gap:6px; margin-bottom:6px; align-items:center;';
 
             const options = programsApprovedChemicals.map(x => {
                 const selected = String(x._id) === String(c.chemicalId) ? 'selected' : '';
-                return `<option value="${x._id}" data-name="${escapeHtml(x.productName || x.tradeName || '')}" ${selected}>${escapeHtml(x.productName || x.tradeName || '(unnamed)')}${x.manufacturer ? ' — ' + escapeHtml(x.manufacturer) : ''}</option>`;
+                const defUnit = x.rateUnit || '';
+                return `<option value="${x._id}" data-name="${escapeHtml(x.productName || x.tradeName || '')}" data-default-unit="${escapeHtml(defUnit)}" ${selected}>${escapeHtml(x.productName || x.tradeName || '(unnamed)')}${x.manufacturer ? ' — ' + escapeHtml(x.manufacturer) : ''}</option>`;
             }).join('');
 
+            const currentUnit = c.rateUnit || c.unit || '';
+            const unitOpts = PROGRAM_RATE_UNIT_OPTIONS.map(u =>
+                `<option value="${u}" ${u === currentUnit ? 'selected' : ''}>${u}</option>`
+            ).join('');
+
             div.innerHTML = `
-                <select class="chem-id" style="padding:6px; border:1px solid var(--border); border-radius:4px;">
+                <select class="chem-id" style="padding:6px; border:1px solid var(--border); border-radius:4px;" onchange="onChemicalSelectChange(this)">
                     <option value="">Select chemical…</option>
                     ${options}
                 </select>
                 <input type="number" class="chem-rate" step="0.01" min="0" placeholder="Rate" value="${c.rate ?? c.suggestedRate ?? ''}" style="padding:6px; border:1px solid var(--border); border-radius:4px;">
-                <input type="text" class="chem-unit" placeholder="oz/acre" value="${escapeHtml(c.rateUnit || c.unit || '')}" style="padding:6px; border:1px solid var(--border); border-radius:4px;">
+                <select class="chem-unit" style="padding:6px; border:1px solid var(--border); border-radius:4px;" required>
+                    <option value="">— unit —</option>
+                    ${unitOpts}
+                </select>
                 <button class="btn btn-outline" style="padding:4px 8px; font-size:11px; border-color:#dc2626; color:#dc2626;" onclick="this.parentElement.remove()">×</button>
             `;
             return div;
+        }
+
+        // Pre-fill the rate-unit dropdown from the chemical's catalog default
+        // when the user picks a chemical — only if the row hasn't been
+        // manually set yet (blank) so we don't clobber an admin's override.
+        function onChemicalSelectChange(selectEl) {
+            const row = selectEl.closest('.chem-row');
+            if (!row) return;
+            const unitSelect = row.querySelector('.chem-unit');
+            if (!unitSelect || unitSelect.value) return;
+            const defUnit = selectEl.selectedOptions[0]?.dataset.defaultUnit;
+            if (defUnit && PROGRAM_RATE_UNIT_OPTIONS.includes(defUnit)) {
+                unitSelect.value = defUnit;
+            }
         }
 
         function collectPassesFromDom() {
@@ -11437,6 +11476,25 @@
                 alert('Name and crop are required.');
                 return;
             }
+            const passes = collectPassesFromDom();
+
+            // Block save if any chemical is missing its rate unit — we can't
+            // price the program downstream without it (calculateAmount falls
+            // through the switch and renders raw rate×acres, which was the
+            // "26000 gl" bug on Dryland Corn).
+            const missing = [];
+            passes.forEach((p, pIdx) => {
+                (p.chemicals || []).forEach(c => {
+                    if ((c.chemicalId || c.productName) && !c.rateUnit) {
+                        missing.push(`Pass ${pIdx + 1}: ${c.productName || c.chemicalId}`);
+                    }
+                });
+            });
+            if (missing.length) {
+                alert('Rate unit is required for every chemical. Missing:\n\n' + missing.join('\n'));
+                return;
+            }
+
             const body = {
                 name,
                 crop,
@@ -11448,7 +11506,7 @@
                 rotationNotes: document.getElementById('programRotationNotes').value,
                 grazingNotes: document.getElementById('programGrazingNotes').value,
                 groundType: document.getElementById('programGroundType').value,
-                passes: collectPassesFromDom(),
+                passes,
             };
 
             try {
