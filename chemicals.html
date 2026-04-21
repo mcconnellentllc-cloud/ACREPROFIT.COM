@@ -2531,11 +2531,15 @@
                     const customRate = getCustomRate(chemItem.productName);
                     const rate = customRate !== null ? customRate : (chemItem.rate ?? chemItem.suggestedRate);
                     const rateUnit = chemItem.rateUnit;
-                    const unit = chemItem.unit || 'gal';
-                    const unitsPerPack = chemItem.unitsPerPack || 250;
 
-                    // Look up LIVE price from the catalog - catalog is the ONLY source of truth
-                    // If a product isn't in the catalog or has no price, cost = 0 and we flag it
+                    // Look up LIVE price from the catalog FIRST — catalog is the source
+                    // of truth for sellPrice convention ($/unit where unit is the
+                    // catalog's pack unit like 'gal' or 'lb'). pr-146 moved this above
+                    // the unit determination because program subdoc fields (unit,
+                    // unitsPerPack, packSize) drifted to bogus values like 'fl oz/acre'
+                    // when the schema's mirrorChemicalRates accidentally copied
+                    // rateUnit → unit. Using catalog values first keeps calculateAmount
+                    // and cost math aligned on the same unit convention.
                     const catalogMatch = (window.allChemicalsForPricing || chemicals || []).find(c => {
                         const catalogName = (c.productName || c.name || '').toLowerCase().trim();
                         const programName = (chemItem.productName || '').toLowerCase().trim();
@@ -2545,6 +2549,13 @@
                     });
                     const price = catalogMatch?.sellPrice || catalogMatch?.price || 0;
                     const priceMissing = !catalogMatch || !price;
+
+                    // Pack fields: catalog wins, program subdoc is fallback, then hardcoded
+                    // defaults. Unit drives the calculateAmount target so fl oz/acre rates
+                    // convert correctly to the catalog's sell-price unit (usually 'gal').
+                    const unit = catalogMatch?.unit || chemItem.unit || 'gal';
+                    const unitsPerPack = catalogMatch?.unitsPerPack || chemItem.unitsPerPack || 250;
+                    const packSize = catalogMatch?.packSize || chemItem.packSize;
 
                     // Calculate amount needed
                     const totalNeeded = calculateAmount(rate, rateUnit, acres, unit, sprayVolume);
@@ -2557,7 +2568,7 @@
                         rateUnit,
                         totalNeeded,
                         packages,
-                        packSize: chemItem.packSize,
+                        packSize,
                         unitsPerPack,
                         unit,
                         price,
@@ -2573,7 +2584,7 @@
                             name: chemItem.productName,
                             totalNeeded: 0,
                             packages: 0,
-                            packSize: chemItem.packSize,
+                            packSize,
                             unitsPerPack,
                             unit,
                             price,
