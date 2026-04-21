@@ -135,14 +135,28 @@ SprayProgramSchema.pre('save', async function(next) {
   const hasPasses = Array.isArray(this.passes) && this.passes.length > 0;
   const hasApplications = Array.isArray(this.applications) && this.applications.length > 0;
 
-  if (hasPasses && !hasApplications) {
+  // Mirror passes[] ↔ applications[] on every save.
+  //
+  // BUG FIX (pr-145): the original guard `hasPasses && !hasApplications`
+  // only fired on first insert. On update, both arrays already exist from
+  // the initial save so neither branch fired → applications[] went stale
+  // whenever the admin editor wrote new data to passes[].
+  //
+  // New logic: isModified() on the written side triggers the mirror on
+  // every save — insert OR update. The bootstrap guards (one side empty)
+  // remain for legacy-doc hydration but are now a fallback, not the
+  // primary path.
+  const passesModified = this.isModified('passes');
+  const appsModified = this.isModified('applications');
+
+  if (passesModified || (hasPasses && !hasApplications)) {
     this.applications = this.passes.map(p => ({
       name: p.name || '',
       timing: p.timing || '',
       deliveryWindow: '',
       chemicals: (p.chemicals || []).map(c => ({ ...c.toObject ? c.toObject() : c })),
     }));
-  } else if (hasApplications && !hasPasses) {
+  } else if (appsModified || (hasApplications && !hasPasses)) {
     this.passes = this.applications.map((a, idx) => ({
       passNumber: idx + 1,
       name: a.name || `Pass ${idx + 1}`,
