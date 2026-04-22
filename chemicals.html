@@ -289,7 +289,7 @@
                         </div>
 
                         <div class="config-field">
-                            <label for="programTankSize">Tank Size (gal) <span style="color:#c00;">*</span></label>
+                            <label for="programTankSize">Sprayer Tank Size (gal) <span style="color:#c00;">*</span></label>
                             <div class="input-spinner">
                                 <button type="button" class="spinner-btn minus" onclick="adjustValue('programTankSize', -100)">−</button>
                                 <input type="number" id="programTankSize" min="1" step="any" placeholder="1000" required>
@@ -542,7 +542,7 @@
         // means the farmer consciously picked a different pack size for that
         // product. Cleared when a new program is selected.
         let userPackChoices = new Map();
-        // Editable package state: productName → { chemicalId, packSize, unitsPerPack, sellPrice, qty, isCustomRequest, customRequest }
+        // Editable package state: productName → { chemicalId, packSize, unitsPerPack, sellPrice, qty }
         // Seeded from smart picker defaults; farmer edits override.
         let packageEdits = new Map();
         // Tank + carrier volume inputs for per-load mix planning. Session-local,
@@ -1720,6 +1720,7 @@
         document.getElementById('programAcres')?.addEventListener('input', updateProgramCarrierAutoFill);
         document.getElementById('sprayVolume')?.addEventListener('input', updateProgramCarrierAutoFill);
         document.getElementById('programTankSize')?.addEventListener('input', updateProgramLoadCount);
+        document.getElementById('programTankSize')?.addEventListener('input', updateLoadConfig);
         document.getElementById('programTotalCarrierGallons')?.addEventListener('input', function () {
             this.dataset.userEdited = 'true';
             updateProgramLoadCount();
@@ -1941,14 +1942,6 @@
                         estCostPerAcre += inUnit * price;
                     });
                 });
-                const costPerAcreHTML = canCalc && estCostPerAcre > 0
-                    ? `<div style="background:#f0f7ef; border:2px solid #2d5a27; border-radius:8px; padding:14px 18px; margin-bottom:12px; text-align:center;">
-                        <div style="color:#2d5a27; font-size:0.75rem; font-weight:600; letter-spacing:0.5px;">ESTIMATED COST PER ACRE</div>
-                        <div style="color:#2d5a27; font-size:1.8rem; font-weight:800; margin-top:2px;">$${estCostPerAcre.toFixed(2)}</div>
-                        <div style="color:#666; font-size:0.75rem;">+ Hydrovant (adjusts with spray volume)</div>
-                       </div>`
-                    : '';
-
                 return `
                 <div class="program-card" data-program-id="${prog._id}" ${prog.badge ? 'style="border: 2px solid #2d5a27; box-shadow: 0 4px 12px rgba(45,90,39,0.15);"' : ''}>
                     <div class="program-header">
@@ -1957,7 +1950,6 @@
                     </div>
                     ${prog.badge ? `<div style="background:linear-gradient(135deg, #2d5a27 0%, #1f4019 100%); color:white; padding:6px 12px; border-radius:4px; display:inline-block; font-size:0.75rem; font-weight:700; letter-spacing:0.5px; margin-bottom:12px;">&#9733; ${prog.badge.toUpperCase()}</div>` : ''}
                     <p class="program-desc">${prog.description}</p>
-                    ${costPerAcreHTML}
                     ${prog.groundType ? `<div style="background:#f0f7ef; padding:10px 14px; border-radius:6px; margin-bottom:12px; font-size:0.88rem; color:#2d5a27; border-left:3px solid #2d5a27;"><strong>Best For:</strong> ${prog.groundType}</div>` : ''}
                     <div style="background:#fef3c7; border:1px solid #f59e0b; border-radius:8px; padding:12px 16px; margin-bottom:12px; font-size:0.82rem; color:#92400e;">
                         <div style="font-weight:700; margin-bottom:4px;">&#9888; Important Notice</div>
@@ -2268,10 +2260,6 @@
 
         // SKU dropdown changed — update the packageEdits entry and recalc.
         function onSkuChange(productName, chemicalId) {
-            if (chemicalId === '__custom__') {
-                requestCustomPack(productName);
-                return;
-            }
             const catalog = window.allChemicalsForPricing || chemicals || [];
             const sku = catalog.find(c => String(c._id) === String(chemicalId));
             if (!sku) return;
@@ -2286,8 +2274,7 @@
             pe.sellPrice = sku.sellPrice || sku.price || 0;
             pe.sourceSupplier = sku.sourceSupplier || '';
             pe.qty = minQty;
-            pe.isCustomRequest = false;
-            pe.customRequest = null;
+            // (custom pack fields removed in pr-148g)
             // Also update userPackChoices so resolvePack stays in sync
             userPackChoices.set(productName, String(sku._id));
             recalcPackageTotals();
@@ -2313,7 +2300,6 @@
         function recalcPackageTotals() {
             let newTotal = 0;
             for (const [name, pe] of packageEdits) {
-                if (pe.isCustomRequest) continue;
                 newTotal += pe.qty * pe.unitsPerPack * pe.sellPrice;
             }
             // Also count Hydrovant if it's a standalone row (not in packageEdits)
@@ -2332,52 +2318,40 @@
             }
         }
 
-        // Custom pack request — open a prompt dialog for non-catalog packs
-        async function requestCustomPack(productName) {
-            const packSize = await promptDialog(`Custom pack for ${productName}:`, {
-                title: 'Request Custom Pack',
-                placeholder: 'e.g., 250 gal tote',
-                ok: 'Add to Bid Sheet'
-            });
-            if (!packSize) {
-                // User cancelled — reset dropdown to previous selection
-                const pe = packageEdits.get(productName);
-                if (pe) {
-                    const sel = document.querySelector(`select[data-product="${productName.replace(/'/g, "\\'")}"]`);
-                    if (sel) sel.value = String(pe.chemicalId);
-                }
+        // Print only the batch sheet (load sheet + Tank & Load Planning section)
+        function printBatchSheet() {
+            const loadSheet = document.getElementById('loadSheetSection');
+            if (!loadSheet || loadSheet.style.display === 'none') {
+                toast('Enter tank size and calculate a program first.', 'error');
                 return;
             }
-            const qty = await promptDialog(`How many of "${packSize}" do you need?`, {
-                title: 'Quantity',
-                default: '1',
-                ok: 'Confirm'
-            });
-            if (!qty) return;
-            const pe = packageEdits.get(productName);
-            if (!pe) return;
-            pe.isCustomRequest = true;
-            pe.customRequest = { packSize, unit: pe.unitsPerPack > 100 ? 'gal' : 'gal', quantity: parseInt(qty) || 1, reason: 'Farmer-requested non-catalog pack' };
-            calculateProgramOrder();
-        }
-
-        // Cancel a custom pack request and revert to the smart-picker default
-        function cancelCustomPack(productName) {
-            const pe = packageEdits.get(productName);
-            if (pe) {
-                pe.isCustomRequest = false;
-                pe.customRequest = null;
-            }
-            // Clear and let calculateProgramOrder re-seed from picker
-            packageEdits.delete(productName);
-            calculateProgramOrder();
+            const printContent = loadSheet.innerHTML;
+            const printWindow = window.open('', '_blank', 'width=900,height=700');
+            printWindow.document.write(`
+                <html><head><title>Batch Sheet — ${selectedProgram?.name || 'Program'}</title>
+                <style>
+                    body { font-family: Arial, sans-serif; padding: 20px; }
+                    table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+                    th, td { border: 1px solid #000; padding: 4px 8px; }
+                    th { background: #f3f4f6; }
+                    @media print { body { padding: 0; } }
+                </style></head><body>
+                <h2>${selectedProgram?.name || 'Spray Program'} — Batch Sheet</h2>
+                ${printContent}
+                <div style="margin-top: 24px; padding-top: 8px; border-top: 1px solid #000; font-style: italic; font-size: 10pt;">
+                    Applicator initials: ____________ &nbsp; Date: __________
+                </div>
+                </body></html>
+            `);
+            printWindow.document.close();
+            printWindow.print();
         }
 
         // Update tank + carrier-volume state from the inputs and render the
         // load-count readout. Called on every oninput and after each full
         // calculateProgramOrder() render (since recalc wipes the DOM).
         function updateLoadConfig() {
-            tankSizeGal = parseFloat(document.getElementById('loadTankSize')?.value) || 0;
+            tankSizeGal = parseFloat(document.getElementById('programTankSize')?.value) || 0;
             // GPA comes from the existing spray volume input (program flow uses
             // #sprayVolume; direct-selection flow uses #cropGPA). No duplicate
             // input needed — single source of truth for carrier volume.
@@ -2869,9 +2843,7 @@
                                         unitsPerPack: item.unitsPerPack || 1,
                                         sellPrice: item.price,
                                         qty: minQty,
-                                        sourceSupplier: candidates.find(c => String(c.catalogEntry._id) === String(item.chemicalId))?.catalogEntry.sourceSupplier || '',
-                                        isCustomRequest: false,
-                                        customRequest: null
+                                        sourceSupplier: candidates.find(c => String(c.catalogEntry._id) === String(item.chemicalId))?.catalogEntry.sourceSupplier || ''
                                     });
                                 }
                                 const pe = packageEdits.get(item.name);
@@ -2884,9 +2856,8 @@
                                 const skuOptionsHtml = candidates.map(cand => {
                                     const id = String(cand.catalogEntry._id);
                                     const sel = id === String(pe.chemicalId) ? 'selected' : '';
-                                    const supplier = cand.catalogEntry.sourceSupplier ? `${cand.catalogEntry.sourceSupplier} — ` : '';
                                     const label = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
-                                    return `<option value="${id}" ${sel}>${supplier}${label} @ $${(cand.catalogEntry.sellPrice||0).toFixed(2)}/${cand.catalogEntry.unit||'gl'}</option>`;
+                                    return `<option value="${id}" ${sel}>${label} @ $${(cand.catalogEntry.sellPrice||0).toFixed(2)}/${cand.catalogEntry.unit||'gl'}</option>`;
                                 }).join('');
                                 const hasSkuOptions = candidates.length > 0;
                                 const minQty = Math.max(1, Math.ceil(item.totalNeeded / (pe.unitsPerPack || 1)));
@@ -2906,9 +2877,7 @@
                                         <select class="sku-select" data-product="${safeName}" onchange="onSkuChange('${safeName}', this.value)"
                                             style="width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:0.85rem; margin-bottom:6px;">
                                             ${skuOptionsHtml}
-                                            <option value="__custom__">Request custom pack...</option>
                                         </select>` : `<div style="font-size:0.85rem; color:#6b7280; margin-bottom:6px;">${pe.packSize || 'Unknown pack'}</div>`}
-                                        ${!pe.isCustomRequest ? `
                                         <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
                                             <span style="font-size:0.8rem; color:#666;">Qty:</span>
                                             <input type="number" class="pkg-qty-input" value="${pe.qty}" min="1"
@@ -2920,18 +2889,9 @@
                                         </div>
                                         ${overage > 0.1 ? `<div style="font-size:0.78rem; color:#059669;">Extra: +${overage.toFixed(1)} ${item.unit} ($${overageCost.toFixed(2)})</div>` : ''}
                                         ${overage < -0.1 ? `<div style="font-size:0.78rem; color:#dc2626; font-weight:600;">⚠ Short ${Math.abs(overage).toFixed(1)} ${item.unit} — need ${item.totalNeeded.toFixed(1)}, ordering ${ordered.toFixed(1)}</div>` : ''}
-                                        ` : `
-                                        <div style="background:#fef9c3; padding:8px 10px; border-radius:6px; font-size:0.82rem; color:#854d0e;">
-                                            <strong>Custom pack requested</strong><br>
-                                            ${pe.customRequest?.packSize || 'TBD'} × ${pe.customRequest?.quantity || '?'}<br>
-                                            <span style="font-size:0.75rem;">Added to bid sheet on order submit</span><br>
-                                            <button type="button" onclick="cancelCustomPack('${safeName}')" style="background:none; border:none; color:#dc2626; font-size:0.78rem; cursor:pointer; padding:0; margin-top:4px; text-decoration:underline;">Cancel custom request</button>
-                                        </div>`}
                                     </td>
                                     <td class="cost-col">
-                                        ${pe.isCustomRequest
-                                            ? `<span style="color:#854d0e; font-weight:600;">Pending</span>`
-                                            : item.priceIsSpeculated
+                                        ${item.priceIsSpeculated
                                             ? `<strong style="color:#d97706;">~$${lineCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;">est.</span>`
                                             : `<strong>$${lineCost.toFixed(2)}</strong>`
                                         }
@@ -2976,14 +2936,9 @@
                     </table>
 
                     <div class="load-config-section" style="margin:24px 0; padding:20px; background:#f8faf8; border:2px solid #e5e7eb; border-radius:12px;">
-                        <h3 style="margin:0 0 6px 0; color:#2d5a27; font-size:1.05rem;">🚜 Tank & Load Planning</h3>
-                        <p style="margin:0 0 16px 0; color:#666; font-size:0.875rem;">Optional — drives your per-load mix sheet. Leave blank if you're only ordering chemical.</p>
-                        <div style="margin-bottom:16px;">
-                            <label style="display:block; font-weight:600; margin-bottom:6px; font-size:0.875rem;">Sprayer Tank Size (gal)</label>
-                            <input type="number" id="loadTankSize" placeholder="e.g., 1000" min="1"
-                                style="width:260px; padding:10px; border:2px solid #e5e7eb; border-radius:8px; font-size:1rem;"
-                                oninput="updateLoadConfig()">
-                            <div style="font-size:0.8rem; color:#6b7280; margin-top:4px;">Carrier volume comes from your Spray Volume input above.</div>
+                        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+                            <h3 style="margin:0; color:#2d5a27; font-size:1.05rem;">🚜 Tank & Load Planning</h3>
+                            <button type="button" class="btn btn-outline btn-sm" onclick="printBatchSheet()" style="font-size:0.8rem;">Print Batch Sheet</button>
                         </div>
                         <div id="loadReadout" style="display:none; background:#fff; border:1px solid #d1fae5; border-radius:8px; padding:16px;">
                         </div>
@@ -3200,7 +3155,7 @@
             // Restore tank/GPA inputs — pack selector recalc wipes the DOM
             // for the totals section, including the Tank & Load Planning block.
             if (tankSizeGal > 0) {
-                const tankInput = document.getElementById('loadTankSize');
+                const tankInput = document.getElementById('programTankSize');
                 if (tankInput) tankInput.value = tankSizeGal;
             }
             // gpaCarrier reads from #sprayVolume / #cropGPA — no separate input to restore
@@ -3651,10 +3606,6 @@ Generated by AcreProfit.com`;
                     // If farmer edited this row's package, use their choice.
                     // Otherwise fall back to smart picker.
                     const pe = packageEdits.get(chemItem.productName);
-                    if (pe && pe.isCustomRequest) {
-                        // Custom pack request — skip from items, goes to customPackRequests
-                        return;
-                    }
                     let chosenChemId, chosenPackSize, chosenQty, chosenPrice;
                     if (pe) {
                         chosenChemId = pe.chemicalId;
@@ -3712,21 +3663,6 @@ Generated by AcreProfit.com`;
                             crop: selectedProgram.crop,
                             acres
                         },
-                        // Custom pack requests — non-catalog packs farmer requested via the
-                        // "Request custom pack" flow. Server writes these to a pending bid-sheet
-                        // entry so admin can source them. Not billed on this order.
-                        customPackRequests: Array.from(packageEdits.values())
-                            .filter(pe => pe.isCustomRequest && pe.customRequest)
-                            .map(pe => ({
-                                productName: pe.customRequest.productName || Object.keys(totalsByChemical).find(k => {
-                                    const edit = packageEdits.get(k);
-                                    return edit === pe;
-                                }) || 'Unknown',
-                                packSize: pe.customRequest.packSize,
-                                unit: pe.customRequest.unit || 'gal',
-                                quantity: pe.customRequest.quantity || 1,
-                                reason: pe.customRequest.reason || ''
-                            })),
                         customerNotes: `Program: ${selectedProgram.name} for ${acres} acres`,
                         actingAsCustomerId: window.actingAsCustomerId || null,
                         discountCode: discountCode || null,
