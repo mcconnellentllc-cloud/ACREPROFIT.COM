@@ -311,7 +311,7 @@
                     : null;
 
                 const tr = document.createElement('tr');
-                tr.dataset.segIdx = String(idx);
+                tr.dataset.segIdx = String(idx); // used by updateSegmentCalcs for in-place updates
                 tr.innerHTML = `
                     <td data-label="#">${rowNum}</td>
                     <td data-label="Acres applied (cumulative)">
@@ -330,12 +330,12 @@
                 tr.querySelector('.acres-input').addEventListener('input', (e) => {
                     const v = parseFloat(e.target.value);
                     segments[idx].acres = Number.isFinite(v) ? v : null;
-                    renderSegments();
+                    updateSegmentCalcs();
                 });
                 tr.querySelector('.remaining-input').addEventListener('input', (e) => {
                     const v = parseFloat(e.target.value);
                     segments[idx].remaining = Number.isFinite(v) ? v : null;
-                    renderSegments();
+                    updateSegmentCalcs();
                 });
                 tr.querySelector('[data-remove]').addEventListener('click', () => {
                     segments.splice(idx, 1);
@@ -343,6 +343,54 @@
                 });
             });
 
+            updateRunningTotals();
+        }
+
+        // In-place update of derived cells (Segment GPA, Running GPA, validation
+        // errors) without rebuilding table rows. Called on every input keystroke
+        // so the farmer keeps focus while typing. Full renderSegments() is only
+        // needed when rows are added/removed or starting volume changes.
+        function updateSegmentCalcs() {
+            const rows = document.querySelectorAll('#segmentsBody tr[data-seg-idx]');
+            rows.forEach((tr, i) => {
+                const idx = parseInt(tr.dataset.segIdx);
+                const seg = segments[idx];
+                const prev = idx === 0
+                    ? { acres: 0, remaining: startingVolume }
+                    : segments[idx - 1];
+
+                const validation = validateSegment(seg, prev);
+                const segmentGpa = validation.ok
+                    ? (prev.remaining - seg.remaining) / (seg.acres - prev.acres)
+                    : null;
+                const runningGpa = validation.ok
+                    ? (startingVolume - seg.remaining) / seg.acres
+                    : null;
+
+                // Update GPA cells (4th and 5th td)
+                const cells = tr.querySelectorAll('td');
+                if (cells[3]) cells[3].innerHTML = segmentGpa != null ? segmentGpa.toFixed(2) : '&mdash;';
+                if (cells[4]) cells[4].innerHTML = runningGpa != null ? runningGpa.toFixed(2) : '&mdash;';
+
+                // Update validation styling on inputs
+                const acresInput = tr.querySelector('.acres-input');
+                const remainingInput = tr.querySelector('.remaining-input');
+                if (acresInput) acresInput.classList.toggle('invalid', validation.acresInvalid);
+                if (remainingInput) remainingInput.classList.toggle('invalid', validation.remainingInvalid);
+
+                // Update or create error message
+                let errorDiv = tr.querySelector('.row-error');
+                if (validation.error) {
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.className = 'row-error';
+                        remainingInput?.parentElement?.appendChild(errorDiv);
+                    }
+                    errorDiv.textContent = validation.error;
+                } else if (errorDiv) {
+                    errorDiv.remove();
+                }
+            });
             updateRunningTotals();
         }
 
