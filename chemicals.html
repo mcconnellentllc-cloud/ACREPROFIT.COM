@@ -542,6 +542,9 @@
         // means the farmer consciously picked a different pack size for that
         // product. Cleared when a new program is selected.
         let userPackChoices = new Map();
+        // Editable package state: productName → { chemicalId, packSize, unitsPerPack, sellPrice, qty, isCustomRequest, customRequest }
+        // Seeded from smart picker defaults; farmer edits override.
+        let packageEdits = new Map();
         // Tank + carrier volume inputs for per-load mix planning. Session-local,
         // exposed on window for the per-load sheet to consume in a later commit.
         let tankSizeGal = 0;
@@ -1995,6 +1998,7 @@
                 btn.addEventListener('click', () => {
                     selectedProgram = programs.find(p => p._id === btn.dataset.programId);
                     userPackChoices.clear(); // reset pack overrides for the new program
+                    packageEdits.clear(); // reset editable package state
                     showProgramAcresInput();
                 });
             });
@@ -2262,23 +2266,110 @@
             return input ? parseFloat(input.value) : null;
         }
 
-        // Expand/collapse the pack-options sub-row under a totals row.
-        // Swaps the chevron glyph so farmers can see state at a glance.
-        function togglePackOptions(rowId, btn) {
-            const row = document.getElementById(rowId);
-            if (!row) return;
-            const open = row.style.display !== 'none';
-            row.style.display = open ? 'none' : '';
-            if (btn) {
-                btn.textContent = btn.textContent.replace(open ? '▴' : '▾', open ? '▾' : '▴');
+        // SKU dropdown changed — update the packageEdits entry and recalc.
+        function onSkuChange(productName, chemicalId) {
+            if (chemicalId === '__custom__') {
+                requestCustomPack(productName);
+                return;
+            }
+            const catalog = window.allChemicalsForPricing || chemicals || [];
+            const sku = catalog.find(c => String(c._id) === String(chemicalId));
+            if (!sku) return;
+            const pe = packageEdits.get(productName);
+            if (!pe) return;
+            // Recompute needed qty from totalsByChemical
+            const needed = Object.values(totalsByChemical).find(t => t.name === productName)?.totalNeeded || 0;
+            const minQty = Math.max(1, Math.ceil(needed / (sku.unitsPerPack || 1)));
+            pe.chemicalId = sku._id;
+            pe.packSize = sku.packSize;
+            pe.unitsPerPack = sku.unitsPerPack || 1;
+            pe.sellPrice = sku.sellPrice || sku.price || 0;
+            pe.sourceSupplier = sku.sourceSupplier || '';
+            pe.qty = minQty;
+            pe.isCustomRequest = false;
+            pe.customRequest = null;
+            // Also update userPackChoices so resolvePack stays in sync
+            userPackChoices.set(productName, String(sku._id));
+            recalcPackageTotals();
+        }
+
+        // Qty input changed — enforce min=1, update state, recalc.
+        let _qtyDebounce = null;
+        function onQtyChange(productName, input) {
+            clearTimeout(_qtyDebounce);
+            _qtyDebounce = setTimeout(() => {
+                const pe = packageEdits.get(productName);
+                if (!pe) return;
+                let val = parseInt(input.value) || 0;
+                if (val < 1) { val = 1; input.value = 1; }
+                pe.qty = val;
+                recalcPackageTotals();
+            }, 150);
+        }
+
+        // Rebuild the totals footer + cost/acre from packageEdits state.
+        // Called after any SKU or qty change. Does NOT re-render the full
+        // program — only updates the dollar values inline.
+        function recalcPackageTotals() {
+            let newTotal = 0;
+            for (const [name, pe] of packageEdits) {
+                if (pe.isCustomRequest) continue;
+                newTotal += pe.qty * pe.unitsPerPack * pe.sellPrice;
+            }
+            // Also count Hydrovant if it's a standalone row (not in packageEdits)
+            const hydroRow = document.querySelector('.hydrovant-row .cost-col strong');
+            if (hydroRow) {
+                newTotal += parseFloat(hydroRow.textContent.replace(/[$,]/g, '')) || 0;
+            }
+            // Update grand total
+            const totalEl = document.querySelector('.grand-total');
+            if (totalEl) totalEl.textContent = '$' + newTotal.toFixed(2);
+            // Update cost/acre
+            const acres = parseFloat(document.getElementById('programAcres')?.value) || 0;
+            if (acres > 0) {
+                const cpaEl = document.querySelector('.order-totals-section tfoot tr:last-child td:last-child');
+                if (cpaEl) cpaEl.textContent = '$' + (newTotal / acres).toFixed(2);
             }
         }
 
-        // Farmer picked a specific pack size for this product. Store the
-        // override and re-run the whole program calc so the totals, cost/acre,
-        // speculation banner, and submit payload all agree on the new choice.
-        function selectPack(productName, chemicalId) {
-            userPackChoices.set(productName, chemicalId);
+        // Custom pack request — open a prompt dialog for non-catalog packs
+        async function requestCustomPack(productName) {
+            const packSize = await promptDialog(`Custom pack for ${productName}:`, {
+                title: 'Request Custom Pack',
+                placeholder: 'e.g., 250 gal tote',
+                ok: 'Add to Bid Sheet'
+            });
+            if (!packSize) {
+                // User cancelled — reset dropdown to previous selection
+                const pe = packageEdits.get(productName);
+                if (pe) {
+                    const sel = document.querySelector(`select[data-product="${productName.replace(/'/g, "\\'")}"]`);
+                    if (sel) sel.value = String(pe.chemicalId);
+                }
+                return;
+            }
+            const qty = await promptDialog(`How many of "${packSize}" do you need?`, {
+                title: 'Quantity',
+                default: '1',
+                ok: 'Confirm'
+            });
+            if (!qty) return;
+            const pe = packageEdits.get(productName);
+            if (!pe) return;
+            pe.isCustomRequest = true;
+            pe.customRequest = { packSize, unit: pe.unitsPerPack > 100 ? 'gal' : 'gal', quantity: parseInt(qty) || 1, reason: 'Farmer-requested non-catalog pack' };
+            calculateProgramOrder();
+        }
+
+        // Cancel a custom pack request and revert to the smart-picker default
+        function cancelCustomPack(productName) {
+            const pe = packageEdits.get(productName);
+            if (pe) {
+                pe.isCustomRequest = false;
+                pe.customRequest = null;
+            }
+            // Clear and let calculateProgramOrder re-seed from picker
+            packageEdits.delete(productName);
             calculateProgramOrder();
         }
 
@@ -2765,81 +2856,87 @@
                         </thead>
                         <tbody>
                             ${Object.values(totalsByChemical).map(item => {
-                                const breakdown = calculateProductPackages(item.totalNeeded, {
-                                    packSize: item.packSize,
-                                    unitsPerPack: item.unitsPerPack,
-                                    unit: item.unit,
-                                    productName: item.name
-                                });
-                                // Recalculate cost based on actual packages
-                                const actualCost = breakdown.totalOrdered * item.price;
-                                // Pack selector: only shown when the catalog has 2+ valid
-                                // candidates for this product. Radio list appears in a
-                                // sub-row toggled by the "Options" chevron.
                                 const candidates = item.packCandidates || [];
-                                const hasOptions = candidates.length > 1;
                                 const rowKey = (item.name || '').replace(/[^a-zA-Z0-9]/g, '_');
-                                const optionsRowId = `packOptions-${rowKey}`;
-                                const chosenId = String(item.chemicalId || '');
+                                const safeName = (item.name || '').replace(/'/g, "\\'");
+
+                                // Seed packageEdits from smart-picker defaults if farmer hasn't edited yet
+                                if (!packageEdits.has(item.name)) {
+                                    const minQty = Math.max(1, Math.ceil(item.totalNeeded / (item.unitsPerPack || 1)));
+                                    packageEdits.set(item.name, {
+                                        chemicalId: item.chemicalId,
+                                        packSize: item.packSize,
+                                        unitsPerPack: item.unitsPerPack || 1,
+                                        sellPrice: item.price,
+                                        qty: minQty,
+                                        sourceSupplier: candidates.find(c => String(c.catalogEntry._id) === String(item.chemicalId))?.catalogEntry.sourceSupplier || '',
+                                        isCustomRequest: false,
+                                        customRequest: null
+                                    });
+                                }
+                                const pe = packageEdits.get(item.name);
+                                const ordered = pe.qty * pe.unitsPerPack;
+                                const overage = ordered - item.totalNeeded;
+                                const lineCost = ordered * pe.sellPrice;
+                                const overageCost = overage > 0 ? overage * pe.sellPrice : 0;
+
+                                // Build SKU dropdown options from all catalog candidates
+                                const skuOptionsHtml = candidates.map(cand => {
+                                    const id = String(cand.catalogEntry._id);
+                                    const sel = id === String(pe.chemicalId) ? 'selected' : '';
+                                    const supplier = cand.catalogEntry.sourceSupplier ? `${cand.catalogEntry.sourceSupplier} — ` : '';
+                                    const label = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
+                                    return `<option value="${id}" ${sel}>${supplier}${label} @ $${(cand.catalogEntry.sellPrice||0).toFixed(2)}/${cand.catalogEntry.unit||'gl'}</option>`;
+                                }).join('');
+                                const hasSkuOptions = candidates.length > 0;
+                                const minQty = Math.max(1, Math.ceil(item.totalNeeded / (pe.unitsPerPack || 1)));
+
                                 return `
                                 <tr>
                                     <td>
                                         <strong>${item.name}</strong>
-                                        ${item.rateUnitMissing ? '<div style="color:#dc2626; font-size:0.75rem; font-weight:600; margin-top:2px;">&#9888; Missing rate unit &mdash; quantity may be wrong. Admin: set unit in Programs editor.</div>' : ''}
+                                        ${item.rateUnitMissing ? '<div style="color:#dc2626; font-size:0.75rem; font-weight:600; margin-top:2px;">&#9888; Missing rate unit</div>' : ''}
                                     </td>
                                     <td class="needed-col">
                                         <span class="total-gal">${item.totalNeeded.toFixed(1)} ${item.unit || ''}</span>
                                         ${(item.rateUnit && item.rateUnit !== item.unit) ? `<div style="font-size:0.72rem; color:#6b7280;">(from ${item.rateUnit})</div>` : ''}
                                     </td>
                                     <td class="breakdown-col">
-                                        <div class="pkg-breakdown">
-                                            ${breakdown.packages.map((pkg, idx) => `
-                                                <span class="pkg-chip">${pkg.qty} ${pkg.label}</span>
-                                                ${idx < breakdown.packages.length - 1 ? '<span class="pkg-plus">+</span>' : ''}
-                                            `).join('')}
+                                        ${hasSkuOptions ? `
+                                        <select class="sku-select" data-product="${safeName}" onchange="onSkuChange('${safeName}', this.value)"
+                                            style="width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:0.85rem; margin-bottom:6px;">
+                                            ${skuOptionsHtml}
+                                            <option value="__custom__">Request custom pack...</option>
+                                        </select>` : `<div style="font-size:0.85rem; color:#6b7280; margin-bottom:6px;">${pe.packSize || 'Unknown pack'}</div>`}
+                                        ${!pe.isCustomRequest ? `
+                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                                            <span style="font-size:0.8rem; color:#666;">Qty:</span>
+                                            <input type="number" class="pkg-qty-input" value="${pe.qty}" min="1"
+                                                data-product="${safeName}" data-min="${minQty}"
+                                                onchange="onQtyChange('${safeName}', this)"
+                                                oninput="onQtyChange('${safeName}', this)"
+                                                style="width:60px; padding:4px 6px; border:1px solid #d1d5db; border-radius:4px; font-size:0.9rem; text-align:center;">
+                                            <span style="font-size:0.8rem; color:#666;">× ${pe.unitsPerPack} = ${ordered.toFixed(1)} ${item.unit}</span>
                                         </div>
-                                        <div class="pkg-total">
-                                            = ${breakdown.totalOrdered.toFixed(1)} ${item.unit} ordered
-                                            ${breakdown.overage > 0.1 ? `<span class="overage">(+${breakdown.overage.toFixed(1)} extra)</span>` : ''}
-                                        </div>
-                                        ${hasOptions ? `
-                                        <button type="button" class="pack-options-toggle" style="background:none; border:none; color:#2d5a27; font-size:0.8rem; font-weight:600; cursor:pointer; margin-top:6px; padding:0;" onclick="togglePackOptions('${optionsRowId}', this)">
-                                            ▾ Options (${candidates.length} pack sizes)
-                                        </button>` : ''}
+                                        ${overage > 0.1 ? `<div style="font-size:0.78rem; color:#059669;">Extra: +${overage.toFixed(1)} ${item.unit} ($${overageCost.toFixed(2)})</div>` : ''}
+                                        ${overage < -0.1 ? `<div style="font-size:0.78rem; color:#dc2626; font-weight:600;">⚠ Short ${Math.abs(overage).toFixed(1)} ${item.unit} — need ${item.totalNeeded.toFixed(1)}, ordering ${ordered.toFixed(1)}</div>` : ''}
+                                        ` : `
+                                        <div style="background:#fef9c3; padding:8px 10px; border-radius:6px; font-size:0.82rem; color:#854d0e;">
+                                            <strong>Custom pack requested</strong><br>
+                                            ${pe.customRequest?.packSize || 'TBD'} × ${pe.customRequest?.quantity || '?'}<br>
+                                            <span style="font-size:0.75rem;">Added to bid sheet on order submit</span><br>
+                                            <button type="button" onclick="cancelCustomPack('${safeName}')" style="background:none; border:none; color:#dc2626; font-size:0.78rem; cursor:pointer; padding:0; margin-top:4px; text-decoration:underline;">Cancel custom request</button>
+                                        </div>`}
                                     </td>
                                     <td class="cost-col">
-                                        ${item.priceIsSpeculated
-                                            ? `<strong style="color:#d97706;">~$${actualCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;" title="Estimated price">est.</span>`
-                                            : `<strong>$${actualCost.toFixed(2)}</strong>`
+                                        ${pe.isCustomRequest
+                                            ? `<span style="color:#854d0e; font-weight:600;">Pending</span>`
+                                            : item.priceIsSpeculated
+                                            ? `<strong style="color:#d97706;">~$${lineCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;">est.</span>`
+                                            : `<strong>$${lineCost.toFixed(2)}</strong>`
                                         }
                                     </td>
                                 </tr>
-                                ${hasOptions ? `
-                                <tr id="${optionsRowId}" class="pack-options-row" style="display:none; background:#f9fafb;">
-                                    <td colspan="4" style="padding:0;">
-                                        <div style="padding:12px 16px;">
-                                            <div style="font-size:0.85rem; color:#6b7280; margin-bottom:8px; font-weight:600;">Pack size options for ${item.name}:</div>
-                                            <div style="display:grid; grid-template-columns:auto 1fr auto auto auto; gap:8px 16px; align-items:center; font-size:0.88rem;">
-                                                ${candidates.map(cand => {
-                                                    const id = String(cand.catalogEntry._id);
-                                                    const isChosen = id === chosenId;
-                                                    const packLabel = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
-                                                    const supplierPrefix = cand.catalogEntry.sourceSupplier
-                                                        ? `<strong>${cand.catalogEntry.sourceSupplier}</strong> — `
-                                                        : '';
-                                                    return `
-                                                    <label style="display:contents; cursor:pointer;">
-                                                        <input type="radio" name="pack-${rowKey}" value="${id}" ${isChosen ? 'checked' : ''} onchange="selectPack('${(item.name || '').replace(/'/g, "\\'")}', '${id}')" style="cursor:pointer;">
-                                                        <span style="font-weight:${isChosen ? '700' : '400'};">${supplierPrefix}${packLabel}</span>
-                                                        <span style="color:#6b7280;">${cand.qty} × ${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'} = ${cand.totalOrdered.toFixed(1)} ${cand.catalogEntry.unit || 'gl'}</span>
-                                                        <span style="color:${cand.overage > 10 ? '#dc2626' : '#6b7280'};">${cand.overage > 0.1 ? `+${cand.overage.toFixed(1)} over` : 'exact'}</span>
-                                                        <span style="font-weight:600; color:#2d5a27;">$${cand.totalCost.toFixed(2)}</span>
-                                                    </label>
-                                                `;}).join('')}
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>` : ''}
                             `}).join('')}
                             ${(() => {
                                 // Only show separate Hydrovant row if it's NOT already in the program (most programs include it)
@@ -3551,23 +3648,35 @@ Generated by AcreProfit.com`;
                     const submitUnit = preMatch?.unit || chemItem.unit || 'gal';
                     const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, submitUnit, submitSprayVolume);
 
-                    // Resolve the pack: farmer override wins, else algorithmic picker.
-                    const picked = resolvePack(totalNeeded, chemItem.productName);
-                    const catalogMatch = picked?.catalogEntry || preMatch;
-
-                    const packages = picked ? picked.qty : Math.ceil(totalNeeded / (catalogMatch?.unitsPerPack || chemItem.unitsPerPack || 1));
-                    if (!picked && !catalogMatch?.unitsPerPack && !chemItem.unitsPerPack) {
-                        console.warn(`Missing unitsPerPack for ${chemItem.productName} — defaulting to 1`);
+                    // If farmer edited this row's package, use their choice.
+                    // Otherwise fall back to smart picker.
+                    const pe = packageEdits.get(chemItem.productName);
+                    if (pe && pe.isCustomRequest) {
+                        // Custom pack request — skip from items, goes to customPackRequests
+                        return;
+                    }
+                    let chosenChemId, chosenPackSize, chosenQty, chosenPrice;
+                    if (pe) {
+                        chosenChemId = pe.chemicalId;
+                        chosenPackSize = pe.packSize;
+                        chosenQty = pe.qty;
+                        chosenPrice = pe.sellPrice;
+                    } else {
+                        const picked = resolvePack(totalNeeded, chemItem.productName);
+                        const catalogMatch = picked?.catalogEntry || preMatch;
+                        chosenChemId = catalogMatch?._id || null;
+                        chosenPackSize = catalogMatch?.packSize || chemItem.packSize;
+                        chosenQty = picked ? picked.qty : Math.ceil(totalNeeded / (catalogMatch?.unitsPerPack || chemItem.unitsPerPack || 1));
+                        chosenPrice = catalogMatch?.sellPrice || catalogMatch?.price || 0;
                     }
 
                     items.push({
-                        chemicalId: catalogMatch?._id || null,
+                        chemicalId: chosenChemId,
                         productName: chemItem.productName,
-                        packSize: catalogMatch?.packSize || chemItem.packSize,
+                        packSize: chosenPackSize,
                         unit: chemItem.unit,
-                        quantity: packages,
-                        // unitPrice is advisory - server re-prices from catalog before saving
-                        unitPrice: catalogMatch?.sellPrice || catalogMatch?.price || 0,
+                        quantity: chosenQty,
+                        unitPrice: chosenPrice,
                         acres,
                         rate: chemItem.rate ?? chemItem.suggestedRate,
                         rateUnit: chemItem.rateUnit,
@@ -3603,6 +3712,21 @@ Generated by AcreProfit.com`;
                             crop: selectedProgram.crop,
                             acres
                         },
+                        // Custom pack requests — non-catalog packs farmer requested via the
+                        // "Request custom pack" flow. Server writes these to a pending bid-sheet
+                        // entry so admin can source them. Not billed on this order.
+                        customPackRequests: Array.from(packageEdits.values())
+                            .filter(pe => pe.isCustomRequest && pe.customRequest)
+                            .map(pe => ({
+                                productName: pe.customRequest.productName || Object.keys(totalsByChemical).find(k => {
+                                    const edit = packageEdits.get(k);
+                                    return edit === pe;
+                                }) || 'Unknown',
+                                packSize: pe.customRequest.packSize,
+                                unit: pe.customRequest.unit || 'gal',
+                                quantity: pe.customRequest.quantity || 1,
+                                reason: pe.customRequest.reason || ''
+                            })),
                         customerNotes: `Program: ${selectedProgram.name} for ${acres} acres`,
                         actingAsCustomerId: window.actingAsCustomerId || null,
                         discountCode: discountCode || null,
