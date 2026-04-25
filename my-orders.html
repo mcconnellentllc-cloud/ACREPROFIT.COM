@@ -92,6 +92,8 @@
         }
     </style>
     <script src="dialog.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar dashboard-navbar">
@@ -216,7 +218,9 @@
                 });
                 const orderId = order._id ? order._id.slice(-8).toUpperCase() : 'N/A';
                 const items = order.items || [];
-                const total = order.totalAmount || items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+                const total = order.totalAmount != null
+                    ? order.totalAmount
+                    : items.reduce((sum, i) => sum.plus(new Decimal(i.totalPrice || 0)), new Decimal(0));
 
                 return `
                     <div class="order-card">
@@ -233,14 +237,14 @@
                                     <div class="order-item">
                                         <span class="item-name">${item.productName}</span>
                                         <span class="item-qty">${item.quantity} ${item.unit}</span>
-                                        <span class="item-price">$${(item.totalPrice || 0).toFixed(2)}</span>
+                                        <span class="item-price">${fmtMoney((item.totalPrice || 0))}</span>
                                     </div>
                                 `).join('')}
                                 ${items.length > 3 ? `<p style="color: #666; font-size: 0.9rem;">+ ${items.length - 3} more items</p>` : ''}
                             </div>
                             <div class="order-total">
                                 <span>Total:</span>
-                                <span>$${total.toFixed(2)}</span>
+                                <span>${fmtMoney(total)}</span>
                             </div>
                             <div class="order-actions">
                                 <button class="btn btn-primary" onclick="viewInvoice('${order._id}')">View Invoice</button>
@@ -279,7 +283,7 @@
             const invoiceNum = serverInvoice?.invoiceNumber || order._id.slice(-8).toUpperCase();
             const items = serverInvoice?.items || order.items || [];
             const subtotal = serverInvoice?.subtotal
-                ?? items.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+                ?? items.reduce((sum, i) => sum.plus(new Decimal(i.totalPrice || 0)), new Decimal(0));
             const total = serverInvoice?.total ?? order.totalAmount ?? subtotal;
 
             document.getElementById('invoiceContent').innerHTML = `
@@ -324,8 +328,8 @@
                             <tr>
                                 <td>${item.productName}</td>
                                 <td>${item.quantity} ${item.unit}</td>
-                                <td class="text-right">$${(item.unitPrice || item.pricePerUnit || 0).toFixed(2)}</td>
-                                <td class="text-right">$${(item.totalPrice || 0).toFixed(2)}</td>
+                                <td class="text-right">${fmtMoney((item.unitPrice || item.pricePerUnit || 0))}</td>
+                                <td class="text-right">${fmtMoney((item.totalPrice || 0))}</td>
                             </tr>
                         `).join('')}
                     </tbody>
@@ -335,11 +339,11 @@
                     <table>
                         <tr>
                             <td>Subtotal:</td>
-                            <td class="text-right">$${subtotal.toFixed(2)}</td>
+                            <td class="text-right">${fmtMoney(subtotal)}</td>
                         </tr>
                         <tr class="total-row">
                             <td>Total:</td>
-                            <td class="text-right">$${total.toFixed(2)}</td>
+                            <td class="text-right">${fmtMoney(total)}</td>
                         </tr>
                     </table>
                 </div>

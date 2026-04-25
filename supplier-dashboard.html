@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar admin-nav">
@@ -292,7 +294,7 @@
                             <span class="price-prefix">$</span>
                             <input type="number"
                                    class="price-input"
-                                   value="${product.costPrice.toFixed(2)}"
+                                   value="${new Decimal(product.costPrice).toFixed(2)}"
                                    step="0.01"
                                    min="0"
                                    data-original="${product.costPrice}"
@@ -378,8 +380,8 @@
                 document.getElementById('totalOrders').textContent = orders.length;
 
                 // Calculate total value
-                const totalValue = orders.reduce((sum, order) => sum + (order.supplierTotal || 0), 0);
-                document.getElementById('totalValue').textContent = '$' + totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const totalValue = orders.reduce((sum, order) => sum.plus(new Decimal(order.supplierTotal || 0)), new Decimal(0));
+                document.getElementById('totalValue').textContent = fmtMoneyLocale(totalValue);
 
                 renderOrdersTable(orders);
             } catch (error) {
@@ -404,7 +406,7 @@
                     <td>
                         ${order.items.map(item => `${item.productName} (${item.quantity})`).join(', ')}
                     </td>
-                    <td>$${(order.supplierTotal || 0).toFixed(2)}</td>
+                    <td>${fmtMoney((order.supplierTotal || 0))}</td>
                     <td><span class="status-badge status-${order.status}">${order.status}</span></td>
                     <td>${new Date(order.createdAt).toLocaleDateString()}</td>
                 </tr>

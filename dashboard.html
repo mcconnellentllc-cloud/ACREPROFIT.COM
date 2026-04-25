@@ -19,6 +19,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <!-- Role Switcher Banner (Super Admin only) -->
@@ -548,8 +550,8 @@
                 if (ordersRes.ok) {
                     const orders = await ordersRes.json();
                     document.getElementById('adminTotalOrders').textContent = orders.length;
-                    const totalRevenue = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-                    document.getElementById('adminTotalRevenue').textContent = '$' + totalRevenue.toLocaleString();
+                    const totalRevenue = orders.reduce((sum, o) => sum.plus(new Decimal(o.totalAmount || 0)), new Decimal(0));
+                    document.getElementById('adminTotalRevenue').textContent = fmtMoneyLocale(totalRevenue);
                 }
             } catch (error) {
                 console.error('Error loading admin stats:', error);
@@ -579,14 +581,13 @@
                     const orders = await ordersRes.json();
                     const activeOrders = orders.filter(o => o.status !== 'delivered' && o.status !== 'cancelled');
                     document.getElementById('distOrderCount').textContent = activeOrders.length;
-                    const totalSales = orders.reduce((sum, o) => sum + (o.totalAmount || 0), 0);
-                    document.getElementById('distRevenue').textContent = '$' + totalSales.toLocaleString();
+                    const totalSales = orders.reduce((sum, o) => sum.plus(new Decimal(o.totalAmount || 0)), new Decimal(0));
+                    document.getElementById('distRevenue').textContent = fmtMoneyLocale(totalSales);
                 }
 
                 if (ledgerRes.ok) {
                     const ledger = await ledgerRes.json();
-                    const balance = ledger.balance || 0;
-                    document.getElementById('distCommission').textContent = '$' + balance.toLocaleString();
+                    document.getElementById('distCommission').textContent = fmtMoney(ledger.balance);
                 }
             } catch (error) {
                 console.error('Error loading distributor stats:', error);
