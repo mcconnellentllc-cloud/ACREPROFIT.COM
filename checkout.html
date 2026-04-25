@@ -482,6 +482,8 @@
             border-color: #2D5A27;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -868,7 +870,7 @@
                         <div class="order-item-meta">${item.timing ? item.timing.replace('-', ' ') : ''} ${item.packSize || ''}</div>
                     </div>
                     <div class="order-item-qty">x${item.qty || item.quantity || 1}</div>
-                    <div class="order-item-price">$${(item.total || item.price || 0).toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div class="order-item-price">${fmtMoneyLocale(item.total || item.price || 0)}</div>
                 </div>
             `).join('');
         }
@@ -890,10 +892,10 @@
 
         function updateTotals() {
             const items = orderData.items || [];
-            const subtotal = items.reduce((sum, item) => sum + (item.total || item.price || 0), 0);
+            const subtotal = items.reduce((sum, item) => sum.plus(new Decimal(item.total || item.price || 0)), new Decimal(0));
 
             document.getElementById('itemCount').textContent = items.length;
-            document.getElementById('itemsSubtotal').textContent = '$' + subtotal.toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('itemsSubtotal').textContent = fmtMoneyLocale(subtotal);
 
             // Freight charge for delivery option
             const deliveryOpt = document.querySelector('input[name="deliveryOption"]:checked')?.value || 'pickup';
@@ -905,10 +907,10 @@
             const feeAmount = document.getElementById('processingFeeAmount');
 
             if (selectedPaymentMethod === 'ach') {
-                processingFee = Math.min((subtotal + freight) * 0.008, 5);
+                processingFee = Math.min(Number(subtotal.plus(freight).times(0.008)), 5);
                 feeRow.style.display = 'flex';
                 feeLabel.textContent = 'Processing Fee (ACH)';
-                feeAmount.textContent = '$' + processingFee.toFixed(2);
+                feeAmount.textContent = fmtMoney(processingFee);
             } else {
                 processingFee = 0;
                 feeRow.style.display = 'none';
@@ -922,7 +924,7 @@
                     const row = document.createElement('div');
                     row.id = 'freightRow';
                     row.style.cssText = 'display:flex; justify-content:space-between; padding:4px 0;';
-                    row.innerHTML = '<span>Freight (delivery to farm - estimate)</span><span id="freightAmount">$' + freight.toFixed(2) + '</span>';
+                    row.innerHTML = '<span>Freight (delivery to farm - estimate)</span><span id="freightAmount">' + fmtMoney(freight) + '</span>';
                     totalRow.appendChild(row);
                     freightRow = row;
                 }
@@ -930,15 +932,15 @@
             if (freightRow) {
                 freightRow.style.display = freight > 0 ? 'flex' : 'none';
                 const amt = document.getElementById('freightAmount');
-                if (amt) amt.textContent = '$' + freight.toFixed(2);
+                if (amt) amt.textContent = fmtMoney(freight);
             }
 
-            const total = subtotal + freight + processingFee;
-            document.getElementById('orderTotal').textContent = '$' + total.toLocaleString('en-US', {minimumFractionDigits: 2});
-            orderData.subtotal = subtotal;
+            const total = subtotal.plus(freight).plus(processingFee);
+            document.getElementById('orderTotal').textContent = fmtMoneyLocale(total);
+            orderData.subtotal = Number(subtotal.toFixed(2));
             orderData.freight = freight;
             orderData.processingFee = processingFee;
-            orderData.total = total;
+            orderData.total = Number(total.toFixed(2));
         }
 
         function selectPayment(method) {
