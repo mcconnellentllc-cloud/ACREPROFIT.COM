@@ -72,6 +72,8 @@
             .products-table { display: block; overflow-x: auto; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar dashboard-navbar">
@@ -319,7 +321,11 @@
                 <tbody>`;
 
             filtered.forEach(p => {
-                const totalMargin = p.margin || (p.sellPrice && p.costPrice ? Math.round(((p.sellPrice - p.costPrice) / p.sellPrice) * 100) : 0);
+                const sp = new Decimal(p.sellPrice || 0);
+                const cp = new Decimal(p.costPrice || 0);
+                const totalMargin = p.margin != null
+                    ? Number(p.margin)
+                    : (sp.gt(0) && cp.gt(0) ? Math.round(Number(sp.minus(cp).div(sp).times(100))) : 0);
                 const adminMargin = p.adminMargin || 0;
                 const regularMargin = p.regularMargin || 0;
                 const marginClass = totalMargin >= 20 ? 'margin-good' : totalMargin >= 10 ? 'margin-low' : 'margin-negative';
@@ -328,15 +334,15 @@
 
                 // Format margin display
                 const marginDisplay = adminMargin > 0 || regularMargin > 0
-                    ? `<span class="margin-badge ${marginClass}">${totalMargin.toFixed(1)}%</span><br><small style="color: #888;">$${(p.sellPrice - p.costPrice).toFixed(2)}/unit</small>`
-                    : `<span class="margin-badge ${marginClass}">${totalMargin.toFixed(1)}%</span><br><small style="color: #888;">$${(p.sellPrice - p.costPrice).toFixed(2)}/unit</small>`;
+                    ? `<span class="margin-badge ${marginClass}">${totalMargin.toFixed(1)}%</span><br><small style="color: #888;">${fmtMoney(sp.minus(cp))}/unit</small>`
+                    : `<span class="margin-badge ${marginClass}">${totalMargin.toFixed(1)}%</span><br><small style="color: #888;">${fmtMoney(sp.minus(cp))}/unit</small>`;
 
                 html += `<tr>
                     <td><strong>${p.productName}</strong>${p.isRestrictedUse ? ' <span style="color: red; font-size: 0.75rem;">(RUP)</span>' : ''}<br><small class="category-badge ${catClass}">${p.category}</small></td>
                     <td>${p.sourceSupplier || 'CPD'}</td>
                     <td>${p.packSize || '-'}<br><small>(${p.unit})</small></td>
-                    <td class="price-cell price-cost">$${(p.costPrice || 0).toFixed(2)}</td>
-                    <td class="price-cell price-retail">$${(p.sellPrice || 0).toFixed(2)}</td>
+                    <td class="price-cell price-cost">${fmtMoney((p.costPrice || 0))}</td>
+                    <td class="price-cell price-retail">${fmtMoney((p.sellPrice || 0))}</td>
                     <td>${marginDisplay}</td>
                     <td>${status}</td>
                     <td class="actions">
@@ -417,16 +423,16 @@
             // Calculate total margin from cost to retail
             const totalMargin = retail > 0 ? ((retail - cost) / retail) * 100 : 0;
 
-            document.getElementById('adminPrice').value = adminPrice.toFixed(2);
-            document.getElementById('sellPrice').value = retail.toFixed(2);
+            document.getElementById('adminPrice').value = new Decimal(adminPrice).toFixed(2);
+            document.getElementById('sellPrice').value = new Decimal(retail).toFixed(2);
 
-            document.getElementById('previewCost').textContent = '$' + cost.toFixed(2);
+            document.getElementById('previewCost').textContent = fmtMoney(cost);
             document.getElementById('previewAdminMargin').textContent = adminMarginPct.toFixed(1) + '%';
-            document.getElementById('previewAdminPrice').textContent = '$' + adminPrice.toFixed(2);
+            document.getElementById('previewAdminPrice').textContent = fmtMoney(adminPrice);
             document.getElementById('previewRegularMargin').textContent = regularMarginPct.toFixed(1) + '%';
-            document.getElementById('previewRetail').textContent = '$' + retail.toFixed(2);
+            document.getElementById('previewRetail').textContent = fmtMoney(retail);
             document.getElementById('previewMargin').innerHTML = '<strong>' + totalMargin.toFixed(1) + '%</strong>';
-            document.getElementById('previewProfit').textContent = '$' + (retail - cost).toFixed(2);
+            document.getElementById('previewProfit').textContent = fmtMoney((retail - cost));
         }
 
         function updateMarginFromPrice() {
@@ -444,16 +450,16 @@
                 // Calculate total margin
                 const totalMargin = ((retail - cost) / retail) * 100;
 
-                document.getElementById('adminPrice').value = adminPrice.toFixed(2);
+                document.getElementById('adminPrice').value = new Decimal(adminPrice).toFixed(2);
                 document.getElementById('regularMarginPct').value = regularMargin.toFixed(1);
 
-                document.getElementById('previewCost').textContent = '$' + cost.toFixed(2);
+                document.getElementById('previewCost').textContent = fmtMoney(cost);
                 document.getElementById('previewAdminMargin').textContent = adminMarginPct.toFixed(1) + '%';
-                document.getElementById('previewAdminPrice').textContent = '$' + adminPrice.toFixed(2);
+                document.getElementById('previewAdminPrice').textContent = fmtMoney(adminPrice);
                 document.getElementById('previewRegularMargin').textContent = regularMargin.toFixed(1) + '%';
-                document.getElementById('previewRetail').textContent = '$' + retail.toFixed(2);
+                document.getElementById('previewRetail').textContent = fmtMoney(retail);
                 document.getElementById('previewMargin').innerHTML = '<strong>' + totalMargin.toFixed(1) + '%</strong>';
-                document.getElementById('previewProfit').textContent = '$' + (retail - cost).toFixed(2);
+                document.getElementById('previewProfit').textContent = fmtMoney((retail - cost));
             }
         }
 
