@@ -8,6 +8,11 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
+// Decimal128 migration helpers (C2/C3). Pre-C3, the toJSON transform is a
+// no-op on Number values and the pre('validate') coerce hook short-circuits
+// when the schema field type is still Number. See server/lib/money.js for
+// behaviour details.
+const { decimalToJSONTransform, coerceMoneyFields, serializeMoney } = require('./lib/money');
 // SendGrid transactional email. Preferred over SMTP when SENDGRID_API_KEY is
 // set because Microsoft 365 Security Defaults block SMTP basic auth
 // (535 5.7.139). Wrapped in try/catch so the app still boots if the dep
@@ -483,6 +488,31 @@ const orderSchema = new mongoose.Schema({
 // user cannot have two orders with the same key.
 orderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
+const ORDER_MONEY_PATHS = {
+    'orderLines.pricePerPackage': 4,
+    'orderLines.lineTotal': 2,
+    'hydrovant.pricePerPackage': 4,
+    'hydrovant.lineTotal': 2,
+    'chemicals.pricePerPackage': 4,
+    'chemicals.totalPrice': 2,
+    'seeds.pricePerBag': 4,
+    'seeds.totalPrice': 2,
+    'pivotBio.pricePerUnit': 4,
+    'pivotBio.totalPrice': 2,
+    'additionalProducts.hydrovant': 2,
+    'additionalProducts.multiseal': 2,
+    'additionalProducts.pump': 2,
+    'totalCost': 2,
+    'costPerAcre': 4,
+    'repCommission': 2,
+    'adminRevenue': 2,
+    'totalCost_cost': 2,
+    'totalCost_admin': 2,
+    'totalConfirmedPrice': 2,
+};
+orderSchema.set('toJSON', { transform: decimalToJSONTransform });
+orderSchema.pre('validate', function (next) { coerceMoneyFields(this, ORDER_MONEY_PATHS); next(); });
+
 const Order = mongoose.model('Order', orderSchema);
 
 // Rep Application Model
@@ -531,6 +561,16 @@ const repCommissionSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+const REP_COMMISSION_MONEY_PATHS = {
+    'totalCommissionEarned': 2,
+    'totalCommissionPaid': 2,
+    'commissionBalance': 2,
+    'history.orderTotal': 2,
+    'history.commissionAmount': 2,
+};
+repCommissionSchema.set('toJSON', { transform: decimalToJSONTransform });
+repCommissionSchema.pre('validate', function (next) { coerceMoneyFields(this, REP_COMMISSION_MONEY_PATHS); next(); });
+
 const RepCommission = mongoose.model('RepCommission', repCommissionSchema);
 
 // Chemical catalog model — extracted to server/models/Chemical.js. The merged
@@ -554,6 +594,13 @@ const chemicalPriceHistorySchema = new mongoose.Schema({
     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now }
 });
+
+const CHEMICAL_PRICE_HISTORY_MONEY_PATHS = {
+    'costPrice': 4,
+    'sellPrice': 4,
+};
+chemicalPriceHistorySchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalPriceHistorySchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_PRICE_HISTORY_MONEY_PATHS); next(); });
 
 const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
 
@@ -625,6 +672,12 @@ auditLogSchema.pre('findOneAndUpdate', function(next) {
     }
     next();
 });
+
+const AUDIT_LOG_MONEY_PATHS = {
+    'amount': 2,
+};
+auditLogSchema.set('toJSON', { transform: decimalToJSONTransform });
+auditLogSchema.pre('validate', function (next) { coerceMoneyFields(this, AUDIT_LOG_MONEY_PATHS); next(); });
 
 const AuditLog = mongoose.model('AuditLog', auditLogSchema);
 
@@ -771,6 +824,12 @@ distributorPricingSchema.index({ distributorId: 1, chemicalId: 1 }, { unique: tr
 distributorPricingSchema.index({ distributorId: 1 });
 distributorPricingSchema.index({ chemicalId: 1 });
 
+const DISTRIBUTOR_PRICING_MONEY_PATHS = {
+    'retailPrice': 4,
+};
+distributorPricingSchema.set('toJSON', { transform: decimalToJSONTransform });
+distributorPricingSchema.pre('validate', function (next) { coerceMoneyFields(this, DISTRIBUTOR_PRICING_MONEY_PATHS); next(); });
+
 const DistributorPricing = mongoose.model('DistributorPricing', distributorPricingSchema);
 
 // ============ CHEMICAL QUOTE MODEL ============
@@ -836,6 +895,14 @@ chemicalQuoteSchema.virtual('packPriceCalculated').get(function() {
     }
     return this.packPrice;
 });
+
+const CHEMICAL_QUOTE_MONEY_PATHS = {
+    'pricePerUnit': 4,
+    'packPrice': 4,
+    'volumeDiscount.discountedPrice': 4,
+};
+chemicalQuoteSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalQuoteSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_QUOTE_MONEY_PATHS); next(); });
 
 const ChemicalQuote = mongoose.model('ChemicalQuote', chemicalQuoteSchema);
 
@@ -941,6 +1008,12 @@ rupSaleRecordSchema.index({ purchaserId: 1 });
 rupSaleRecordSchema.index({ epaRegistrationNumber: 1 });
 rupSaleRecordSchema.index({ applicatorLicenseNumber: 1 });
 rupSaleRecordSchema.index({ status: 1 });
+
+const RUP_SALE_RECORD_MONEY_PATHS = {
+    'totalAmount': 2,
+};
+rupSaleRecordSchema.set('toJSON', { transform: decimalToJSONTransform });
+rupSaleRecordSchema.pre('validate', function (next) { coerceMoneyFields(this, RUP_SALE_RECORD_MONEY_PATHS); next(); });
 
 const RupSaleRecord = mongoose.model('RupSaleRecord', rupSaleRecordSchema);
 
@@ -1176,6 +1249,19 @@ chemicalOrderSchema.pre('save', async function(next) {
     next();
 });
 
+const CHEMICAL_ORDER_MONEY_PATHS = {
+    'items.unitPrice': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'discount': 2,
+    'marginAdjustment': 4,
+    'freight': 2,
+    'processingFee': 2,
+    'total': 2,
+};
+chemicalOrderSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalOrderSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_ORDER_MONEY_PATHS); next(); });
+
 const ChemicalOrder = mongoose.model('ChemicalOrder', chemicalOrderSchema);
 
 // Ledger Entry Model (Who Owes Who tracking)
@@ -1202,6 +1288,13 @@ const ledgerEntrySchema = new mongoose.Schema({
 
 ledgerEntrySchema.index({ representativeId: 1, date: -1 });
 ledgerEntrySchema.index({ referenceType: 1, referenceId: 1 });
+
+const LEDGER_ENTRY_MONEY_PATHS = {
+    'amount': 2,
+    'runningBalance': 2,
+};
+ledgerEntrySchema.set('toJSON', { transform: decimalToJSONTransform });
+ledgerEntrySchema.pre('validate', function (next) { coerceMoneyFields(this, LEDGER_ENTRY_MONEY_PATHS); next(); });
 
 const LedgerEntry = mongoose.model('LedgerEntry', ledgerEntrySchema);
 
@@ -1507,6 +1600,18 @@ purchaseOrderSchema.index({ 'supplier.name': 1 });
 purchaseOrderSchema.index({ status: 1 });
 purchaseOrderSchema.index({ orderDate: -1 });
 
+const PURCHASE_ORDER_MONEY_PATHS = {
+    'items.pricePerUnit': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'freight': 2,
+    'otherFees': 2,
+    'superAdminFee': 2,
+    'totalCost': 2,
+};
+purchaseOrderSchema.set('toJSON', { transform: decimalToJSONTransform });
+purchaseOrderSchema.pre('validate', function (next) { coerceMoneyFields(this, PURCHASE_ORDER_MONEY_PATHS); next(); });
+
 const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
 
 // Supplier Model - Save supplier information for reuse
@@ -1602,6 +1707,16 @@ quoteRequestSchema.index({ customerId: 1 });
 quoteRequestSchema.index({ representativeId: 1 });
 quoteRequestSchema.index({ status: 1 });
 quoteRequestSchema.index({ submittedAt: -1 });
+
+const QUOTE_REQUEST_MONEY_PATHS = {
+    'items.costPrice': 4,
+    'items.adminPrice': 4,
+    'items.sellPrice': 4,
+    'items.totalPrice': 2,
+    'estimatedTotal': 2,
+};
+quoteRequestSchema.set('toJSON', { transform: decimalToJSONTransform });
+quoteRequestSchema.pre('validate', function (next) { coerceMoneyFields(this, QUOTE_REQUEST_MONEY_PATHS); next(); });
 
 const QuoteRequest = mongoose.model('QuoteRequest', quoteRequestSchema);
 
@@ -1713,6 +1828,16 @@ supplierBidSheetSchema.index({ status: 1 });
 supplierBidSheetSchema.index({ createdAt: -1 });
 supplierBidSheetSchema.index({ 'invitedSuppliers.supplierId': 1 });
 
+const SUPPLIER_BID_SHEET_MONEY_PATHS = {
+    'supplierBids.itemPricing.pricePerUnit': 4,
+    'supplierBids.itemPricing.totalPrice': 2,
+    'supplierBids.subtotal': 2,
+    'supplierBids.freight': 2,
+    'supplierBids.totalBid': 2,
+};
+supplierBidSheetSchema.set('toJSON', { transform: decimalToJSONTransform });
+supplierBidSheetSchema.pre('validate', function (next) { coerceMoneyFields(this, SUPPLIER_BID_SHEET_MONEY_PATHS); next(); });
+
 const SupplierBidSheet = mongoose.model('SupplierBidSheet', supplierBidSheetSchema);
 
 // Purchase Order Split Model (How a PO is split between distributors)
@@ -1774,6 +1899,16 @@ purchaseOrderSplitSchema.index({ purchaseOrderId: 1 });
 purchaseOrderSplitSchema.index({ distributorId: 1 });
 purchaseOrderSplitSchema.index({ status: 1 });
 
+const PURCHASE_ORDER_SPLIT_MONEY_PATHS = {
+    'items.pricePerUnit': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'freightAllocation': 2,
+    'totalCost': 2,
+};
+purchaseOrderSplitSchema.set('toJSON', { transform: decimalToJSONTransform });
+purchaseOrderSplitSchema.pre('validate', function (next) { coerceMoneyFields(this, PURCHASE_ORDER_SPLIT_MONEY_PATHS); next(); });
+
 const PurchaseOrderSplit = mongoose.model('PurchaseOrderSplit', purchaseOrderSplitSchema);
 
 // ============ INVENTORY MODEL ============
@@ -1814,6 +1949,13 @@ inventorySchema.index({ chemicalId: 1, location: 1 }, { unique: true });
 inventorySchema.index({ productName: 1 });
 inventorySchema.index({ distributorId: 1 });
 inventorySchema.index({ quantityOnHand: 1 });
+
+const INVENTORY_MONEY_PATHS = {
+    'averageCost': 4,
+    'lastCost': 4,
+};
+inventorySchema.set('toJSON', { transform: decimalToJSONTransform });
+inventorySchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_MONEY_PATHS); next(); });
 
 const Inventory = mongoose.model('Inventory', inventorySchema);
 
@@ -1863,6 +2005,13 @@ inventoryTransactionSchema.index({ inventoryId: 1, createdAt: -1 });
 inventoryTransactionSchema.index({ referenceType: 1, referenceId: 1 });
 inventoryTransactionSchema.index({ type: 1 });
 inventoryTransactionSchema.index({ createdAt: -1 });
+
+const INVENTORY_TRANSACTION_MONEY_PATHS = {
+    'unitCost': 4,
+    'totalCost': 2,
+};
+inventoryTransactionSchema.set('toJSON', { transform: decimalToJSONTransform });
+inventoryTransactionSchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_TRANSACTION_MONEY_PATHS); next(); });
 
 const InventoryTransaction = mongoose.model('InventoryTransaction', inventoryTransactionSchema);
 
@@ -1916,6 +2065,13 @@ inventoryBatchSchema.index({ chemicalId: 1, status: 1 });
 inventoryBatchSchema.index({ poNumber: 1 });
 inventoryBatchSchema.index({ productName: 1 });
 inventoryBatchSchema.index({ status: 1, quantityRemaining: 1 });
+
+const INVENTORY_BATCH_MONEY_PATHS = {
+    'costPerUnit': 4,
+    'totalCost': 2,
+};
+inventoryBatchSchema.set('toJSON', { transform: decimalToJSONTransform });
+inventoryBatchSchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_BATCH_MONEY_PATHS); next(); });
 
 const InventoryBatch = mongoose.model('InventoryBatch', inventoryBatchSchema);
 
@@ -2043,6 +2199,25 @@ invoiceSchema.index({ orderId: 1 });
 invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ invoiceDate: -1 });
 
+const INVOICE_MONEY_PATHS = {
+    'subtotal': 2,
+    'discount': 2,
+    'tax': 2,
+    'shipping': 2,
+    'total': 2,
+    'amountPaid': 2,
+    'amountDue': 2,
+    'creditedAmount': 2,
+    'surchargeAmount': 2,
+    'items.unitPrice': 4,
+    'items.costPrice': 4,
+    'items.adminPrice': 4,
+    'items.totalPrice': 2,
+    'items.margin': 4,
+};
+invoiceSchema.set('toJSON', { transform: decimalToJSONTransform });
+invoiceSchema.pre('validate', function (next) { coerceMoneyFields(this, INVOICE_MONEY_PATHS); next(); });
+
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 
 // ============ CREDIT NOTE MODEL ============
@@ -2093,6 +2268,12 @@ const creditNoteSchema = new mongoose.Schema({
 });
 creditNoteSchema.index({ invoiceId: 1, createdAt: -1 });
 creditNoteSchema.index({ creditNoteNumber: 1 });
+
+const CREDIT_NOTE_MONEY_PATHS = {
+    'amount': 2,
+};
+creditNoteSchema.set('toJSON', { transform: decimalToJSONTransform });
+creditNoteSchema.pre('validate', function (next) { coerceMoneyFields(this, CREDIT_NOTE_MONEY_PATHS); next(); });
 
 const CreditNote = mongoose.model('CreditNote', creditNoteSchema);
 
@@ -2161,6 +2342,16 @@ programQuoteSchema.index({ quoteNumber: 1 });
 programQuoteSchema.index({ customerId: 1 });
 programQuoteSchema.index({ status: 1 });
 programQuoteSchema.index({ createdAt: -1 });
+
+const PROGRAM_QUOTE_MONEY_PATHS = {
+    'items.unitPrice': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'total': 2,
+    'costPerAcre': 4,
+};
+programQuoteSchema.set('toJSON', { transform: decimalToJSONTransform });
+programQuoteSchema.pre('validate', function (next) { coerceMoneyFields(this, PROGRAM_QUOTE_MONEY_PATHS); next(); });
 
 const ProgramQuote = mongoose.model('ProgramQuote', programQuoteSchema);
 
@@ -7508,8 +7699,8 @@ app.get('/api/chemicals', async (req, res) => {
                     packSize: c.packSize,
                     unit: c.unit,
                     unitsPerPack: c.unitsPerPack,
-                    price: c.sellPrice, // Only the retail price
-                    sellPrice: c.sellPrice,
+                    price: serializeMoney(c.sellPrice), // Only the retail price
+                    sellPrice: serializeMoney(c.sellPrice),
                     defaultRate: c.defaultRate,
                     rateUnit: c.rateUnit,
                     notes: c.notes,
@@ -7692,7 +7883,7 @@ app.get('/api/chemicals/available', async (req, res) => {
                 packSize: c.packSize,
                 unit: c.unit,
                 unitsPerPack: c.unitsPerPack,
-                sellPrice: c.sellPrice,
+                sellPrice: serializeMoney(c.sellPrice),
                 priceIsSpeculated: c.priceIsSpeculated === true,
                 defaultRate: c.defaultRate,
                 rateUnit: c.rateUnit,
@@ -7778,7 +7969,7 @@ app.get('/api/chemicals/search', authMiddleware, async (req, res) => {
             packSize: c.packSize,
             unit: c.unit,
             unitsPerPack: c.unitsPerPack,
-            sellPrice: c.sellPrice,
+            sellPrice: serializeMoney(c.sellPrice),
             defaultRate: c.defaultRate,
             rateUnit: c.rateUnit,
             supplier: c.sourceSupplier,
@@ -7927,7 +8118,7 @@ app.get('/api/chemicals/category/:category', async (req, res) => {
             productName: c.productName,
             packSize: c.packSize,
             unit: c.unit,
-            price: c.sellPrice,
+            price: serializeMoney(c.sellPrice),
             defaultRate: c.defaultRate,
             rateUnit: c.rateUnit
         })));
@@ -7944,10 +8135,13 @@ app.get('/api/chemicals/report/margins', authMiddleware, adminMiddleware, async 
         const report = chemicals.map(c => ({
             productName: c.productName,
             packSize: c.packSize,
-            costPrice: c.costPrice,
-            sellPrice: c.sellPrice,
+            costPrice: serializeMoney(c.costPrice),
+            sellPrice: serializeMoney(c.sellPrice),
             margin: c.margin,
-            profitPerUnit: Math.round((c.sellPrice - c.costPrice) * 100) / 100
+            // C3 PREREQUISITE: profitPerUnit arithmetic uses Number coercion via
+            // Decimal128.valueOf, loses precision post-C3. Rewrite in Decimal
+            // before C3 deploy. See post-c3-verification-checklist.md.
+            profitPerUnit: Math.round((Number(c.sellPrice) - Number(c.costPrice)) * 100) / 100
         }));
 
         res.json(report);
@@ -8337,8 +8531,8 @@ app.get('/api/admin/chemicals/duplicates-audit', authMiddleware, adminMiddleware
                 sourceSupplier: chem.sourceSupplier,
                 isActive: chem.isActive !== false,
                 isRestrictedUse: chem.isRestrictedUse === true,
-                costPrice: chem.costPrice || 0,
-                sellPrice: chem.sellPrice || 0,
+                costPrice: serializeMoney(chem.costPrice || 0),
+                sellPrice: serializeMoney(chem.sellPrice || 0),
                 priceDate: chem.priceDate || null,
                 quantityOnHand: inv.quantityOnHand,
                 quantityReserved: inv.quantityReserved,
@@ -10631,6 +10825,13 @@ const chemicalRequestSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+const CHEMICAL_REQUEST_MONEY_PATHS = {
+    'competitorPrice': 4,
+    'supplierQuotes.price': 4,
+};
+chemicalRequestSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalRequestSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_REQUEST_MONEY_PATHS); next(); });
+
 const ChemicalRequest = mongoose.model('ChemicalRequest', chemicalRequestSchema);
 
 // Submit "Found it Cheaper" price match request
@@ -10824,6 +11025,12 @@ const userSubmittedChemicalSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+const USER_SUBMITTED_CHEMICAL_MONEY_PATHS = {
+    'costPerUnit': 4,
+};
+userSubmittedChemicalSchema.set('toJSON', { transform: decimalToJSONTransform });
+userSubmittedChemicalSchema.pre('validate', function (next) { coerceMoneyFields(this, USER_SUBMITTED_CHEMICAL_MONEY_PATHS); next(); });
 
 const UserSubmittedChemical = mongoose.model('UserSubmittedChemical', userSubmittedChemicalSchema);
 
@@ -11754,10 +11961,10 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
             packSize: c.packSize,
             unit: c.unit,
             unitsPerPack: c.unitsPerPack,
-            costPrice: c.costPrice,
-            adminPrice: c.adminPrice,
+            costPrice: serializeMoney(c.costPrice),
+            adminPrice: serializeMoney(c.adminPrice),
             adminMargin: c.adminMargin,
-            sellPrice: c.sellPrice,
+            sellPrice: serializeMoney(c.sellPrice),
             margin: c.margin,
             activeIngredients: c.activeIngredients,
             isActive: c.isActive,
@@ -13039,7 +13246,7 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
                 quantityReserved: 0,
                 quantityAvailable: 0,
                 quantityOnOrder: onOrderMap[chem._id.toString()] || 0,
-                averageCost: chem.costPrice || 0,
+                averageCost: serializeMoney(chem.costPrice || 0),
                 location: 'main',
                 needsInventoryRecord: true
             }));
@@ -13882,10 +14089,10 @@ app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, a
                 category: c.category,
                 packSize: c.packSize,
                 unit: c.unit,
-                costPrice: c.costPrice,
-                adminPrice: c.adminPrice,
+                costPrice: serializeMoney(c.costPrice),
+                adminPrice: serializeMoney(c.adminPrice),
                 adminMargin: c.adminMargin,
-                sellPrice: c.sellPrice,
+                sellPrice: serializeMoney(c.sellPrice),
                 margin: c.margin,
                 activeIngredients: c.activeIngredients,
                 isActive: c.isActive,
@@ -15956,10 +16163,10 @@ app.get('/api/distributor/products', authMiddleware, adminMiddleware, async (req
                 category: c.category,
                 packSize: c.packSize,
                 unit: c.unit,
-                costPrice: c.costPrice,
-                adminPrice: c.adminPrice,
-                sellPrice: c.sellPrice,
-                price: customPrice?.retailPrice || c.sellPrice,
+                costPrice: serializeMoney(c.costPrice),
+                adminPrice: serializeMoney(c.adminPrice),
+                sellPrice: serializeMoney(c.sellPrice),
+                price: serializeMoney(customPrice?.retailPrice || c.sellPrice),
                 isAvailable: customPrice?.isAvailable !== false,
                 notes: customPrice?.notes || ''
             };

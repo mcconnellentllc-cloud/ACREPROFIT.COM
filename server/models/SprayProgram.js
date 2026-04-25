@@ -192,5 +192,14 @@ SprayProgramSchema.pre('save', async function(next) {
   }
 });
 
+// Decimal128 migration (C2). Only `estimatedCostPerAcre` is money on this
+// schema; rate fields are quantity, not money. dp=4 because per-acre.
+const { decimalToJSONTransform, coerceMoneyFields } = require('../lib/money');
+const SPRAY_PROGRAM_MONEY_PATHS = {
+    'estimatedCostPerAcre': 4,
+};
+SprayProgramSchema.set('toJSON', { transform: decimalToJSONTransform });
+SprayProgramSchema.pre('validate', function (next) { coerceMoneyFields(this, SPRAY_PROGRAM_MONEY_PATHS); next(); });
+
 module.exports = mongoose.models.SprayProgram
   || mongoose.model('SprayProgram', SprayProgramSchema);
