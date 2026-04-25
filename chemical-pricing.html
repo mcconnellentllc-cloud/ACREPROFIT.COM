@@ -347,6 +347,8 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <!-- Access Denied Screen -->
@@ -538,17 +540,23 @@
             updateStats();
         }
 
-        // Calculate prices with two-tier margins
+        // Calculate prices with two-tier margins. Money values flow as Decimal
+        // instances; percentage results stay Number (per migration policy: only
+        // $ values become Decimal128, % stays float).
         function calculateAdminPrice(costPrice, adminMarginPct) {
-            return costPrice / (1 - adminMarginPct / 100);
+            const margin = new Decimal(adminMarginPct).div(100);
+            return new Decimal(costPrice).div(new Decimal(1).minus(margin));
         }
 
         function calculateSellPrice(adminPrice, regularMarginPct) {
-            return adminPrice / (1 - regularMarginPct / 100);
+            const margin = new Decimal(regularMarginPct).div(100);
+            return new Decimal(adminPrice).div(new Decimal(1).minus(margin));
         }
 
         function calculateTotalMargin(costPrice, sellPrice) {
-            return sellPrice > 0 ? ((sellPrice - costPrice) / sellPrice) * 100 : 0;
+            const sell = new Decimal(sellPrice);
+            if (sell.lte(0)) return 0;
+            return Number(sell.minus(new Decimal(costPrice)).div(sell).times(100));
         }
 
         function renderTable() {
@@ -557,7 +565,7 @@
                 const adminPrice = calculateAdminPrice(p.costPrice, p.adminMarginPct || 0);
                 const sellPrice = calculateSellPrice(adminPrice, p.regularMarginPct || 0);
                 const totalMargin = calculateTotalMargin(p.costPrice, sellPrice);
-                const marginAmt = sellPrice - p.costPrice;
+                const marginAmt = sellPrice.minus(new Decimal(p.costPrice));
                 return `
                     <tr>
                         <td>
@@ -566,22 +574,22 @@
                         </td>
                         <td><span class="category-badge ${p.category}">${p.category}</span></td>
                         <td>${p.package}<br><small style="color:#666">(${p.unitsPerPack} ${p.unit})</small></td>
-                        <td class="cost-price">$${p.costPrice.toFixed(2)}/${p.unit}</td>
+                        <td class="cost-price">${fmtMoney(p.costPrice)}/${p.unit}</td>
                         <td>
                             <input type="number" class="editable-input" style="width:60px; color:#dc3545;"
                                    value="${p.adminMarginPct || 0}"
                                    min="0" max="100" step="0.1"
                                    onchange="updateAdminMargin(${idx}, this.value)">%
                         </td>
-                        <td style="color:#888;">$${adminPrice.toFixed(2)}/${p.unit}</td>
+                        <td style="color:#888;">${fmtMoney(adminPrice)}/${p.unit}</td>
                         <td>
                             <input type="number" class="editable-input" style="width:60px; color:#D4A017;"
                                    value="${p.regularMarginPct || 0}"
                                    min="0" max="100" step="0.1"
                                    onchange="updateRegularMargin(${idx}, this.value)">%
                         </td>
-                        <td class="sell-price">$${sellPrice.toFixed(2)}/${p.unit}</td>
-                        <td class="margin-amount">${totalMargin.toFixed(1)}%<br><small style="color:#888;">$${marginAmt.toFixed(2)}</small></td>
+                        <td class="sell-price">${fmtMoney(sellPrice)}/${p.unit}</td>
+                        <td class="margin-amount">${totalMargin.toFixed(1)}%<br><small style="color:#888;">${fmtMoney(marginAmt)}</small></td>
                     </tr>
                 `;
             }).join('');
@@ -612,22 +620,22 @@
 
         function updateStats() {
             const totalProducts = products.length;
-            let totalCost = 0;
-            let totalSell = 0;
+            let totalCost = new Decimal(0);
+            let totalSell = new Decimal(0);
             let totalMarginPct = 0;
 
             products.forEach(p => {
                 const adminPrice = calculateAdminPrice(p.costPrice, p.adminMarginPct || 0);
                 const sellPrice = calculateSellPrice(adminPrice, p.regularMarginPct || 0);
-                totalCost += p.costPrice;
-                totalSell += sellPrice;
+                totalCost = totalCost.plus(new Decimal(p.costPrice));
+                totalSell = totalSell.plus(sellPrice);
                 totalMarginPct += calculateTotalMargin(p.costPrice, sellPrice);
             });
 
             document.getElementById('totalProducts').textContent = totalProducts;
             document.getElementById('avgMargin').textContent = (totalMarginPct / totalProducts).toFixed(1) + '%';
-            document.getElementById('totalCostValue').textContent = '$' + totalCost.toFixed(2);
-            document.getElementById('totalSellValue').textContent = '$' + totalSell.toFixed(2);
+            document.getElementById('totalCostValue').textContent = fmtMoney(totalCost);
+            document.getElementById('totalSellValue').textContent = fmtMoney(totalSell);
         }
 
         function savePrices() {

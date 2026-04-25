@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar admin-nav">
@@ -487,7 +489,7 @@
                 dropdown.innerHTML = filtered.map(p => `
                     <div class="dropdown-item" onclick="addProduct('${p._id}')">
                         <span class="product-name">${p.productName}</span>
-                        <span class="product-details">${p.packSize} - $${(p.effectivePrice || p.baseRetailPrice || p.sellPrice || p.price || 0).toFixed(2)}/${p.unit}</span>
+                        <span class="product-details">${p.packSize} - ${fmtMoney(p.effectivePrice || p.baseRetailPrice || p.sellPrice || p.price || 0)}/${p.unit}</span>
                     </div>
                 `).join('');
             }
@@ -503,8 +505,9 @@
             const existing = invoiceItems.find(i => i.productId === productId);
             if (existing) {
                 existing.quantity++;
-                existing.total = existing.quantity * existing.unitPrice;
+                existing.total = Number(new Decimal(existing.unitPrice).times(existing.quantity).toFixed(2));
             } else {
+                const unitPrice = Number(new Decimal(product.effectivePrice || product.baseRetailPrice || product.sellPrice || product.price || 0));
                 invoiceItems.push({
                     productId: product._id,
                     productName: product.productName,
@@ -512,8 +515,8 @@
                     packSize: product.packSize,
                     unit: product.unit,
                     quantity: 1,
-                    unitPrice: product.effectivePrice || product.baseRetailPrice || product.sellPrice || product.price || 0,
-                    total: product.effectivePrice || product.baseRetailPrice || product.sellPrice || product.price || 0
+                    unitPrice: unitPrice,
+                    total: unitPrice
                 });
             }
 
@@ -546,10 +549,10 @@
                         <button class="qty-btn" onclick="adjustQty(${index}, 1)">+</button>
                     </div>
                     <div class="item-price">
-                        <span>$${item.unitPrice.toFixed(2)}</span>
+                        <span>${fmtMoney(item.unitPrice)}</span>
                     </div>
                     <div class="item-total">
-                        <span>$${item.total.toFixed(2)}</span>
+                        <span>${fmtMoney(item.total)}</span>
                     </div>
                     <button class="item-remove" onclick="removeItem(${index})">×</button>
                 </div>
@@ -587,8 +590,8 @@
                 invoiceItems.forEach(item => {
                     const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
                     if (prod) {
-                        item.unitPrice = prod.sellPrice || prod.price || item.unitPrice;
-                        item.total = item.quantity * item.unitPrice;
+                        item.unitPrice = Number(new Decimal(prod.sellPrice || prod.price || item.unitPrice));
+                        item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
                     }
                 });
                 renderInvoiceItems();
@@ -601,8 +604,8 @@
                 invoiceItems.forEach(item => {
                     const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
                     if (prod && prod.adminPrice) {
-                        item.unitPrice = prod.adminPrice;
-                        item.total = item.quantity * item.unitPrice;
+                        item.unitPrice = Number(new Decimal(prod.adminPrice));
+                        item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
                     }
                 });
                 document.getElementById('discountReason').value = 'No distributor margin (admin price)';
@@ -611,8 +614,8 @@
                 invoiceItems.forEach(item => {
                     const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
                     if (prod && prod.costPrice) {
-                        item.unitPrice = prod.costPrice;
-                        item.total = item.quantity * item.unitPrice;
+                        item.unitPrice = Number(new Decimal(prod.costPrice));
+                        item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
                     }
                 });
                 document.getElementById('discountReason').value = 'At cost (no markup)';
@@ -626,14 +629,15 @@
         }
 
         function updateTotals() {
-            const subtotal = invoiceItems.reduce((sum, item) => sum + item.total, 0);
-            const discount = parseFloat(document.getElementById('discountAmount').value) || 0;
-            const total = Math.max(0, subtotal - discount);
+            const subtotal = invoiceItems.reduce((sum, item) => sum.plus(new Decimal(item.total)), new Decimal(0));
+            const discount = new Decimal(parseFloat(document.getElementById('discountAmount').value) || 0);
+            const totalDiff = subtotal.minus(discount);
+            const total = totalDiff.lt(0) ? new Decimal(0) : totalDiff;
 
             // Update preview
-            document.getElementById('previewSubtotal').textContent = '$' + subtotal.toFixed(2);
-            document.getElementById('previewDiscount').textContent = '-$' + discount.toFixed(2);
-            document.getElementById('previewTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('previewSubtotal').textContent = fmtMoney(subtotal);
+            document.getElementById('previewDiscount').textContent = '-' + fmtMoney(discount);
+            document.getElementById('previewTotal').textContent = fmtMoney(total);
 
             const discountRow = document.getElementById('previewDiscountRow');
             discountRow.style.display = discount > 0 ? 'flex' : 'none';
@@ -647,8 +651,8 @@
                     <tr>
                         <td>${item.productName}</td>
                         <td>${item.quantity}</td>
-                        <td>$${item.unitPrice.toFixed(2)}</td>
-                        <td>$${item.total.toFixed(2)}</td>
+                        <td>${fmtMoney(item.unitPrice)}</td>
+                        <td>${fmtMoney(item.total)}</td>
                     </tr>
                 `).join('');
             }
@@ -810,7 +814,7 @@
                 <tr>
                     <td><strong>${inv.invoiceNumber}</strong></td>
                     <td>${inv.customerName || inv.customerId?.name || 'N/A'}</td>
-                    <td>$${(inv.total || 0).toFixed(2)}</td>
+                    <td>${fmtMoney(inv.total || 0)}</td>
                     <td>
                         <span class="status-badge status-${inv.status || 'draft'}">${inv.status || 'draft'}</span>
                         ${inv.paymentStatus === 'paid' ? '<span class="status-badge status-paid">Paid</span>' : ''}
@@ -871,8 +875,8 @@
                     <tr>
                         <td style="padding:8px; border-bottom:1px solid #eee;">${i.productName || ''}</td>
                         <td style="padding:8px; border-bottom:1px solid #eee;">${i.quantity || 0} ${i.unit || ''}</td>
-                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">$${(i.unitPrice || 0).toFixed(2)}</td>
-                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">$${(i.totalPrice || 0).toFixed(2)}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${fmtMoney(i.unitPrice || 0)}</td>
+                        <td style="padding:8px; border-bottom:1px solid #eee; text-align:right;">${fmtMoney(i.totalPrice || 0)}</td>
                     </tr>
                 `).join('');
 
@@ -915,10 +919,10 @@
 
                     <div style="display:flex; justify-content:flex-end;">
                         <table>
-                            <tr><td style="padding:4px 12px;">Subtotal:</td><td style="text-align:right; padding:4px 0;">$${(inv.subtotal || 0).toFixed(2)}</td></tr>
-                            ${(inv.discount || 0) > 0 ? `<tr><td style="padding:4px 12px;">Discount:</td><td style="text-align:right; padding:4px 0;">-$${inv.discount.toFixed(2)}</td></tr>` : ''}
-                            <tr style="font-weight:700; border-top:2px solid #2d5a27;"><td style="padding:8px 12px;">Total:</td><td style="text-align:right; padding:8px 0;">$${(inv.total || 0).toFixed(2)}</td></tr>
-                            <tr><td style="padding:4px 12px; color:#666;">Amount Due:</td><td style="text-align:right; padding:4px 0; color:#666;">$${(inv.amountDue ?? inv.total ?? 0).toFixed(2)}</td></tr>
+                            <tr><td style="padding:4px 12px;">Subtotal:</td><td style="text-align:right; padding:4px 0;">${fmtMoney(inv.subtotal || 0)}</td></tr>
+                            ${new Decimal(inv.discount || 0).gt(0) ? `<tr><td style="padding:4px 12px;">Discount:</td><td style="text-align:right; padding:4px 0;">-${fmtMoney(inv.discount)}</td></tr>` : ''}
+                            <tr style="font-weight:700; border-top:2px solid #2d5a27;"><td style="padding:8px 12px;">Total:</td><td style="text-align:right; padding:8px 0;">${fmtMoney(inv.total || 0)}</td></tr>
+                            <tr><td style="padding:4px 12px; color:#666;">Amount Due:</td><td style="text-align:right; padding:4px 0; color:#666;">${fmtMoney(inv.amountDue ?? inv.total ?? 0)}</td></tr>
                         </table>
                     </div>
 
@@ -956,7 +960,7 @@
                     <tr>
                         <td style="padding:6px 8px; border-bottom:1px solid #eee;">${cn.creditNoteNumber || ''}</td>
                         <td style="padding:6px 8px; border-bottom:1px solid #eee;">${new Date(cn.issuedAt || cn.createdAt).toLocaleDateString()}</td>
-                        <td style="padding:6px 8px; border-bottom:1px solid #eee; text-align:right;">$${Number(cn.amount || 0).toFixed(2)}</td>
+                        <td style="padding:6px 8px; border-bottom:1px solid #eee; text-align:right;">${fmtMoney(cn.amount || 0)}</td>
                         <td style="padding:6px 8px; border-bottom:1px solid #eee;">${cn.refundMode === 'stripe' ? 'Stripe' : 'Record only'}</td>
                         <td style="padding:6px 8px; border-bottom:1px solid #eee;">${statusLabel[cn.status] || cn.status || ''}</td>
                         <td style="padding:6px 8px; border-bottom:1px solid #eee; color:#666;">${(cn.reason || '').replace(/[<>]/g, '')}</td>
@@ -1054,15 +1058,15 @@
 
         function openCreditNoteModal(invoiceId, invoiceNumber, amountPaid, creditedAmount, paymentMethod) {
             pendingCreditNoteInvoiceId = invoiceId;
-            const remaining = Math.round((Number(amountPaid || 0) - Number(creditedAmount || 0)) * 100) / 100;
+            const remaining = new Decimal(amountPaid || 0).minus(new Decimal(creditedAmount || 0));
             pendingCreditNoteRemaining = remaining;
-            if (remaining <= 0) {
+            if (remaining.lte(0)) {
                 alert('This invoice has already been fully credited.');
                 return;
             }
             document.getElementById('cnInvoiceNumber').textContent = invoiceNumber || '';
-            document.getElementById('cnAmountPaid').textContent = Number(amountPaid || 0).toFixed(2);
-            document.getElementById('cnAlreadyCredited').textContent = Number(creditedAmount || 0).toFixed(2);
+            document.getElementById('cnAmountPaid').textContent = new Decimal(amountPaid || 0).toFixed(2);
+            document.getElementById('cnAlreadyCredited').textContent = new Decimal(creditedAmount || 0).toFixed(2);
             document.getElementById('cnRemaining').textContent = remaining.toFixed(2);
             const methodLabels = {
                 'stripe': 'Card (Stripe)',
@@ -1103,8 +1107,8 @@
                 alert('Enter a positive credit amount.');
                 return;
             }
-            if (amount > pendingCreditNoteRemaining + 0.005) {
-                alert(`Amount exceeds remaining creditable balance $${pendingCreditNoteRemaining.toFixed(2)}.`);
+            if (new Decimal(amount).gt(pendingCreditNoteRemaining.plus(0.005))) {
+                alert(`Amount exceeds remaining creditable balance ${fmtMoney(pendingCreditNoteRemaining)}.`);
                 return;
             }
             if (!reason) {

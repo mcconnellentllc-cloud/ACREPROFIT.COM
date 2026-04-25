@@ -283,6 +283,8 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <div class="spray-sheet">
@@ -464,14 +466,14 @@
             }
 
             // Chemicals table
-            let chemicalsCost = 0;
+            let chemicalsCost = new Decimal(0);
             if (orderData.chemicals) {
                 const tbody = document.getElementById('chemicalsBody');
                 tbody.innerHTML = orderData.chemicals.map(chem => {
                     const totalNeeded = calculateTotalNeeded(chem.rate, chem.unit, orderData.acres);
                     const packages = Math.ceil(totalNeeded / chem.packageSize);
-                    const cost = packages * (chem.pricePerUnit || 0) * chem.packageSize;
-                    chemicalsCost += cost;
+                    const cost = new Decimal(packages).times(chem.pricePerUnit || 0).times(chem.packageSize);
+                    chemicalsCost = chemicalsCost.plus(cost);
 
                     return `
                         <tr>
@@ -486,7 +488,7 @@
             }
 
             // Additional products
-            let additionalCost = 0;
+            let additionalCost = new Decimal(0);
             const additionalBody = document.getElementById('additionalBody');
             const additionalSection = document.getElementById('additionalProducts');
             let additionalHtml = '';
@@ -496,23 +498,23 @@
                 let price = 165;
                 if (gal >= 61) price = 125;
                 else if (gal >= 10) price = 135;
-                const total = gal * price;
-                additionalCost += total;
-                additionalHtml += `<tr><td>Hydrovant</td><td>${gal} gal</td><td>$${price}</td><td>$${total.toLocaleString()}</td></tr>`;
+                const total = new Decimal(gal).times(price);
+                additionalCost = additionalCost.plus(total);
+                additionalHtml += `<tr><td>Hydrovant</td><td>${gal} gal</td><td>$${price}</td><td>${fmtMoneyLocale(total)}</td></tr>`;
             }
 
             if (orderData.additionalProducts?.multiseal > 0) {
                 const qty = orderData.additionalProducts.multiseal;
-                const total = qty * 300;
-                additionalCost += total;
-                additionalHtml += `<tr><td>Multi Seal</td><td>${qty} bucket${qty > 1 ? 's' : ''}</td><td>$300</td><td>$${total.toLocaleString()}</td></tr>`;
+                const total = new Decimal(qty).times(300);
+                additionalCost = additionalCost.plus(total);
+                additionalHtml += `<tr><td>Multi Seal</td><td>${qty} bucket${qty > 1 ? 's' : ''}</td><td>$300</td><td>${fmtMoneyLocale(total)}</td></tr>`;
             }
 
             if (orderData.additionalProducts?.pump > 0) {
                 const qty = orderData.additionalProducts.pump;
-                const total = qty * 130;
-                additionalCost += total;
-                additionalHtml += `<tr><td>Pump</td><td>${qty}</td><td>$130</td><td>$${total.toLocaleString()}</td></tr>`;
+                const total = new Decimal(qty).times(130);
+                additionalCost = additionalCost.plus(total);
+                additionalHtml += `<tr><td>Pump</td><td>${qty}</td><td>$130</td><td>${fmtMoneyLocale(total)}</td></tr>`;
             }
 
             if (additionalHtml) {
@@ -521,11 +523,12 @@
             }
 
             // Totals
-            const totalCost = chemicalsCost + additionalCost;
-            document.getElementById('chemicalsCost').textContent = '$' + chemicalsCost.toLocaleString();
-            document.getElementById('additionalCost').textContent = '$' + additionalCost.toLocaleString();
-            document.getElementById('totalCost').textContent = '$' + totalCost.toLocaleString();
-            document.getElementById('perAcreCost').textContent = '$' + (totalCost / orderData.acres).toFixed(2) + '/acre';
+            const totalCost = chemicalsCost.plus(additionalCost);
+            document.getElementById('chemicalsCost').textContent = fmtMoneyLocale(chemicalsCost);
+            document.getElementById('additionalCost').textContent = fmtMoneyLocale(additionalCost);
+            document.getElementById('totalCost').textContent = fmtMoneyLocale(totalCost);
+            const perAcre = orderData.acres > 0 ? totalCost.div(orderData.acres) : new Decimal(0);
+            document.getElementById('perAcreCost').textContent = fmtMoney(perAcre) + '/acre';
         }
 
         // Order ref

@@ -71,6 +71,8 @@
         .order-confirmation h2 { color: #2d5a27; margin-bottom: 1rem; }
         .order-number { font-size: 1.5rem; font-weight: 700; background: #f8f9fa; padding: 1rem; border-radius: 8px; margin: 1rem 0; }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar dashboard-navbar">
@@ -214,7 +216,7 @@
                         <p style="color: #888; font-size: 0.8rem;">${p.notes || ''}</p>
                     </div>
                     <div class="product-price">
-                        $${(p.sellPrice || 0).toFixed(2)}<small>/${p.unit}</small>
+                        ${fmtMoney((p.sellPrice || 0))}<small>/${p.unit}</small>
                     </div>
                     <div class="product-actions">
                         <input type="number" class="qty-input" id="qty-${p._id}" min="1" value="1" step="1">
@@ -286,23 +288,23 @@
                 return;
             }
 
-            let total = 0;
+            let total = new Decimal(0);
             cartItems.innerHTML = cart.map((item, index) => {
-                const itemTotal = item.price * item.quantity;
-                total += itemTotal;
+                const itemTotal = new Decimal(item.price).times(item.quantity);
+                total = total.plus(itemTotal);
                 return `
                     <div class="cart-item">
                         <div class="cart-item-info">
                             <h5>${item.productName}</h5>
-                            <p>${item.quantity} ${item.unit} @ $${item.price.toFixed(2)}/${item.unit}</p>
+                            <p>${item.quantity} ${item.unit} @ ${fmtMoney(item.price)}/${item.unit}</p>
                         </div>
-                        <div class="cart-item-total">$${itemTotal.toFixed(2)}</div>
+                        <div class="cart-item-total">${fmtMoney(itemTotal)}</div>
                         <button class="remove-btn" onclick="removeFromCart(${index})">&times;</button>
                     </div>
                 `;
             }).join('');
 
-            document.getElementById('cartTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('cartTotal').textContent = fmtMoney(total);
             cartSummary.style.display = 'block';
             checkoutForm.style.display = 'block';
         }
@@ -323,10 +325,10 @@
                         quantity: item.quantity,
                         unit: item.unit,
                         pricePerUnit: item.price,
-                        totalPrice: item.price * item.quantity
+                        totalPrice: Number(new Decimal(item.price).times(item.quantity).toFixed(2))
                     })),
                     notes: document.getElementById('orderNotes').value,
-                    totalAmount: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+                    totalAmount: Number(cart.reduce((sum, item) => sum.plus(new Decimal(item.price).times(item.quantity)), new Decimal(0)).toFixed(2))
                 };
 
                 const response = await fetch(`${API_URL}/api/chemical-orders`, {
@@ -355,7 +357,7 @@
                         <h2>Order Submitted!</h2>
                         <p>Thank you for your order. We'll process it shortly.</p>
                         <div class="order-number">Order #${order._id ? order._id.slice(-8).toUpperCase() : 'PENDING'}</div>
-                        <p>Total: <strong>$${orderData.totalAmount.toFixed(2)}</strong></p>
+                        <p>Total: <strong>${fmtMoney(orderData.totalAmount)}</strong></p>
                         <p style="color: #666; margin-top: 1rem;">You'll receive an invoice via email.</p>
                         <div style="margin-top: 2rem;">
                             <a href="/my-orders.html" class="btn btn-primary" style="display: inline-block; width: auto; margin-right: 1rem;">View My Orders</a>

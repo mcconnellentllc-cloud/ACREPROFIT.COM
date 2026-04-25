@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
     <script src="dialog.js"></script>
 </head>
 <body>
@@ -3597,7 +3599,7 @@
                 allProducts.forEach(p => {
                     const opt = document.createElement('option');
                     opt.value = p._id;
-                    opt.textContent = `${p.productName} - $${p.sellPrice?.toFixed(2) || '0.00'}/${p.unit || 'unit'}`;
+                    opt.textContent = `${p.productName} - ${p.sellPrice != null ? fmtMoney(p.sellPrice) : '$0.00'}/${p.unit || 'unit'}`;
                     opt.dataset.price = p.sellPrice || 0;
                     opt.dataset.unit = p.unit || 'gal';
                     opt.dataset.name = p.productName;
@@ -3643,7 +3645,7 @@
                 qty: qty,
                 unit: unitInput.value,
                 pricePerUnit: pricePerUnit,
-                total: Math.round(qty * pricePerUnit * 100) / 100,
+                total: Number(new Decimal(qty).times(pricePerUnit).toFixed(2)),
                 chemicalId: select.value
             });
 
@@ -3669,22 +3671,22 @@
                 return;
             }
 
-            let totalCost = 0;
+            let totalCost = new Decimal(0);
             tbody.innerHTML = orderEditProducts.map((p, idx) => {
-                totalCost += p.total;
+                totalCost = totalCost.plus(new Decimal(p.total || 0));
                 return `
                     <tr>
                         <td>${p.name}</td>
                         <td>${p.qty}</td>
                         <td>${p.unit}</td>
-                        <td>$${p.pricePerUnit?.toFixed(2) || '0.00'}</td>
-                        <td>$${p.total?.toFixed(2) || '0.00'}</td>
+                        <td>${p.pricePerUnit != null ? fmtMoney(p.pricePerUnit) : '$0.00'}</td>
+                        <td>${p.total != null ? fmtMoney(p.total) : '$0.00'}</td>
                         <td><button class="btn btn-sm" style="color: #dc2626;" onclick="removeProductFromOrder(${idx})">Remove</button></td>
                     </tr>
                 `;
             }).join('');
 
-            document.getElementById('orderEditTotal').textContent = '$' + totalCost.toFixed(2);
+            document.getElementById('orderEditTotal').textContent = fmtMoney(totalCost);
         }
 
         async function saveOrderEditChanges() {
@@ -3939,7 +3941,7 @@
                         </div>
                         <div class="distributor-stats">
                             <div class="dist-stat">
-                                <span class="dist-stat-value">$${(d.inventoryValue || 0).toLocaleString(undefined, {minimumFractionDigits: 0, maximumFractionDigits: 0})}</span>
+                                <span class="dist-stat-value">${fmtMoneyLocale((d.inventoryValue || 0))}</span>
                                 <span class="dist-stat-label">Inventory (${d.inventoryItems || 0} items)</span>
                             </div>
                             <div class="dist-stat">
@@ -4309,7 +4311,7 @@
                         <td>${order.userId?.name || 'Unknown'}</td>
                         <td>${order.crop || order.sprayParams?.crop || '-'}${order.program ? ' / ' + order.program : ''}</td>
                         <td>${(order.acres || order.totalAcres)?.toLocaleString() || '-'}</td>
-                        <td>$${(order.totalCost || order.total || 0).toLocaleString()}</td>
+                        <td>${fmtMoneyLocale((order.totalCost || order.total || 0))}</td>
                         <td><span class="order-status status-${s}">${friendlyOrderStatus(s)}</span></td>
                         <td style="display: flex; gap: 8px; align-items: center;">
                             <button class="btn btn-sm btn-outline" onclick="openOrderEditModal('${order._id}')">Edit</button>
@@ -4348,7 +4350,7 @@
                 document.getElementById('pendingOrders').textContent = orders.filter(o => ['submitted', 'payment_pending', 'pending'].includes(o.status)).length;
 
                 const totalRevenue = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
-                document.getElementById('totalRevenue').textContent = '$' + totalRevenue.toLocaleString();
+                document.getElementById('totalRevenue').textContent = fmtMoneyLocale(totalRevenue);
 
                 // Recent orders
                 const recentOrders = orders.slice(0, 5);
@@ -4459,7 +4461,7 @@
                         });
                         details = changes.join(', ');
                     } else if (e.amount) {
-                        details = `$${e.amount.toLocaleString('en-US', {minimumFractionDigits: 2})}`;
+                        details = `${fmtMoneyLocale(e.amount)}`;
                     }
                     if (e.reason) details = (details ? details + ' | ' : '') + e.reason;
                     if (e.entityRef) details = (details ? details + ' | ' : '') + 'Ref: ' + e.entityRef;
@@ -4692,7 +4694,7 @@
                         </div>
                         <div style="display:flex; justify-content:space-between; align-items:center;">
                             <div style="font-size:0.85rem; color:#666;">
-                                $${(q.total || 0).toLocaleString()} · ${new Date(q.createdAt).toLocaleDateString()}
+                                ${fmtMoneyLocale((q.total || 0))} · ${new Date(q.createdAt).toLocaleDateString()}
                                 · Expires ${new Date(q.expiresAt).toLocaleDateString()}
                             </div>
                             ${q.status === 'sent' ? `
@@ -4953,7 +4955,7 @@
                     </div>
                     <div class="order-item-details">
                         <span class="order-acres">${order.acres?.toLocaleString() || 0} acres</span>
-                        <span class="order-total">$${(order.totalCost || order.totalPrice || 0).toLocaleString()}</span>
+                        <span class="order-total">${fmtMoneyLocale((order.totalCost || order.totalPrice || 0))}</span>
                         <span class="order-status status-${order.status}">${order.status.toUpperCase()}</span>
                     </div>
                 </div>
@@ -4976,7 +4978,7 @@
                         <span class="order-date">${invDate}</span>
                     </div>
                     <div class="order-item-details">
-                        <span class="invoice-total">$${(inv.total || 0).toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        <span class="invoice-total">${fmtMoneyLocale((inv.total || 0))}</span>
                         <span class="order-status status-${inv.status || 'draft'}">${(inv.status || 'draft').toUpperCase()}</span>
                         ${paidBadge}
                     </div>
@@ -5158,7 +5160,7 @@
                                onchange="updateItem(${index}, 'unitPrice', parseFloat(this.value))"
                                style="width: 100px;">
                     </td>
-                    <td>$${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}</td>
+                    <td>${fmtMoney(new Decimal(item.quantity || 0).times(item.unitPrice || 0))}</td>
                     <td>
                         <button class="btn-remove" onclick="removeOrderItem(${index})" title="Remove item">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
@@ -5195,12 +5197,12 @@
         }
 
         function updateOrderTotals() {
-            const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+            const subtotal = orderItems.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0));
             const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
-            const total = subtotal - discount;
+            const total = subtotal.minus(discount);
 
-            document.getElementById('orderSubtotal').textContent = '$' + subtotal.toFixed(2);
-            document.getElementById('orderTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('orderSubtotal').textContent = fmtMoney(subtotal);
+            document.getElementById('orderTotal').textContent = fmtMoney(total);
         }
 
         async function saveOrderChanges() {
@@ -5208,7 +5210,7 @@
 
             const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
             const notes = document.getElementById('orderNotes').value;
-            const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+            const subtotal = orderItems.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0));
 
             try {
                 // Determine if this is a ChemicalOrder or regular Order.
@@ -5227,9 +5229,9 @@
                 if (isChemicalOrder) {
                     payload = {
                         items: orderItems,
-                        subtotal: subtotal,
+                        subtotal: Number(subtotal.toFixed(2)),
                         discount: discount,
-                        total: subtotal - discount,
+                        total: Number(subtotal.minus(discount).toFixed(2)),
                         internalNotes: notes
                     };
                 } else {
@@ -5240,9 +5242,9 @@
                             packagesNeeded: item.quantity,
                             packageUnit: item.unit || 'units',
                             pricePerPackage: item.unitPrice,
-                            totalPrice: (item.quantity || 0) * (item.unitPrice || 0)
+                            totalPrice: Number(new Decimal(item.quantity || 0).times(item.unitPrice || 0).toFixed(2))
                         })),
-                        totalCost: subtotal - discount,
+                        totalCost: Number(subtotal.minus(discount).toFixed(2)),
                         notes: notes
                     };
                 }
@@ -5375,9 +5377,9 @@
             const dueDate = new Date(now);
             dueDate.setDate(dueDate.getDate() + 30);
 
-            const subtotal = orderItems.reduce((sum, item) => sum + ((item.quantity || 0) * (item.unitPrice || 0)), 0);
+            const subtotal = orderItems.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0));
             const discount = parseFloat(document.getElementById('orderDiscount').value) || 0;
-            const total = subtotal - discount;
+            const total = subtotal.minus(discount);
 
             // Populate invoice
             document.getElementById('invoiceNumber').textContent = `INV-${currentOrder.orderNumber?.replace('CO-', '') || now.getFullYear() + '-00001'}`;
@@ -5408,23 +5410,23 @@
                 <tr>
                     <td>${item.productName || 'Product'}</td>
                     <td>${item.quantity || 0}</td>
-                    <td>$${(item.unitPrice || 0).toFixed(2)}</td>
-                    <td>$${((item.quantity || 0) * (item.unitPrice || 0)).toFixed(2)}</td>
+                    <td>${fmtMoney((item.unitPrice || 0))}</td>
+                    <td>${fmtMoney(new Decimal(item.quantity || 0).times(item.unitPrice || 0))}</td>
                 </tr>
             `).join('') || '<tr><td colspan="4" style="text-align: center;">No items</td></tr>';
 
             // Totals
-            document.getElementById('invoiceSubtotal').textContent = '$' + subtotal.toFixed(2);
+            document.getElementById('invoiceSubtotal').textContent = fmtMoney(subtotal);
 
             const discountLine = document.getElementById('invoiceDiscountLine');
             if (discount > 0) {
                 discountLine.style.display = 'flex';
-                document.getElementById('invoiceDiscountAmount').textContent = '-$' + discount.toFixed(2);
+                document.getElementById('invoiceDiscountAmount').textContent = '-$' + new Decimal(discount).toFixed(2);
             } else {
                 discountLine.style.display = 'none';
             }
 
-            document.getElementById('invoiceTotalDue').textContent = '$' + total.toFixed(2);
+            document.getElementById('invoiceTotalDue').textContent = fmtMoney(total);
 
             document.getElementById('invoiceModal').style.display = 'flex';
         }
@@ -5977,24 +5979,24 @@
                     <td>${p.sourceSupplier}</td>
                     <td>${p.packSize} <small>(${p.unit})</small></td>
                     <td>
-                        $${costPrice.toFixed(2)}
+                        ${fmtMoney(costPrice)}
                         <br><small style="color: ${isPriceStale ? '#f59e0b' : 'var(--text-muted)'};">${priceAgeDisplay}</small>
                     </td>
                     <td>
-                        <span style="color: ${adminMarginColor}; font-weight: 700;">$${adminMarginDollars.toFixed(2)}</span>
-                        <br><small style="color: var(--text-muted);">Admin: $${adminPrice.toFixed(2)}</small>
+                        <span style="color: ${adminMarginColor}; font-weight: 700;">${fmtMoney(adminMarginDollars)}</span>
+                        <br><small style="color: var(--text-muted);">Admin: ${fmtMoney(adminPrice)}</small>
                     </td>
                     <td>
-                        <span style="color: ${marginDollarColor}; font-weight: 700;">$${marginDollars.toFixed(2)}</span>
+                        <span style="color: ${marginDollarColor}; font-weight: 700;">${fmtMoney(marginDollars)}</span>
                         <br><small style="color: var(--text-muted);">/unit</small>
                     </td>
-                    <td>$${sellPrice.toFixed(2)}</td>
+                    <td>${fmtMoney(sellPrice)}</td>
                     <td>
                         <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
                         ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
                     </td>
                     <td>${p.unitsSold || 0}</td>
-                    <td>$${(p.totalRevenue || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</td>
+                    <td>${fmtMoneyLocale((p.totalRevenue || 0))}</td>
                     <td>
                         <button class="btn btn-sm ${needsPricing && inventory > 0 ? 'btn-primary' : 'btn-outline'}" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins" ${needsPricing && inventory > 0 ? 'style="background:#dc2626; border-color:#dc2626; animation: pulse 2s infinite;"' : ''}>
                             ${needsPricing && inventory > 0 ? 'Set Price' : 'Edit'}
@@ -6017,33 +6019,37 @@
             }).join('');
 
             // Totals row - sum across all products weighted by inventory on hand
-            let totalCostValue = 0;         // cost × inventory
-            let totalAdminMarginValue = 0;  // admin margin × inventory
-            let totalDistMarginValue = 0;   // distributor margin × inventory
-            let totalSellValue = 0;         // sell × inventory
+            let totalCostValue = new Decimal(0);         // cost × inventory
+            let totalAdminMarginValue = new Decimal(0);  // admin margin × inventory
+            let totalDistMarginValue = new Decimal(0);   // distributor margin × inventory
+            let totalSellValue = new Decimal(0);         // sell × inventory
             let totalInventoryItems = 0;
 
             // Per-unit totals (if every unit sold at set margins)
-            let totalCostPerUnit = 0;
-            let totalAdminMarginPerUnit = 0;
-            let totalDistMarginPerUnit = 0;
+            let totalCostPerUnit = new Decimal(0);
+            let totalAdminMarginPerUnit = new Decimal(0);
+            let totalDistMarginPerUnit = new Decimal(0);
 
             products.forEach(p => {
-                const cost = p.costPrice || 0;
-                const adminMargin = p.adminMarginDollars !== undefined ? p.adminMarginDollars : ((p.adminPrice || cost) - cost);
-                const distMargin = p.marginDollars !== undefined ? p.marginDollars : ((p.sellPrice || cost) - (p.adminPrice || cost));
-                const sell = p.sellPrice || cost;
+                const cost = new Decimal(p.costPrice || 0);
+                const adminMargin = p.adminMarginDollars !== undefined && p.adminMarginDollars !== null
+                    ? new Decimal(p.adminMarginDollars)
+                    : new Decimal(p.adminPrice || p.costPrice || 0).minus(cost);
+                const distMargin = p.marginDollars !== undefined && p.marginDollars !== null
+                    ? new Decimal(p.marginDollars)
+                    : new Decimal(p.sellPrice || p.costPrice || 0).minus(new Decimal(p.adminPrice || p.costPrice || 0));
+                const sell = new Decimal(p.sellPrice || p.costPrice || 0);
                 const inv = p.quantityOnHand || 0;
 
-                totalCostValue += cost * inv;
-                totalAdminMarginValue += adminMargin * inv;
-                totalDistMarginValue += distMargin * inv;
-                totalSellValue += sell * inv;
+                totalCostValue = totalCostValue.plus(cost.times(inv));
+                totalAdminMarginValue = totalAdminMarginValue.plus(adminMargin.times(inv));
+                totalDistMarginValue = totalDistMarginValue.plus(distMargin.times(inv));
+                totalSellValue = totalSellValue.plus(sell.times(inv));
                 totalInventoryItems += inv;
 
-                totalCostPerUnit += cost;
-                totalAdminMarginPerUnit += adminMargin;
-                totalDistMarginPerUnit += distMargin;
+                totalCostPerUnit = totalCostPerUnit.plus(cost);
+                totalAdminMarginPerUnit = totalAdminMarginPerUnit.plus(adminMargin);
+                totalDistMarginPerUnit = totalDistMarginPerUnit.plus(distMargin);
             });
 
             tbody.innerHTML += `
@@ -6053,19 +6059,19 @@
                         <small style="color:#666; font-weight:400;">Sum of (price × current inventory) across all products</small>
                     </td>
                     <td style="padding:16px 12px;">
-                        <div style="color:#111;">$${totalCostValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div style="color:#111;">${fmtMoneyLocale(totalCostValue)}</div>
                         <small style="color:#666; font-weight:400;">Total cost of inventory</small>
                     </td>
                     <td style="padding:16px 12px;">
-                        <div style="color:#059669;">$${totalAdminMarginValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div style="color:#059669;">${fmtMoneyLocale(totalAdminMarginValue)}</div>
                         <small style="color:#666; font-weight:400;">Admin margin if all sells</small>
                     </td>
                     <td style="padding:16px 12px;">
-                        <div style="color:#7c3aed;">$${totalDistMarginValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div style="color:#7c3aed;">${fmtMoneyLocale(totalDistMarginValue)}</div>
                         <small style="color:#666; font-weight:400;">Dist margin if all sells</small>
                     </td>
                     <td style="padding:16px 12px;">
-                        <div style="color:#2d5a27;">$${totalSellValue.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</div>
+                        <div style="color:#2d5a27;">${fmtMoneyLocale(totalSellValue)}</div>
                         <small style="color:#666; font-weight:400;">Total revenue potential</small>
                     </td>
                     <td style="padding:16px 12px;">
@@ -6104,9 +6110,9 @@
             const adminMargin = product.adminMarginDollars !== undefined ? product.adminMarginDollars : (adminPrice - cost);
             const margin = product.marginDollars !== undefined ? product.marginDollars : (sellPrice - adminPrice);
 
-            document.getElementById('editProductCost').value = cost.toFixed(2);
-            document.getElementById('editProductAdminMargin').value = adminMargin.toFixed(2);
-            document.getElementById('editProductMargin').value = margin.toFixed(2);
+            document.getElementById('editProductCost').value = new Decimal(cost).toFixed(2);
+            document.getElementById('editProductAdminMargin').value = new Decimal(adminMargin).toFixed(2);
+            document.getElementById('editProductMargin').value = new Decimal(margin).toFixed(2);
             document.getElementById('editProductPriceSpeculated').checked = product.priceIsSpeculated === true;
 
             calcEditPricePreview();
@@ -6177,11 +6183,11 @@
             const adminPrice = cost + adminMargin;
             const sellPrice = adminPrice + margin;
 
-            document.getElementById('editPreviewCost').textContent = '$' + cost.toFixed(2);
-            document.getElementById('editPreviewAdminMargin').textContent = '$' + adminMargin.toFixed(2);
-            document.getElementById('editPreviewAdminPrice').textContent = '$' + adminPrice.toFixed(2);
-            document.getElementById('editPreviewMargin').textContent = '$' + margin.toFixed(2);
-            document.getElementById('editPreviewSellPrice').textContent = '$' + sellPrice.toFixed(2);
+            document.getElementById('editPreviewCost').textContent = fmtMoney(cost);
+            document.getElementById('editPreviewAdminMargin').textContent = fmtMoney(adminMargin);
+            document.getElementById('editPreviewAdminPrice').textContent = fmtMoney(adminPrice);
+            document.getElementById('editPreviewMargin').textContent = fmtMoney(margin);
+            document.getElementById('editPreviewSellPrice').textContent = fmtMoney(sellPrice);
         }
 
         async function saveProductMargins() {
@@ -6245,7 +6251,7 @@
             const sellPrice = adminPrice + marginDollars;
 
             if (cost > 0) {
-                preview.innerHTML = `<span style="color: #059669; font-weight: 700;">$${sellPrice.toFixed(2)}</span>`;
+                preview.innerHTML = `<span style="color: #059669; font-weight: 700;">${fmtMoney(sellPrice)}</span>`;
             } else {
                 preview.textContent = '$0.00';
             }
@@ -6628,7 +6634,7 @@
                                 </div>
                                 <div style="display: flex; justify-content: space-between; align-items: center;">
                                     <span style="font-size: 1.1rem; font-weight: 700; color: #059669;">
-                                        ${p.sellPrice ? '$' + p.sellPrice.toFixed(2) : 'Contact for price'}
+                                        ${p.sellPrice ? fmtMoney(p.sellPrice) : 'Contact for price'}
                                     </span>
                                     <button class="btn btn-sm btn-primary" onclick="addToPreorderQuote('${p._id}', '${(p.productName || '').replace(/'/g, "\\'")}', '${p.packSize || ''}', '${p.unit || 'unit'}')" style="background: #7c3aed;">
                                         + Add to Quote
@@ -6795,7 +6801,7 @@
                     <td>${q.customerId?.name || q.customerName || 'Unknown'}</td>
                     <td>${q.items.length} items</td>
                     <td>${totalQty.toLocaleString()}</td>
-                    <td>${q.estimatedTotal ? '$' + q.estimatedTotal.toLocaleString() : '-'}</td>
+                    <td>${q.estimatedTotal ? fmtMoneyLocale(q.estimatedTotal) : '-'}</td>
                     <td><span class="order-status" style="background: ${statusColors[q.status]}20; color: ${statusColors[q.status]};">${q.status}</span></td>
                     <td>${new Date(q.submittedAt).toLocaleDateString()}</td>
                     <td>
@@ -6881,7 +6887,7 @@
                     (i.isPriced ? ` @ $${i.sellPrice}/unit = $${i.totalPrice}` : ' - NOT PRICED')
                 ).join('\n');
 
-                toast(`Quote ${quote.quoteNumber}\nCustomer: ${quote.customerName || 'Unknown'}\nStatus: ${quote.status}\n\nItems:\n${itemsList}\n\n${quote.estimatedTotal ? 'Total: $' + quote.estimatedTotal.toLocaleString() : 'Total: Not yet priced'}`, 'info');
+                toast(`Quote ${quote.quoteNumber}\nCustomer: ${quote.customerName || 'Unknown'}\nStatus: ${quote.status}\n\nItems:\n${itemsList}\n\n${quote.estimatedTotal ? 'Total: ' + fmtMoneyLocale(quote.estimatedTotal) : 'Total: Not yet priced'}`, 'info');
             } catch (error) {
                 console.error('Error viewing quote:', error);
             }
@@ -7027,7 +7033,7 @@
 
             // Calculate estimated savings (mock for now)
             const savings = awarded * 500; // Placeholder
-            document.getElementById('totalSavings').textContent = '$' + savings.toLocaleString();
+            document.getElementById('totalSavings').textContent = fmtMoneyLocale(savings);
         }
 
         function renderBidSheets(sheets) {
@@ -7076,7 +7082,7 @@
                     <td>${s.invitedSuppliers.length} invited</td>
                     <td>${s.supplierBids.length} bids</td>
                     <td style="font-weight: 700; color: ${lowestBid ? '#10b981' : 'inherit'};">
-                        ${lowestBid ? '$' + lowestBid.toLocaleString() : '-'}
+                        ${lowestBid ? fmtMoneyLocale(lowestBid) : '-'}
                     </td>
                     <td><span class="order-status" style="background: ${statusColors[s.status]}20; color: ${statusColors[s.status]};">${statusLabels[s.status] || s.status}</span></td>
                     <td>
@@ -7360,7 +7366,7 @@
                         <div style="border: 2px solid ${b.isSelected ? '#10b981' : '#e5e7eb'}; border-radius: 8px; padding: 16px; margin-bottom: 12px; ${b.isSelected ? 'background: #ecfdf5;' : ''}">
                             <div style="display: flex; justify-content: space-between; align-items: center;">
                                 <strong style="font-size: 1.1rem;">${b.supplierName}</strong>
-                                <span style="font-size: 1.25rem; font-weight: 700; color: #10b981;">$${b.totalBid?.toLocaleString() || '0'}</span>
+                                <span style="font-size: 1.25rem; font-weight: 700; color: #10b981;">${b.totalBid != null ? fmtMoneyLocale(b.totalBid) : '$0.00'}</span>
                             </div>
                             <div style="margin-top: 8px; color: #6b7280; font-size: 0.9rem;">
                                 Freight: $${b.freight || 0} | Terms: ${b.paymentTerms || 'N/A'}
@@ -7506,12 +7512,12 @@
                 msg += `${comparison.itemCount} items, ${comparison.supplierCount} suppliers\n\n`;
 
                 comparison.comparison.forEach(c => {
-                    msg += `#${c.rank} ${c.supplierName}: $${c.totalBid.toLocaleString()}`;
+                    msg += `#${c.rank} ${c.supplierName}: ${fmtMoneyLocale(c.totalBid)}`;
                     if (c.rank > 1) msg += ` (+${c.percentAboveLowest}%)`;
                     msg += '\n';
                 });
 
-                msg += `\nLowest: $${comparison.comparison[0].totalBid.toLocaleString()} from ${comparison.comparison[0].supplierName}`;
+                msg += `\nLowest: ${fmtMoneyLocale(comparison.comparison[0].totalBid)} from ${comparison.comparison[0].supplierName}`;
 
                 toast(msg, 'info');
             } catch (error) {
@@ -7532,7 +7538,7 @@
                 }
 
                 const options = sheet.supplierBids.map((b, i) =>
-                    `${i + 1}. ${b.supplierName} - $${b.totalBid?.toLocaleString() || 0}`
+                    `${i + 1}. ${b.supplierName} - ${b.totalBid != null ? fmtMoneyLocale(b.totalBid) : '$0.00'}`
                 ).join('\n');
 
                 const choice = await promptDialog(`Select winning supplier:\n\n${options}\n\nEnter number (1-${sheet.supplierBids.length}):`);
@@ -7697,33 +7703,33 @@
 
             // Build commissions tooltip
             const commissionsDetail = commissionsOwed.length > 0
-                ? commissionsOwed.map(c => `${c.repName.split(' ')[0]}: $${c.owed.toLocaleString('en-US', {minimumFractionDigits: 2})}`).join(' | ')
+                ? commissionsOwed.map(c => `${c.repName.split(' ')[0]}: ${fmtMoneyLocale(c.owed)}`).join(' | ')
                 : 'No unpaid commissions';
 
             document.getElementById('ledgerTopSummary').innerHTML = `
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #dc2626;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">TOTAL AP DEBT</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #dc2626;">$${totalApDebt.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #dc2626;">${fmtMoneyLocale(totalApDebt)}</div>
                     <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Combined loans from distributors</div>
                 </div>
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #059669;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">CASH IN BANK</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #059669;">$${cashInBank.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
-                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Customer $${customerPaymentsIn.toLocaleString('en-US', {minimumFractionDigits: 2})} in, $${paidOutToDistributors.toLocaleString('en-US', {minimumFractionDigits: 2})} paid out</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #059669;">${fmtMoneyLocale(cashInBank)}</div>
+                    <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Customer ${fmtMoneyLocale(customerPaymentsIn)} in, ${fmtMoneyLocale(paidOutToDistributors)} paid out</div>
                 </div>
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #2563eb;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">AVAILABLE TO PAY</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #2563eb;">$${canPayNow.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #2563eb;">${fmtMoneyLocale(canPayNow)}</div>
                     <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Ready for checks to distributors</div>
                 </div>
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #d97706;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">COMMISSIONS OWED</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #d97706;">$${totalCommissionsOwed.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #d97706;">${fmtMoneyLocale(totalCommissionsOwed)}</div>
                     <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">${commissionsDetail}</div>
                 </div>
                 <div style="background: white; padding: 20px 24px; border-radius: 8px; border: 2px solid #7c3aed;">
                     <div style="color: #666; font-size: 0.85rem; margin-bottom: 4px; font-weight: 600;">ADMIN MARGIN BANKED</div>
-                    <div style="font-size: 2rem; font-weight: 800; color: #7c3aed;">$${adminMarginBanked.toLocaleString('en-US', {minimumFractionDigits: 2})}</div>
+                    <div style="font-size: 2rem; font-weight: 800; color: #7c3aed;">${fmtMoneyLocale(adminMarginBanked)}</div>
                     <div style="color: #999; font-size: 0.8rem; margin-top: 4px;">Acre Profit's retained earnings</div>
                 </div>
             `;
@@ -7741,14 +7747,14 @@
                 <div class="stat-card" style="border-left: 4px solid ${apOwes ? '#dc2626' : '#059669'}; padding: 16px;">
                     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
                         <strong style="font-size:1.1rem;">${firstName}</strong>
-                        <span style="font-size:1.3rem; font-weight:800; color: ${apOwes ? '#dc2626' : '#059669'};">$${owing.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                        <span style="font-size:1.3rem; font-weight:800; color: ${apOwes ? '#dc2626' : '#059669'};">${fmtMoneyLocale(owing)}</span>
                     </div>
                     <div style="color: ${apOwes ? '#dc2626' : '#059669'}; font-weight:600; margin-bottom:8px;">
                         ${apOwes ? 'AP owes ' + firstName : firstName + ' owes AP'}
                     </div>
                     <div style="display:flex; justify-content:space-between; font-size:0.85rem; color:#666;">
-                        <span>Put in: $${moneyIn.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
-                        <span>Paid back: $${moneyOut.toLocaleString('en-US', {minimumFractionDigits: 2})}</span>
+                        <span>Put in: ${fmtMoneyLocale(moneyIn)}</span>
+                        <span>Paid back: ${fmtMoneyLocale(moneyOut)}</span>
                     </div>
                 </div>
                 `;
@@ -7797,13 +7803,13 @@
                         ${e.notes ? `<br><small style="color:#999;">${e.notes}</small>` : ''}
                     </td>
                     <td style="text-align:right; color: #059669; font-weight:${moneyIn > 0 ? '700' : '400'};">
-                        ${moneyIn > 0 ? '$' + moneyIn.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}
+                        ${moneyIn > 0 ? fmtMoneyLocale(moneyIn) : '-'}
                     </td>
                     <td style="text-align:right; color: #dc2626; font-weight:${moneyOut > 0 ? '700' : '400'};">
-                        ${moneyOut > 0 ? '$' + moneyOut.toLocaleString('en-US', {minimumFractionDigits: 2}) : '-'}
+                        ${moneyOut > 0 ? fmtMoneyLocale(moneyOut) : '-'}
                     </td>
                     <td style="text-align:right; font-weight:700; color: ${balanceColor};">
-                        $${Math.abs(e.runningBalance).toLocaleString('en-US', {minimumFractionDigits: 2})}
+                        ${fmtMoneyLocale(new Decimal(e.runningBalance).abs())}
                         <br><small style="font-weight:600;">${balanceLabel}</small>
                     </td>
                     <td>${actionsHtml}</td>
@@ -8044,7 +8050,7 @@
 
                 closeCashDepositModal();
                 loadLedger();
-                toast(`Cash deposit of $${amount.toFixed(2)} recorded`, 'success');
+                toast(`Cash deposit of $${amount.toFixed(2)} recorded`, 'success'); // Number form input, skipped C1b — revisit at outbound-ledger cleanup pass
             } catch (error) {
                 toast('Error: ' + error.message, 'error');
             }
@@ -8089,7 +8095,7 @@
                 if (res.ok) {
                     closeRecordPaymentModal();
                     loadLedger();
-                    toast(`Payment of $${amount.toFixed(2)} to ${distName} recorded successfully!`, 'success');
+                    toast(`Payment of $${amount.toFixed(2)} to ${distName} recorded successfully!`, 'success'); // Number form input, skipped C1b — revisit at outbound-ledger cleanup pass
                 } else {
                     const error = await res.json();
                     toast(error.error || 'Failed to record payment', 'error');
@@ -8143,7 +8149,7 @@
                 document.getElementById('totalPOs').textContent = purchaseOrders.length;
                 document.getElementById('pendingPOs').textContent = purchaseOrders.filter(p => ['draft', 'submitted', 'confirmed'].includes(p.status)).length;
                 const totalValue = purchaseOrders.reduce((sum, p) => sum + (p.totalCost || 0), 0);
-                document.getElementById('totalPOValue').textContent = '$' + totalValue.toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('totalPOValue').textContent = fmtMoneyLocale(totalValue);
 
             } catch (error) {
                 console.error('Error loading purchase orders:', error);
@@ -8181,14 +8187,14 @@
                 const itemsHtml = (po.items || []).map(item => {
                     const distribution = item.distribution || [];
                     const distHtml = distribution.length > 0
-                        ? distribution.map(d => `<span style="background:${d.distributor.includes('Kyle') ? '#dbeafe' : d.distributor.includes('Ty') ? '#ede9fe' : '#f3f4f6'}; color:#333; padding:2px 8px; border-radius:3px; margin-right:6px; font-size:0.8rem;">${d.distributor.split(' ')[0]}: ${d.quantity.toLocaleString()} ${item.unit || ''} ($${d.value.toLocaleString(undefined, {minimumFractionDigits: 2})})</span>`).join('')
+                        ? distribution.map(d => `<span style="background:${d.distributor.includes('Kyle') ? '#dbeafe' : d.distributor.includes('Ty') ? '#ede9fe' : '#f3f4f6'}; color:#333; padding:2px 8px; border-radius:3px; margin-right:6px; font-size:0.8rem;">${d.distributor.split(' ')[0]}: ${d.quantity.toLocaleString()} ${item.unit || ''} (${fmtMoneyLocale(d.value)})</span>`).join('')
                         : '<span style="color:#999; font-size:0.8rem;">No inventory</span>';
 
                     return `
                     <div style="padding:10px 0; border-bottom:1px solid #eee;">
                         <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
                             <strong>${item.productName}</strong>
-                            <span style="color:#666; font-size:0.9rem;">${item.quantityOrdered.toLocaleString()} ${item.unit || ''} @ $${item.pricePerUnit.toFixed(2)} = $${(item.totalPrice || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</span>
+                            <span style="color:#666; font-size:0.9rem;">${item.quantityOrdered.toLocaleString()} ${item.unit || ''} @ ${fmtMoney(item.pricePerUnit)} = ${fmtMoneyLocale((item.totalPrice || 0))}</span>
                         </div>
                         <div style="color:#666; font-size:0.85rem;">Currently held: ${distHtml}</div>
                     </div>`;
@@ -8206,7 +8212,7 @@
                             <div style="color:#666; font-size:0.9rem;">${po.supplier?.name || '-'} | Ordered ${po.orderDate ? new Date(po.orderDate).toLocaleDateString() : '-'}${po.paidDate ? ' | Paid ' + new Date(po.paidDate).toLocaleDateString() : ''}</div>
                         </div>
                         <div style="text-align:right;">
-                            <div style="font-size:1.4rem; font-weight:800; color:#111;">$${(po.totalCost || 0).toLocaleString(undefined, {minimumFractionDigits: 2})}</div>
+                            <div style="font-size:1.4rem; font-weight:800; color:#111;">${fmtMoneyLocale((po.totalCost || 0))}</div>
                             <button class="btn btn-outline btn-sm" onclick="openPODetail('${po._id}')" style="margin-top:4px;">View / Edit</button>
                         </div>
                     </div>
@@ -8376,18 +8382,18 @@
                 subtotal += lineTotal;
 
                 const totalEl = row.querySelector('.po-item-total');
-                if (totalEl) totalEl.textContent = '$' + lineTotal.toFixed(2);
+                if (totalEl) totalEl.textContent = fmtMoney(lineTotal);
             });
 
             const freight = parseFloat(document.getElementById('poFreight')?.value) || 0;
             const otherFees = parseFloat(document.getElementById('poOtherFees')?.value) || 0;
             const superAdminFee = parseFloat(document.getElementById('poSuperAdminFee')?.value) || 0;
 
-            document.getElementById('poSubtotalDisplay').textContent = '$' + subtotal.toFixed(2);
-            document.getElementById('poFeesDisplay').textContent = '$' + (freight + otherFees).toFixed(2);
+            document.getElementById('poSubtotalDisplay').textContent = fmtMoney(subtotal);
+            document.getElementById('poFeesDisplay').textContent = fmtMoney((freight + otherFees));
             const superAdminFeeDisplay = document.getElementById('poSuperAdminFeeDisplay');
-            if (superAdminFeeDisplay) superAdminFeeDisplay.textContent = '$' + superAdminFee.toFixed(2);
-            document.getElementById('poTotalDisplay').textContent = '$' + (subtotal + freight + otherFees + superAdminFee).toFixed(2);
+            if (superAdminFeeDisplay) superAdminFeeDisplay.textContent = fmtMoney(superAdminFee);
+            document.getElementById('poTotalDisplay').textContent = fmtMoney((subtotal + freight + otherFees + superAdminFee));
         }
 
         async function createPurchaseOrder() {
@@ -8525,11 +8531,11 @@
                 document.getElementById('poDetailSupplier').textContent = currentPO.supplier?.name || 'Unknown Supplier';
                 document.getElementById('poDetailStatus').value = currentPO.status;
                 document.getElementById('poDetailDate').textContent = currentPO.orderDate ? new Date(currentPO.orderDate).toLocaleDateString() : '-';
-                document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                document.getElementById('poDetailTotalValue').textContent = fmtMoneyLocale((currentPO.totalCost || 0));
                 // Show super admin fee if present
                 const adminFeeEl = document.getElementById('poDetailAdminFee');
                 if (adminFeeEl) {
-                    adminFeeEl.textContent = '$' + (currentPO.superAdminFee || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    adminFeeEl.textContent = fmtMoneyLocale((currentPO.superAdminFee || 0));
                 }
 
                 // Calculate total gallons for admin fee calculator
@@ -8549,7 +8555,7 @@
                             <input type="number" value="${item.pricePerUnit}" step="0.01" min="0" style="width: 90px; padding: 4px; border: 1px solid #ddd; border-radius: 4px;"
                                 onchange="updatePOItemPrice(${idx}, this.value)">
                         </td>
-                        <td>$${(item.totalPrice || 0).toFixed(2)}</td>
+                        <td>${fmtMoney((item.totalPrice || 0))}</td>
                         <td style="color: #7c3aed; font-weight: 600;">${item.quantityAllocated || 0}</td>
                         <td style="color: ${(item.quantityRemaining || item.quantityOrdered) > 0 ? '#10b981' : '#6b7280'};">
                             ${item.quantityRemaining !== undefined ? item.quantityRemaining : item.quantityOrdered}
@@ -8824,7 +8830,7 @@
             const totalGallons = parseFloat(gallonsText.replace(/,/g, '')) || 0;
 
             const fee = rate * totalGallons;
-            document.getElementById('poCalculatedFee').textContent = '$' + fee.toLocaleString(undefined, { minimumFractionDigits: 2 });
+            document.getElementById('poCalculatedFee').textContent = fmtMoneyLocale(fee);
             return fee;
         }
 
@@ -8846,8 +8852,8 @@
                 if (res.ok) {
                     const data = await res.json();
                     currentPO = data;
-                    document.getElementById('poDetailAdminFee').textContent = '$' + (fee).toLocaleString(undefined, { minimumFractionDigits: 2 });
-                    document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    document.getElementById('poDetailAdminFee').textContent = fmtMoneyLocale((fee));
+                    document.getElementById('poDetailTotalValue').textContent = fmtMoneyLocale((currentPO.totalCost || 0));
                     loadPurchaseOrders();
                     toast('Admin fee applied successfully!', 'success');
                 } else {
@@ -8898,7 +8904,7 @@
                 if (res.ok) {
                     const data = await res.json();
                     currentPO = data.purchaseOrder;
-                    document.getElementById('poDetailTotalValue').textContent = '$' + (currentPO.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2 });
+                    document.getElementById('poDetailTotalValue').textContent = fmtMoneyLocale((currentPO.totalCost || 0));
                     openPODetail(currentPO._id); // Refresh
                     loadPurchaseOrders();
                 } else {
@@ -9003,15 +9009,15 @@
                                 <tr>
                                     <td style="padding: 6px;">${item.productName}</td>
                                     <td style="padding: 6px; text-align: right;">${item.quantityAllocated}</td>
-                                    <td style="padding: 6px; text-align: right;">$${(item.pricePerUnit || 0).toFixed(2)}</td>
-                                    <td style="padding: 6px; text-align: right;">$${(item.totalPrice || 0).toFixed(2)}</td>
+                                    <td style="padding: 6px; text-align: right;">${fmtMoney((item.pricePerUnit || 0))}</td>
+                                    <td style="padding: 6px; text-align: right;">${fmtMoney((item.totalPrice || 0))}</td>
                                 </tr>
                             `).join('')}
                         </tbody>
                         <tfoot>
                             <tr style="font-weight: 600; border-top: 2px solid #e5e7eb;">
                                 <td colspan="3" style="padding: 8px;">Split Total:</td>
-                                <td style="padding: 8px; text-align: right;">$${(split.totalCost || 0).toFixed(2)}</td>
+                                <td style="padding: 8px; text-align: right;">${fmtMoney((split.totalCost || 0))}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -9081,11 +9087,11 @@
                 subtotal += lineTotal;
 
                 const totalEl = document.querySelector(`.split-item-total[data-index="${idx}"]`);
-                if (totalEl) totalEl.textContent = '$' + lineTotal.toFixed(2);
+                if (totalEl) totalEl.textContent = fmtMoney(lineTotal);
             });
 
             const freight = parseFloat(document.getElementById('splitFreight').value) || 0;
-            document.getElementById('splitTotalDisplay').textContent = '$' + (subtotal + freight).toFixed(2);
+            document.getElementById('splitTotalDisplay').textContent = fmtMoney((subtotal + freight));
         }
 
         async function createSplit() {
@@ -9842,25 +9848,25 @@
 
                 return `
                     <tr data-id="${p._id}" data-category="${p.category}" data-name="${p.productName.toLowerCase()}"
-                        data-orig-cost="${costPrice.toFixed(2)}" data-orig-admin="${adminPrice.toFixed(2)}" data-orig-retail="${retailPrice.toFixed(2)}"
+                        data-orig-cost="${new Decimal(costPrice).toFixed(2)}" data-orig-admin="${new Decimal(adminPrice).toFixed(2)}" data-orig-retail="${new Decimal(retailPrice).toFixed(2)}"
                         class="${hasChanges ? 'has-changes' : ''}">
                         <td><strong>${p.productName}</strong></td>
                         <td><span class="category-badge cat-${p.category}">${p.category}</span></td>
                         <td>/${p.unit}</td>
                         <td style="background: #fef2f2;">
                             <input type="number" step="0.01" class="pricing-input cost-input ${hasChanges ? 'changed' : ''}"
-                                   value="${costPrice.toFixed(2)}" data-field="costPrice" onchange="markPricingChanged(this)">
+                                   value="${new Decimal(costPrice).toFixed(2)}" data-field="costPrice" onchange="markPricingChanged(this)">
                         </td>
                         <td style="background: #fffbeb;">
                             <input type="number" step="0.01" class="pricing-input admin-input ${hasChanges ? 'changed' : ''}"
-                                   value="${adminPrice.toFixed(2)}" data-field="adminPrice" onchange="markPricingChanged(this)">
+                                   value="${new Decimal(adminPrice).toFixed(2)}" data-field="adminPrice" onchange="markPricingChanged(this)">
                         </td>
                         <td style="background: #f0fdf4;">
                             <input type="number" step="0.01" class="pricing-input retail-input ${hasChanges ? 'changed' : ''}"
-                                   value="${retailPrice.toFixed(2)}" data-field="sellPrice" onchange="markPricingChanged(this)">
+                                   value="${new Decimal(retailPrice).toFixed(2)}" data-field="sellPrice" onchange="markPricingChanged(this)">
                         </td>
-                        <td class="ap-margin">$${apMargin.toFixed(2)}</td>
-                        <td class="rep-commission">$${repCommission.toFixed(2)}</td>
+                        <td class="ap-margin">${fmtMoney(apMargin)}</td>
+                        <td class="rep-commission">${fmtMoney(repCommission)}</td>
                         <td><div class="row-save-indicator ${hasChanges ? 'unsaved' : ''}"></div></td>
                     </tr>
                 `;
@@ -9873,8 +9879,8 @@
                     const cost = parseFloat(row.querySelector('.cost-input').value) || 0;
                     const admin = parseFloat(row.querySelector('.admin-input').value) || 0;
                     const retail = parseFloat(row.querySelector('.retail-input').value) || 0;
-                    row.querySelector('.ap-margin').textContent = '$' + (admin - cost).toFixed(2);
-                    row.querySelector('.rep-commission').textContent = '$' + (retail - admin).toFixed(2);
+                    row.querySelector('.ap-margin').textContent = fmtMoney((admin - cost));
+                    row.querySelector('.rep-commission').textContent = fmtMoney((retail - admin));
                     markPricingChanged(this);
                 });
             });
@@ -9958,9 +9964,9 @@
 
                     if (res.ok) {
                         // Update original values
-                        row.dataset.origCost = costPrice.toFixed(2);
-                        row.dataset.origAdmin = adminPrice.toFixed(2);
-                        row.dataset.origRetail = sellPrice.toFixed(2);
+                        row.dataset.origCost = new Decimal(costPrice).toFixed(2);
+                        row.dataset.origAdmin = new Decimal(adminPrice).toFixed(2);
+                        row.dataset.origRetail = new Decimal(sellPrice).toFixed(2);
 
                         // Update local data
                         const product = pricingProducts.find(p => p._id === productId);
@@ -10024,9 +10030,9 @@
                 });
 
                 if (res.ok) {
-                    row.dataset.origCost = costPrice.toFixed(2);
-                    row.dataset.origAdmin = adminPrice.toFixed(2);
-                    row.dataset.origRetail = sellPrice.toFixed(2);
+                    row.dataset.origCost = new Decimal(costPrice).toFixed(2);
+                    row.dataset.origAdmin = new Decimal(adminPrice).toFixed(2);
+                    row.dataset.origRetail = new Decimal(sellPrice).toFixed(2);
                     changedProducts.delete(productId);
                     row.classList.remove('has-changes');
                     row.querySelectorAll('.pricing-input').forEach(i => i.classList.remove('changed'));
@@ -10068,9 +10074,9 @@
 
                 // Calculate per rep
                 const repData = {
-                    kyle: { customers: 0, orders: 0, sales: 0, commission: 0 },
-                    ty: { customers: 0, orders: 0, sales: 0, commission: 0 },
-                    chad: { customers: 0, orders: 0, sales: 0, commission: 0 }
+                    kyle: { customers: 0, orders: 0, sales: new Decimal(0), commission: new Decimal(0) },
+                    ty: { customers: 0, orders: 0, sales: new Decimal(0), commission: new Decimal(0) },
+                    chad: { customers: 0, orders: 0, sales: new Decimal(0), commission: new Decimal(0) }
                 };
 
                 // Count customers per rep
@@ -10086,28 +10092,32 @@
                     const repId = o.representativeId?.toLowerCase?.() || o.representativeId;
                     if (typeof repId === 'string' && repData[repId]) {
                         repData[repId].orders++;
-                        repData[repId].sales += o.totalCost || 0;
+                        const orderTotal = new Decimal(o.totalCost || 0);
+                        repData[repId].sales = repData[repId].sales.plus(orderTotal);
                         // Commission is tracked per order or estimated as % of sale
-                        repData[repId].commission += o.repCommission || (o.totalCost * 0.05) || 0; // Default 5% if not set
+                        const orderCommission = o.repCommission != null
+                            ? new Decimal(o.repCommission)
+                            : orderTotal.times(0.05);
+                        repData[repId].commission = repData[repId].commission.plus(orderCommission);
                     }
                 });
 
                 // Update UI
-                let totalEarned = 0, totalPaid = 0;
+                let totalEarned = new Decimal(0), totalPaid = new Decimal(0);
                 ['kyle', 'ty', 'chad'].forEach(rep => {
                     const data = repData[rep];
                     document.getElementById(`${rep}-customers`).textContent = data.customers;
                     document.getElementById(`${rep}-orders`).textContent = data.orders;
-                    document.getElementById(`${rep}-sales`).textContent = '$' + data.sales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                    document.getElementById(`${rep}-earned`).textContent = '$' + data.commission.toFixed(2);
+                    document.getElementById(`${rep}-sales`).textContent = fmtMoneyLocale(data.sales);
+                    document.getElementById(`${rep}-earned`).textContent = fmtMoney(data.commission);
                     document.getElementById(`${rep}-paid`).textContent = '$0.00'; // TODO: Track actual payments
-                    document.getElementById(`${rep}-balance`).textContent = '$' + data.commission.toFixed(2);
-                    totalEarned += data.commission;
+                    document.getElementById(`${rep}-balance`).textContent = fmtMoney(data.commission);
+                    totalEarned = totalEarned.plus(data.commission);
                 });
 
-                document.getElementById('totalCommissionsEarned').textContent = '$' + totalEarned.toFixed(2);
+                document.getElementById('totalCommissionsEarned').textContent = fmtMoney(totalEarned);
                 document.getElementById('totalCommissionsPaid').textContent = '$0.00';
-                document.getElementById('totalCommissionsPending').textContent = '$' + totalEarned.toFixed(2);
+                document.getElementById('totalCommissionsPending').textContent = fmtMoney(totalEarned);
 
             } catch (error) {
                 console.error('Error loading commission data:', error);
@@ -10167,17 +10177,20 @@
                 });
 
                 // Calculate totals
-                let totalSales = 0;
-                let totalCommission = 0;
+                let totalSales = new Decimal(0);
+                let totalCommission = new Decimal(0);
                 myOrders.forEach(o => {
-                    totalSales += o.totalCost || 0;
-                    totalCommission += o.repCommission || (o.totalCost * 0.05) || 0;
+                    const orderTotal = new Decimal(o.totalCost || 0);
+                    totalSales = totalSales.plus(orderTotal);
+                    totalCommission = totalCommission.plus(
+                        o.repCommission != null ? new Decimal(o.repCommission) : orderTotal.times(0.05)
+                    );
                 });
 
                 // Update summary cards
-                document.getElementById('totalCommissionsEarned').textContent = '$' + totalCommission.toFixed(2);
+                document.getElementById('totalCommissionsEarned').textContent = fmtMoney(totalCommission);
                 document.getElementById('totalCommissionsPaid').textContent = '$0.00';
-                document.getElementById('totalCommissionsPending').textContent = '$' + totalCommission.toFixed(2);
+                document.getElementById('totalCommissionsPending').textContent = fmtMoney(totalCommission);
 
                 // Replace grid with single rep view
                 grid.innerHTML = `
@@ -10200,13 +10213,13 @@
                             </div>
                             <div class="rep-stat">
                                 <span class="label">Total Sales</span>
-                                <span class="value">$${totalSales.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                                <span class="value">${fmtMoneyLocale(totalSales)}</span>
                             </div>
                         </div>
                         <div class="commission-breakdown">
                             <div class="commission-row earned">
                                 <span>Commission Earned</span>
-                                <span>$${totalCommission.toFixed(2)}</span>
+                                <span>${fmtMoney(totalCommission)}</span>
                             </div>
                             <div class="commission-row paid">
                                 <span>Paid Out</span>
@@ -10214,7 +10227,7 @@
                             </div>
                             <div class="commission-row balance">
                                 <span>Balance Owed to You</span>
-                                <span>$${totalCommission.toFixed(2)}</span>
+                                <span>${fmtMoney(totalCommission)}</span>
                             </div>
                         </div>
                     </div>
@@ -10330,8 +10343,8 @@
                         <td style="text-align: center; color: ${available > 0 ? '#059669' : '#dc2626'};"><strong>${available.toLocaleString()}</strong></td>
                         <td style="text-align: center; color: ${onOrder > 0 ? '#2563eb' : '#666'};">${onOrder > 0 ? onOrder.toLocaleString() : '-'}</td>
                         <td>${item.unit || '-'}</td>
-                        <td class="cost-column">$${cost.toFixed(2)}</td>
-                        <td><strong style="color: var(--primary);">$${sellPrice.toFixed(2)}</strong></td>
+                        <td class="cost-column">${fmtMoney(cost)}</td>
+                        <td><strong style="color: var(--primary);">${fmtMoney(sellPrice)}</strong></td>
                         <td><span class="order-status ${statusClass}">${statusText}</span></td>
                         <td>
                             <button class="btn btn-sm btn-outline" onclick="viewInventoryBatches('${item.chemicalId?._id || item.chemicalId}', '${item.productName}')" title="View batches by PO">Batches</button>
@@ -10358,7 +10371,7 @@
             const locations = [...new Set(allInventory.map(item => item.location).filter(Boolean))].length;
 
             document.getElementById('totalInventoryItems').textContent = totalItems;
-            document.getElementById('totalInventoryValue').textContent = '$' + totalValue.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('totalInventoryValue').textContent = fmtMoneyLocale(totalValue);
             document.getElementById('lowStockCount').textContent = lowStockItems.length;
             document.getElementById('inventoryCategories').textContent = locations || 1;
 
@@ -10387,13 +10400,13 @@
                 return aUrgency - bUrgency;
             });
 
-            let totalReorderCost = 0;
+            let totalReorderCost = new Decimal(0);
 
             tableBody.innerHTML = lowStockItems.map(item => {
                 const isCritical = item.quantity === 0;
                 const suggestedOrder = Math.max(item.lowStockThreshold * 2, (item.lowStockThreshold - item.quantity) + item.lowStockThreshold);
-                const estCost = suggestedOrder * (item.costPerUnit || 0);
-                totalReorderCost += estCost;
+                const estCost = new Decimal(suggestedOrder).times(item.costPerUnit || 0);
+                totalReorderCost = totalReorderCost.plus(estCost);
 
                 const qtyClass = isCritical ? 'critical' : 'low';
                 const rowClass = isCritical ? 'critical' : '';
@@ -10408,14 +10421,14 @@
                         <td><span class="qty-badge ${qtyClass}">${isCritical ? 'OUT' : item.quantity} ${item.unit || ''}</span></td>
                         <td>${item.lowStockThreshold} ${item.unit || ''}</td>
                         <td><span class="suggested-qty">+${suggestedOrder} ${item.unit || ''}</span></td>
-                        <td><strong>$${estCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}</strong></td>
+                        <td><strong>${fmtMoneyLocale(estCost)}</strong></td>
                         <td><button class="btn-reorder" onclick="createPOForItem('${item.id || item._id}')">Create PO</button></td>
                     </tr>
                 `;
             }).join('');
 
             summaryText.textContent = `${lowStockItems.length} item${lowStockItems.length > 1 ? 's' : ''} need${lowStockItems.length === 1 ? 's' : ''} reordering`;
-            totalCostEl.textContent = `Estimated total: $${totalReorderCost.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+            totalCostEl.textContent = `Estimated total: ${fmtMoneyLocale(totalReorderCost)}`;
         }
 
         // Toggle low inventory details
@@ -10442,16 +10455,16 @@
 
             let csvContent = 'Product Name,SKU,Category,Current Qty,Unit,Threshold,Suggested Order,Cost Per Unit,Est. Reorder Cost,Location,Notes\n';
 
-            let totalCost = 0;
+            let totalCost = new Decimal(0);
             lowStockItems.forEach(item => {
                 const suggestedOrder = Math.max(item.lowStockThreshold * 2, (item.lowStockThreshold - item.quantity) + item.lowStockThreshold);
-                const estCost = suggestedOrder * (item.costPerUnit || 0);
-                totalCost += estCost;
+                const estCost = new Decimal(suggestedOrder).times(item.costPerUnit || 0);
+                totalCost = totalCost.plus(estCost);
 
                 csvContent += `"${item.productName || ''}","${item.sku || ''}","${item.category || ''}",${item.quantity || 0},"${item.unit || ''}",${item.lowStockThreshold || 0},${suggestedOrder},${item.costPerUnit || 0},${estCost.toFixed(2)},"${item.location || ''}","${(item.notes || '').replace(/"/g, '""')}"\n`;
             });
 
-            csvContent += `\n"TOTAL","","","","","","","","${totalCost.toFixed(2)}","",""\n`;
+            csvContent += `\n"TOTAL","","","","","","","","${new Decimal(totalCost).toFixed(2)}","",""\n`;
             csvContent += `\n"Report Generated","${new Date().toLocaleString()}","","","","","","","","",""\n`;
 
             // Download the CSV
@@ -10484,7 +10497,7 @@
                     if (qtyInput) qtyInput.value = suggestedOrder;
                 }, 100);
             } else {
-                toast(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: $${(suggestedOrder * (item.costPerUnit || 0)).toFixed(2)}`, 'info');
+                toast(`Create a Purchase Order for:\n\nProduct: ${item.productName}\nSuggested Qty: ${suggestedOrder} ${item.unit || ''}\nEst. Cost: ${fmtMoney(new Decimal(suggestedOrder).times(item.costPerUnit || 0))}`, 'info');
             }
         }
 
@@ -10545,7 +10558,7 @@
                                 <td>${batch.lotNumber || '-'}</td>
                                 <td>${receivedDate}<br><small style="color: var(--text-muted);">${batch.quantityReceived} ${batch.unit || ''} received</small></td>
                                 <td><strong style="color: ${batch.quantityRemaining > 0 ? 'var(--success)' : 'var(--text-muted)'};">${batch.quantityRemaining}</strong> ${batch.unit || ''}</td>
-                                <td><strong>$${(batch.costPerUnit || 0).toFixed(2)}</strong></td>
+                                <td><strong>${fmtMoney((batch.costPerUnit || 0))}</strong></td>
                                 <td>${batch.supplierName || '-'}</td>
                                 <td><span class="order-status ${statusClass}">${batch.status}</span></td>
                             </tr>
@@ -10563,7 +10576,7 @@
                         <div style="margin-top: 16px; padding: 12px; background: #f8fafc; border-radius: 8px; display: flex; gap: 24px;">
                             <div><strong>Total Batches:</strong> ${batches.length}</div>
                             <div><strong>Total Remaining:</strong> ${totalRemaining.toLocaleString()}</div>
-                            <div><strong>Weighted Avg Cost:</strong> $${avgCost.toFixed(2)}</div>
+                            <div><strong>Weighted Avg Cost:</strong> ${fmtMoney(avgCost)}</div>
                         </div>
                     `;
                 }
@@ -10740,7 +10753,7 @@
             const value = qty * cost;
             const preview = document.getElementById('transferValuePreview');
             if (qty > 0 && cost > 0) {
-                document.getElementById('transferValueAmount').textContent = '$' + value.toLocaleString(undefined, {minimumFractionDigits: 2});
+                document.getElementById('transferValueAmount').textContent = fmtMoneyLocale(value);
                 preview.style.display = 'block';
             } else {
                 preview.style.display = 'none';
@@ -10773,7 +10786,7 @@
                 const data = await res.json();
                 if (res.ok) {
                     let msg = data.message;
-                    if (data.transferValue > 0) msg += `\nLedger value: $${data.transferValue.toFixed(2)}`;
+                    if (data.transferValue > 0) msg += `\nLedger value: ${fmtMoney(data.transferValue)}`;
                     toast(msg, 'info');
                     closeTransferModal();
                     loadInventory();
@@ -10929,12 +10942,12 @@
             // Auto-calculate retail price if margin is entered
             const retailPrice = cost * (1 + margin / 100);
             if (margin > 0 && cost > 0) {
-                document.getElementById('invSellPrice').value = retailPrice.toFixed(2);
+                document.getElementById('invSellPrice').value = new Decimal(retailPrice).toFixed(2);
             }
 
             // Total value (based on cost for internal tracking)
             const total = qty * cost;
-            document.getElementById('invTotalValue').textContent = '$' + total.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            document.getElementById('invTotalValue').textContent = fmtMoneyLocale(total);
         }
 
         // Save inventory item

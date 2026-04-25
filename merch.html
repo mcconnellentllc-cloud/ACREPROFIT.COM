@@ -10,6 +10,8 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <!-- Admin Preview Mode Banner -->
@@ -179,7 +181,7 @@
                                             `).join('')}
                                         </div>
                                         <div class="product-price">
-                                            <span class="price">$${item.price.toFixed(2)}</span>
+                                            <span class="price">${fmtMoney(item.price)}</span>
                                             <span class="credit-price">or ${item.price} credits</span>
                                         </div>
                                         <button class="btn btn-primary btn-block add-to-cart"
@@ -271,15 +273,15 @@
                 return;
             }
 
-            let total = 0;
+            let total = new Decimal(0);
             cartItems.innerHTML = cart.map(item => {
-                total += item.price * item.quantity;
+                total = total.plus(new Decimal(item.price).times(item.quantity));
                 return `
                     <div class="cart-item">
                         <div class="cart-item-info">
                             <h4>${item.name}</h4>
                             <span class="cart-item-size">Size: ${item.size}</span>
-                            <span class="cart-item-price">$${item.price.toFixed(2)}</span>
+                            <span class="cart-item-price">${fmtMoney(item.price)}</span>
                         </div>
                         <div class="cart-item-qty">
                             <button class="qty-btn" onclick="updateQty('${item.cartKey}', -1)">-</button>
@@ -290,7 +292,7 @@
                 `;
             }).join('');
 
-            cartTotal.textContent = `$${total.toFixed(2)}`;
+            cartTotal.textContent = `${fmtMoney(total)}`;
             checkoutBtn.disabled = false;
         }
 
@@ -311,7 +313,7 @@
             btn.disabled = true;
             btn.textContent = 'Processing...';
 
-            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const total = cart.reduce((sum, item) => sum.plus(new Decimal(item.price).times(item.quantity)), new Decimal(0));
 
             try {
                 // Submit merch order to API
@@ -329,7 +331,7 @@
                             quantity: item.quantity,
                             price: item.price
                         })),
-                        total,
+                        total: Number(total.toFixed(2)),
                         shippingAddress: userData.farm ? {
                             name: userData.name,
                             address: userData.farm.address || '',
@@ -347,7 +349,7 @@
                 }
 
                 // Success
-                alert(`Order placed successfully! Total: $${total.toFixed(2)}. You'll receive shipping confirmation via email.`);
+                alert(`Order placed successfully! Total: ${fmtMoney(total)}. You'll receive shipping confirmation via email.`);
 
                 cart = [];
                 updateCart();

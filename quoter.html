@@ -502,6 +502,8 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <!-- Access Denied Screen -->
@@ -897,14 +899,14 @@
             document.getElementById('statSuppliers').textContent = suppliers.length;
 
             // Calculate potential savings
-            let totalSavings = 0;
+            let totalSavings = new Decimal(0);
             bestDeals.forEach(deal => {
                 if (deal.alternatives && deal.alternatives.length > 0) {
                     const highestAlt = Math.max(...deal.alternatives.map(a => a.price));
-                    totalSavings += (highestAlt - deal.bestPrice);
+                    totalSavings = totalSavings.plus(new Decimal(String(highestAlt)).minus(String(deal.bestPrice)));
                 }
             });
-            document.getElementById('statSavings').textContent = '$' + totalSavings.toFixed(2);
+            document.getElementById('statSavings').textContent = fmtMoney(totalSavings);
         }
 
         function populateFilters() {
@@ -948,7 +950,7 @@
                         <div class="product-name">${deal.productName}</div>
                         ${deal.notes ? `<div class="product-note">${deal.notes}</div>` : ''}
                     </td>
-                    <td class="price-cell price-low">$${deal.bestPrice.toFixed(2)}/${deal.unit}</td>
+                    <td class="price-cell price-low">${fmtMoney(deal.bestPrice)}/${deal.unit}</td>
                     <td><span class="supplier-badge">${deal.bestSupplier}</span><span class="best-deal-badge">Best</span></td>
                     <td>${deal.packSize}</td>
                     <td>${new Date(deal.quoteDate).toLocaleDateString()}</td>
@@ -1002,7 +1004,9 @@
             }
 
             tbody.innerHTML = quotes.map(q => {
-                const packPrice = q.packPrice || (q.pricePerUnit * (q.unitsPerPack || 1));
+                const packPrice = q.packPrice != null
+                    ? q.packPrice
+                    : new Decimal(String(q.pricePerUnit)).times(q.unitsPerPack || 1).toFixed(2);
                 return `
                     <tr>
                         <td>
@@ -1012,11 +1016,11 @@
                         </td>
                         <td><span class="supplier-badge">${q.supplier}</span></td>
                         <td>${q.packSize}</td>
-                        <td class="price-cell">$${q.pricePerUnit.toFixed(2)}/${q.unit}</td>
-                        <td>$${packPrice.toFixed(2)}</td>
+                        <td class="price-cell">${fmtMoney(q.pricePerUnit)}/${q.unit}</td>
+                        <td>${fmtMoney(packPrice)}</td>
                         <td>
                             ${q.volumeDiscount && q.volumeDiscount.discountedPrice
-                                ? `<span class="savings-badge">${q.volumeDiscount.minQuantity}+: $${q.volumeDiscount.discountedPrice.toFixed(2)}</span>`
+                                ? `<span class="savings-badge">${q.volumeDiscount.minQuantity}+: ${fmtMoney(q.volumeDiscount.discountedPrice)}</span>`
                                 : '-'}
                         </td>
                         <td>${new Date(q.quoteDate).toLocaleDateString()}</td>
@@ -1075,15 +1079,15 @@
                             <div class="comparison-stats">
                                 <div class="comparison-stat">
                                     <div class="label">Lowest Price</div>
-                                    <div class="value best">$${data.comparison.lowestPrice.toFixed(2)}</div>
+                                    <div class="value best">${fmtMoney(data.comparison.lowestPrice)}</div>
                                 </div>
                                 <div class="comparison-stat">
                                     <div class="label">Highest Price</div>
-                                    <div class="value worst">$${data.comparison.highestPrice.toFixed(2)}</div>
+                                    <div class="value worst">${fmtMoney(data.comparison.highestPrice)}</div>
                                 </div>
                                 <div class="comparison-stat">
                                     <div class="label">Price Difference</div>
-                                    <div class="value">$${data.comparison.priceDifference.toFixed(2)}</div>
+                                    <div class="value">${fmtMoney(data.comparison.priceDifference)}</div>
                                 </div>
                                 <div class="comparison-stat">
                                     <div class="label">Potential Savings</div>
@@ -1115,11 +1119,11 @@
                                         <td><span class="supplier-badge">${q.supplier}</span></td>
                                         <td>${q.packSize}</td>
                                         <td class="price-cell ${idx === 0 ? 'price-low' : (idx === data.quotes.length - 1 ? 'price-high' : '')}">
-                                            $${q.pricePerUnit.toFixed(2)}/${q.unit}
+                                            ${fmtMoney(q.pricePerUnit)}/${q.unit}
                                         </td>
                                         <td>
                                             ${q.volumeDiscount && q.volumeDiscount.discountedPrice
-                                                ? `${q.volumeDiscount.minQuantity}+: $${q.volumeDiscount.discountedPrice.toFixed(2)}`
+                                                ? `${q.volumeDiscount.minQuantity}+: ${fmtMoney(q.volumeDiscount.discountedPrice)}`
                                                 : '-'}
                                         </td>
                                         <td>${new Date(q.quoteDate).toLocaleDateString()}</td>
