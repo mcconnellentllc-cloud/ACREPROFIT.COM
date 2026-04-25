@@ -288,6 +288,8 @@
             border-radius: 8px;
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -819,7 +821,7 @@
                         <td>${line.totalNeeded.toFixed(2)} ${line.packageUnit || 'gal'}</td>
                         <td>${line.packSize} ${line.packageUnit}</td>
                         <td>${line.packagesNeeded}</td>
-                        <td>${line.lineTotal !== null ? '$' + line.lineTotal.toFixed(2) : 'Quote Required'}</td>
+                        <td>${line.lineTotal !== null ? fmtMoney(line.lineTotal) : 'Quote Required'}</td>
                         <td class="${line.status === 'confirmed' ? 'status-confirmed' : 'status-needs-quote'}">
                             ${line.status === 'confirmed' ? 'Confirmed' : 'Needs Quote'}
                         </td>
@@ -837,7 +839,7 @@
                         <td>${hv.gallonsNeeded.toFixed(3)} gal</td>
                         <td>${hv.packageSize} gal</td>
                         <td>${hv.packagesNeeded}</td>
-                        <td>${hv.lineTotal !== null ? '$' + hv.lineTotal.toFixed(2) : 'Quote Required'}</td>
+                        <td>${hv.lineTotal !== null ? fmtMoney(hv.lineTotal) : 'Quote Required'}</td>
                         <td class="${hv.status === 'confirmed' ? 'status-confirmed' : 'status-needs-quote'}">
                             ${hv.status === 'confirmed' ? 'Confirmed' : 'Needs Quote'}
                         </td>
@@ -850,8 +852,8 @@
             // Summary
             document.getElementById('summaryAcres').textContent = calculationResult.acres;
             document.getElementById('summaryVolume').textContent = calculationResult.totalWaterVolume + ' gallons';
-            document.getElementById('summaryCostPerAcre').textContent = '$' + calculationResult.costPerAcre.toFixed(2);
-            document.getElementById('summaryTotal').textContent = '$' + calculationResult.totalConfirmedPrice.toFixed(2);
+            document.getElementById('summaryCostPerAcre').textContent = fmtMoney(calculationResult.costPerAcre);
+            document.getElementById('summaryTotal').textContent = fmtMoney(calculationResult.totalConfirmedPrice);
 
             // Buttons
             quoteMessage.style.display = 'none';
