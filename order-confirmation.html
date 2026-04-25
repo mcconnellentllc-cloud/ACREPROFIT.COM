@@ -257,6 +257,8 @@
             }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar">
@@ -438,7 +440,7 @@
                 statusEl.innerHTML = '<span class="payment-status paid">Paid</span>';
             }
 
-            document.getElementById('orderTotal').textContent = '$' + (order.total || 0).toLocaleString('en-US', {minimumFractionDigits: 2});
+            document.getElementById('orderTotal').textContent = fmtMoneyLocale(order.total || 0);
 
             // Rep info
             const location = order.location || 'mcconnell';
