@@ -11,6 +11,8 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script src="dialog.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <!-- Admin Preview Mode Banner -->
@@ -615,16 +617,17 @@
                     const totalOrdered = qty * c.unitsPerPack;
                     const overage = totalOrdered - totalNeeded;
                     const price = c.sellPrice || c.price || 0;
-                    const totalCost = totalOrdered * price;
+                    const totalCost = new Decimal(totalOrdered).times(price);
                     return { catalogEntry: c, qty, totalOrdered, overage, totalCost, price };
                 });
 
             if (scored.length === 0) return null;
 
-            // Pick: lowest overage, tie-break on lowest totalCost
+            // Pick: lowest overage, tie-break on lowest totalCost. totalCost is
+            // a Decimal, so use .cmp() for sort ordering (returns -1/0/1).
             scored.sort((a, b) => {
                 if (Math.abs(a.overage - b.overage) > 0.01) return a.overage - b.overage;
-                return a.totalCost - b.totalCost;
+                return a.totalCost.cmp(b.totalCost);
             });
 
             return scored[0];
@@ -656,13 +659,13 @@
                     const totalOrdered = qty * c.unitsPerPack;
                     const overage = totalOrdered - totalNeeded;
                     const price = c.sellPrice || c.price || 0;
-                    const totalCost = totalOrdered * price;
+                    const totalCost = new Decimal(totalOrdered).times(price);
                     return { catalogEntry: c, qty, totalOrdered, overage, totalCost, price };
                 });
 
             scored.sort((a, b) => {
                 if (Math.abs(a.overage - b.overage) > 0.01) return a.overage - b.overage;
-                return a.totalCost - b.totalCost;
+                return a.totalCost.cmp(b.totalCost);
             });
 
             return scored;
@@ -1561,7 +1564,7 @@
                     <td><span class="category-badge ${chem.category || 'herbicide'}">${chem.category || 'herbicide'}</span></td>
                     <td>${chem.packSize}</td>
                     <td class="price-cell">
-                        <span class="unit-price">$${(chem.price || 0).toFixed(2)}</span>
+                        <span class="unit-price">${fmtMoney((chem.price || 0))}</span>
                         <span class="price-per">/${chem.unit}</span>
                     </td>
                     <td class="qty-cell">
@@ -1605,9 +1608,9 @@
             if (input && subtotalCell && chem) {
                 const qty = parseInt(input.value) || 0;
                 const unitsPerPack = chem.unitsPerPack || 1;
-                const subtotal = qty * unitsPerPack * (chem.price || 0);
-                subtotalCell.textContent = `$${subtotal.toFixed(2)}`;
-                subtotalCell.classList.toggle('has-value', subtotal > 0);
+                const subtotal = new Decimal(qty).times(unitsPerPack).times(chem.price || 0);
+                subtotalCell.textContent = fmtMoney(subtotal);
+                subtotalCell.classList.toggle('has-value', subtotal.gt(0));
             }
         }
 
@@ -1642,7 +1645,7 @@
                     <div class="rate-chem-info">
                         <h4>${chem.productName}</h4>
                         <span class="chem-category">${chem.category || 'herbicide'}</span>
-                        <span class="chem-pack">${chem.packSize} - $${(chem.price || 0).toFixed(2)}/${chem.unit}</span>
+                        <span class="chem-pack">${chem.packSize} - ${fmtMoney((chem.price || 0))}/${chem.unit}</span>
                     </div>
                     <div class="rate-input-group">
                         <input type="number" step="0.1" min="0" placeholder="${chem.defaultRate || 0}"
@@ -1781,8 +1784,8 @@
                 resultsDiv.style.display = 'block';
                 let totalCost = cropOrderItems.reduce((sum, item) => {
                     const unitsPerPack = item.chem.unitsPerPack || 1;
-                    return sum + (item.packages * unitsPerPack * (item.chem.price || 0));
-                }, 0);
+                    return sum.plus(new Decimal(item.packages).times(unitsPerPack).times(item.chem.price || 0));
+                }, new Decimal(0));
 
                 resultsDiv.innerHTML = `
                     <h3>Order Summary for ${acres.toLocaleString()} acres</h3>
@@ -1799,14 +1802,14 @@
                         <tbody>
                             ${cropOrderItems.map(item => {
                                 const unitsPerPack = item.chem.unitsPerPack || 1;
-                                const cost = item.packages * unitsPerPack * (item.chem.price || 0);
+                                const cost = new Decimal(item.packages).times(unitsPerPack).times(item.chem.price || 0);
                                 return `
                                     <tr>
                                         <td>${item.chem.productName}</td>
                                         <td>${item.rate ?? item.suggestedRate} ${item.rateUnit}</td>
                                         <td>${item.totalNeeded.toFixed(1)} ${item.chem.unit}</td>
                                         <td>${item.packages} x ${item.chem.packSize}</td>
-                                        <td>$${cost.toFixed(2)}</td>
+                                        <td>${fmtMoney(cost)}</td>
                                     </tr>
                                 `;
                             }).join('')}
@@ -1814,7 +1817,7 @@
                         <tfoot>
                             <tr>
                                 <td colspan="4"><strong>Estimated Total</strong></td>
-                                <td><strong>$${totalCost.toFixed(2)}</strong></td>
+                                <td><strong>${fmtMoney(totalCost)}</strong></td>
                             </tr>
                         </tfoot>
                     </table>
@@ -1922,7 +1925,7 @@
 
             list.innerHTML = filtered.map(prog => {
                 // Calculate estimated cost per acre across all applications
-                let estCostPerAcre = 0;
+                let estCostPerAcre = new Decimal(0);
                 let canCalc = true;
                 prog.applications.forEach(app => {
                     app.chemicals.forEach(c => {
@@ -1939,7 +1942,7 @@
                         // Convert rate to catalog's unit (usually gal) — not the
                         // program subdoc's unit which may be corrupt ('fl oz/acre').
                         const inUnit = calculateAmount(c.rate ?? c.suggestedRate, c.rateUnit, 1, found?.unit || c.unit || 'gal');
-                        estCostPerAcre += inUnit * price;
+                        estCostPerAcre = estCostPerAcre.plus(new Decimal(inUnit).times(price));
                     });
                 });
                 return `
@@ -2209,7 +2212,7 @@
 
             const display = document.getElementById('hydrovantAmount');
             if (acres > 0) {
-                display.innerHTML = `<strong>${hydrovantGal.toFixed(2)} gallons</strong> (${hydrovantOz.toFixed(0)} fl oz) for ${acres.toLocaleString()} acres at ${sprayVol} gal/acre`;
+                display.innerHTML = `<strong>${new Decimal(hydrovantGal).toFixed(2)} gallons</strong> (${hydrovantOz.toFixed(0)} fl oz) for ${acres.toLocaleString()} acres at ${sprayVol} gal/acre`;
             } else {
                 display.textContent = 'Enter acres to calculate';
             }
@@ -2243,7 +2246,7 @@
                     const totalId = 'total-' + productName.replace(/[^a-zA-Z0-9]/g, '_');
                     const totalEl = document.getElementById(totalId);
                     if (totalEl) {
-                        totalEl.innerHTML = `<strong>${totalNeeded.toFixed(2)}</strong> ${unit}`;
+                        totalEl.innerHTML = `<strong>${new Decimal(totalNeeded).toFixed(2)}</strong> ${unit}`;
                     }
                 }
             });
@@ -2271,7 +2274,9 @@
             pe.chemicalId = sku._id;
             pe.packSize = sku.packSize;
             pe.unitsPerPack = sku.unitsPerPack || 1;
-            pe.sellPrice = sku.sellPrice || sku.price || 0;
+            // Coerce to Number at cache boundary — same invariant as the seed site.
+            const nextPrice = Number(sku.sellPrice || sku.price || 0);
+            pe.sellPrice = Number.isFinite(nextPrice) ? nextPrice : 0;
             pe.sourceSupplier = sku.sourceSupplier || '';
             pe.qty = minQty;
             // (custom pack fields removed in pr-148g)
@@ -2309,12 +2314,12 @@
             }
             // Update grand total
             const totalEl = document.querySelector('.grand-total');
-            if (totalEl) totalEl.textContent = '$' + newTotal.toFixed(2);
+            if (totalEl) totalEl.textContent = fmtMoney(newTotal);
             // Update cost/acre
             const acres = parseFloat(document.getElementById('programAcres')?.value) || 0;
             if (acres > 0) {
                 const cpaEl = document.querySelector('.order-totals-section tfoot tr:last-child td:last-child');
-                if (cpaEl) cpaEl.textContent = '$' + (newTotal / acres).toFixed(2);
+                if (cpaEl) cpaEl.textContent = fmtMoney((newTotal / acres));
             }
         }
 
@@ -2444,7 +2449,7 @@
             if (rateUnit.includes('fl oz') || rateUnit.includes('oz')) {
                 const gal = (rate * acres) / 128;
                 if (gal < 1) return { amount: (rate * acres).toFixed(1), displayUnit: 'fl oz' };
-                return { amount: gal.toFixed(2), displayUnit: 'gal' };
+                return { amount: new Decimal(gal).toFixed(2), displayUnit: 'gal' };
             }
             if (rateUnit.includes('gal')) {
                 return { amount: (rate * acres).toFixed(2), displayUnit: 'gal' };
@@ -2580,7 +2585,7 @@
             const resultsDiv = document.getElementById('programResults');
             let spraySheets = [];
             let totalsByChemical = {};
-            let totalCost = 0;
+            let totalCost = new Decimal(0);
 
             // Calculate Hydrovant
             const hydrovantOzPerGal = 0.128;
@@ -2631,7 +2636,7 @@
                     // Calculate amount needed
                     const totalNeeded = calculateAmount(rate, rateUnit, acres, unit, sprayVolume);
                     const packages = Math.ceil(totalNeeded / unitsPerPack);
-                    const cost = packages * unitsPerPack * price;
+                    const cost = new Decimal(packages).times(unitsPerPack).times(price || 0);
 
                     sheetChemicals.push({
                         name: chemItem.productName,
@@ -2730,9 +2735,9 @@
                     item.cost = picked.totalCost;
                 } else {
                     item.packages = Math.ceil(item.totalNeeded / (item.unitsPerPack || 1));
-                    item.cost = item.packages * (item.unitsPerPack || 1) * item.price;
+                    item.cost = new Decimal(item.packages).times(item.unitsPerPack || 1).times(item.price || 0);
                 }
-                totalCost += item.cost;
+                totalCost = totalCost.plus(item.cost);
             });
 
             // Render truck route schedule
@@ -2798,7 +2803,7 @@
                                     <td>${c.name}</td>
                                     <td><span class="source-badge cpd">Acre Profit</span></td>
                                     <td>${c.rate ?? c.suggestedRate} ${c.rateUnit}</td>
-                                    <td><strong>${c.totalNeeded.toFixed(2)} ${c.unit}</strong></td>
+                                    <td><strong>${new Decimal(c.totalNeeded).toFixed(2)} ${c.unit}</strong></td>
                                 </tr>
                             `).join('')}
                             ${sheet.customChemicals && sheet.customChemicals.length > 0 ? sheet.customChemicals.map(c => `
@@ -2806,7 +2811,7 @@
                                     <td>${c.name}</td>
                                     <td><span class="source-badge bid-sheet">Bid Sheet</span></td>
                                     <td>${c.rate ?? c.suggestedRate} ${c.rateUnit}</td>
-                                    <td><strong>${c.totalNeeded.toFixed(2)} ${c.unit}</strong></td>
+                                    <td><strong>${new Decimal(c.totalNeeded).toFixed(2)} ${c.unit}</strong></td>
                                 </tr>
                             `).join('') : ''}
                         </tbody>
@@ -2834,14 +2839,23 @@
                                 const rowKey = (item.name || '').replace(/[^a-zA-Z0-9]/g, '_');
                                 const safeName = (item.name || '').replace(/'/g, "\\'");
 
-                                // Seed packageEdits from smart-picker defaults if farmer hasn't edited yet
+                                // Seed packageEdits from smart-picker defaults if farmer hasn't edited yet.
+                                // Normalize sellPrice to Number at the cache boundary — post-C3 the
+                                // API serves Decimal128 as string, but downstream Map reads
+                                // (recalcPackageTotals at 2303, lineCost/overageCost at 2855-2856)
+                                // do Number arithmetic. One-line coerce keeps the cache consistent.
                                 if (!packageEdits.has(item.name)) {
                                     const minQty = Math.max(1, Math.ceil(item.totalNeeded / (item.unitsPerPack || 1)));
+                                    let seededPrice = Number(item.price);
+                                    if (!Number.isFinite(seededPrice)) {
+                                        console.warn('packageEdits seed: invalid price for', item.name, item.price);
+                                        seededPrice = 0;
+                                    }
                                     packageEdits.set(item.name, {
                                         chemicalId: item.chemicalId,
                                         packSize: item.packSize,
                                         unitsPerPack: item.unitsPerPack || 1,
-                                        sellPrice: item.price,
+                                        sellPrice: seededPrice,
                                         qty: minQty,
                                         sourceSupplier: candidates.find(c => String(c.catalogEntry._id) === String(item.chemicalId))?.catalogEntry.sourceSupplier || ''
                                     });
@@ -2857,7 +2871,7 @@
                                     const id = String(cand.catalogEntry._id);
                                     const sel = id === String(pe.chemicalId) ? 'selected' : '';
                                     const label = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
-                                    return `<option value="${id}" ${sel}>${label} @ $${(cand.catalogEntry.sellPrice||0).toFixed(2)}/${cand.catalogEntry.unit||'gl'}</option>`;
+                                    return `<option value="${id}" ${sel}>${label} @ ${fmtMoney((cand.catalogEntry.sellPrice||0))}/${cand.catalogEntry.unit||'gl'}</option>`;
                                 }).join('');
                                 const hasSkuOptions = candidates.length > 0;
                                 const minQty = Math.max(1, Math.ceil(item.totalNeeded / (pe.unitsPerPack || 1)));
@@ -2887,13 +2901,13 @@
                                                 style="width:60px; padding:4px 6px; border:1px solid #d1d5db; border-radius:4px; font-size:0.9rem; text-align:center;">
                                             <span style="font-size:0.8rem; color:#666;">× ${pe.unitsPerPack} = ${ordered.toFixed(1)} ${item.unit}</span>
                                         </div>
-                                        ${overage > 0.1 ? `<div style="font-size:0.78rem; color:#059669;">Extra: +${overage.toFixed(1)} ${item.unit} ($${overageCost.toFixed(2)})</div>` : ''}
+                                        ${overage > 0.1 ? `<div style="font-size:0.78rem; color:#059669;">Extra: +${overage.toFixed(1)} ${item.unit} (${fmtMoney(overageCost)})</div>` : ''}
                                         ${overage < -0.1 ? `<div style="font-size:0.78rem; color:#dc2626; font-weight:600;">⚠ Short ${Math.abs(overage).toFixed(1)} ${item.unit} — need ${item.totalNeeded.toFixed(1)}, ordering ${ordered.toFixed(1)}</div>` : ''}
                                     </td>
                                     <td class="cost-col">
                                         ${item.priceIsSpeculated
-                                            ? `<strong style="color:#d97706;">~$${lineCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;">est.</span>`
-                                            : `<strong>$${lineCost.toFixed(2)}</strong>`
+                                            ? `<strong style="color:#d97706;">~${fmtMoney(lineCost)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;">est.</span>`
+                                            : `<strong>${fmtMoney(lineCost)}</strong>`
                                         }
                                     </td>
                                 </tr>
@@ -2904,12 +2918,12 @@
                                 if (hydrovantAlreadyIncluded) return '';
                                 const hydroCatalog = (chemicals || []).find(c => (c.productName || c.name || '').toLowerCase().includes('hydrovant'));
                                 const hydroPrice = hydroCatalog?.sellPrice || hydroCatalog?.price || 0;
-                                const hydroCost = Math.ceil(hydrovantGal / 5) * 5 * hydroPrice;
+                                const hydroCost = new Decimal(Math.ceil(hydrovantGal / 5) * 5).times(hydroPrice);
                                 return `
                             <tr class="hydrovant-row">
                                 <td><strong>Hydrovant (NIS)</strong><br><span style="font-size: 0.8rem; color: #666;">0.1% v/v surfactant</span></td>
                                 <td class="needed-col">
-                                    <span class="total-gal">${hydrovantGal.toFixed(2)} gl</span>
+                                    <span class="total-gal">${new Decimal(hydrovantGal).toFixed(2)} gl</span>
                                 </td>
                                 <td class="breakdown-col">
                                     <div class="pkg-breakdown">
@@ -2919,18 +2933,18 @@
                                         = ${(Math.ceil(hydrovantGal / 5) * 5).toFixed(1)} gl ordered
                                     </div>
                                 </td>
-                                <td class="cost-col"><strong>$${hydroCost.toFixed(2)}</strong></td>
+                                <td class="cost-col"><strong>${fmtMoney(hydroCost)}</strong></td>
                             </tr>`;
                             })()}
                         </tbody>
                         <tfoot>
                             <tr class="total-row">
                                 <td colspan="3"><strong>Estimated Total</strong></td>
-                                <td><strong class="grand-total">$${totalCost.toFixed(2)}</strong></td>
+                                <td><strong class="grand-total">${fmtMoney(totalCost)}</strong></td>
                             </tr>
                             <tr style="background:#f0f7ef;">
                                 <td colspan="3" style="padding:14px; font-weight:700; color:#2d5a27; font-size:1.05rem;">COST PER ACRE</td>
-                                <td style="padding:14px; font-weight:800; color:#2d5a27; font-size:1.4rem;">$${(totalCost / acres).toFixed(2)}</td>
+                                <td style="padding:14px; font-weight:800; color:#2d5a27; font-size:1.4rem;">${acres > 0 ? fmtMoney(totalCost.div(acres)) : '$0.00'}</td>
                             </tr>
                         </tfoot>
                     </table>
@@ -2964,7 +2978,7 @@
                         });
                         const needed = Object.values(totalsByChemical).map(item => ({ name: item.name, needed: item.totalNeeded }));
                         const allInStock = needed.every((n, i) => stockStatus[i] >= n.needed);
-                        const amountDue = totalCost.toFixed(2);
+                        const amountDue = new Decimal(totalCost).toFixed(2);
 
                         if (allInStock) {
                             return `
@@ -3110,7 +3124,7 @@
                                 ${customChemList.map(item => `
                                     <tr>
                                         <td><strong>${item.name}</strong></td>
-                                        <td>${item.totalNeeded.toFixed(2)} ${item.unit}</td>
+                                        <td>${new Decimal(item.totalNeeded).toFixed(2)} ${item.unit}</td>
                                         <td>${item.packSize}</td>
                                         <td class="bid-price-cell">$_______/${item.unit}</td>
                                         <td class="bid-avail-cell">_______</td>
@@ -3290,7 +3304,7 @@ FARM INFORMATION:
 - Delivery Needed By: ${getDeliveryDate()}
 
 PRODUCTS NEEDED:
-${customChemList.map(item => `- ${item.name}: ${item.totalNeeded.toFixed(2)} ${item.unit} (preferred pack: ${item.packSize})`).join('\n')}
+${customChemList.map(item => `- ${item.name}: ${new Decimal(item.totalNeeded).toFixed(2)} ${item.unit} (preferred pack: ${item.packSize})`).join('\n')}
 
 Please provide:
 1. Price per unit
@@ -3449,8 +3463,8 @@ Generated by AcreProfit.com`;
             }
             const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
 
-            let originalTotal = 0;
-            let adjustedTotal = 0;
+            let originalTotal = new Decimal(0);
+            let adjustedTotal = new Decimal(0);
             let totalUnits = 0;
 
             selectedProgram.applications.forEach(app => {
@@ -3476,21 +3490,28 @@ Generated by AcreProfit.com`;
                     let adjUnit = sellPrice;
                     if (discountCode === 'ATCOSTAP') adjUnit = costPrice || sellPrice;
                     else if (discountCode === 'NODISTMARG') adjUnit = adminPrice;
-                    if (marginAdjust) adjUnit = Math.max(costPrice || 0, adjUnit + marginAdjust);
+                    if (marginAdjust) {
+                        // costPrice falsy → no floor; matches pre-migration semantic.
+                        // marginAdjust is a dollar adjustment from form input (Number).
+                        // decimal.js-light has no Decimal.max; open-code the max.
+                        const costFloor = new Decimal(costPrice || 0);
+                        const adjusted = new Decimal(adjUnit).plus(marginAdjust);
+                        adjUnit = adjusted.lt(costFloor) ? costFloor : adjusted;
+                    }
 
-                    originalTotal += sellPrice * packages;
-                    adjustedTotal += adjUnit * packages;
+                    originalTotal = originalTotal.plus(new Decimal(sellPrice).times(packages));
+                    adjustedTotal = adjustedTotal.plus(new Decimal(adjUnit).times(packages));
                     totalUnits += packages;
                 });
             });
 
-            const diff = adjustedTotal - originalTotal;
-            const sign = diff >= 0 ? '+' : '-';
+            const diff = adjustedTotal.minus(originalTotal);
+            const sign = diff.lt(0) ? '-' : '+';
             preview.style.display = 'block';
             preview.innerHTML = `
-                <div>Original total: $${originalTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
-                <div>Adjusted total: $${adjustedTotal.toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})}</div>
-                <div style="color:${diff < 0 ? '#059669' : '#dc2626'};">Change: ${sign}$${Math.abs(diff).toLocaleString('en-US', {minimumFractionDigits:2, maximumFractionDigits:2})} over ${totalUnits} unit${totalUnits===1?'':'s'}</div>
+                <div>Original total: ${fmtMoneyLocale(originalTotal)}</div>
+                <div>Adjusted total: ${fmtMoneyLocale(adjustedTotal)}</div>
+                <div style="color:${diff.lt(0) ? '#059669' : '#dc2626'};">Change: ${sign}${fmtMoneyLocale(diff.abs())} over ${totalUnits} unit${totalUnits===1?'':'s'}</div>
             `;
         }
 
@@ -3520,15 +3541,15 @@ Generated by AcreProfit.com`;
                 packSize: item.packSize,
                 unit: item.unit,
                 quantity: item.packages,
-                unitPrice: item.price,
-                totalPrice: item.cost,
+                unitPrice: Number(item.price) || 0,
+                totalPrice: Number(new Decimal(item.cost || 0).toFixed(2)),
                 acres,
                 rate: null,
                 rateUnit: null,
                 calculatedAmount: item.totalNeeded
             }));
 
-            const subtotal = items.reduce((sum, it) => sum + (it.totalPrice || 0), 0);
+            const subtotal = Number(items.reduce((sum, it) => sum.plus(new Decimal(it.totalPrice || 0)), new Decimal(0)).toFixed(2));
             const gpa = parseFloat(document.getElementById('sprayVolume')?.value) || 0;
 
             const payload = {
@@ -3700,23 +3721,23 @@ Generated by AcreProfit.com`;
                 return;
             }
 
-            let total = 0;
+            let total = new Decimal(0);
             summaryItems.innerHTML = orderItems.map(item => {
                 const unitsPerPack = item.chem.unitsPerPack || 1;
-                const cost = item.qty * unitsPerPack * (item.chem.price || 0);
-                total += cost;
+                const cost = new Decimal(item.qty).times(unitsPerPack).times(item.chem.price || 0);
+                total = total.plus(cost);
                 return `
                     <div class="summary-item">
                         <span>${item.chem.productName}</span>
                         <span>${item.qty} x ${item.chem.packSize}</span>
-                        <span>$${cost.toFixed(2)}</span>
+                        <span>${fmtMoney(cost)}</span>
                         <button class="remove-btn" onclick="removeFromOrder('${item.chemId}')">×</button>
                     </div>
                 `;
             }).join('');
 
             itemCount.textContent = `${orderItems.length} items`;
-            orderTotal.textContent = `$${total.toFixed(2)}`;
+            orderTotal.textContent = fmtMoney(total);
             submitBtn.disabled = false;
 
             // Cost per acre display (sidebar)
@@ -3729,7 +3750,7 @@ Generated by AcreProfit.com`;
             if (cpaRow && cpaSpan) {
                 if (acres > 0 && inRecipeFlow) {
                     cpaRow.style.display = 'flex';
-                    cpaSpan.textContent = '$' + (total / acres).toFixed(2);
+                    cpaSpan.textContent = fmtMoney(total.div(acres));
                 } else {
                     cpaRow.style.display = 'none';
                 }

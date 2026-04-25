@@ -19,3 +19,24 @@ Run through this list once when the data migration lands, then archive.
      `totalRevenue`/`totalSales` when orders with non-zero `total` exist.
   Fix path if drift exists: align dashboard to the canonical field name OR
   add an explicit alias on the orders serializer.
+
+- **`chemicals.html` site #6 — DOM textContent parseFloat round-trip
+  (line ~2308 post-C1f).** `recalcPackageTotals` reads the Hydrovant row's
+  rendered currency string out of the DOM, strips `$`/`,` with regex, and
+  `parseFloat`s to a Number for accumulator math. Survives post-C3 because
+  `fmtMoney`/`fmtMoneyLocale` output matches the strip regex. Out of scope
+  for the migration — deliberately left as-is to avoid architectural debt
+  cleanup creeping into the forwards-compat work. Future refactor
+  opportunity: compute `hydroCost` directly from the closure at the render
+  site (line ~2921) and accumulate that value, not a DOM re-parse. One-day
+  cleanup, do it when you touch this flow for another reason.
+
+- **`chemicals.html` `packageEdits` Map post-C3 smoke test.** Open a
+  program with a chemical priced at a non-round value (e.g. `$12.755/gal`)
+  where Decimal128 precision matters more than Number's. Trigger a package
+  edit (change qty or SKU). Verify the grand-total in the footer and the
+  cost-per-acre cell compute correctly and display the expected rounded
+  values. Confirms the seed-time `Number(item.price)` coercion (chemicals.html
+  ~line 2848) and the `onSkuChange` Number coerce (~line 2281) both keep
+  the Map Number-typed end-to-end so downstream Number arithmetic at
+  `recalcPackageTotals` and per-row `lineCost`/`overageCost` stays correct.
