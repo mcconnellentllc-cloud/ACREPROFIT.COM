@@ -100,6 +100,8 @@
             .qty-input { width: 50px; }
         }
     </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
 </head>
 <body>
     <nav class="navbar dashboard-navbar">
@@ -357,7 +359,7 @@
 
                 for (const p of grouped[cat]) {
                     const totalVol = p.qty > 0 ? (p.qty * p.unitsPerPack) : 0;
-                    const lineTotal = p.qty > 0 ? (p.qty * p.unitsPerPack * p.price) : 0;
+                    const lineTotal = p.qty > 0 ? new Decimal(p.qty).times(p.unitsPerPack).times(p.price) : new Decimal(0);
                     const stockClass = p.quantityAvailable > 20 ? 'stock-in' :
                                        p.quantityAvailable > 0 ? 'stock-low' : 'stock-out';
                     const stockText = p.quantityAvailable > 20 ? 'In Stock' :
@@ -381,11 +383,11 @@
                                         ${locationText ? `<small style="color:#2d5a27;">Available at: ${locationText}</small>` : ''}
                                     </td>
                                     <td>${p.packSize}${p.unitsPerPack > 1 ? `<br><small style="color:#888;">(${p.unitsPerPack} ${p.unit})</small>` : ''}</td>
-                                    <td class="right"><span class="price-big">$${p.price.toFixed(2)}</span><span class="price-unit">/${p.unit}</span></td>
+                                    <td class="right"><span class="price-big">${fmtMoney(p.price)}</span><span class="price-unit">/${p.unit}</span></td>
                                     <td class="center"><span class="stock-badge ${stockClass}">${stockText}</span></td>
                                     <td class="center"><input type="number" class="qty-input" min="0" value="${p.qty}" data-product-id="${p.id}" onchange="updateQty('${p.id}', this.value)" onfocus="this.select()"></td>
                                     <td class="right total-uom" id="vol-${p.id}">${totalVol > 0 ? totalVol.toLocaleString() + ' ' + p.unit : '-'}</td>
-                                    <td class="right line-total" id="line-${p.id}">${lineTotal > 0 ? '$' + lineTotal.toFixed(2) : '-'}</td>
+                                    <td class="right line-total" id="line-${p.id}">${lineTotal.gt(0) ? fmtMoney(lineTotal) : '-'}</td>
                                 </tr>`;
                 }
 
@@ -404,22 +406,22 @@
 
             // Update the volume and line total cells
             const totalVol = qty * product.unitsPerPack;
-            const lineTotal = qty * product.unitsPerPack * product.price;
+            const lineTotal = new Decimal(qty).times(product.unitsPerPack).times(product.price);
 
             const volEl = document.getElementById('vol-' + productId);
             const lineEl = document.getElementById('line-' + productId);
             if (volEl) volEl.textContent = totalVol > 0 ? totalVol.toLocaleString() + ' ' + product.unit : '-';
-            if (lineEl) lineEl.textContent = lineTotal > 0 ? '$' + lineTotal.toFixed(2) : '-';
+            if (lineEl) lineEl.textContent = lineTotal.gt(0) ? fmtMoney(lineTotal) : '-';
 
             updateCartBar();
         }
 
         function updateCartBar() {
             const cartItems = products.filter(p => p.qty > 0);
-            const total = cartItems.reduce((sum, p) => sum + (p.qty * p.unitsPerPack * p.price), 0);
+            const total = cartItems.reduce((sum, p) => sum.plus(new Decimal(p.qty).times(p.unitsPerPack).times(p.price)), new Decimal(0));
 
             document.getElementById('cartItemCount').textContent = cartItems.length;
-            document.getElementById('cartTotal').textContent = '$' + total.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            document.getElementById('cartTotal').textContent = fmtMoneyLocale(total);
 
             const cartBar = document.getElementById('cartBar');
             cartBar.style.display = cartItems.length > 0 ? 'block' : 'none';
@@ -441,12 +443,12 @@
             }
 
             const tbody = document.getElementById('reviewTableBody');
-            let total = 0;
+            let total = new Decimal(0);
 
             tbody.innerHTML = cartItems.map(p => {
                 const totalVol = p.qty * p.unitsPerPack;
-                const lineTotal = p.qty * p.unitsPerPack * p.price;
-                total += lineTotal;
+                const lineTotal = new Decimal(p.qty).times(p.unitsPerPack).times(p.price);
+                total = total.plus(lineTotal);
 
                 return `
                     <tr>
@@ -457,8 +459,8 @@
                                 onchange="updateReviewQty('${p.id}', this.value)" style="width: 60px;">
                         </td>
                         <td class="right"><strong>${totalVol.toLocaleString()} ${p.unit}</strong></td>
-                        <td class="right">$${p.price.toFixed(2)}/${p.unit}</td>
-                        <td class="right"><strong>$${lineTotal.toFixed(2)}</strong></td>
+                        <td class="right">${fmtMoney(p.price)}/${p.unit}</td>
+                        <td class="right"><strong>${fmtMoney(lineTotal)}</strong></td>
                         <td><button class="btn btn-danger btn-sm" onclick="removeFromReview('${p.id}')" style="padding: 0.3rem 0.6rem;">&times;</button></td>
                     </tr>
                 `;
@@ -470,12 +472,12 @@
                     <td colspan="3">Order Total</td>
                     <td class="right" id="reviewTotalVol">${cartItems.reduce((s,p) => s + p.qty * p.unitsPerPack, 0).toLocaleString()} units</td>
                     <td></td>
-                    <td class="right" id="reviewTotalPrice">$${total.toFixed(2)}</td>
+                    <td class="right" id="reviewTotalPrice">${fmtMoney(total)}</td>
                     <td></td>
                 </tr>
             `;
 
-            document.getElementById('reviewTotal').textContent = '$' + total.toFixed(2);
+            document.getElementById('reviewTotal').textContent = fmtMoney(total);
             document.getElementById('orderReviewModal').classList.add('active');
         }
 
@@ -533,8 +535,8 @@
 
             const confirmed = confirm(
                 `Submit order for ${cartItems.length} products?\n\n` +
-                cartItems.map(p => `${p.name}: ${p.qty} packs (${(p.qty * p.unitsPerPack).toLocaleString()} ${p.unit}) - $${(p.qty * p.unitsPerPack * p.price).toFixed(2)}`).join('\n') +
-                `\n\nTotal: $${cartItems.reduce((s,p) => s + p.qty * p.unitsPerPack * p.price, 0).toFixed(2)}`
+                cartItems.map(p => `${p.name}: ${p.qty} packs (${(p.qty * p.unitsPerPack).toLocaleString()} ${p.unit}) - ${fmtMoney(new Decimal(p.qty).times(p.unitsPerPack).times(p.price))}`).join('\n') +
+                `\n\nTotal: ${fmtMoney(cartItems.reduce((s,p) => s.plus(new Decimal(p.qty).times(p.unitsPerPack).times(p.price)), new Decimal(0)))}`
             );
 
             if (!confirmed) return;
