@@ -564,3 +564,235 @@ describe('coerceMoneyFields', () => {
         }
     });
 });
+
+// ============ C3A PARITY TESTS ============
+//
+// For each converted site family, two assertions:
+//   (a) clean inputs: pre and post produce byte-identical Number output
+//   (b) float-trap inputs: post produces the hand-calculated correct answer;
+//       pre is allowed to be wrong (and IS wrong, in most of these cases —
+//       that's the bug C3a fixes).
+
+const Decimal = require('decimal.js-light');
+
+describe('C3a parity — site families converted in this commit', () => {
+
+    // Pre/post helpers for the (a) prerequisite — autoGenerateInvoice items.
+    // Pre: native JS multiplication. Post: Decimal then Number cast.
+    function preAutoInvoiceItem(qty, unitPrice, costPrice) {
+        return {
+            totalPrice: qty * unitPrice,
+            margin: (unitPrice - costPrice) * qty,
+        };
+    }
+    function postAutoInvoiceItem(qty, unitPrice, costPrice) {
+        return {
+            totalPrice: Number(new Decimal(qty).times(unitPrice).toFixed(2)),
+            margin: Number(new Decimal(unitPrice).minus(costPrice).times(qty).toFixed(4)),
+        };
+    }
+
+    test('autoGenerateInvoice items — clean inputs, byte-identical totalPrice + margin', () => {
+        const pre = preAutoInvoiceItem(10, 25.00, 15.00);
+        const post = postAutoInvoiceItem(10, 25.00, 15.00);
+        assert.equal(post.totalPrice, pre.totalPrice);
+        assert.equal(post.margin, pre.margin);
+        assert.equal(post.totalPrice, 250);
+        assert.equal(post.margin, 100);
+    });
+
+    test('autoGenerateInvoice items — float-trap inputs, post is correct', () => {
+        // 265 × 13.77 = 3649.05 (the INV-00008 reproducer). Pre produces
+        // 3649.0499999999997 due to float drift.
+        const pre = preAutoInvoiceItem(265, 13.77, 0);
+        const post = postAutoInvoiceItem(265, 13.77, 0);
+        assert.equal(pre.totalPrice, 3649.0499999999997, 'baseline drift confirmed');
+        assert.equal(post.totalPrice, 3649.05, 'post-conversion is exact');
+        // Margin chain: (13.77 - 0) * 265 = 3649.05, same drift in pre
+        assert.equal(post.margin, 3649.05);
+    });
+
+    // ---- normalizedChemicals + discount accumulator (Group 2) ----
+
+    function preNormalize(items, discount) {
+        // Original code: totalDiscount += (fullPrice - pricePerUnit) * qty
+        let totalDiscount = 0;
+        const out = items.map((c) => {
+            let unit = c.fullPrice;
+            if (discount === 'at_cost') unit = c.costPrice;
+            if (discount && unit !== c.fullPrice) {
+                totalDiscount += (c.fullPrice - unit) * c.qty;
+            }
+            return { totalPrice: Math.round(c.qty * unit * 100) / 100 };
+        });
+        const subtotal = out.reduce((s, x) => s + x.totalPrice, 0);
+        return {
+            totalDiscount: Math.round(totalDiscount * 100) / 100,
+            subtotal,
+            items: out,
+        };
+    }
+
+    function postNormalize(items, discount) {
+        let totalDiscountDec = new Decimal(0);
+        const out = items.map((c) => {
+            let unit = c.fullPrice;
+            if (discount === 'at_cost') unit = c.costPrice;
+            if (discount && unit !== c.fullPrice) {
+                totalDiscountDec = totalDiscountDec.plus(
+                    new Decimal(c.fullPrice).minus(unit).times(c.qty)
+                );
+            }
+            return { totalPrice: Number(new Decimal(c.qty).times(unit).toFixed(2)) };
+        });
+        const subtotal = Number(out.reduce(
+            (s, x) => s.plus(new Decimal(x.totalPrice)), new Decimal(0)
+        ).toFixed(2));
+        return {
+            totalDiscount: Number(totalDiscountDec.toFixed(2)),
+            subtotal,
+            items: out,
+        };
+    }
+
+    test('normalizedChemicals — clean inputs at-cost discount', () => {
+        const items = [
+            { qty: 5, fullPrice: 20, costPrice: 12 },
+            { qty: 3, fullPrice: 50, costPrice: 30 },
+        ];
+        const pre = preNormalize(items, 'at_cost');
+        const post = postNormalize(items, 'at_cost');
+        assert.equal(post.subtotal, pre.subtotal);
+        assert.equal(post.totalDiscount, pre.totalDiscount);
+        assert.equal(post.subtotal, 150);  // 5×12 + 3×30 = 150
+        assert.equal(post.totalDiscount, 100);  // (20-12)×5 + (50-30)×3 = 100
+    });
+
+    test('normalizedChemicals — float-trap (qty 7 × price 13.77)', () => {
+        const items = [{ qty: 7, fullPrice: 13.77, costPrice: 7.50 }];
+        const post = postNormalize(items, 'at_cost');
+        // 7 × 7.50 = 52.50 exact
+        assert.equal(post.subtotal, 52.50);
+        // (13.77 - 7.50) × 7 = 43.89 — Decimal exact
+        assert.equal(post.totalDiscount, 43.89);
+    });
+
+    // ---- profitPerUnit margin report ----
+
+    test('profitPerUnit — float-trap subtraction', () => {
+        // Pre: Math.round((Number('15.755') - Number('7.10')) * 100) / 100
+        // Post: serializeMoney(new Decimal('15.755').minus('7.10'))
+        const sellPrice = '15.755';
+        const costPrice = '7.10';
+        // Hand calc: 15.755 - 7.10 = 8.655
+        const post = serializeMoney(new Decimal(sellPrice).minus(costPrice));
+        assert.equal(post, '8.655');
+    });
+
+    // ---- 3-operand chain (the qty × unitsPerPack × price case from many sites) ----
+
+    test('3-operand chain — float-trap with drift', () => {
+        // Pick a multi-operand chain where Number arithmetic drifts:
+        // 0.1 + 0.2 + 0.4 in Number is 0.7000000000000001
+        // (7 × 13 × 0.1 happens to NOT drift in JS — value lands on a clean float)
+        const pre = 0.1 + 0.2 + 0.4;
+        const post = Number(new Decimal(0.1).plus(0.2).plus(0.4).toFixed(2));
+        assert.equal(pre, 0.7000000000000001, 'baseline drift confirmed');
+        assert.equal(post, 0.70);
+    });
+
+    // ---- accumulator drift (0.1 + 0.2 + 0.3) ----
+
+    test('accumulator — 0.1 + 0.2 + 0.3 must equal 0.60 exact', () => {
+        const items = [{ p: 0.1 }, { p: 0.2 }, { p: 0.3 }];
+        // Pre: reduce((s, x) => s + x.p, 0) → 0.6000000000000001
+        const pre = items.reduce((s, x) => s + x.p, 0);
+        // Post: Decimal accumulator
+        const post = Number(items.reduce(
+            (s, x) => s.plus(new Decimal(x.p)), new Decimal(0)
+        ).toFixed(2));
+        assert.equal(pre, 0.6000000000000001, 'baseline drift confirmed');
+        assert.equal(post, 0.60);
+    });
+
+    // ---- cashInBank 5-operand chain (Group 8) ----
+
+    test('cashInBank chain — multi-operand subtraction', () => {
+        // capitalIn + customerPaymentsIn - paidOutToDistributors - commissionsPaidTotal - adminMarginWithdrawn
+        const capitalIn = 10000.00;
+        const customerPaymentsIn = 25000.50;
+        const paidOutToDistributors = 12500.25;
+        const commissionsPaidTotal = new Decimal(0.10).plus(0.20).plus(0.30);  // 0.60 exact via Decimal
+        const adminMarginWithdrawn = 2500.00;
+
+        const cashInBank = Number(
+            new Decimal(capitalIn)
+                .plus(customerPaymentsIn)
+                .minus(paidOutToDistributors)
+                .minus(commissionsPaidTotal)
+                .minus(adminMarginWithdrawn)
+                .toFixed(2)
+        );
+        // Hand calc: 10000 + 25000.50 - 12500.25 - 0.60 - 2500.00 = 19999.65
+        assert.equal(cashInBank, 19999.65);
+    });
+
+    // ---- supplierBidSheet reduce (Group 10) ----
+
+    test('supplierTotal reduce — multi-operand inside reduce', () => {
+        const items = [
+            { quantity: 10, unitPrice: 12.755 },  // 127.55
+            { quantity: 5, unitPrice: 99.99 },    // 499.95
+            { quantity: 3, unitPrice: 0.1 },      // 0.30 (float-trap)
+        ];
+        const post = Number(items.reduce(
+            (sum, item) => sum.plus(new Decimal(item.quantity).times(item.unitPrice)),
+            new Decimal(0)
+        ).toFixed(2));
+        // Hand calc: 127.55 + 499.95 + 0.30 = 627.80
+        assert.equal(post, 627.80);
+    });
+
+    // ---- sequential-rounding preserved (Group 12 lines 12609/12648 post-C3a) ----
+
+    test('sequential-rounding pattern preserved', () => {
+        // serverPricePerPackage = round(sellPrice * pkgSize)
+        // serverLineTotal = round(serverPricePerPackage * pkgsNeeded)
+        // Pre and post should produce IDENTICAL output for clean inputs
+        // because the sequential-rounding semantic is preserved.
+        const sellPrice = 12.755;
+        const pkgSize = 5;
+        const pkgsNeeded = 3;
+
+        const preServerPrice = Math.round(sellPrice * pkgSize * 100) / 100;
+        const preServerTotal = Math.round(preServerPrice * pkgsNeeded * 100) / 100;
+
+        const postServerPrice = Number(new Decimal(sellPrice).times(pkgSize).toFixed(2));
+        const postServerTotal = Number(new Decimal(postServerPrice).times(pkgsNeeded).toFixed(2));
+
+        // 12.755 * 5 = 63.775 → round → 63.78
+        // 63.78 * 3 = 191.34 → round → 191.34
+        assert.equal(preServerPrice, postServerPrice);
+        assert.equal(preServerTotal, postServerTotal);
+        assert.equal(postServerTotal, 191.34);
+    });
+
+    // ---- inventory transactions: quantity × cost ----
+
+    test('inventory totalCost — quantity × unitCost at dp=2', () => {
+        const quantity = 100;
+        const unitCost = 12.755;
+        const post = Number(new Decimal(quantity).times(unitCost).toFixed(2));
+        assert.equal(post, 1275.50);
+    });
+
+    // ---- amountDue subtraction (invoice routes) ----
+
+    test('amountDue subtraction — total minus paid', () => {
+        const total = 1234.56;
+        const amountPaid = 1000.00;
+        const post = Number(new Decimal(total).minus(amountPaid).toFixed(2));
+        assert.equal(post, 234.56);
+    });
+});
+

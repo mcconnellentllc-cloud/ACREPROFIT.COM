@@ -6,41 +6,40 @@ Two sections:
   arithmetic as part of the C3 commit.
 - **Verification items** — checks to run once after C3 lands.
 
-## C3 prerequisites — server-side native arithmetic on Decimal128 fields
+## C3 prerequisites — RESOLVED in C3a
 
-Three sites do native JS arithmetic on values that will be Decimal128
-post-C3. JS coerces Decimal128 via `valueOf()` → string → Number → arithmetic
-→ result is a Number with float drift. For typical 2dp money values this is
-within-cent accuracy on a single op, but compounds across reduces and
-multi-operand expressions. **Rewrite all three in Decimal before C3
-deploys.**
+The three native-arithmetic sites flagged in C2 as "must convert before C3
+deploys" were converted as part of C3a. Plus the broader sweep of ~67
+math sites total. C3a result: server computes in Decimal, writes back as
+`Number(dec.toFixed(dp))` at the schema/wire boundary. Schemas remain
+Number-typed, wire format unchanged.
 
-1. **`server/index.js:2442-2455`** (`autoGenerateInvoice` invoice items
-   build). Currently:
-   ```js
-   const unitPrice = item.unitPrice || item.pricePerUnit || chem?.sellPrice || 0;
-   const totalPrice = qty * unitPrice;
-   const margin = (unitPrice - costPrice) * qty;
-   ```
-   Rewrite both `totalPrice` and `margin` in Decimal. Output stays as a
-   Decimal128 instance assigned into the new Invoice doc so the schema
-   pre('validate') hook coerces correctly on save.
+When C3b lands, all the math is already correct; C3b only flips the
+storage type and seeds the backfill.
 
-2. **`server/index.js:5499-5538`** (checkout `normalizedChemicals` map).
-   Currently:
-   ```js
-   totalPrice: Math.round(qty * pricePerUnit * 100) / 100
-   ```
-   Rewrite in Decimal. Store as Decimal128 → Order doc for save.
+## Future cleanup items (not blocking C3)
 
-3. **`server/index.js:8138-8147`** (margin report). Currently
-   `profitPerUnit: Math.round((c.sellPrice - c.costPrice) * 100) / 100`.
-   Has a defensive `Number(...)` cast added in C2 so it won't crash post-C3,
-   but it loses precision via the cast. Rewrite in Decimal:
-   `profitPerUnit: serializeMoney(new Decimal(c.sellPrice).minus(c.costPrice))`.
+- **`chemicalQuoteSchema.virtual('packPriceCalculated')` (server/index.js:891)
+  is dead code.** Single reference is the definition itself; no callers
+  anywhere in the repo (verified by grep). C3a left the body unchanged
+  (`Math.round(this.pricePerUnit * this.unitsPerPack * 100) / 100`) per
+  the "don't refactor dead code" rule. Remove the virtual entirely in a
+  separate cleanup commit after C3 lands. If a future feature needs a
+  computed pack price, it can be reintroduced with the proper Decimal
+  shape at that time.
 
-These three sites cannot deploy after C3 in their current form. Treat as
-hard prerequisites, not future-checklist items.
+- **Sequential-round vs round-once-at-end pattern (lines ~12609-12610
+  and ~12648-12649 post-C3a, line numbers will shift again at C3b).**
+  Two pairs of sites in chemicals.html submit-order validation round
+  the per-package price first, THEN multiply by package count and round
+  again. Pre-C3a behavior was sequential rounding; C3a preserves it
+  literally for parity safety. The mathematically more accurate approach
+  is to compute the full chain in Decimal and round once at the end —
+  preserves more precision but produces different penny-level results
+  on long product chains. **If round-once-at-end is the better long-term
+  math, ship as a separate, intentional commit with documented behavior
+  change and stakeholder visibility — not as a hidden side effect of
+  the migration.**
 
 ## Verification items
 

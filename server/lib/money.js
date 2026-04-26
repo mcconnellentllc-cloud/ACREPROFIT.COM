@@ -58,6 +58,12 @@ function toDec(v, dp = 2) {
 function serializeMoney(v) {
     if (v === null || v === undefined) return null;
     if (isDecimal128(v)) return v.toString();
+    // decimal.js-light Decimal instance — has .toString() and an isDecimal flag.
+    // Identified by ducktype since the constructor reference may differ across
+    // module loads. C3a sites pass these directly: `serializeMoney(new Decimal(a).minus(b))`.
+    if (v && typeof v === 'object' && typeof v.toFixed === 'function' && typeof v.cmp === 'function') {
+        return v.toString();
+    }
     if (typeof v === 'number') {
         if (!Number.isFinite(v)) return null;
         return v.toString();
@@ -203,4 +209,7 @@ module.exports = {
     serializeMoney,
     decimalToJSONTransform,
     coerceMoneyFields,
+    // Re-exported so callers (C3a math conversions, C3b backfill script)
+    // can use the same Decimal class without each one re-requiring the dep.
+    Decimal,
 };
