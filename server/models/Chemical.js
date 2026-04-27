@@ -263,4 +263,18 @@ chemicalSchema.index({ 'stateRegistrations.state': 1 });
 chemicalSchema.index({ tradeName: 1, manufacturer: 1 });
 chemicalSchema.index({ 'activeIngredients.name': 1 });
 
+// Decimal128 migration (C2). Pre-C3 these fields are still Number, so the
+// transform is a no-op and the pre('validate') hook short-circuits via the
+// Decimal128 instance check in coerceMoneyFields.
+const { decimalToJSONTransform, coerceMoneyFields } = require('../lib/money');
+const CHEMICAL_MONEY_PATHS = {
+    'costPrice': 4,
+    'adminMarginDollars': 4,
+    'adminPrice': 4,
+    'marginDollars': 4,
+    'sellPrice': 4,
+};
+chemicalSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_MONEY_PATHS); next(); });
+
 module.exports = mongoose.models.Chemical || mongoose.model('Chemical', chemicalSchema);

@@ -8,6 +8,13 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const Stripe = require('stripe');
 const nodemailer = require('nodemailer');
+// Decimal128 migration helpers (C2/C3). Pre-C3, the toJSON transform is a
+// no-op on Number values and the pre('validate') coerce hook short-circuits
+// when the schema field type is still Number. See server/lib/money.js for
+// behaviour details. C3a uses Decimal directly for in-handler math; results
+// cast back to Number(dec.toFixed(dp)) at the wire/storage boundary so the
+// schema sees Numbers (still its declared type pre-C3b).
+const { decimalToJSONTransform, coerceMoneyFields, serializeMoney, Decimal } = require('./lib/money');
 // SendGrid transactional email. Preferred over SMTP when SENDGRID_API_KEY is
 // set because Microsoft 365 Security Defaults block SMTP basic auth
 // (535 5.7.139). Wrapped in try/catch so the app still boots if the dep
@@ -483,6 +490,31 @@ const orderSchema = new mongoose.Schema({
 // user cannot have two orders with the same key.
 orderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
+const ORDER_MONEY_PATHS = {
+    'orderLines.pricePerPackage': 4,
+    'orderLines.lineTotal': 2,
+    'hydrovant.pricePerPackage': 4,
+    'hydrovant.lineTotal': 2,
+    'chemicals.pricePerPackage': 4,
+    'chemicals.totalPrice': 2,
+    'seeds.pricePerBag': 4,
+    'seeds.totalPrice': 2,
+    'pivotBio.pricePerUnit': 4,
+    'pivotBio.totalPrice': 2,
+    'additionalProducts.hydrovant': 2,
+    'additionalProducts.multiseal': 2,
+    'additionalProducts.pump': 2,
+    'totalCost': 2,
+    'costPerAcre': 4,
+    'repCommission': 2,
+    'adminRevenue': 2,
+    'totalCost_cost': 2,
+    'totalCost_admin': 2,
+    'totalConfirmedPrice': 2,
+};
+orderSchema.set('toJSON', { transform: decimalToJSONTransform });
+orderSchema.pre('validate', function (next) { coerceMoneyFields(this, ORDER_MONEY_PATHS); next(); });
+
 const Order = mongoose.model('Order', orderSchema);
 
 // Rep Application Model
@@ -531,6 +563,16 @@ const repCommissionSchema = new mongoose.Schema({
     updatedAt: { type: Date, default: Date.now }
 });
 
+const REP_COMMISSION_MONEY_PATHS = {
+    'totalCommissionEarned': 2,
+    'totalCommissionPaid': 2,
+    'commissionBalance': 2,
+    'history.orderTotal': 2,
+    'history.commissionAmount': 2,
+};
+repCommissionSchema.set('toJSON', { transform: decimalToJSONTransform });
+repCommissionSchema.pre('validate', function (next) { coerceMoneyFields(this, REP_COMMISSION_MONEY_PATHS); next(); });
+
 const RepCommission = mongoose.model('RepCommission', repCommissionSchema);
 
 // Chemical catalog model — extracted to server/models/Chemical.js. The merged
@@ -554,6 +596,13 @@ const chemicalPriceHistorySchema = new mongoose.Schema({
     changedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     createdAt: { type: Date, default: Date.now }
 });
+
+const CHEMICAL_PRICE_HISTORY_MONEY_PATHS = {
+    'costPrice': 4,
+    'sellPrice': 4,
+};
+chemicalPriceHistorySchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalPriceHistorySchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_PRICE_HISTORY_MONEY_PATHS); next(); });
 
 const ChemicalPriceHistory = mongoose.model('ChemicalPriceHistory', chemicalPriceHistorySchema);
 
@@ -625,6 +674,12 @@ auditLogSchema.pre('findOneAndUpdate', function(next) {
     }
     next();
 });
+
+const AUDIT_LOG_MONEY_PATHS = {
+    'amount': 2,
+};
+auditLogSchema.set('toJSON', { transform: decimalToJSONTransform });
+auditLogSchema.pre('validate', function (next) { coerceMoneyFields(this, AUDIT_LOG_MONEY_PATHS); next(); });
 
 const AuditLog = mongoose.model('AuditLog', auditLogSchema);
 
@@ -771,6 +826,12 @@ distributorPricingSchema.index({ distributorId: 1, chemicalId: 1 }, { unique: tr
 distributorPricingSchema.index({ distributorId: 1 });
 distributorPricingSchema.index({ chemicalId: 1 });
 
+const DISTRIBUTOR_PRICING_MONEY_PATHS = {
+    'retailPrice': 4,
+};
+distributorPricingSchema.set('toJSON', { transform: decimalToJSONTransform });
+distributorPricingSchema.pre('validate', function (next) { coerceMoneyFields(this, DISTRIBUTOR_PRICING_MONEY_PATHS); next(); });
+
 const DistributorPricing = mongoose.model('DistributorPricing', distributorPricingSchema);
 
 // ============ CHEMICAL QUOTE MODEL ============
@@ -836,6 +897,14 @@ chemicalQuoteSchema.virtual('packPriceCalculated').get(function() {
     }
     return this.packPrice;
 });
+
+const CHEMICAL_QUOTE_MONEY_PATHS = {
+    'pricePerUnit': 4,
+    'packPrice': 4,
+    'volumeDiscount.discountedPrice': 4,
+};
+chemicalQuoteSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalQuoteSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_QUOTE_MONEY_PATHS); next(); });
 
 const ChemicalQuote = mongoose.model('ChemicalQuote', chemicalQuoteSchema);
 
@@ -941,6 +1010,12 @@ rupSaleRecordSchema.index({ purchaserId: 1 });
 rupSaleRecordSchema.index({ epaRegistrationNumber: 1 });
 rupSaleRecordSchema.index({ applicatorLicenseNumber: 1 });
 rupSaleRecordSchema.index({ status: 1 });
+
+const RUP_SALE_RECORD_MONEY_PATHS = {
+    'totalAmount': 2,
+};
+rupSaleRecordSchema.set('toJSON', { transform: decimalToJSONTransform });
+rupSaleRecordSchema.pre('validate', function (next) { coerceMoneyFields(this, RUP_SALE_RECORD_MONEY_PATHS); next(); });
 
 const RupSaleRecord = mongoose.model('RupSaleRecord', rupSaleRecordSchema);
 
@@ -1176,6 +1251,19 @@ chemicalOrderSchema.pre('save', async function(next) {
     next();
 });
 
+const CHEMICAL_ORDER_MONEY_PATHS = {
+    'items.unitPrice': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'discount': 2,
+    'marginAdjustment': 4,
+    'freight': 2,
+    'processingFee': 2,
+    'total': 2,
+};
+chemicalOrderSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalOrderSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_ORDER_MONEY_PATHS); next(); });
+
 const ChemicalOrder = mongoose.model('ChemicalOrder', chemicalOrderSchema);
 
 // Ledger Entry Model (Who Owes Who tracking)
@@ -1202,6 +1290,13 @@ const ledgerEntrySchema = new mongoose.Schema({
 
 ledgerEntrySchema.index({ representativeId: 1, date: -1 });
 ledgerEntrySchema.index({ referenceType: 1, referenceId: 1 });
+
+const LEDGER_ENTRY_MONEY_PATHS = {
+    'amount': 2,
+    'runningBalance': 2,
+};
+ledgerEntrySchema.set('toJSON', { transform: decimalToJSONTransform });
+ledgerEntrySchema.pre('validate', function (next) { coerceMoneyFields(this, LEDGER_ENTRY_MONEY_PATHS); next(); });
 
 const LedgerEntry = mongoose.model('LedgerEntry', ledgerEntrySchema);
 
@@ -1507,6 +1602,18 @@ purchaseOrderSchema.index({ 'supplier.name': 1 });
 purchaseOrderSchema.index({ status: 1 });
 purchaseOrderSchema.index({ orderDate: -1 });
 
+const PURCHASE_ORDER_MONEY_PATHS = {
+    'items.pricePerUnit': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'freight': 2,
+    'otherFees': 2,
+    'superAdminFee': 2,
+    'totalCost': 2,
+};
+purchaseOrderSchema.set('toJSON', { transform: decimalToJSONTransform });
+purchaseOrderSchema.pre('validate', function (next) { coerceMoneyFields(this, PURCHASE_ORDER_MONEY_PATHS); next(); });
+
 const PurchaseOrder = mongoose.model('PurchaseOrder', purchaseOrderSchema);
 
 // Supplier Model - Save supplier information for reuse
@@ -1602,6 +1709,16 @@ quoteRequestSchema.index({ customerId: 1 });
 quoteRequestSchema.index({ representativeId: 1 });
 quoteRequestSchema.index({ status: 1 });
 quoteRequestSchema.index({ submittedAt: -1 });
+
+const QUOTE_REQUEST_MONEY_PATHS = {
+    'items.costPrice': 4,
+    'items.adminPrice': 4,
+    'items.sellPrice': 4,
+    'items.totalPrice': 2,
+    'estimatedTotal': 2,
+};
+quoteRequestSchema.set('toJSON', { transform: decimalToJSONTransform });
+quoteRequestSchema.pre('validate', function (next) { coerceMoneyFields(this, QUOTE_REQUEST_MONEY_PATHS); next(); });
 
 const QuoteRequest = mongoose.model('QuoteRequest', quoteRequestSchema);
 
@@ -1713,6 +1830,16 @@ supplierBidSheetSchema.index({ status: 1 });
 supplierBidSheetSchema.index({ createdAt: -1 });
 supplierBidSheetSchema.index({ 'invitedSuppliers.supplierId': 1 });
 
+const SUPPLIER_BID_SHEET_MONEY_PATHS = {
+    'supplierBids.itemPricing.pricePerUnit': 4,
+    'supplierBids.itemPricing.totalPrice': 2,
+    'supplierBids.subtotal': 2,
+    'supplierBids.freight': 2,
+    'supplierBids.totalBid': 2,
+};
+supplierBidSheetSchema.set('toJSON', { transform: decimalToJSONTransform });
+supplierBidSheetSchema.pre('validate', function (next) { coerceMoneyFields(this, SUPPLIER_BID_SHEET_MONEY_PATHS); next(); });
+
 const SupplierBidSheet = mongoose.model('SupplierBidSheet', supplierBidSheetSchema);
 
 // Purchase Order Split Model (How a PO is split between distributors)
@@ -1774,6 +1901,16 @@ purchaseOrderSplitSchema.index({ purchaseOrderId: 1 });
 purchaseOrderSplitSchema.index({ distributorId: 1 });
 purchaseOrderSplitSchema.index({ status: 1 });
 
+const PURCHASE_ORDER_SPLIT_MONEY_PATHS = {
+    'items.pricePerUnit': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'freightAllocation': 2,
+    'totalCost': 2,
+};
+purchaseOrderSplitSchema.set('toJSON', { transform: decimalToJSONTransform });
+purchaseOrderSplitSchema.pre('validate', function (next) { coerceMoneyFields(this, PURCHASE_ORDER_SPLIT_MONEY_PATHS); next(); });
+
 const PurchaseOrderSplit = mongoose.model('PurchaseOrderSplit', purchaseOrderSplitSchema);
 
 // ============ INVENTORY MODEL ============
@@ -1814,6 +1951,13 @@ inventorySchema.index({ chemicalId: 1, location: 1 }, { unique: true });
 inventorySchema.index({ productName: 1 });
 inventorySchema.index({ distributorId: 1 });
 inventorySchema.index({ quantityOnHand: 1 });
+
+const INVENTORY_MONEY_PATHS = {
+    'averageCost': 4,
+    'lastCost': 4,
+};
+inventorySchema.set('toJSON', { transform: decimalToJSONTransform });
+inventorySchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_MONEY_PATHS); next(); });
 
 const Inventory = mongoose.model('Inventory', inventorySchema);
 
@@ -1863,6 +2007,13 @@ inventoryTransactionSchema.index({ inventoryId: 1, createdAt: -1 });
 inventoryTransactionSchema.index({ referenceType: 1, referenceId: 1 });
 inventoryTransactionSchema.index({ type: 1 });
 inventoryTransactionSchema.index({ createdAt: -1 });
+
+const INVENTORY_TRANSACTION_MONEY_PATHS = {
+    'unitCost': 4,
+    'totalCost': 2,
+};
+inventoryTransactionSchema.set('toJSON', { transform: decimalToJSONTransform });
+inventoryTransactionSchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_TRANSACTION_MONEY_PATHS); next(); });
 
 const InventoryTransaction = mongoose.model('InventoryTransaction', inventoryTransactionSchema);
 
@@ -1916,6 +2067,13 @@ inventoryBatchSchema.index({ chemicalId: 1, status: 1 });
 inventoryBatchSchema.index({ poNumber: 1 });
 inventoryBatchSchema.index({ productName: 1 });
 inventoryBatchSchema.index({ status: 1, quantityRemaining: 1 });
+
+const INVENTORY_BATCH_MONEY_PATHS = {
+    'costPerUnit': 4,
+    'totalCost': 2,
+};
+inventoryBatchSchema.set('toJSON', { transform: decimalToJSONTransform });
+inventoryBatchSchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_BATCH_MONEY_PATHS); next(); });
 
 const InventoryBatch = mongoose.model('InventoryBatch', inventoryBatchSchema);
 
@@ -2043,6 +2201,25 @@ invoiceSchema.index({ orderId: 1 });
 invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ invoiceDate: -1 });
 
+const INVOICE_MONEY_PATHS = {
+    'subtotal': 2,
+    'discount': 2,
+    'tax': 2,
+    'shipping': 2,
+    'total': 2,
+    'amountPaid': 2,
+    'amountDue': 2,
+    'creditedAmount': 2,
+    'surchargeAmount': 2,
+    'items.unitPrice': 4,
+    'items.costPrice': 4,
+    'items.adminPrice': 4,
+    'items.totalPrice': 2,
+    'items.margin': 4,
+};
+invoiceSchema.set('toJSON', { transform: decimalToJSONTransform });
+invoiceSchema.pre('validate', function (next) { coerceMoneyFields(this, INVOICE_MONEY_PATHS); next(); });
+
 const Invoice = mongoose.model('Invoice', invoiceSchema);
 
 // ============ CREDIT NOTE MODEL ============
@@ -2093,6 +2270,12 @@ const creditNoteSchema = new mongoose.Schema({
 });
 creditNoteSchema.index({ invoiceId: 1, createdAt: -1 });
 creditNoteSchema.index({ creditNoteNumber: 1 });
+
+const CREDIT_NOTE_MONEY_PATHS = {
+    'amount': 2,
+};
+creditNoteSchema.set('toJSON', { transform: decimalToJSONTransform });
+creditNoteSchema.pre('validate', function (next) { coerceMoneyFields(this, CREDIT_NOTE_MONEY_PATHS); next(); });
 
 const CreditNote = mongoose.model('CreditNote', creditNoteSchema);
 
@@ -2161,6 +2344,16 @@ programQuoteSchema.index({ quoteNumber: 1 });
 programQuoteSchema.index({ customerId: 1 });
 programQuoteSchema.index({ status: 1 });
 programQuoteSchema.index({ createdAt: -1 });
+
+const PROGRAM_QUOTE_MONEY_PATHS = {
+    'items.unitPrice': 4,
+    'items.totalPrice': 2,
+    'subtotal': 2,
+    'total': 2,
+    'costPerAcre': 4,
+};
+programQuoteSchema.set('toJSON', { transform: decimalToJSONTransform });
+programQuoteSchema.pre('validate', function (next) { coerceMoneyFields(this, PROGRAM_QUOTE_MONEY_PATHS); next(); });
 
 const ProgramQuote = mongoose.model('ProgramQuote', programQuoteSchema);
 
@@ -2439,6 +2632,11 @@ async function autoGenerateInvoiceForPaidOrder(order) {
                 const adminPrice = chem?.adminPrice || 0;
                 const unitPrice = item.unitPrice || item.pricePerUnit || chem?.sellPrice || 0;
                 const qty = item.quantity || 0;
+                // C3a: compute totalPrice + margin in Decimal, write back as Number
+                // (cents-precision for totalPrice, per-unit precision for margin since
+                // margin is per-unit dollars × qty).
+                const totalPriceDec = new Decimal(qty).times(unitPrice);
+                const marginDec = new Decimal(unitPrice).minus(costPrice).times(qty);
                 return {
                     productName: item.productName,
                     description: `${item.packSize || ''} ${item.unit || ''}`.trim(),
@@ -2450,8 +2648,8 @@ async function autoGenerateInvoiceForPaidOrder(order) {
                     unitPrice,
                     costPrice,
                     adminPrice,
-                    totalPrice: qty * unitPrice,
-                    margin: (unitPrice - costPrice) * qty
+                    totalPrice: Number(totalPriceDec.toFixed(2)),
+                    margin: Number(marginDec.toFixed(4)),
                 };
             });
             subtotal = order.subtotal || 0;
@@ -2492,7 +2690,7 @@ async function autoGenerateInvoiceForPaidOrder(order) {
                     totalPrice: pb.totalPrice
                 });
             });
-            subtotal = order.totalCost || invoiceItems.reduce((sum, i) => sum + (i.totalPrice || 0), 0);
+            subtotal = order.totalCost || Number(invoiceItems.reduce((sum, i) => sum.plus(new Decimal(i.totalPrice || 0)), new Decimal(0)).toFixed(2));
             total = subtotal;
             orderNumber = `ORD-${order._id.toString().slice(-8).toUpperCase()}`;
         }
@@ -2600,7 +2798,7 @@ async function autoCreateRupRecordsForOrder(order, opts = {}) {
 
             const totalUnits = (item.quantity || 0) * (chemical.unitsPerPack || 1);
             const unitPrice = item.unitPrice || chemical.sellPrice || 0;
-            const totalAmount = Math.round(totalUnits * unitPrice * 100) / 100;
+            const totalAmount = Number(new Decimal(totalUnits).times(unitPrice).toFixed(2));
             const requiredCerts = chemical.requiredCertifications || [];
 
             const record = new RupSaleRecord({
@@ -2720,8 +2918,8 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
     const newQuantity = previousQuantity + quantity;
 
     if (previousQuantity > 0 && inventory.averageCost > 0) {
-        const totalOldValue = previousQuantity * inventory.averageCost;
-        const totalNewValue = quantity * unitCost;
+        const totalOldValue = Number(new Decimal(previousQuantity).times(inventory.averageCost).toFixed(4));
+        const totalNewValue = Number(new Decimal(quantity).times(unitCost).toFixed(4));
         inventory.averageCost = (totalOldValue + totalNewValue) / newQuantity;
     } else {
         inventory.averageCost = unitCost;
@@ -2746,7 +2944,7 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
         quantityReceived: quantity,
         quantityRemaining: quantity,
         costPerUnit: unitCost,
-        totalCost: quantity * unitCost,
+        totalCost: Number(new Decimal(quantity).times(unitCost).toFixed(2)),
         location: location || 'main',
         supplierName: supplierName || '',
         status: 'active',
@@ -2764,7 +2962,7 @@ async function receiveInventory({ chemicalId, productName, packSize, unit, quant
         previousQuantity,
         newQuantity,
         unitCost,
-        totalCost: quantity * unitCost,
+        totalCost: Number(new Decimal(quantity).times(unitCost).toFixed(2)),
         referenceType: 'PurchaseOrder',
         referenceId: purchaseOrderId,
         referenceNumber: poNumber,
@@ -4969,7 +5167,7 @@ app.post('/api/calculate', authMiddleware, (req, res) => {
             }
 
             const packagesNeeded = Math.ceil(totalGallons / chemical.packageSize);
-            const totalPrice = packagesNeeded * (chemical.pricePerPackage || 0);
+            const totalPrice = Number(new Decimal(packagesNeeded).times(chemical.pricePerPackage || 0).toFixed(2));
 
             return {
                 name: chemical.name,
@@ -4985,7 +5183,7 @@ app.post('/api/calculate', authMiddleware, (req, res) => {
             };
         });
 
-        const totalPrice = calculations.reduce((sum, c) => sum + c.totalPrice, 0);
+        const totalPrice = Number(calculations.reduce((sum, c) => sum.plus(new Decimal(c.totalPrice || 0)), new Decimal(0)).toFixed(2));
         const costPerAcre = acres > 0 ? Math.round((totalPrice / acres) * 100) / 100 : 0;
 
         res.json({
@@ -5495,10 +5693,13 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
         // Look up chemical pricing for discount code application
         const allChemicals = discountType ? await Chemical.find({ isActive: true }).lean() : [];
 
-        const costPerAcre = acres > 0 ? Math.round((totalPrice / acres) * 100) / 100 : 0;
+        const costPerAcre = acres > 0 ? Number(new Decimal(totalPrice).div(acres).toFixed(2)) : 0;
 
-        // Normalize chemicals array and apply discount code pricing
-        let totalDiscount = 0;
+        // Normalize chemicals array and apply discount code pricing.
+        // C3a: totalDiscount accumulator runs in Decimal, written back as Number
+        // at the order-payload boundary. Per-row totalPrice computes in Decimal,
+        // stored as Number(toFixed(2)).
+        let totalDiscountDec = new Decimal(0);
         const normalizedChemicals = (chemicals || []).map(c => {
             const name = c.name || c.productName;
             const qty = c.qty || c.quantity || 0;
@@ -5516,7 +5717,9 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                     } else if (discountType === 'no_dist_margin') {
                         pricePerUnit = chem.adminPrice || fullPrice;
                     }
-                    totalDiscount += (fullPrice - pricePerUnit) * qty;
+                    totalDiscountDec = totalDiscountDec.plus(
+                        new Decimal(fullPrice).minus(pricePerUnit).times(qty)
+                    );
                 }
             }
 
@@ -5525,7 +5728,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                 qty,
                 unit: c.unit || 'gal',
                 pricePerUnit,
-                totalPrice: Math.round(qty * pricePerUnit * 100) / 100,
+                totalPrice: Number(new Decimal(qty).times(pricePerUnit).toFixed(2)),
                 chemicalId: c.chemicalId,
                 packSize: c.packSize,
                 sourceSupplier: c.sourceSupplier
@@ -5534,9 +5737,9 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
         // Recalculate total from adjusted line items if discount applied
         const adjustedTotal = discountType
-            ? normalizedChemicals.reduce((sum, c) => sum + (c.totalPrice || 0), 0)
+            ? Number(normalizedChemicals.reduce((sum, c) => sum.plus(new Decimal(c.totalPrice || 0)), new Decimal(0)).toFixed(2))
             : totalPrice;
-        const adjustedCostPerAcre = acres > 0 ? Math.round((adjustedTotal / acres) * 100) / 100 : 0;
+        const adjustedCostPerAcre = acres > 0 ? Number(new Decimal(adjustedTotal).div(acres).toFixed(2)) : 0;
 
         // Atomic transaction: order + inventory reservations must succeed together or not at all
         let order;
@@ -5556,7 +5759,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                     pivotBio,
                     totalCost: adjustedTotal,
                     costPerAcre: adjustedCostPerAcre,
-                    discount: Math.round(totalDiscount * 100) / 100,
+                    discount: Number(totalDiscountDec.toFixed(2)),
                     discountReason: discountDescription || undefined,
                     status: status || 'draft',
                     notes,
@@ -5575,8 +5778,8 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                     const pricingMap = {};
                     chemicalPricing.forEach(c => { pricingMap[c._id.toString()] = c; });
 
-                    let totalRepCommission = 0;
-                    let totalAdminRevenue = 0;
+                    let totalRepCommissionDec = new Decimal(0);
+                    let totalAdminRevenueDec = new Decimal(0);
 
                     for (const chem of normalizedChemicals) {
                         const qty = chem.qty || chem.quantity || 0;
@@ -5594,15 +5797,19 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
                             const pricing = pricingMap[chem.chemicalId.toString()];
                             if (pricing) {
-                                totalRepCommission += (pricing.marginDollars || 0) * qty;
-                                totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                                totalRepCommissionDec = totalRepCommissionDec.plus(
+                                    new Decimal(pricing.marginDollars || 0).times(qty)
+                                );
+                                totalAdminRevenueDec = totalAdminRevenueDec.plus(
+                                    new Decimal(pricing.adminMarginDollars || 0).times(qty)
+                                );
                             }
                         }
                     }
 
-                    if (totalRepCommission > 0 || totalAdminRevenue > 0) {
-                        order.repCommission = totalRepCommission;
-                        order.adminRevenue = totalAdminRevenue;
+                    if (totalRepCommissionDec.gt(0) || totalAdminRevenueDec.gt(0)) {
+                        order.repCommission = Number(totalRepCommissionDec.toFixed(2));
+                        order.adminRevenue = Number(totalAdminRevenueDec.toFixed(2));
                         await order.save({ session: dbSession });
                     }
                 }
@@ -5758,22 +5965,26 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
                         pricingMap[c._id.toString()] = c;
                     });
 
-                    let totalRepCommission = 0;
-                    let totalAdminRevenue = 0;
+                    let totalRepCommissionDec = new Decimal(0);
+                    let totalAdminRevenueDec = new Decimal(0);
 
                     for (const chem of chemicals) {
                         const qty = chem.packagesNeeded || chem.qty || chem.quantity || 0;
                         if (chem.chemicalId && qty > 0) {
                             const pricing = pricingMap[chem.chemicalId.toString()];
                             if (pricing) {
-                                totalRepCommission += (pricing.marginDollars || 0) * qty;
-                                totalAdminRevenue += (pricing.adminMarginDollars || 0) * qty;
+                                totalRepCommissionDec = totalRepCommissionDec.plus(
+                                    new Decimal(pricing.marginDollars || 0).times(qty)
+                                );
+                                totalAdminRevenueDec = totalAdminRevenueDec.plus(
+                                    new Decimal(pricing.adminMarginDollars || 0).times(qty)
+                                );
                             }
                         }
                     }
 
-                    order.repCommission = totalRepCommission;
-                    order.adminRevenue = totalAdminRevenue;
+                    order.repCommission = Number(totalRepCommissionDec.toFixed(2));
+                    order.adminRevenue = Number(totalAdminRevenueDec.toFixed(2));
                 }
             } catch (commErr) {
                 console.error('Commission calculation warning:', commErr.message);
@@ -6221,10 +6432,14 @@ app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (
             };
         }).filter(c => c.owed > 0);
 
-        const totalCommissionsOwed = commissionsOwed.reduce((sum, c) => sum + c.owed, 0);
+        const totalCommissionsOwed = Number(
+            commissionsOwed.reduce((sum, c) => sum.plus(new Decimal(c.owed || 0)), new Decimal(0)).toFixed(2)
+        );
         const adminMarginEarned = adminRevenue[0]?.total || 0;
         const adminMarginWithdrawn = adminWithdrawn[0]?.total || 0;
-        const adminMarginBanked = adminMarginEarned - adminMarginWithdrawn;
+        const adminMarginBanked = Number(
+            new Decimal(adminMarginEarned).minus(adminMarginWithdrawn).toFixed(2)
+        );
 
         // Cash deposits / capital contributions (category = cash_deposit, credit = money into bank)
         const cashDeposits = await LedgerEntry.aggregate([
@@ -6232,10 +6447,25 @@ app.get('/api/admin/stats/sales-total', authMiddleware, adminMiddleware, async (
             { $group: { _id: null, total: { $sum: '$amount' } } }
         ]);
 
-        const customerPaymentsIn = (chemOrderSales[0]?.total || 0) + (orderSales[0]?.total || 0);
+        const customerPaymentsIn = Number(
+            new Decimal(chemOrderSales[0]?.total || 0).plus(orderSales[0]?.total || 0).toFixed(2)
+        );
         const paidOutToDistributors = checksWritten[0]?.total || 0;
         const capitalIn = cashDeposits[0]?.total || 0;
-        const cashInBank = capitalIn + customerPaymentsIn - paidOutToDistributors - (commissionsPaid.reduce((s, c) => s + c.total, 0)) - adminMarginWithdrawn;
+        // C3a: cashInBank is a 5-operand chain. Decompose into named intermediates
+        // for readability instead of a single long Decimal expression.
+        const commissionsPaidTotal = commissionsPaid.reduce(
+            (sum, c) => sum.plus(new Decimal(c.total || 0)),
+            new Decimal(0)
+        );
+        const cashInBank = Number(
+            new Decimal(capitalIn)
+                .plus(customerPaymentsIn)
+                .minus(paidOutToDistributors)
+                .minus(commissionsPaidTotal)
+                .minus(adminMarginWithdrawn)
+                .toFixed(2)
+        );
 
         res.json({
             totalSales: customerPaymentsIn,
@@ -6667,10 +6897,12 @@ app.post('/api/payments/create-intent', authMiddleware, async (req, res) => {
 
         // Calculate platform fee (optional - 0% for now, can add later)
         const platformFeePercent = 0;
+        // Stripe API expects integer cents — leave as Number arithmetic, do not convert to Decimal.
         const applicationFee = Math.round(orderAmount * 100 * platformFeePercent);
 
         // Create payment intent params
         const paymentIntentParams = {
+            // Stripe API expects integer cents — leave as Number arithmetic, do not convert to Decimal.
             amount: Math.round(orderAmount * 100), // Convert to cents
             currency: 'usd',
             payment_method_types: paymentMethod === 'ach' ? ['us_bank_account'] : ['card'],
@@ -7508,8 +7740,8 @@ app.get('/api/chemicals', async (req, res) => {
                     packSize: c.packSize,
                     unit: c.unit,
                     unitsPerPack: c.unitsPerPack,
-                    price: c.sellPrice, // Only the retail price
-                    sellPrice: c.sellPrice,
+                    price: serializeMoney(c.sellPrice), // Only the retail price
+                    sellPrice: serializeMoney(c.sellPrice),
                     defaultRate: c.defaultRate,
                     rateUnit: c.rateUnit,
                     notes: c.notes,
@@ -7692,7 +7924,7 @@ app.get('/api/chemicals/available', async (req, res) => {
                 packSize: c.packSize,
                 unit: c.unit,
                 unitsPerPack: c.unitsPerPack,
-                sellPrice: c.sellPrice,
+                sellPrice: serializeMoney(c.sellPrice),
                 priceIsSpeculated: c.priceIsSpeculated === true,
                 defaultRate: c.defaultRate,
                 rateUnit: c.rateUnit,
@@ -7778,7 +8010,7 @@ app.get('/api/chemicals/search', authMiddleware, async (req, res) => {
             packSize: c.packSize,
             unit: c.unit,
             unitsPerPack: c.unitsPerPack,
-            sellPrice: c.sellPrice,
+            sellPrice: serializeMoney(c.sellPrice),
             defaultRate: c.defaultRate,
             rateUnit: c.rateUnit,
             supplier: c.sourceSupplier,
@@ -7927,7 +8159,7 @@ app.get('/api/chemicals/category/:category', async (req, res) => {
             productName: c.productName,
             packSize: c.packSize,
             unit: c.unit,
-            price: c.sellPrice,
+            price: serializeMoney(c.sellPrice),
             defaultRate: c.defaultRate,
             rateUnit: c.rateUnit
         })));
@@ -7944,10 +8176,10 @@ app.get('/api/chemicals/report/margins', authMiddleware, adminMiddleware, async 
         const report = chemicals.map(c => ({
             productName: c.productName,
             packSize: c.packSize,
-            costPrice: c.costPrice,
-            sellPrice: c.sellPrice,
+            costPrice: serializeMoney(c.costPrice),
+            sellPrice: serializeMoney(c.sellPrice),
             margin: c.margin,
-            profitPerUnit: Math.round((c.sellPrice - c.costPrice) * 100) / 100
+            profitPerUnit: serializeMoney(new Decimal(c.sellPrice || 0).minus(c.costPrice || 0)),
         }));
 
         res.json(report);
@@ -8337,8 +8569,8 @@ app.get('/api/admin/chemicals/duplicates-audit', authMiddleware, adminMiddleware
                 sourceSupplier: chem.sourceSupplier,
                 isActive: chem.isActive !== false,
                 isRestrictedUse: chem.isRestrictedUse === true,
-                costPrice: chem.costPrice || 0,
-                sellPrice: chem.sellPrice || 0,
+                costPrice: serializeMoney(chem.costPrice || 0),
+                sellPrice: serializeMoney(chem.sellPrice || 0),
                 priceDate: chem.priceDate || null,
                 quantityOnHand: inv.quantityOnHand,
                 quantityReserved: inv.quantityReserved,
@@ -8503,7 +8735,7 @@ app.post('/api/quotes', authMiddleware, adminMiddleware, async (req, res) => {
 
         // Calculate pack price if units provided
         if (quote.pricePerUnit && quote.unitsPerPack) {
-            quote.packPrice = Math.round(quote.pricePerUnit * quote.unitsPerPack * 100) / 100;
+            quote.packPrice = Number(new Decimal(quote.pricePerUnit).times(quote.unitsPerPack).toFixed(2));
         }
 
         await quote.save();
@@ -8535,7 +8767,7 @@ app.post('/api/quotes/bulk', authMiddleware, adminMiddleware, async (req, res) =
 
                 // Calculate pack price if units provided
                 if (quote.pricePerUnit && quote.unitsPerPack) {
-                    quote.packPrice = Math.round(quote.pricePerUnit * quote.unitsPerPack * 100) / 100;
+                    quote.packPrice = Number(new Decimal(quote.pricePerUnit).times(quote.unitsPerPack).toFixed(2));
                 }
 
                 await quote.save();
@@ -9440,7 +9672,7 @@ app.get('/api/supplier/orders', authMiddleware, supplierMiddleware, async (req, 
                     farm: order.userId.farm?.name
                 } : null,
                 items: supplierItems,
-                supplierTotal: supplierItems.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0)
+                supplierTotal: Number(supplierItems.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0)).toFixed(2))
             };
         });
 
@@ -9848,11 +10080,13 @@ app.post('/api/chemical-orders', authMiddleware, rejectPendingChemicalOrders, as
                 unitPrice = Math.max(chemical.costPrice || 0, unitPrice + applyMarginAdjust);
             }
 
-            const totalPrice = Math.round(serverQuantity * unitPrice * 100) / 100;
-            subtotal += totalPrice;
+            const totalPrice = Number(new Decimal(serverQuantity).times(unitPrice).toFixed(2));
+            subtotal = Number(new Decimal(subtotal).plus(totalPrice).toFixed(2));
 
             if (chemical.sellPrice) {
-                totalDiscount += (chemical.sellPrice - unitPrice) * serverQuantity;
+                totalDiscount = Number(new Decimal(totalDiscount).plus(
+                    new Decimal(chemical.sellPrice).minus(unitPrice).times(serverQuantity)
+                ).toFixed(2));
             }
 
             orderItems.push({
@@ -9872,8 +10106,8 @@ app.post('/api/chemical-orders', authMiddleware, rejectPendingChemicalOrders, as
             });
         }
 
-        subtotal = Math.round(subtotal * 100) / 100;
-        totalDiscount = Math.round(totalDiscount * 100) / 100;
+        subtotal = Number(new Decimal(subtotal).toFixed(2));
+        totalDiscount = Number(new Decimal(totalDiscount).toFixed(2));
 
         // Build reason string for audit + order record
         let discountReasonFull = discountDescription;
@@ -10098,13 +10332,15 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
 
                     // Track the discount amount
                     if (chemical.sellPrice) {
-                        totalDiscount += (chemical.sellPrice - unitPrice) * qty;
+                        totalDiscount = Number(new Decimal(totalDiscount).plus(
+                            new Decimal(chemical.sellPrice).minus(unitPrice).times(qty)
+                        ).toFixed(2));
                     }
                 }
             }
 
-            const totalPrice = Math.round(qty * unitPrice * 100) / 100;
-            verifiedSubtotal += totalPrice;
+            const totalPrice = Number(new Decimal(qty).times(unitPrice).toFixed(2));
+            verifiedSubtotal = Number(new Decimal(verifiedSubtotal).plus(totalPrice).toFixed(2));
 
             orderItems.push({
                 productName,
@@ -10119,10 +10355,10 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
         }
 
         // Server calculates the final totals (never trust frontend totals)
-        const calculatedSubtotal = Math.round(verifiedSubtotal * 100) / 100;
-        const calculatedWithFreight = calculatedSubtotal + freightCharge;
-        const calculatedFee = paymentMethod === 'ach' ? Math.min(calculatedWithFreight * 0.008, 5) : 0;
-        const calculatedTotal = Math.round((calculatedWithFreight + calculatedFee) * 100) / 100;
+        const calculatedSubtotal = Number(new Decimal(verifiedSubtotal).toFixed(2));
+        const calculatedWithFreight = Number(new Decimal(calculatedSubtotal).plus(freightCharge).toFixed(2));
+        const calculatedFee = paymentMethod === 'ach' ? Math.min(Number(new Decimal(calculatedWithFreight).times(0.008).toFixed(2)), 5) : 0;
+        const calculatedTotal = Number(new Decimal(calculatedWithFreight).plus(calculatedFee).toFixed(2));
 
         // Build reason string
         let discountReasonFull = discountDescription;
@@ -10149,7 +10385,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             processingFee: calculatedFee,
             total: calculatedTotal,
             customerNotes: notes,
-            discount: Math.round(totalDiscount * 100) / 100,
+            discount: Number(new Decimal(totalDiscount).toFixed(2)),
             discountReason: discountReasonFull || undefined,
             marginAdjustment: applyMarginAdjust || 0,
             marginAdjustmentReason: marginAdjustmentReason || '',
@@ -10182,11 +10418,11 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                 entityType: 'ChemicalOrder',
                 entityId: order._id,
                 entityRef: order.orderNumber,
-                amount: Math.round(totalDiscount * 100) / 100,
+                amount: Number(new Decimal(totalDiscount).toFixed(2)),
                 reason: discountReasonFull,
                 before: { totalDiscount: 0 },
                 after: {
-                    totalDiscount: Math.round(totalDiscount * 100) / 100,
+                    totalDiscount: Number(new Decimal(totalDiscount).toFixed(2)),
                     marginAdjustment: applyMarginAdjust,
                     discountCode: discountCode || null
                 }
@@ -10490,22 +10726,24 @@ app.put('/api/admin/chemical-orders/:id/status', authMiddleware, adminMiddleware
             });
 
             if (!existingEntry) {
-                let costTotal = 0;
+                let costTotalDec = new Decimal(0);
                 for (const item of order.items) {
                     if (item.chemicalId) {
                         const chemical = await Chemical.findById(item.chemicalId);
                         if (chemical) {
-                            costTotal += item.quantity * chemical.costPrice * (chemical.unitsPerPack || 1);
+                            costTotalDec = costTotalDec.plus(
+                                new Decimal(item.quantity).times(chemical.costPrice).times(chemical.unitsPerPack || 1)
+                            );
                         }
                     } else {
-                        costTotal += item.totalPrice || 0;
+                        costTotalDec = costTotalDec.plus(new Decimal(item.totalPrice || 0));
                     }
                 }
 
                 await createLedgerEntry({
                     representativeId: order.representativeId,
                     description: `Order ${order.orderNumber} delivered (${order.items.length} items)`,
-                    amount: Math.round(costTotal * 100) / 100,
+                    amount: Number(costTotalDec.toFixed(2)),
                     type: 'debit',
                     category: 'order',
                     referenceType: 'ChemicalOrder',
@@ -10630,6 +10868,13 @@ const chemicalRequestSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+const CHEMICAL_REQUEST_MONEY_PATHS = {
+    'competitorPrice': 4,
+    'supplierQuotes.price': 4,
+};
+chemicalRequestSchema.set('toJSON', { transform: decimalToJSONTransform });
+chemicalRequestSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_REQUEST_MONEY_PATHS); next(); });
 
 const ChemicalRequest = mongoose.model('ChemicalRequest', chemicalRequestSchema);
 
@@ -10824,6 +11069,12 @@ const userSubmittedChemicalSchema = new mongoose.Schema({
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+const USER_SUBMITTED_CHEMICAL_MONEY_PATHS = {
+    'costPerUnit': 4,
+};
+userSubmittedChemicalSchema.set('toJSON', { transform: decimalToJSONTransform });
+userSubmittedChemicalSchema.pre('validate', function (next) { coerceMoneyFields(this, USER_SUBMITTED_CHEMICAL_MONEY_PATHS); next(); });
 
 const UserSubmittedChemical = mongoose.model('UserSubmittedChemical', userSubmittedChemicalSchema);
 
@@ -11267,7 +11518,7 @@ app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (r
         }));
 
         // Calculate totals (superAdminFee only if user is superadmin)
-        const subtotal = processedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        const subtotal = Number(processedItems.reduce((sum, item) => sum.plus(new Decimal(item.totalPrice || 0)), new Decimal(0)).toFixed(2));
         const adminFee = req.user.role === 'superadmin' ? (superAdminFee || 0) : 0;
         const totalCost = subtotal + (freight || 0) + (otherFees || 0) + adminFee;
 
@@ -11275,11 +11526,11 @@ app.post('/api/admin/purchase-orders', authMiddleware, adminMiddleware, async (r
             poNumber,
             supplier,
             items: processedItems,
-            subtotal: Math.round(subtotal * 100) / 100,
+            subtotal: Number(new Decimal(subtotal).toFixed(2)),
             freight: freight || 0,
             otherFees: otherFees || 0,
             superAdminFee: adminFee,
-            totalCost: Math.round(totalCost * 100) / 100,
+            totalCost: Number(new Decimal(totalCost).toFixed(2)),
             expectedDeliveryDate,
             deliveryLocation,
             notes,
@@ -11363,8 +11614,8 @@ app.put('/api/admin/purchase-orders/:id/items/:itemIndex/price', authMiddleware,
         po.items[itemIndex].totalPrice = Math.round((po.items[itemIndex].quantityOrdered * pricePerUnit) * 100) / 100;
 
         // Recalculate totals
-        const subtotal = po.items.reduce((sum, item) => sum + item.totalPrice, 0);
-        po.subtotal = Math.round(subtotal * 100) / 100;
+        const subtotal = Number(po.items.reduce((sum, item) => sum.plus(new Decimal(item.totalPrice || 0)), new Decimal(0)).toFixed(2));
+        po.subtotal = Number(new Decimal(subtotal).toFixed(2));
         po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
 
         po.updatedBy = req.user._id;
@@ -11408,8 +11659,8 @@ app.put('/api/admin/purchase-orders/:id/items/:itemIndex/quantity', authMiddlewa
         item.quantityRemaining = quantityOrdered - item.quantityAllocated;
 
         // Recalculate totals
-        const subtotal = po.items.reduce((sum, i) => sum + i.totalPrice, 0);
-        po.subtotal = Math.round(subtotal * 100) / 100;
+        const subtotal = Number(po.items.reduce((sum, i) => sum.plus(new Decimal(i.totalPrice || 0)), new Decimal(0)).toFixed(2));
+        po.subtotal = Number(new Decimal(subtotal).toFixed(2));
         po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
 
         po.updatedBy = req.user._id;
@@ -11449,8 +11700,8 @@ app.post('/api/admin/purchase-orders/:id/items', authMiddleware, adminMiddleware
         po.items.push(newItem);
 
         // Recalculate totals
-        const subtotal = po.items.reduce((sum, item) => sum + item.totalPrice, 0);
-        po.subtotal = Math.round(subtotal * 100) / 100;
+        const subtotal = Number(po.items.reduce((sum, item) => sum.plus(new Decimal(item.totalPrice || 0)), new Decimal(0)).toFixed(2));
+        po.subtotal = Number(new Decimal(subtotal).toFixed(2));
         po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
 
         po.updatedBy = req.user._id;
@@ -11488,8 +11739,8 @@ app.delete('/api/admin/purchase-orders/:id/items/:itemIndex', authMiddleware, ad
         po.items.splice(itemIndex, 1);
 
         // Recalculate totals
-        const subtotal = po.items.reduce((sum, item) => sum + item.totalPrice, 0);
-        po.subtotal = Math.round(subtotal * 100) / 100;
+        const subtotal = Number(po.items.reduce((sum, item) => sum.plus(new Decimal(item.totalPrice || 0)), new Decimal(0)).toFixed(2));
+        po.subtotal = Number(new Decimal(subtotal).toFixed(2));
         po.totalCost = Math.round((subtotal + po.freight + po.otherFees) * 100) / 100;
 
         po.updatedBy = req.user._id;
@@ -11595,7 +11846,7 @@ app.post('/api/admin/purchase-orders/:id/splits', authMiddleware, adminMiddlewar
             };
         });
 
-        const subtotal = processedItems.reduce((sum, item) => sum + item.totalPrice, 0);
+        const subtotal = Number(processedItems.reduce((sum, item) => sum.plus(new Decimal(item.totalPrice || 0)), new Decimal(0)).toFixed(2));
 
         const split = new PurchaseOrderSplit({
             purchaseOrderId: po._id,
@@ -11604,9 +11855,9 @@ app.post('/api/admin/purchase-orders/:id/splits', authMiddleware, adminMiddlewar
             distributorName: distributor.name,
             splitCode,
             items: processedItems,
-            subtotal: Math.round(subtotal * 100) / 100,
+            subtotal: Number(new Decimal(subtotal).toFixed(2)),
             freightAllocation: freightAllocation || 0,
-            totalCost: Math.round((subtotal + (freightAllocation || 0)) * 100) / 100,
+            totalCost: Number(new Decimal(subtotal).plus(freightAllocation || 0).toFixed(2)),
             notes,
             createdBy: req.user._id
         });
@@ -11754,10 +12005,10 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
             packSize: c.packSize,
             unit: c.unit,
             unitsPerPack: c.unitsPerPack,
-            costPrice: c.costPrice,
-            adminPrice: c.adminPrice,
+            costPrice: serializeMoney(c.costPrice),
+            adminPrice: serializeMoney(c.adminPrice),
             adminMargin: c.adminMargin,
-            sellPrice: c.sellPrice,
+            sellPrice: serializeMoney(c.sellPrice),
             margin: c.margin,
             activeIngredients: c.activeIngredients,
             isActive: c.isActive,
@@ -11973,19 +12224,21 @@ app.post('/api/spray-programs', authMiddleware, async (req, res) => {
 
         // Calculate estimated cost per acre if applications provided
         if (applications && applications.length > 0) {
-            let totalCost = 0;
+            let totalCostDec = new Decimal(0);
             for (const app of applications) {
                 for (const chem of app.chemicals || []) {
                     if (chem.chemicalId) {
                         const chemical = await Chemical.findById(chem.chemicalId);
                         if (chemical && chemical.sellPrice && chem.suggestedRate) {
                             // Convert rate to gallons and multiply by price
-                            totalCost += (chem.suggestedRate / 128) * chemical.sellPrice;
+                            totalCostDec = totalCostDec.plus(
+                                new Decimal(chem.suggestedRate).div(128).times(chemical.sellPrice)
+                            );
                         }
                     }
                 }
             }
-            program.estimatedCostPerAcre = Math.round(totalCost * 100) / 100;
+            program.estimatedCostPerAcre = Number(totalCostDec.toFixed(2));
         }
 
         await program.save();
@@ -12011,7 +12264,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
 
         const orderLines = [];
         const unpricedLines = [];
-        let totalConfirmedPrice = 0;
+        let totalConfirmedPriceDec = new Decimal(0);
         let hasNeedsQuote = false;
         let valorWarning = false;
         const totalWaterVolume = acres * gpa;
@@ -12099,9 +12352,12 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 });
             } else if (onHandQuantity >= packagesNeeded) {
                 status = 'confirmed';
-                pricePerPackage = chemical.sellPrice * packageSize;
-                lineTotal = packagesNeeded * pricePerPackage;
-                totalConfirmedPrice += lineTotal;
+                // Keep pricePerPackage / lineTotal as Decimal during iteration so
+                // the accumulator at totalConfirmedPriceDec uses unrounded values
+                // (matches pre-C3a "accumulate unrounded, round once at end").
+                pricePerPackage = new Decimal(chemical.sellPrice).times(packageSize);
+                lineTotal = pricePerPackage.times(packagesNeeded);
+                totalConfirmedPriceDec = totalConfirmedPriceDec.plus(lineTotal);
             } else {
                 status = 'needs_quote';
                 pricePerPackage = null;
@@ -12121,8 +12377,8 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 packageUnit: chemical.unit,
                 packagesNeeded,
                 onHandQuantity,
-                pricePerPackage: pricePerPackage ? Math.round(pricePerPackage * 100) / 100 : null,
-                lineTotal: lineTotal ? Math.round(lineTotal * 100) / 100 : null,
+                pricePerPackage: pricePerPackage ? Number(pricePerPackage.toFixed(2)) : null,
+                lineTotal: lineTotal ? Number(lineTotal.toFixed(2)) : null,
                 status,
                 supplier: chemical.sourceSupplier
             });
@@ -12152,8 +12408,8 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 const hvUnpriced = hydrovant.sellPrice == null;
                 const hvStatus = hvUnpriced ? 'unpriced'
                     : (hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote');
-                const hvPricePerPack = hvStatus === 'confirmed' ? (hydrovant.sellPrice * hvPackageSize) : null;
-                const hvLineTotal = hvStatus === 'confirmed' ? (hvPackagesNeeded * hvPricePerPack) : null;
+                const hvPricePerPack = hvStatus === 'confirmed' ? new Decimal(hydrovant.sellPrice).times(hvPackageSize) : null;
+                const hvLineTotal = hvStatus === 'confirmed' ? hvPricePerPack.times(hvPackagesNeeded) : null;
                 if (hvUnpriced) {
                     unpricedLines.push({
                         chemicalId: hydrovant._id,
@@ -12163,7 +12419,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 }
 
                 if (hvStatus === 'confirmed' && hvLineTotal) {
-                    totalConfirmedPrice += hvLineTotal;
+                    totalConfirmedPriceDec = totalConfirmedPriceDec.plus(hvLineTotal);
                 } else {
                     hasNeedsQuote = true;
                 }
@@ -12178,8 +12434,8 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                     packageUnit: hydrovant.unit,
                     packagesNeeded: hvPackagesNeeded,
                     onHandQuantity: hvOnHand,
-                    pricePerPackage: hvPricePerPack ? Math.round(hvPricePerPack * 100) / 100 : null,
-                    lineTotal: hvLineTotal ? Math.round(hvLineTotal * 100) / 100 : null,
+                    pricePerPackage: hvPricePerPack ? Number(hvPricePerPack.toFixed(2)) : null,
+                    lineTotal: hvLineTotal ? Number(hvLineTotal.toFixed(2)) : null,
                     status: hvStatus,
                     isAutoAdded: true,
                     note: '0.1% of total spray volume'
@@ -12199,8 +12455,8 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             unpriced: unpricedLines,
             valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
             orderStatus,
-            totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
-            costPerAcre: acres > 0 ? Math.round((totalConfirmedPrice / acres) * 100) / 100 : 0
+            totalConfirmedPrice: Number(totalConfirmedPriceDec.toFixed(2)),
+            costPerAcre: acres > 0 ? Number(totalConfirmedPriceDec.div(acres).toFixed(2)) : 0
         });
     } catch (error) {
         console.error('Calculate error:', error);
@@ -12327,8 +12583,12 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
             if (line.status === 'confirmed') {
                 const pkgSize = chem.unitsPerPack || line.packageSize || 1;
                 const pkgsNeeded = line.packagesNeeded;
-                const serverPricePerPackage = Math.round(chem.sellPrice * pkgSize * 100) / 100;
-                const serverLineTotal = Math.round(serverPricePerPackage * pkgsNeeded * 100) / 100;
+                // C3a: preserves sequential-rounding behavior (round at each step)
+                // — the line-total reads the already-rounded per-package price,
+                // not an unrounded intermediate. Re-examine round-once-at-end as
+                // a future intentional change; see post-c3-verification-checklist.md.
+                const serverPricePerPackage = Number(new Decimal(chem.sellPrice).times(pkgSize).toFixed(2));
+                const serverLineTotal = Number(new Decimal(serverPricePerPackage).times(pkgsNeeded).toFixed(2));
 
                 // Forensic warn — never block, just log.
                 if (line.pricePerPackage != null &&
@@ -12366,8 +12626,9 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
             }
             if (hydrovant.status === 'confirmed') {
                 const hvPkgSize = hvChem.unitsPerPack || hydrovant.packageSize || 2.5;
-                const hvPrice = Math.round(hvChem.sellPrice * hvPkgSize * 100) / 100;
-                const hvTotal = Math.round(hvPrice * hydrovant.packagesNeeded * 100) / 100;
+                // C3a: same sequential-rounding semantics as the per-line case above.
+                const hvPrice = Number(new Decimal(hvChem.sellPrice).times(hvPkgSize).toFixed(2));
+                const hvTotal = Number(new Decimal(hvPrice).times(hydrovant.packagesNeeded).toFixed(2));
 
                 if (hydrovant.pricePerPackage != null &&
                     Math.abs(hydrovant.pricePerPackage - hvPrice) >= 0.01) {
@@ -12428,11 +12689,12 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
         }
 
         // Recompute total from overwritten server values — never trust client total.
-        const serverTotalConfirmedPrice = Math.round(
+        const serverTotalConfirmedPrice = Number(
             chemicals
                 .filter(c => c.status === 'confirmed' && c.totalPrice)
-                .reduce((sum, c) => sum + c.totalPrice, 0) * 100
-        ) / 100;
+                .reduce((sum, c) => sum.plus(new Decimal(c.totalPrice || 0)), new Decimal(0))
+                .toFixed(2)
+        );
 
         // --- 4. Atomic: save order + reserve inventory for confirmed lines ---
         let order;
@@ -12532,6 +12794,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                     name: c.name,
                                     description: `${c.packagesNeeded} x ${c.packageSize} ${c.packageUnit}`
                                 },
+                                // Stripe API expects integer cents — leave as Number arithmetic, do not convert to Decimal.
                                 unit_amount: Math.round(c.totalPrice * 100)
                             },
                             quantity: 1
@@ -12846,7 +13109,7 @@ app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) =
 async function calculateOrder(acres, gpa, products) {
     const orderLines = [];
     const unpricedLines = [];
-    let totalConfirmedPrice = 0;
+    let totalConfirmedPriceDec = new Decimal(0);
     let hasNeedsQuote = false;
     let valorWarning = false;
     const totalWaterVolume = acres * gpa;
@@ -12894,9 +13157,9 @@ async function calculateOrder(acres, gpa, products) {
             });
         } else if (onHandQuantity >= packagesNeeded) {
             status = 'confirmed';
-            pricePerPackage = chemical.sellPrice * packageSize;
-            lineTotal = packagesNeeded * pricePerPackage;
-            totalConfirmedPrice += lineTotal;
+            pricePerPackage = new Decimal(chemical.sellPrice).times(packageSize);
+            lineTotal = pricePerPackage.times(packagesNeeded);
+            totalConfirmedPriceDec = totalConfirmedPriceDec.plus(lineTotal);
         } else {
             status = 'needs_quote';
             pricePerPackage = null;
@@ -12916,8 +13179,8 @@ async function calculateOrder(acres, gpa, products) {
             packageUnit: chemical.unit,
             packagesNeeded,
             onHandQuantity,
-            pricePerPackage: pricePerPackage ? Math.round(pricePerPackage * 100) / 100 : null,
-            lineTotal: lineTotal ? Math.round(lineTotal * 100) / 100 : null,
+            pricePerPackage: pricePerPackage ? Number(pricePerPackage.toFixed(2)) : null,
+            lineTotal: lineTotal ? Number(lineTotal.toFixed(2)) : null,
             status,
             supplier: chemical.sourceSupplier
         });
@@ -12938,10 +13201,10 @@ async function calculateOrder(acres, gpa, products) {
             const hvUnpriced = hvChem.sellPrice == null;
             const hvStatus = hvUnpriced ? 'unpriced'
                 : (hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote');
-            const hvPrice = hvStatus === 'confirmed' ? hvChem.sellPrice * hvPkgSize : null;
-            const hvTotal = hvStatus === 'confirmed' ? hvPkgs * hvPrice : null;
+            const hvPrice = hvStatus === 'confirmed' ? new Decimal(hvChem.sellPrice).times(hvPkgSize) : null;
+            const hvTotal = hvStatus === 'confirmed' ? hvPrice.times(hvPkgs) : null;
 
-            if (hvStatus === 'confirmed' && hvTotal) totalConfirmedPrice += hvTotal;
+            if (hvStatus === 'confirmed' && hvTotal) totalConfirmedPriceDec = totalConfirmedPriceDec.plus(hvTotal);
             else hasNeedsQuote = true;
 
             if (hvUnpriced) {
@@ -12959,8 +13222,8 @@ async function calculateOrder(acres, gpa, products) {
                 packageSize: hvPkgSize,
                 packagesNeeded: hvPkgs,
                 status: hvStatus,
-                pricePerPackage: hvPrice ? Math.round(hvPrice * 100) / 100 : null,
-                lineTotal: hvTotal ? Math.round(hvTotal * 100) / 100 : null
+                pricePerPackage: hvPrice ? Number(hvPrice.toFixed(2)) : null,
+                lineTotal: hvTotal ? Number(hvTotal.toFixed(2)) : null
             };
         }
     }
@@ -12974,8 +13237,8 @@ async function calculateOrder(acres, gpa, products) {
         unpriced: unpricedLines,
         valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
         orderStatus: hasNeedsQuote ? 'pending_quote' : 'ready_for_checkout',
-        totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
-        costPerAcre: acres > 0 ? Math.round((totalConfirmedPrice / acres) * 100) / 100 : 0
+        totalConfirmedPrice: Number(totalConfirmedPriceDec.toFixed(2)),
+        costPerAcre: acres > 0 ? Number(totalConfirmedPriceDec.div(acres).toFixed(2)) : 0
     };
 }
 
@@ -13039,7 +13302,7 @@ app.get('/api/admin/inventory', authMiddleware, adminMiddleware, async (req, res
                 quantityReserved: 0,
                 quantityAvailable: 0,
                 quantityOnOrder: onOrderMap[chem._id.toString()] || 0,
-                averageCost: chem.costPrice || 0,
+                averageCost: serializeMoney(chem.costPrice || 0),
                 location: 'main',
                 needsInventoryRecord: true
             }));
@@ -13882,10 +14145,10 @@ app.get('/api/admin/products-with-inventory', authMiddleware, adminMiddleware, a
                 category: c.category,
                 packSize: c.packSize,
                 unit: c.unit,
-                costPrice: c.costPrice,
-                adminPrice: c.adminPrice,
+                costPrice: serializeMoney(c.costPrice),
+                adminPrice: serializeMoney(c.adminPrice),
                 adminMargin: c.adminMargin,
-                sellPrice: c.sellPrice,
+                sellPrice: serializeMoney(c.sellPrice),
                 margin: c.margin,
                 activeIngredients: c.activeIngredients,
                 isActive: c.isActive,
@@ -14137,7 +14400,7 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
                     });
                 });
             }
-            subtotal = order.totalCost || invoiceItems.reduce((sum, item) => sum + (item.totalPrice || 0), 0);
+            subtotal = order.totalCost || Number(invoiceItems.reduce((sum, item) => sum.plus(new Decimal(item.totalPrice || 0)), new Decimal(0)).toFixed(2));
             total = subtotal;
             orderNumber = `ORD-${order._id.toString().slice(-8).toUpperCase()}`;
         }
@@ -14182,7 +14445,7 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
         const invoiceNumber = await generateInvoiceNumber();
 
         // Calculate totals
-        const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
+        const subtotal = Number(items.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0)).toFixed(2));
         const total = subtotal - (discount || 0);
 
         // Determine representative: allow superadmin to specify, otherwise use customer's rep or current user
@@ -14235,7 +14498,7 @@ app.put('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (req, 
         if (paymentStatus) invoice.paymentStatus = paymentStatus;
         if (amountPaid !== undefined) {
             invoice.amountPaid = amountPaid;
-            invoice.amountDue = invoice.total - amountPaid;
+            invoice.amountDue = Number(new Decimal(invoice.total).minus(amountPaid).toFixed(2));
             if (amountPaid >= invoice.total) {
                 invoice.paymentStatus = 'paid';
             } else if (amountPaid > 0) {
@@ -14416,7 +14679,7 @@ app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware
         const beforePaymentStatus = invoice.paymentStatus;
         const beforeCreditedAmount = alreadyCredited;
         const remaining = Math.round((amountPaid - alreadyCredited) * 100) / 100;
-        const roundedAmount = Math.round(amount * 100) / 100;
+        const roundedAmount = Number(new Decimal(amount).toFixed(2));
         if (roundedAmount > remaining) {
             return res.status(400).json({
                 error: `Credit amount $${roundedAmount.toFixed(2)} exceeds remaining uncredited balance $${remaining.toFixed(2)}`
@@ -14453,6 +14716,7 @@ app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware
             try {
                 const refund = await stripe.refunds.create({
                     payment_intent: invoice.stripePaymentIntentId,
+                    // Stripe API expects integer cents — leave as Number arithmetic, do not convert to Decimal.
                     amount: Math.round(roundedAmount * 100),
                     metadata: {
                         creditNoteNumber,
@@ -14601,6 +14865,7 @@ async function ensureInvoiceCheckoutSession(invoice, method) {
 
     const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
     const invoiceTotal = Number(invoice.total || 0);
+    // Stripe API expects integer cents — leave as Number arithmetic, do not convert to Decimal.
     const amountCents = Math.round(invoiceTotal * 100);
     if (!amountCents || amountCents < 50) {
         // Stripe minimum is $0.50. Guard against zero-total invoices.
@@ -14608,6 +14873,7 @@ async function ensureInvoiceCheckoutSession(invoice, method) {
     }
 
     const surchargeCents = method === 'card'
+        // Stripe API expects integer cents — leave as Number arithmetic, do not convert to Decimal.
         ? Math.round(invoiceTotal * CARD_SURCHARGE_RATE * 100)
         : 0;
     const surchargeDollars = surchargeCents / 100;
@@ -14707,7 +14973,7 @@ app.get('/api/public/invoice/:id', async (req, res) => {
             return res.status(404).json({ error: 'Invoice not found' });
         }
         const total = Number(invoice.total || 0);
-        const surchargeCard = Math.round(total * CARD_SURCHARGE_RATE * 100) / 100;
+        const surchargeCard = Number(new Decimal(total).times(CARD_SURCHARGE_RATE).toFixed(2));
         const totalWithCardSurcharge = Math.round((total + surchargeCard) * 100) / 100;
         res.json({
             invoiceNumber: invoice.invoiceNumber || '',
@@ -14796,7 +15062,12 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         `).join('');
 
         // Calculate totals
-        const subtotal = invoice.subtotal || invoice.items?.reduce((sum, i) => sum + (i.total || i.quantity * i.unitPrice || 0), 0) || 0;
+        const subtotal = invoice.subtotal || Number(
+            (invoice.items || []).reduce(
+                (sum, i) => sum.plus(new Decimal(i.total || new Decimal(i.quantity || 0).times(i.unitPrice || 0) || 0)),
+                new Decimal(0)
+            ).toFixed(2)
+        );
         const discount = invoice.discount || 0;
         const total = invoice.total || (subtotal - discount);
 
@@ -15209,7 +15480,7 @@ app.post('/api/admin/quotes/:id/convert', authMiddleware, adminMiddleware, async
             unitPrice: it.unitPrice,
             totalPrice: (it.quantity || 0) * (it.unitPrice || 0)
         }));
-        const subtotal = items.reduce((sum, it) => sum + (it.totalPrice || 0), 0);
+        const subtotal = Number(items.reduce((sum, it) => sum.plus(new Decimal(it.totalPrice || 0)), new Decimal(0)).toFixed(2));
 
         // Representative: superadmin may override via body, else quote rep,
         // else customer's rep, else the converter.
@@ -15259,7 +15530,7 @@ app.post('/api/admin/invoices/:id/payment', authMiddleware, adminMiddleware, asy
 
         const newAmountPaid = (invoice.amountPaid || 0) + amount;
         invoice.amountPaid = newAmountPaid;
-        invoice.amountDue = invoice.total - newAmountPaid;
+        invoice.amountDue = Number(new Decimal(invoice.total).minus(newAmountPaid).toFixed(2));
         invoice.paymentMethod = method;
         invoice.paymentDate = new Date();
 
@@ -15956,10 +16227,10 @@ app.get('/api/distributor/products', authMiddleware, adminMiddleware, async (req
                 category: c.category,
                 packSize: c.packSize,
                 unit: c.unit,
-                costPrice: c.costPrice,
-                adminPrice: c.adminPrice,
-                sellPrice: c.sellPrice,
-                price: customPrice?.retailPrice || c.sellPrice,
+                costPrice: serializeMoney(c.costPrice),
+                adminPrice: serializeMoney(c.adminPrice),
+                sellPrice: serializeMoney(c.sellPrice),
+                price: serializeMoney(customPrice?.retailPrice || c.sellPrice),
                 isAvailable: customPrice?.isAvailable !== false,
                 notes: customPrice?.notes || ''
             };
@@ -16189,21 +16460,21 @@ app.put('/api/admin/quote-requests/:id/price', authMiddleware, adminMiddleware, 
         }
 
         // Update pricing for each item
-        let estimatedTotal = 0;
+        let estimatedTotalDec = new Decimal(0);
         for (const updatedItem of items) {
             const item = quote.items.id(updatedItem._id);
             if (item) {
                 item.costPrice = updatedItem.costPrice;
                 item.adminPrice = updatedItem.adminPrice;
                 item.sellPrice = updatedItem.sellPrice;
-                item.totalPrice = (updatedItem.sellPrice || 0) * item.quantityNeeded;
+                item.totalPrice = Number(new Decimal(updatedItem.sellPrice || 0).times(item.quantityNeeded).toFixed(2));
                 item.priceNotes = updatedItem.priceNotes;
                 item.isPriced = updatedItem.sellPrice > 0;
-                estimatedTotal += item.totalPrice;
+                estimatedTotalDec = estimatedTotalDec.plus(item.totalPrice);
             }
         }
 
-        quote.estimatedTotal = estimatedTotal;
+        quote.estimatedTotal = Number(estimatedTotalDec.toFixed(2));
         quote.status = 'pricing';
         quote.pricedAt = new Date();
         quote.adminNotes = adminNotes;
@@ -16929,11 +17200,11 @@ app.post('/api/admin/bid-sheets/:id/responses', authMiddleware, adminMiddleware,
         }
 
         // Calculate totals
-        let subtotal = 0;
+        let subtotalDec = new Decimal(0);
         const pricedItems = itemPricing.map((ip, idx) => {
             const item = bidSheet.items[ip.itemIndex] || bidSheet.items[idx];
-            const totalPrice = (ip.pricePerUnit || 0) * (item?.quantityNeeded || ip.quantity || 0);
-            subtotal += totalPrice;
+            const totalPrice = Number(new Decimal(ip.pricePerUnit || 0).times(item?.quantityNeeded || ip.quantity || 0).toFixed(2));
+            subtotalDec = subtotalDec.plus(totalPrice);
             return {
                 productName: item?.productName || ip.productName,
                 itemIndex: ip.itemIndex ?? idx,
@@ -16945,7 +17216,8 @@ app.post('/api/admin/bid-sheets/:id/responses', authMiddleware, adminMiddleware,
             };
         });
 
-        const totalBid = subtotal + (freight || 0);
+        const subtotal = Number(subtotalDec.toFixed(2));
+        const totalBid = Number(subtotalDec.plus(freight || 0).toFixed(2));
 
         // Add or update supplier response
         const existingBidIdx = bidSheet.supplierBids.findIndex(
@@ -17695,7 +17967,7 @@ app.post('/api/mixes/:id/order', authMiddleware, async (req, res) => {
             gallonsPerAcre: gallonsPerAcre || mix.gallonsPerAcre,
             totalWaterVolume: (gallonsPerAcre || mix.gallonsPerAcre) * acres,
             items: orderItems,
-            subtotal: orderItems.reduce((sum, item) => sum + item.lineTotal, 0)
+            subtotal: Number(orderItems.reduce((sum, item) => sum.plus(new Decimal(item.lineTotal || 0)), new Decimal(0)).toFixed(2))
         });
     } catch (error) {
         res.status(400).json({ error: error.message });
