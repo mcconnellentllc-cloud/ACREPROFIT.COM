@@ -1,0 +1,220 @@
+// server/routes/admin/mainchem.js
+//
+// POST /api/admin/mainchem/import
+//   Reads server/seed/mainchem-source.json (pre-parsed from the xlsx by the
+//   one-shot scripts/parse-mainchem.js), upserts chemicals into the catalog,
+//   persists a ChemicalImportLog doc with all skip-report rows.
+//
+// Idempotent. Re-running updates existing docs matched by (tradeName, manufacturer).
+//
+// Response: inline skip report (for UI toast) AND persistent log doc (for
+// history page). Delivery = (c) both, per locked spec.
+//
+// Auth: requires superadmin. Uses existing middleware chain — mount point
+// registered in server/index.js alongside other admin routes.
+
+const express = require('express');
+const { randomUUID } = require('crypto');
+const fs = require('fs');
+const path = require('path');
+
+const Chemical = require('../../models/Chemical');
+const ChemicalImportLog = require('../../models/ChemicalImportLog');
+
+const router = express.Router();
+
+// Mounted at /api/admin/mainchem in server/index.js with authMiddleware +
+// superAdminMiddleware. Scope-specific prefix avoids gating the 38 inline
+// /api/admin/* routes that use the permissive adminMiddleware.
+
+router.post('/import', async (req, res) => {
+  const sourceFile = 'mainchem-source.json';
+  const sourcePath = path.join(__dirname, '..', '..', 'seed', sourceFile);
+
+  if (!fs.existsSync(sourcePath)) {
+    return res.status(500).json({
+      ok: false,
+      error: 'seed source not found',
+      path: sourcePath,
+      hint: 'run `node scripts/parse-mainchem.js <xlsx> server/seed/mainchem-source.json` first',
+    });
+  }
+
+  let source;
+  try {
+    source = JSON.parse(fs.readFileSync(sourcePath, 'utf8'));
+  } catch (e) {
+    return res.status(500).json({ ok: false, error: 'seed source malformed', detail: e.message });
+  }
+
+  const importRunId = randomUUID();
+  const importedBy = req.user?.id || req.user?._id?.toString() || 'unknown';
+  let insertedCount = 0;
+  let updatedCount = 0;
+  const errors = [];
+
+  for (const rec of (source.records || [])) {
+    try {
+      // D3: match both tradeName (new) and productName (legacy) so a re-import
+      // finds pre-existing docs that admin created via the legacy UI under the
+      // old field name.
+      const filter = {
+        $or: [
+          { tradeName: rec.tradeName, manufacturer: rec.manufacturer || null },
+          { productName: rec.tradeName, sourceSupplier: rec.manufacturer || null },
+        ],
+      };
+      const update = {
+        $set: {
+          // D3: dual-name population — legacy fields (productName/packSize/unit)
+          // and AI-first fields (tradeName/pkg/uom) coexist. 451 existing
+          // references to legacy names continue to work.
+          tradeName: rec.tradeName,
+          productName: rec.tradeName,
+          manufacturer: rec.manufacturer || null,
+          pkg: rec.pkg || null,
+          packSize: rec.pkg || null,
+          uom: rec.uom || null,
+          unit: rec.uom || null,
+          use: rec.use || null,
+          control: rec.control || null,
+          activeIngredients: rec.activeIngredients || [],
+          moaNumbers: rec.moaNumbers || [],
+          wssa: rec.wssa || null,
+          purposes: rec.purposes || [],
+          aiParseStatus: rec.aiParseStatus || null,
+          aiParseReason: rec.aiParseReason || null,
+          rawConcentration: rec.rawConcentration || null,
+          sourceRow: rec.sourceRow || null,
+          updatedAt: new Date(),
+        },
+        $setOnInsert: {
+          // D2: MAINCHEM imports land as 'pending'. Pricing (costPrice /
+          // sellPrice / adminPrice) is intentionally NOT set — admin enters
+          // pricing via the existing chemicals admin UI and then flips status
+          // to 'approved'. The rejectPendingChemicalOrders middleware blocks
+          // order submission until that promotion happens, which is the real
+          // pricing gate. Re-imports preserve admin's status/addedBy via
+          // $setOnInsert so this only fires on first-time insert.
+          createdAt: new Date(),
+          status: 'pending',
+          addedBy: 'mainchem-import',
+        },
+      };
+      const result = await Chemical.updateOne(filter, update, { upsert: true });
+      if (result.upsertedCount && result.upsertedCount > 0) {
+        insertedCount++;
+      } else if (result.modifiedCount && result.modifiedCount > 0) {
+        updatedCount++;
+      }
+    } catch (err) {
+      errors.push({ tradeName: rec.tradeName, error: err.message });
+    }
+  }
+
+  // Persist skip-report log. Reasons are enum-validated at write time.
+  const logDoc = await ChemicalImportLog.create({
+    importRunId,
+    importedBy,
+    sourceFile: source.sourceFile || sourceFile,
+    totalRows: source.totalRows || 0,
+    insertedCount,
+    updatedCount,
+    skippedRows: (source.skipped || []).map(s => ({
+      rowIndex: s.rowIndex,
+      tradeName: s.tradeName || null,
+      reason: s.reason,
+      rawData: s.rawData || {},
+      resolved: false,
+    })),
+    status: 'complete',
+  });
+
+  res.json({
+    ok: true,
+    importRunId,
+    logId: logDoc._id,
+    insertedCount,
+    updatedCount,
+    skippedCount: (source.skipped || []).length,
+    errors,
+    skippedByReason: countByReason(source.skipped || []),
+    skipped: source.skipped || [],  // inline so admin UI can render without a second fetch
+  });
+});
+
+// GET /api/admin/mainchem/logs — list historical import runs
+// ?count=true returns just { totalLogs, unresolvedSkips } for the admin nav
+// badge — avoids shipping the full skippedRows payload on every nav render.
+router.get('/logs', async (req, res) => {
+  if (req.query.count === 'true') {
+    const totalLogs = await ChemicalImportLog.countDocuments({});
+    const agg = await ChemicalImportLog.aggregate([
+      { $unwind: '$skippedRows' },
+      { $match: { 'skippedRows.resolved': false } },
+      { $count: 'total' },
+    ]);
+    return res.json({
+      ok: true,
+      totalLogs,
+      unresolvedSkips: agg[0]?.total || 0,
+    });
+  }
+  const logs = await ChemicalImportLog.find({})
+    .sort({ timestamp: -1 })
+    .limit(50)
+    .select('-skippedRows.rawData')  // omit heavy raw data from list view
+    .lean();
+  res.json({ ok: true, logs });
+});
+
+// GET /api/admin/mainchem/logs/:id — full detail with skipped rows
+router.get('/logs/:id', async (req, res) => {
+  const log = await ChemicalImportLog.findById(req.params.id).lean();
+  if (!log) return res.status(404).json({ ok: false, error: 'log not found' });
+  res.json({ ok: true, log });
+});
+
+// PATCH /api/admin/mainchem/logs/:id/skipped/:skipId/resolve
+// Admin marks a skipped row as resolved (typically after hand-creating the
+// Chemical doc via the main catalog editor).
+router.patch('/logs/:id/skipped/:skipId/resolve', async (req, res) => {
+  const { resolvedChemicalId } = req.body;
+  const log = await ChemicalImportLog.findById(req.params.id);
+  if (!log) return res.status(404).json({ ok: false, error: 'log not found' });
+  const skip = log.skippedRows.id(req.params.skipId);
+  if (!skip) return res.status(404).json({ ok: false, error: 'skip row not found' });
+  skip.resolved = true;
+  skip.resolvedBy = req.user?.id || 'unknown';
+  skip.resolvedAt = new Date();
+  if (resolvedChemicalId) skip.resolvedChemicalId = resolvedChemicalId;
+  await log.save();
+  res.json({ ok: true, skip });
+});
+
+// PATCH /api/admin/mainchem/logs/:id/status
+router.patch('/logs/:id/status', async (req, res) => {
+  const { status } = req.body;
+  if (!['complete', 'reviewed', 'resolved'].includes(status)) {
+    return res.status(400).json({ ok: false, error: 'invalid status' });
+  }
+  const log = await ChemicalImportLog.findByIdAndUpdate(
+    req.params.id,
+    {
+      status,
+      reviewedBy: req.user?.id || null,
+      reviewedAt: new Date(),
+    },
+    { new: true }
+  );
+  if (!log) return res.status(404).json({ ok: false, error: 'log not found' });
+  res.json({ ok: true, log });
+});
+
+function countByReason(skipped) {
+  const counts = {};
+  skipped.forEach(s => { counts[s.reason] = (counts[s.reason] || 0) + 1; });
+  return counts;
+}
+
+module.exports = router;

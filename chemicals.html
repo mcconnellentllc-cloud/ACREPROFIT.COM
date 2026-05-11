@@ -172,25 +172,20 @@
                             <small style="color:#666;">Typical: 10-20 gal/acre ground, 3-5 gal/acre aerial</small>
                         </div>
                         <div class="form-group">
-                            <label for="cropNozzlePressure">Recommended nozzle pressure</label>
+                            <label for="cropTankSize">Tank size <span style="color:#c00;">*</span></label>
                             <div class="input-with-suffix">
-                                <input type="number" id="cropNozzlePressure" min="10" max="80" step="1" placeholder="40" value="40">
-                                <span class="suffix">PSI</span>
+                                <input type="number" id="cropTankSize" min="1" step="any" placeholder="500" required>
+                                <span class="suffix">gal</span>
                             </div>
-                            <small style="color:#666;">Typical: 30-50 PSI for flat fan nozzles</small>
+                            <small id="cropLoadCountDisplay" style="color:#4a5568;">Drives load count.</small>
                         </div>
                         <div class="form-group">
-                            <label for="cropNozzleType">Nozzle type (optional)</label>
-                            <select id="cropNozzleType" style="padding:10px; border:2px solid var(--border); border-radius:6px; width:100%;">
-                                <option value="">Select nozzle type</option>
-                                <option value="AIXR">AIXR - Air Induction Extended Range</option>
-                                <option value="TTI">TTI - Turbo TeeJet Induction</option>
-                                <option value="XR">XR - Extended Range flat fan</option>
-                                <option value="AI">AI - Air Induction</option>
-                                <option value="TT">TT - Turbo TeeJet</option>
-                                <option value="DG">DG - Drift Guard</option>
-                                <option value="other">Other / Custom</option>
-                            </select>
+                            <label for="cropTotalCarrierGallons">Total carrier gallons <span style="color:#c00;">*</span></label>
+                            <div class="input-with-suffix">
+                                <input type="number" id="cropTotalCarrierGallons" min="1" step="any" placeholder="5000" required>
+                                <span class="suffix">gal</span>
+                            </div>
+                            <small style="color:#666;">Auto-fills from acres &times; GPA. Drives Hydrovant rate (0.1% v/v).</small>
                         </div>
                     </div>
                 </div>
@@ -294,28 +289,23 @@
                         </div>
 
                         <div class="config-field">
-                            <label for="nozzlePressure">Nozzle Pressure (PSI)</label>
+                            <label for="programTankSize">Tank Size (gal) <span style="color:#c00;">*</span></label>
                             <div class="input-spinner">
-                                <button type="button" class="spinner-btn minus" onclick="adjustValue('nozzlePressure', -5)">−</button>
-                                <input type="number" id="nozzlePressure" min="10" max="80" value="40" step="5">
-                                <button type="button" class="spinner-btn plus" onclick="adjustValue('nozzlePressure', 5)">+</button>
+                                <button type="button" class="spinner-btn minus" onclick="adjustValue('programTankSize', -100)">−</button>
+                                <input type="number" id="programTankSize" min="1" step="any" placeholder="1000" required>
+                                <button type="button" class="spinner-btn plus" onclick="adjustValue('programTankSize', 100)">+</button>
                             </div>
-                            <span class="field-note">Typical: 30-50 PSI for flat fan</span>
+                            <span class="field-note" id="programLoadCountDisplay">Drives load count.</span>
                         </div>
 
                         <div class="config-field">
-                            <label for="nozzleType">Nozzle Type</label>
-                            <select id="nozzleType" style="padding:10px; border:2px solid var(--border); border-radius:6px; width:100%; font-size:1rem;">
-                                <option value="">Select type</option>
-                                <option value="AIXR" selected>AIXR - Air Induction Extended Range</option>
-                                <option value="TTI">TTI - Turbo TeeJet Induction</option>
-                                <option value="XR">XR - Extended Range flat fan</option>
-                                <option value="AI">AI - Air Induction</option>
-                                <option value="TT">TT - Turbo TeeJet</option>
-                                <option value="DG">DG - Drift Guard</option>
-                                <option value="other">Other / Custom</option>
-                            </select>
-                            <span class="field-note">AIXR recommended for dicamba/2,4-D</span>
+                            <label for="programTotalCarrierGallons">Total Carrier Gallons <span style="color:#c00;">*</span></label>
+                            <div class="input-spinner">
+                                <button type="button" class="spinner-btn minus" onclick="adjustValue('programTotalCarrierGallons', -500)">−</button>
+                                <input type="number" id="programTotalCarrierGallons" min="1" step="any" placeholder="5000" required>
+                                <button type="button" class="spinner-btn plus" onclick="adjustValue('programTotalCarrierGallons', 500)">+</button>
+                            </div>
+                            <span class="field-note">Auto-fills from acres &times; spray volume. Drives Hydrovant rate (0.1% v/v).</span>
                         </div>
                     </div>
 
@@ -383,6 +373,93 @@
                     <button id="calculateProgram" class="btn btn-primary btn-lg btn-block">
                         Calculate Order & View Packaging
                     </button>
+
+                    <!-- Farmer Rating Widget (mounts when a named SprayProgram is selected) -->
+                    <div id="ratingsWidget" class="ratings-widget" style="display: none; margin-top: 24px;">
+                        <div class="ratings-summary">
+                            <div class="ratings-summary-main">
+                                <span class="ratings-avg-stars" id="ratingsAvgStars">—</span>
+                                <span class="ratings-stars-track" id="ratingsStarsTrack" aria-hidden="true">☆☆☆☆☆</span>
+                                <span class="ratings-count" id="ratingsCount">(0 ratings)</span>
+                            </div>
+                            <button type="button" class="btn btn-outline" id="leaveRatingBtn" onclick="openRatingModal()">Leave a rating</button>
+                        </div>
+                        <div class="ratings-distribution" id="ratingsDistribution"></div>
+                        <div class="ratings-list" id="ratingsList"></div>
+                    </div>
+                </div>
+
+                <!-- Rating Modal (shared by create + edit flows) -->
+                <div class="modal-overlay" id="ratingModalOverlay" style="display:none;">
+                    <div class="modal-content" id="ratingModalContent" style="max-width: 560px; max-height: 92vh; overflow-y: auto;">
+                        <button class="modal-close" onclick="closeRatingModal()">&times;</button>
+                        <h2 id="ratingModalTitle" style="margin-bottom: 16px;">Leave a rating</h2>
+                        <input type="hidden" id="ratingEditId">
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Your rating *</label>
+                            <div class="star-input" data-stars="0" id="ratingStarInput" style="font-size: 28px; cursor: pointer; user-select: none;">
+                                <span class="star" data-value="1">☆</span>
+                                <span class="star" data-value="2">☆</span>
+                                <span class="star" data-value="3">☆</span>
+                                <span class="star" data-value="4">☆</span>
+                                <span class="star" data-value="5">☆</span>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Comment</label>
+                            <textarea id="ratingComment" rows="3" maxlength="2000" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;"></textarea>
+                            <small style="color:#666;"><span id="ratingCommentCount">0</span>/2000</small>
+                        </div>
+
+                        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:6px;">Crop</label>
+                                <select id="ratingCrop" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;">
+                                    <option value="">—</option>
+                                    <option value="corn">Corn</option>
+                                    <option value="milo">Milo</option>
+                                    <option value="wheat">Wheat</option>
+                                    <option value="soybean">Soybean</option>
+                                    <option value="other">Other</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label style="display:block; font-weight:600; margin-bottom:6px;">Season / Year</label>
+                                <select id="ratingSeasonYear" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;">
+                                    <option value="">—</option>
+                                    <option value="2026">2026</option>
+                                    <option value="2025">2025</option>
+                                    <option value="2024">2024</option>
+                                    <option value="2023">2023</option>
+                                    <option value="2022">2022</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Weather conditions</label>
+                            <textarea id="ratingWeather" rows="2" maxlength="500" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;"></textarea>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px;">Yield outcome</label>
+                            <textarea id="ratingYield" rows="2" maxlength="1000" style="width:100%; padding:10px; border:2px solid var(--border, #ccc); border-radius:6px;"></textarea>
+                        </div>
+
+                        <div style="margin-bottom:14px;">
+                            <label style="display:block; font-weight:600; margin-bottom:6px; color:#888;">Photo upload</label>
+                            <button type="button" disabled title="Photo upload coming soon" style="padding:10px 14px; background:#eee; border:1px dashed #aaa; border-radius:6px; color:#888; cursor:not-allowed;">
+                                📷 Photo upload coming soon
+                            </button>
+                        </div>
+
+                        <div class="customer-modal-actions" style="display:flex; justify-content:flex-end; gap:10px;">
+                            <button type="button" class="btn btn-outline" onclick="closeRatingModal()">Cancel</button>
+                            <button type="button" class="btn btn-primary" onclick="submitRating()">Submit rating</button>
+                        </div>
+                    </div>
                 </div>
 
                 <div id="programResults" class="program-results" style="display: none;">
@@ -465,6 +542,9 @@
         // means the farmer consciously picked a different pack size for that
         // product. Cleared when a new program is selected.
         let userPackChoices = new Map();
+        // Editable package state: productName → { chemicalId, packSize, unitsPerPack, sellPrice, qty, isCustomRequest, customRequest }
+        // Seeded from smart picker defaults; farmer edits override.
+        let packageEdits = new Map();
         // Tank + carrier volume inputs for per-load mix planning. Session-local,
         // exposed on window for the per-load sheet to consume in a later commit.
         let tankSizeGal = 0;
@@ -1583,9 +1663,75 @@
 
         document.getElementById('cropAcres')?.addEventListener('input', calculateCropTotals);
 
+        // Build-a-Recipe: tank size + total carrier gallons.
+        // Auto-fill carrier from acres*GPA unless farmer has edited it manually.
+        // Load count = ceil(carrier / tankSize), rendered inline.
+        function updateCropCarrierAutoFill() {
+            const acres = parseFloat(document.getElementById('cropAcres')?.value) || 0;
+            const gpa = parseFloat(document.getElementById('cropGPA')?.value) || 0;
+            const carrier = document.getElementById('cropTotalCarrierGallons');
+            if (!carrier || carrier.dataset.userEdited === 'true') return;
+            if (acres > 0 && gpa > 0) carrier.value = Math.round(acres * gpa);
+            updateCropLoadCount();
+        }
+        function updateCropLoadCount() {
+            const tank = parseFloat(document.getElementById('cropTankSize')?.value) || 0;
+            const carrier = parseFloat(document.getElementById('cropTotalCarrierGallons')?.value) || 0;
+            const out = document.getElementById('cropLoadCountDisplay');
+            if (!out) return;
+            if (tank <= 0 || carrier <= 0) { out.textContent = 'Drives load count.'; return; }
+            const loads = Math.ceil(carrier / tank);
+            const last = carrier - (loads - 1) * tank;
+            out.textContent = (last === tank || loads === 1)
+                ? `${loads} full load${loads === 1 ? '' : 's'} of ${tank} gal each`
+                : `${loads} loads (${loads - 1} full + 1 partial of ${Math.round(last)} gal)`;
+        }
+        document.getElementById('cropAcres')?.addEventListener('input', updateCropCarrierAutoFill);
+        document.getElementById('cropGPA')?.addEventListener('input', updateCropCarrierAutoFill);
+        document.getElementById('cropTankSize')?.addEventListener('input', updateCropLoadCount);
+        document.getElementById('cropTotalCarrierGallons')?.addEventListener('input', function () {
+            this.dataset.userEdited = 'true';
+            updateCropLoadCount();
+        });
+
+        // Program Flow (Option 3): same tank+carrier pattern as Build-a-Recipe,
+        // driven off #programAcres and #sprayVolume. Auto-fill carrier from
+        // acres × sprayVolume unless the farmer has typed an override.
+        function updateProgramCarrierAutoFill() {
+            const acres = parseFloat(document.getElementById('programAcres')?.value) || 0;
+            const gpa = parseFloat(document.getElementById('sprayVolume')?.value) || 0;
+            const carrier = document.getElementById('programTotalCarrierGallons');
+            if (!carrier || carrier.dataset.userEdited === 'true') return;
+            if (acres > 0 && gpa > 0) carrier.value = Math.round(acres * gpa);
+            updateProgramLoadCount();
+        }
+        function updateProgramLoadCount() {
+            const tank = parseFloat(document.getElementById('programTankSize')?.value) || 0;
+            const carrier = parseFloat(document.getElementById('programTotalCarrierGallons')?.value) || 0;
+            const out = document.getElementById('programLoadCountDisplay');
+            if (!out) return;
+            if (tank <= 0 || carrier <= 0) { out.textContent = 'Drives load count.'; return; }
+            const loads = Math.ceil(carrier / tank);
+            const last = carrier - (loads - 1) * tank;
+            out.textContent = (last === tank || loads === 1)
+                ? `${loads} full load${loads === 1 ? '' : 's'} of ${tank} gal each`
+                : `${loads} loads (${loads - 1} full + 1 partial of ${Math.round(last)} gal)`;
+        }
+        document.getElementById('programAcres')?.addEventListener('input', updateProgramCarrierAutoFill);
+        document.getElementById('sprayVolume')?.addEventListener('input', updateProgramCarrierAutoFill);
+        document.getElementById('programTankSize')?.addEventListener('input', updateProgramLoadCount);
+        document.getElementById('programTotalCarrierGallons')?.addEventListener('input', function () {
+            this.dataset.userEdited = 'true';
+            updateProgramLoadCount();
+        });
+
         function calculateCropTotals() {
             const acres = parseFloat(document.getElementById('cropAcres').value) || 0;
             if (acres === 0) return;
+            // Direct-selection flow owns #cropGPA. Do NOT fall through to #sprayVolume
+            // (which belongs to the program flow and has a DOM default of 10, masking
+            // whatever the farmer typed here).
+            const sprayVolume = parseFloat(document.getElementById('cropGPA')?.value) || 10;
 
             const resultsDiv = document.getElementById('cropCalculationResults');
             let hasResults = false;
@@ -1602,7 +1748,7 @@
                     const rateUnit = chem.rateUnit || 'oz/acre';
 
                     // Calculate total needed in base units
-                    let totalNeeded = calculateAmount(rate, rateUnit, acres, chem.unit);
+                    let totalNeeded = calculateAmount(rate, rateUnit, acres, chem.unit, sprayVolume);
 
                     const unitsPerPack = chem.unitsPerPack || 1;
                     const packages = Math.ceil(totalNeeded / unitsPerPack);
@@ -1678,34 +1824,46 @@
             }
         }
 
-        function calculateAmount(rate, rateUnit, acres, targetUnit) {
-            let totalNeeded = rate * acres;
+        function calculateAmount(rate, rateUnit, acres, targetUnit, sprayVolume = 10) {
             const target = (targetUnit || 'gal').toLowerCase();
-            const unit = (rateUnit || '').toLowerCase();
+            // Normalize: lowercase + strip spaces so '% v/v' and '%v/v' collapse.
+            const unitNorm = (rateUnit || '').toLowerCase().replace(/\s+/g, '');
 
-            // Convert to gallons (accept 'gal' or 'gl')
-            if (target === 'gal' || target === 'gl') {
-                if (unit.includes('fl oz') || unit === 'oz/acre' || unit.startsWith('oz')) {
-                    totalNeeded = totalNeeded / 128; // fl oz to gallons
-                } else if (unit.includes('pt')) {
-                    totalNeeded = totalNeeded / 8;
-                } else if (unit.includes('qt')) {
-                    totalNeeded = totalNeeded / 4;
-                } else if (unit.includes('lb')) {
-                    totalNeeded = totalNeeded / 10; // rough approx for liquid lb (varies)
-                }
-                // if already gal/acre, no conversion needed
+            // Water-volume-based rates. '% v/v' (Hydrovant, NIS) and 'lb/100gal'
+            // (AMS) scale with total water (acres × sprayVolume), not with acres
+            // alone. Missing these cases is the bug that made Hydrovant display
+            // 192.6 gal for 1,926 acres (should be 19.26 gal at 10 GPA).
+            if (unitNorm === '%v/v' || unitNorm === '%') {
+                return acres * sprayVolume * (rate / 100);
             }
-            // Convert to pounds
-            else if (target === 'lb') {
-                if (unit.startsWith('oz')) {
+            if (unitNorm === 'lb/100gal') {
+                return (acres * sprayVolume / 100) * rate;
+            }
+
+            // Per-acre rates — convert to target unit.
+            let totalNeeded = rate * acres;
+
+            if (target === 'gal' || target === 'gl') {
+                if (unitNorm.includes('floz') || unitNorm.startsWith('oz')) {
+                    totalNeeded = totalNeeded / 128; // fl oz / dry oz → gal
+                } else if (unitNorm.includes('pt')) {
+                    totalNeeded = totalNeeded / 8;
+                } else if (unitNorm.includes('qt')) {
+                    totalNeeded = totalNeeded / 4;
+                } else if (unitNorm === 'lb/acre') {
+                    totalNeeded = totalNeeded / 10; // liquid-lb rough approx
+                } else if (unitNorm === 'gal/acre') {
+                    // Explicit no-op: gal/acre already matches target.
+                } else {
+                    console.warn('[calculateAmount] unrecognized rateUnit for gal target:', rateUnit);
+                }
+            } else if (target === 'lb') {
+                if (unitNorm.startsWith('oz')) {
                     totalNeeded = totalNeeded / 16; // dry oz to lb
                 }
                 // if already lb/acre, no conversion
-            }
-            // Target is oz (for products sold in oz containers like Mivum)
-            else if (target === 'oz') {
-                if (unit.includes('lb')) {
+            } else if (target === 'oz') {
+                if (unitNorm.includes('lb')) {
                     totalNeeded = totalNeeded * 16; // lb to oz
                 }
                 // if already oz/acre, no conversion
@@ -1777,8 +1935,9 @@
                         });
                         const price = found?.sellPrice || found?.price || 0;
                         if (!price) { canCalc = false; return; }
-                        // Convert rate to product unit
-                        const inUnit = calculateAmount(c.rate ?? c.suggestedRate, c.rateUnit, 1, c.unit || 'gal');
+                        // Convert rate to catalog's unit (usually gal) — not the
+                        // program subdoc's unit which may be corrupt ('fl oz/acre').
+                        const inUnit = calculateAmount(c.rate ?? c.suggestedRate, c.rateUnit, 1, found?.unit || c.unit || 'gal');
                         estCostPerAcre += inUnit * price;
                     });
                 });
@@ -1839,6 +1998,7 @@
                 btn.addEventListener('click', () => {
                     selectedProgram = programs.find(p => p._id === btn.dataset.programId);
                     userPackChoices.clear(); // reset pack overrides for the new program
+                    packageEdits.clear(); // reset editable package state
                     showProgramAcresInput();
                 });
             });
@@ -1849,6 +2009,10 @@
             document.getElementById('selectedProgramName').textContent = selectedProgram.name;
             document.getElementById('programResults').style.display = 'none';
             section.style.display = 'block';
+
+            // Ratings widget: only meaningful for persisted SprayProgram docs
+            // (template-xxx ids live in-memory only, not in DB).
+            loadRatingsForSelectedProgram();
 
             // Clear custom chemicals when selecting new program
             customChemicals = [];
@@ -1862,6 +2026,11 @@
             document.getElementById('sprayVolume').addEventListener('input', updateHydrovant);
             document.getElementById('sprayVolume').addEventListener('input', updateLoadConfig);
             updateHydrovant();
+
+            // Seed the carrier gallons input from the current acres × GPA so
+            // the Hydrovant label and load-count display populate without
+            // requiring the farmer to touch the field first.
+            updateProgramCarrierAutoFill();
 
             section.scrollIntoView({ behavior: 'smooth' });
         }
@@ -2056,6 +2225,7 @@
 
         function updateChemicalTotals() {
             const acres = parseFloat(document.getElementById('programAcres').value) || 0;
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
 
             document.querySelectorAll('.rate-input').forEach(input => {
                 const productName = input.dataset.product;
@@ -2071,8 +2241,13 @@
                 });
 
                 if (chemInfo && acres > 0) {
-                    const unit = chemInfo.unit || 'gl';
-                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit);
+                    // Catalog unit wins over program subdoc to avoid the
+                    // 'fl oz/acre' corruption from mirrorChemicalRates.
+                    const catMatch = (window.allChemicalsForPricing || chemicals || []).find(ch =>
+                        (ch.productName || ch.name || '').toLowerCase().trim() === (productName || '').toLowerCase().trim()
+                    );
+                    const unit = catMatch?.unit || chemInfo.unit || 'gl';
+                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit, sprayVolume);
                     const totalId = 'total-' + productName.replace(/[^a-zA-Z0-9]/g, '_');
                     const totalEl = document.getElementById(totalId);
                     if (totalEl) {
@@ -2091,23 +2266,110 @@
             return input ? parseFloat(input.value) : null;
         }
 
-        // Expand/collapse the pack-options sub-row under a totals row.
-        // Swaps the chevron glyph so farmers can see state at a glance.
-        function togglePackOptions(rowId, btn) {
-            const row = document.getElementById(rowId);
-            if (!row) return;
-            const open = row.style.display !== 'none';
-            row.style.display = open ? 'none' : '';
-            if (btn) {
-                btn.textContent = btn.textContent.replace(open ? '▴' : '▾', open ? '▾' : '▴');
+        // SKU dropdown changed — update the packageEdits entry and recalc.
+        function onSkuChange(productName, chemicalId) {
+            if (chemicalId === '__custom__') {
+                requestCustomPack(productName);
+                return;
+            }
+            const catalog = window.allChemicalsForPricing || chemicals || [];
+            const sku = catalog.find(c => String(c._id) === String(chemicalId));
+            if (!sku) return;
+            const pe = packageEdits.get(productName);
+            if (!pe) return;
+            // Recompute needed qty from totalsByChemical
+            const needed = Object.values(totalsByChemical).find(t => t.name === productName)?.totalNeeded || 0;
+            const minQty = Math.max(1, Math.ceil(needed / (sku.unitsPerPack || 1)));
+            pe.chemicalId = sku._id;
+            pe.packSize = sku.packSize;
+            pe.unitsPerPack = sku.unitsPerPack || 1;
+            pe.sellPrice = sku.sellPrice || sku.price || 0;
+            pe.sourceSupplier = sku.sourceSupplier || '';
+            pe.qty = minQty;
+            pe.isCustomRequest = false;
+            pe.customRequest = null;
+            // Also update userPackChoices so resolvePack stays in sync
+            userPackChoices.set(productName, String(sku._id));
+            recalcPackageTotals();
+        }
+
+        // Qty input changed — enforce min=1, update state, recalc.
+        let _qtyDebounce = null;
+        function onQtyChange(productName, input) {
+            clearTimeout(_qtyDebounce);
+            _qtyDebounce = setTimeout(() => {
+                const pe = packageEdits.get(productName);
+                if (!pe) return;
+                let val = parseInt(input.value) || 0;
+                if (val < 1) { val = 1; input.value = 1; }
+                pe.qty = val;
+                recalcPackageTotals();
+            }, 150);
+        }
+
+        // Rebuild the totals footer + cost/acre from packageEdits state.
+        // Called after any SKU or qty change. Does NOT re-render the full
+        // program — only updates the dollar values inline.
+        function recalcPackageTotals() {
+            let newTotal = 0;
+            for (const [name, pe] of packageEdits) {
+                if (pe.isCustomRequest) continue;
+                newTotal += pe.qty * pe.unitsPerPack * pe.sellPrice;
+            }
+            // Also count Hydrovant if it's a standalone row (not in packageEdits)
+            const hydroRow = document.querySelector('.hydrovant-row .cost-col strong');
+            if (hydroRow) {
+                newTotal += parseFloat(hydroRow.textContent.replace(/[$,]/g, '')) || 0;
+            }
+            // Update grand total
+            const totalEl = document.querySelector('.grand-total');
+            if (totalEl) totalEl.textContent = '$' + newTotal.toFixed(2);
+            // Update cost/acre
+            const acres = parseFloat(document.getElementById('programAcres')?.value) || 0;
+            if (acres > 0) {
+                const cpaEl = document.querySelector('.order-totals-section tfoot tr:last-child td:last-child');
+                if (cpaEl) cpaEl.textContent = '$' + (newTotal / acres).toFixed(2);
             }
         }
 
-        // Farmer picked a specific pack size for this product. Store the
-        // override and re-run the whole program calc so the totals, cost/acre,
-        // speculation banner, and submit payload all agree on the new choice.
-        function selectPack(productName, chemicalId) {
-            userPackChoices.set(productName, chemicalId);
+        // Custom pack request — open a prompt dialog for non-catalog packs
+        async function requestCustomPack(productName) {
+            const packSize = await promptDialog(`Custom pack for ${productName}:`, {
+                title: 'Request Custom Pack',
+                placeholder: 'e.g., 250 gal tote',
+                ok: 'Add to Bid Sheet'
+            });
+            if (!packSize) {
+                // User cancelled — reset dropdown to previous selection
+                const pe = packageEdits.get(productName);
+                if (pe) {
+                    const sel = document.querySelector(`select[data-product="${productName.replace(/'/g, "\\'")}"]`);
+                    if (sel) sel.value = String(pe.chemicalId);
+                }
+                return;
+            }
+            const qty = await promptDialog(`How many of "${packSize}" do you need?`, {
+                title: 'Quantity',
+                default: '1',
+                ok: 'Confirm'
+            });
+            if (!qty) return;
+            const pe = packageEdits.get(productName);
+            if (!pe) return;
+            pe.isCustomRequest = true;
+            pe.customRequest = { packSize, unit: pe.unitsPerPack > 100 ? 'gal' : 'gal', quantity: parseInt(qty) || 1, reason: 'Farmer-requested non-catalog pack' };
+            calculateProgramOrder();
+        }
+
+        // Cancel a custom pack request and revert to the smart-picker default
+        function cancelCustomPack(productName) {
+            const pe = packageEdits.get(productName);
+            if (pe) {
+                pe.isCustomRequest = false;
+                pe.customRequest = null;
+            }
+            // Clear and let calculateProgramOrder re-seed from picker
+            packageEdits.delete(productName);
             calculateProgramOrder();
         }
 
@@ -2366,11 +2628,15 @@
                     const customRate = getCustomRate(chemItem.productName);
                     const rate = customRate !== null ? customRate : (chemItem.rate ?? chemItem.suggestedRate);
                     const rateUnit = chemItem.rateUnit;
-                    const unit = chemItem.unit || 'gal';
-                    const unitsPerPack = chemItem.unitsPerPack || 250;
 
-                    // Look up LIVE price from the catalog - catalog is the ONLY source of truth
-                    // If a product isn't in the catalog or has no price, cost = 0 and we flag it
+                    // Look up LIVE price from the catalog FIRST — catalog is the source
+                    // of truth for sellPrice convention ($/unit where unit is the
+                    // catalog's pack unit like 'gal' or 'lb'). pr-146 moved this above
+                    // the unit determination because program subdoc fields (unit,
+                    // unitsPerPack, packSize) drifted to bogus values like 'fl oz/acre'
+                    // when the schema's mirrorChemicalRates accidentally copied
+                    // rateUnit → unit. Using catalog values first keeps calculateAmount
+                    // and cost math aligned on the same unit convention.
                     const catalogMatch = (window.allChemicalsForPricing || chemicals || []).find(c => {
                         const catalogName = (c.productName || c.name || '').toLowerCase().trim();
                         const programName = (chemItem.productName || '').toLowerCase().trim();
@@ -2381,8 +2647,15 @@
                     const price = catalogMatch?.sellPrice || catalogMatch?.price || 0;
                     const priceMissing = !catalogMatch || !price;
 
+                    // Pack fields: catalog wins, program subdoc is fallback, then hardcoded
+                    // defaults. Unit drives the calculateAmount target so fl oz/acre rates
+                    // convert correctly to the catalog's sell-price unit (usually 'gal').
+                    const unit = catalogMatch?.unit || chemItem.unit || 'gal';
+                    const unitsPerPack = catalogMatch?.unitsPerPack || chemItem.unitsPerPack || 250;
+                    const packSize = catalogMatch?.packSize || chemItem.packSize;
+
                     // Calculate amount needed
-                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit);
+                    const totalNeeded = calculateAmount(rate, rateUnit, acres, unit, sprayVolume);
                     const packages = Math.ceil(totalNeeded / unitsPerPack);
                     const cost = packages * unitsPerPack * price;
 
@@ -2392,7 +2665,7 @@
                         rateUnit,
                         totalNeeded,
                         packages,
-                        packSize: chemItem.packSize,
+                        packSize,
                         unitsPerPack,
                         unit,
                         price,
@@ -2408,22 +2681,28 @@
                             name: chemItem.productName,
                             totalNeeded: 0,
                             packages: 0,
-                            packSize: chemItem.packSize,
+                            packSize,
                             unitsPerPack,
                             unit,
                             price,
                             chemicalId: catalogMatch?._id || null,
-                            priceIsSpeculated: catalogMatch?.priceIsSpeculated === true
+                            priceIsSpeculated: catalogMatch?.priceIsSpeculated === true,
+                            // Track rateUnit for display + null-warning. If a
+                            // single product has different rateUnits across
+                            // passes (shouldn't happen), the first pass wins.
+                            rateUnit: rateUnit || null,
+                            rateUnitMissing: !rateUnit,
                         };
                     }
                     totalsByChemical[key].totalNeeded += totalNeeded;
+                    if (!rateUnit) totalsByChemical[key].rateUnitMissing = true;
                 });
 
                 // Process custom chemicals (not from CPD) for this application
                 customChemicals.filter(c => c.application === app.name).forEach(customChem => {
                     const unit = customChem.rateUnit.includes('gal') ? 'gl' :
                                 customChem.rateUnit.includes('lb') ? 'lb' : 'gl';
-                    const totalNeeded = calculateAmount(customChem.rate, customChem.rateUnit, acres, unit);
+                    const totalNeeded = calculateAmount(customChem.rate, customChem.rateUnit, acres, unit, sprayVolume);
 
                     sheetCustomChemicals.push({
                         name: customChem.productName,
@@ -2577,77 +2856,87 @@
                         </thead>
                         <tbody>
                             ${Object.values(totalsByChemical).map(item => {
-                                const breakdown = calculateProductPackages(item.totalNeeded, {
-                                    packSize: item.packSize,
-                                    unitsPerPack: item.unitsPerPack,
-                                    unit: item.unit,
-                                    productName: item.name
-                                });
-                                // Recalculate cost based on actual packages
-                                const actualCost = breakdown.totalOrdered * item.price;
-                                // Pack selector: only shown when the catalog has 2+ valid
-                                // candidates for this product. Radio list appears in a
-                                // sub-row toggled by the "Options" chevron.
                                 const candidates = item.packCandidates || [];
-                                const hasOptions = candidates.length > 1;
                                 const rowKey = (item.name || '').replace(/[^a-zA-Z0-9]/g, '_');
-                                const optionsRowId = `packOptions-${rowKey}`;
-                                const chosenId = String(item.chemicalId || '');
+                                const safeName = (item.name || '').replace(/'/g, "\\'");
+
+                                // Seed packageEdits from smart-picker defaults if farmer hasn't edited yet
+                                if (!packageEdits.has(item.name)) {
+                                    const minQty = Math.max(1, Math.ceil(item.totalNeeded / (item.unitsPerPack || 1)));
+                                    packageEdits.set(item.name, {
+                                        chemicalId: item.chemicalId,
+                                        packSize: item.packSize,
+                                        unitsPerPack: item.unitsPerPack || 1,
+                                        sellPrice: item.price,
+                                        qty: minQty,
+                                        sourceSupplier: candidates.find(c => String(c.catalogEntry._id) === String(item.chemicalId))?.catalogEntry.sourceSupplier || '',
+                                        isCustomRequest: false,
+                                        customRequest: null
+                                    });
+                                }
+                                const pe = packageEdits.get(item.name);
+                                const ordered = pe.qty * pe.unitsPerPack;
+                                const overage = ordered - item.totalNeeded;
+                                const lineCost = ordered * pe.sellPrice;
+                                const overageCost = overage > 0 ? overage * pe.sellPrice : 0;
+
+                                // Build SKU dropdown options from all catalog candidates
+                                const skuOptionsHtml = candidates.map(cand => {
+                                    const id = String(cand.catalogEntry._id);
+                                    const sel = id === String(pe.chemicalId) ? 'selected' : '';
+                                    const supplier = cand.catalogEntry.sourceSupplier ? `${cand.catalogEntry.sourceSupplier} — ` : '';
+                                    const label = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
+                                    return `<option value="${id}" ${sel}>${supplier}${label} @ $${(cand.catalogEntry.sellPrice||0).toFixed(2)}/${cand.catalogEntry.unit||'gl'}</option>`;
+                                }).join('');
+                                const hasSkuOptions = candidates.length > 0;
+                                const minQty = Math.max(1, Math.ceil(item.totalNeeded / (pe.unitsPerPack || 1)));
+
                                 return `
                                 <tr>
-                                    <td><strong>${item.name}</strong></td>
+                                    <td>
+                                        <strong>${item.name}</strong>
+                                        ${item.rateUnitMissing ? '<div style="color:#dc2626; font-size:0.75rem; font-weight:600; margin-top:2px;">&#9888; Missing rate unit</div>' : ''}
+                                    </td>
                                     <td class="needed-col">
-                                        <span class="total-gal">${item.totalNeeded.toFixed(1)} ${item.unit}</span>
+                                        <span class="total-gal">${item.totalNeeded.toFixed(1)} ${item.unit || ''}</span>
+                                        ${(item.rateUnit && item.rateUnit !== item.unit) ? `<div style="font-size:0.72rem; color:#6b7280;">(from ${item.rateUnit})</div>` : ''}
                                     </td>
                                     <td class="breakdown-col">
-                                        <div class="pkg-breakdown">
-                                            ${breakdown.packages.map((pkg, idx) => `
-                                                <span class="pkg-chip">${pkg.qty} ${pkg.label}</span>
-                                                ${idx < breakdown.packages.length - 1 ? '<span class="pkg-plus">+</span>' : ''}
-                                            `).join('')}
+                                        ${hasSkuOptions ? `
+                                        <select class="sku-select" data-product="${safeName}" onchange="onSkuChange('${safeName}', this.value)"
+                                            style="width:100%; padding:6px 8px; border:1px solid #d1d5db; border-radius:6px; font-size:0.85rem; margin-bottom:6px;">
+                                            ${skuOptionsHtml}
+                                            <option value="__custom__">Request custom pack...</option>
+                                        </select>` : `<div style="font-size:0.85rem; color:#6b7280; margin-bottom:6px;">${pe.packSize || 'Unknown pack'}</div>`}
+                                        ${!pe.isCustomRequest ? `
+                                        <div style="display:flex; align-items:center; gap:6px; margin-bottom:4px;">
+                                            <span style="font-size:0.8rem; color:#666;">Qty:</span>
+                                            <input type="number" class="pkg-qty-input" value="${pe.qty}" min="1"
+                                                data-product="${safeName}" data-min="${minQty}"
+                                                onchange="onQtyChange('${safeName}', this)"
+                                                oninput="onQtyChange('${safeName}', this)"
+                                                style="width:60px; padding:4px 6px; border:1px solid #d1d5db; border-radius:4px; font-size:0.9rem; text-align:center;">
+                                            <span style="font-size:0.8rem; color:#666;">× ${pe.unitsPerPack} = ${ordered.toFixed(1)} ${item.unit}</span>
                                         </div>
-                                        <div class="pkg-total">
-                                            = ${breakdown.totalOrdered.toFixed(1)} ${item.unit} ordered
-                                            ${breakdown.overage > 0.1 ? `<span class="overage">(+${breakdown.overage.toFixed(1)} extra)</span>` : ''}
-                                        </div>
-                                        ${hasOptions ? `
-                                        <button type="button" class="pack-options-toggle" style="background:none; border:none; color:#2d5a27; font-size:0.8rem; font-weight:600; cursor:pointer; margin-top:6px; padding:0;" onclick="togglePackOptions('${optionsRowId}', this)">
-                                            ▾ Options (${candidates.length} pack sizes)
-                                        </button>` : ''}
+                                        ${overage > 0.1 ? `<div style="font-size:0.78rem; color:#059669;">Extra: +${overage.toFixed(1)} ${item.unit} ($${overageCost.toFixed(2)})</div>` : ''}
+                                        ${overage < -0.1 ? `<div style="font-size:0.78rem; color:#dc2626; font-weight:600;">⚠ Short ${Math.abs(overage).toFixed(1)} ${item.unit} — need ${item.totalNeeded.toFixed(1)}, ordering ${ordered.toFixed(1)}</div>` : ''}
+                                        ` : `
+                                        <div style="background:#fef9c3; padding:8px 10px; border-radius:6px; font-size:0.82rem; color:#854d0e;">
+                                            <strong>Custom pack requested</strong><br>
+                                            ${pe.customRequest?.packSize || 'TBD'} × ${pe.customRequest?.quantity || '?'}<br>
+                                            <span style="font-size:0.75rem;">Added to bid sheet on order submit</span><br>
+                                            <button type="button" onclick="cancelCustomPack('${safeName}')" style="background:none; border:none; color:#dc2626; font-size:0.78rem; cursor:pointer; padding:0; margin-top:4px; text-decoration:underline;">Cancel custom request</button>
+                                        </div>`}
                                     </td>
                                     <td class="cost-col">
-                                        ${item.priceIsSpeculated
-                                            ? `<strong style="color:#d97706;">~$${actualCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;" title="Estimated price">est.</span>`
-                                            : `<strong>$${actualCost.toFixed(2)}</strong>`
+                                        ${pe.isCustomRequest
+                                            ? `<span style="color:#854d0e; font-weight:600;">Pending</span>`
+                                            : item.priceIsSpeculated
+                                            ? `<strong style="color:#d97706;">~$${lineCost.toFixed(2)}</strong><span style="font-size:0.75rem; color:#d97706; margin-left:4px;">est.</span>`
+                                            : `<strong>$${lineCost.toFixed(2)}</strong>`
                                         }
                                     </td>
                                 </tr>
-                                ${hasOptions ? `
-                                <tr id="${optionsRowId}" class="pack-options-row" style="display:none; background:#f9fafb;">
-                                    <td colspan="4" style="padding:0;">
-                                        <div style="padding:12px 16px;">
-                                            <div style="font-size:0.85rem; color:#6b7280; margin-bottom:8px; font-weight:600;">Pack size options for ${item.name}:</div>
-                                            <div style="display:grid; grid-template-columns:auto 1fr auto auto auto; gap:8px 16px; align-items:center; font-size:0.88rem;">
-                                                ${candidates.map(cand => {
-                                                    const id = String(cand.catalogEntry._id);
-                                                    const isChosen = id === chosenId;
-                                                    const packLabel = cand.catalogEntry.packSize || `${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'}`;
-                                                    const supplierPrefix = cand.catalogEntry.sourceSupplier
-                                                        ? `<strong>${cand.catalogEntry.sourceSupplier}</strong> — `
-                                                        : '';
-                                                    return `
-                                                    <label style="display:contents; cursor:pointer;">
-                                                        <input type="radio" name="pack-${rowKey}" value="${id}" ${isChosen ? 'checked' : ''} onchange="selectPack('${(item.name || '').replace(/'/g, "\\'")}', '${id}')" style="cursor:pointer;">
-                                                        <span style="font-weight:${isChosen ? '700' : '400'};">${supplierPrefix}${packLabel}</span>
-                                                        <span style="color:#6b7280;">${cand.qty} × ${cand.catalogEntry.unitsPerPack} ${cand.catalogEntry.unit || 'gl'} = ${cand.totalOrdered.toFixed(1)} ${cand.catalogEntry.unit || 'gl'}</span>
-                                                        <span style="color:${cand.overage > 10 ? '#dc2626' : '#6b7280'};">${cand.overage > 0.1 ? `+${cand.overage.toFixed(1)} over` : 'exact'}</span>
-                                                        <span style="font-weight:600; color:#2d5a27;">$${cand.totalCost.toFixed(2)}</span>
-                                                    </label>
-                                                `;}).join('')}
-                                            </div>
-                                        </div>
-                                    </td>
-                                </tr>` : ''}
                             `}).join('')}
                             ${(() => {
                                 // Only show separate Hydrovant row if it's NOT already in the program (most programs include it)
@@ -3021,9 +3310,10 @@
 
         function copyBidSheetEmail() {
             const acres = parseFloat(document.getElementById('programAcres').value) || 0;
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
             const customChemList = Object.values(customChemicals.reduce((acc, c) => {
                 const unit = c.rateUnit.includes('gal') ? 'gl' : c.rateUnit.includes('lb') ? 'lb' : 'gl';
-                const totalNeeded = calculateAmount(c.rate, c.rateUnit, acres, unit);
+                const totalNeeded = calculateAmount(c.rate, c.rateUnit, acres, unit, sprayVolume);
                 const key = c.productName;
                 if (!acc[key]) {
                     acc[key] = { name: c.productName, totalNeeded: 0, packSize: c.packSize, unit };
@@ -3107,7 +3397,9 @@ Generated by AcreProfit.com`;
                     const chem = chemicals.find(c => c._id === chemId);
                     if (chem) {
                         const acres = parseFloat(document.getElementById('cropAcres').value) || 0;
-                        const totalNeeded = calculateAmount(rate, chem.rateUnit || 'oz/acre', acres, chem.unit);
+                        // Same fix as calculateCropTotals — direct-selection reads #cropGPA only.
+                        const sprayVolume = parseFloat(document.getElementById('cropGPA')?.value) || 10;
+                        const totalNeeded = calculateAmount(rate, chem.rateUnit || 'oz/acre', acres, chem.unit, sprayVolume);
                         const packages = Math.ceil(totalNeeded / (chem.unitsPerPack || 1));
                         addToOrder(chemId, packages, 'crop');
                     }
@@ -3124,8 +3416,8 @@ Generated by AcreProfit.com`;
             // Capture current rates (possibly modified from program defaults)
             const acres = parseFloat(document.getElementById('programAcres')?.value) || 0;
             const sprayVol = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
-            const pressure = parseInt(document.getElementById('nozzlePressure')?.value) || 40;
-            const nozzle = document.getElementById('nozzleType')?.value || 'AIXR';
+            const tankSize = parseFloat(document.getElementById('programTankSize')?.value) || null;
+            const totalCarrierGallons = parseFloat(document.getElementById('programTotalCarrierGallons')?.value) || null;
 
             const applications = selectedProgram.applications.map(app => ({
                 name: app.name,
@@ -3158,7 +3450,7 @@ Generated by AcreProfit.com`;
                         description: `Custom recipe based on ${selectedProgram.name}`,
                         crop: selectedProgram.crop,
                         applications,
-                        sprayParams: { gallonsPerAcre: sprayVol, nozzlePressure: pressure, nozzleType: nozzle },
+                        sprayParams: { gallonsPerAcre: sprayVol, tankSize, totalCarrierGallons },
                         basedOn: selectedProgram.name,
                         visibility // 'public' or 'private'
                     })
@@ -3200,6 +3492,7 @@ Generated by AcreProfit.com`;
                 preview.style.display = 'none';
                 return;
             }
+            const sprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
 
             let originalTotal = 0;
             let adjustedTotal = 0;
@@ -3207,8 +3500,6 @@ Generated by AcreProfit.com`;
 
             selectedProgram.applications.forEach(app => {
                 app.chemicals.forEach(chemItem => {
-                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, chemItem.unit || 'gal');
-                    const packages = Math.ceil(totalNeeded / (chemItem.unitsPerPack || 250));
                     const catalogMatch = (window.allChemicalsForPricing || chemicals || []).find(c => {
                         const catalogName = (c.productName || c.name || '').toLowerCase().trim();
                         const programName = (chemItem.productName || '').toLowerCase().trim();
@@ -3217,6 +3508,11 @@ Generated by AcreProfit.com`;
                                programName.includes(catalogName);
                     });
                     if (!catalogMatch) return;
+
+                    const unit = catalogMatch.unit || chemItem.unit || 'gal';
+                    const unitsPerPack = catalogMatch.unitsPerPack || chemItem.unitsPerPack || 250;
+                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, unit, sprayVolume);
+                    const packages = Math.ceil(totalNeeded / unitsPerPack);
 
                     const sellPrice = catalogMatch.sellPrice || catalogMatch.price || 0;
                     const adminPrice = catalogMatch.adminPrice || sellPrice;
@@ -3335,37 +3631,52 @@ Generated by AcreProfit.com`;
                 return;
             }
 
+            const submitSprayVolume = parseFloat(document.getElementById('sprayVolume')?.value) || 10;
             const items = [];
             selectedProgram.applications.forEach(app => {
                 app.chemicals.forEach(chemItem => {
-                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, chemItem.unit || 'gal');
-
-                    // Look up chemicalId from loaded catalog so server can reserve inventory + calculate commissions
-                    // Resolve the pack: farmer override wins, else algorithmic picker.
-                    // Keeps submit payload aligned with whatever the totals table
-                    // rendered (either the default winner or the farmer's choice).
-                    const picked = resolvePack(totalNeeded, chemItem.productName);
-                    const catalogMatch = picked?.catalogEntry || (window.allChemicalsForPricing || chemicals || []).find(c => {
+                    // Catalog match FIRST so we can use its unit for conversion.
+                    // resolvePack does its own match internally, but we need the
+                    // catalog unit before calling calculateAmount.
+                    const preMatch = (window.allChemicalsForPricing || chemicals || []).find(c => {
                         const catalogName = (c.productName || c.name || '').toLowerCase().trim();
                         const programName = (chemItem.productName || '').toLowerCase().trim();
                         return catalogName === programName ||
                                catalogName.includes(programName) ||
                                programName.includes(catalogName);
                     });
+                    const submitUnit = preMatch?.unit || chemItem.unit || 'gal';
+                    const totalNeeded = calculateAmount(chemItem.rate ?? chemItem.suggestedRate, chemItem.rateUnit, acres, submitUnit, submitSprayVolume);
 
-                    const packages = picked ? picked.qty : Math.ceil(totalNeeded / (catalogMatch?.unitsPerPack || chemItem.unitsPerPack || 1));
-                    if (!picked && !catalogMatch?.unitsPerPack && !chemItem.unitsPerPack) {
-                        console.warn(`Missing unitsPerPack for ${chemItem.productName} — defaulting to 1`);
+                    // If farmer edited this row's package, use their choice.
+                    // Otherwise fall back to smart picker.
+                    const pe = packageEdits.get(chemItem.productName);
+                    if (pe && pe.isCustomRequest) {
+                        // Custom pack request — skip from items, goes to customPackRequests
+                        return;
+                    }
+                    let chosenChemId, chosenPackSize, chosenQty, chosenPrice;
+                    if (pe) {
+                        chosenChemId = pe.chemicalId;
+                        chosenPackSize = pe.packSize;
+                        chosenQty = pe.qty;
+                        chosenPrice = pe.sellPrice;
+                    } else {
+                        const picked = resolvePack(totalNeeded, chemItem.productName);
+                        const catalogMatch = picked?.catalogEntry || preMatch;
+                        chosenChemId = catalogMatch?._id || null;
+                        chosenPackSize = catalogMatch?.packSize || chemItem.packSize;
+                        chosenQty = picked ? picked.qty : Math.ceil(totalNeeded / (catalogMatch?.unitsPerPack || chemItem.unitsPerPack || 1));
+                        chosenPrice = catalogMatch?.sellPrice || catalogMatch?.price || 0;
                     }
 
                     items.push({
-                        chemicalId: catalogMatch?._id || null,
+                        chemicalId: chosenChemId,
                         productName: chemItem.productName,
-                        packSize: catalogMatch?.packSize || chemItem.packSize,
+                        packSize: chosenPackSize,
                         unit: chemItem.unit,
-                        quantity: packages,
-                        // unitPrice is advisory - server re-prices from catalog before saving
-                        unitPrice: catalogMatch?.sellPrice || catalogMatch?.price || 0,
+                        quantity: chosenQty,
+                        unitPrice: chosenPrice,
                         acres,
                         rate: chemItem.rate ?? chemItem.suggestedRate,
                         rateUnit: chemItem.rateUnit,
@@ -3396,11 +3707,26 @@ Generated by AcreProfit.com`;
                         totalAcres: acres,
                         sprayParams: {
                             gallonsPerAcre: parseFloat(document.getElementById('sprayVolume')?.value) || 10,
-                            nozzlePressure: parseInt(document.getElementById('nozzlePressure')?.value) || 40,
-                            nozzleType: document.getElementById('nozzleType')?.value || 'AIXR',
+                            tankSize: parseFloat(document.getElementById('programTankSize')?.value) || null,
+                            totalCarrierGallons: parseFloat(document.getElementById('programTotalCarrierGallons')?.value) || null,
                             crop: selectedProgram.crop,
                             acres
                         },
+                        // Custom pack requests — non-catalog packs farmer requested via the
+                        // "Request custom pack" flow. Server writes these to a pending bid-sheet
+                        // entry so admin can source them. Not billed on this order.
+                        customPackRequests: Array.from(packageEdits.values())
+                            .filter(pe => pe.isCustomRequest && pe.customRequest)
+                            .map(pe => ({
+                                productName: pe.customRequest.productName || Object.keys(totalsByChemical).find(k => {
+                                    const edit = packageEdits.get(k);
+                                    return edit === pe;
+                                }) || 'Unknown',
+                                packSize: pe.customRequest.packSize,
+                                unit: pe.customRequest.unit || 'gal',
+                                quantity: pe.customRequest.quantity || 1,
+                                reason: pe.customRequest.reason || ''
+                            })),
                         customerNotes: `Program: ${selectedProgram.name} for ${acres} acres`,
                         actingAsCustomerId: window.actingAsCustomerId || null,
                         discountCode: discountCode || null,
@@ -3515,14 +3841,14 @@ Generated by AcreProfit.com`;
 
             // Capture spray application parameters from the Build a Recipe form
             const gpa = parseFloat(document.getElementById('cropGPA')?.value) || null;
-            const pressure = parseInt(document.getElementById('cropNozzlePressure')?.value) || null;
-            const nozzleType = document.getElementById('cropNozzleType')?.value || null;
+            const tankSize = parseFloat(document.getElementById('cropTankSize')?.value) || null;
+            const totalCarrierGallons = parseFloat(document.getElementById('cropTotalCarrierGallons')?.value) || null;
             const acres = parseFloat(document.getElementById('cropAcres')?.value) || null;
 
-            const sprayParams = (gpa || pressure || nozzleType) ? {
+            const sprayParams = (gpa || tankSize || totalCarrierGallons) ? {
                 gallonsPerAcre: gpa,
-                nozzlePressure: pressure,
-                nozzleType: nozzleType,
+                tankSize,
+                totalCarrierGallons,
                 crop: selectedCrop,
                 acres
             } : null;
@@ -3711,6 +4037,250 @@ Acre Profit Group Purchasing`;
             localStorage.removeItem('actingAsCustomer');
             window.location.href = '/admin.html#customers';
         }
+
+        // ============ FARMER RATINGS WIDGET ============
+        // Loads + renders ratings for the currently selected SprayProgram.
+        // Mounts into #ratingsWidget (a sibling of #calculateProgram inside
+        // #programAcresSection). No-op for hardcoded template-* programs.
+        let currentRatings = { summary: null, ratings: [], userHasRated: false };
+
+        function isPersistedProgramId(id) {
+            return id && typeof id === 'string' && !id.startsWith('template-');
+        }
+
+        async function loadRatingsForSelectedProgram() {
+            const widget = document.getElementById('ratingsWidget');
+            if (!widget) return;
+            if (!selectedProgram || !isPersistedProgramId(selectedProgram._id)) {
+                widget.style.display = 'none';
+                return;
+            }
+            widget.style.display = 'block';
+            document.getElementById('ratingsList').innerHTML = '<p style="color:#666;">Loading ratings…</p>';
+            try {
+                const res = await fetch(`${API_URL}/api/ratings/${selectedProgram._id}`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                const data = await res.json();
+                currentRatings = {
+                    summary: data.summary,
+                    ratings: data.ratings || [],
+                    userHasRated: !!data.userHasRated,
+                };
+                renderRatingsWidget();
+            } catch (err) {
+                document.getElementById('ratingsList').innerHTML =
+                    `<p style="color:#c22;">Failed to load ratings: ${err.message}</p>`;
+            }
+        }
+
+        function renderRatingsWidget() {
+            const { summary, ratings, userHasRated } = currentRatings;
+            const avg = summary?.averageStars;
+            document.getElementById('ratingsAvgStars').textContent = avg != null ? avg.toFixed(1) + ' ★' : 'No ratings yet';
+            document.getElementById('ratingsStarsTrack').textContent =
+                avg != null ? '★'.repeat(Math.round(avg)) + '☆'.repeat(5 - Math.round(avg)) : '';
+            document.getElementById('ratingsCount').textContent = `(${summary?.count || 0} ratings)`;
+
+            const dist = document.getElementById('ratingsDistribution');
+            if (summary && summary.count > 0) {
+                dist.innerHTML = [5, 4, 3, 2, 1].map(n => {
+                    const row = summary.starDistribution.find(r => r.stars === n);
+                    const count = row?.count || 0;
+                    const pct = summary.count ? Math.round((count / summary.count) * 100) : 0;
+                    return `<div style="display:flex; align-items:center; gap:8px; font-size:13px; margin:2px 0;">
+                        <span style="width:30px; color:#666;">${n}★</span>
+                        <div style="flex:1; background:#eee; border-radius:4px; height:8px; overflow:hidden;"><div style="width:${pct}%; height:100%; background:#f59e0b;"></div></div>
+                        <span style="width:28px; text-align:right; color:#666;">${count}</span>
+                    </div>`;
+                }).join('');
+            } else {
+                dist.innerHTML = '';
+            }
+
+            const leaveBtn = document.getElementById('leaveRatingBtn');
+            leaveBtn.style.display = userHasRated ? 'none' : 'inline-block';
+
+            const currentUserId = window.__currentUserId || null;
+            document.getElementById('ratingsList').innerHTML = ratings.length
+                ? ratings.map(r => renderRatingRow(r, currentUserId)).join('')
+                : '<p style="color:#666; padding:12px 0;">No ratings yet. Be the first to share how this program worked on your ground.</p>';
+        }
+
+        function renderRatingRow(r, currentUserId) {
+            const isOwn = currentUserId && String(r.ratedBy) === String(currentUserId);
+            const stars = '★'.repeat(r.stars) + '☆'.repeat(5 - r.stars);
+            const date = r.createdAt ? new Date(r.createdAt).toLocaleDateString() : '';
+            const ctxBits = [];
+            if (r.crop) ctxBits.push(escapeHtmlRating(r.crop));
+            if (r.seasonYear) ctxBits.push(String(r.seasonYear));
+            const ctx = ctxBits.length ? `<span style="color:#666;">· ${ctxBits.join(' · ')}</span>` : '';
+            const weatherYield = (r.weatherConditions || r.yieldOutcome)
+                ? `<details style="margin-top:6px; color:#444;"><summary style="cursor:pointer; color:#666;">Weather & yield</summary>
+                    ${r.weatherConditions ? `<div style="margin-top:4px;"><strong>Weather:</strong> ${escapeHtmlRating(r.weatherConditions)}</div>` : ''}
+                    ${r.yieldOutcome ? `<div style="margin-top:4px;"><strong>Yield:</strong> ${escapeHtmlRating(r.yieldOutcome)}</div>` : ''}
+                   </details>`
+                : '';
+            const ownActions = isOwn
+                ? `<div style="margin-top:8px; display:flex; gap:8px;">
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:12px;" onclick='openRatingModal(${JSON.stringify(r._id)})'>Edit</button>
+                    <button class="btn btn-outline" style="padding:4px 10px; font-size:12px; border-color:#c22; color:#c22;" onclick='deleteOwnRating(${JSON.stringify(r._id)})'>Delete</button>
+                   </div>`
+                : '';
+            return `<div class="rating-row" style="border-top:1px solid #eee; padding:12px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:baseline; gap:12px;">
+                    <div><span style="color:#f59e0b; font-size:16px;">${stars}</span> <strong>${escapeHtmlRating(r.ratedByName || 'Farmer')}</strong> ${ctx}</div>
+                    <div style="color:#888; font-size:12px;">${date}</div>
+                </div>
+                ${r.comment ? `<div style="margin-top:6px;">${escapeHtmlRating(r.comment)}</div>` : ''}
+                ${weatherYield}
+                ${ownActions}
+            </div>`;
+        }
+
+        function escapeHtmlRating(s) {
+            if (s == null) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Star-input click handler (delegated — one listener bound at init).
+        function initRatingStarInput() {
+            const widget = document.getElementById('ratingStarInput');
+            if (!widget) return;
+            widget.addEventListener('click', e => {
+                const star = e.target.closest('.star');
+                if (!star) return;
+                const value = parseInt(star.dataset.value, 10);
+                setRatingStars(value);
+            });
+            const commentEl = document.getElementById('ratingComment');
+            if (commentEl) {
+                commentEl.addEventListener('input', () => {
+                    document.getElementById('ratingCommentCount').textContent = commentEl.value.length;
+                });
+            }
+        }
+
+        function setRatingStars(value) {
+            const widget = document.getElementById('ratingStarInput');
+            widget.dataset.stars = String(value);
+            widget.querySelectorAll('.star').forEach(s => {
+                const v = parseInt(s.dataset.value, 10);
+                s.textContent = v <= value ? '★' : '☆';
+                s.style.color = v <= value ? '#f59e0b' : '#ccc';
+            });
+        }
+
+        function openRatingModal(editId) {
+            if (!selectedProgram || !isPersistedProgramId(selectedProgram._id)) return;
+            document.getElementById('ratingEditId').value = editId || '';
+            document.getElementById('ratingModalTitle').textContent = editId ? 'Edit your rating' : 'Leave a rating';
+
+            if (editId) {
+                const existing = currentRatings.ratings.find(r => String(r._id) === String(editId));
+                if (!existing) {
+                    alert('Rating not found.');
+                    return;
+                }
+                setRatingStars(existing.stars || 0);
+                document.getElementById('ratingComment').value = existing.comment || '';
+                document.getElementById('ratingCrop').value = existing.crop || '';
+                document.getElementById('ratingSeasonYear').value = existing.seasonYear || '';
+                document.getElementById('ratingWeather').value = existing.weatherConditions || '';
+                document.getElementById('ratingYield').value = existing.yieldOutcome || '';
+            } else {
+                setRatingStars(0);
+                document.getElementById('ratingComment').value = '';
+                document.getElementById('ratingCrop').value = selectedProgram.crop || '';
+                document.getElementById('ratingSeasonYear').value = '';
+                document.getElementById('ratingWeather').value = '';
+                document.getElementById('ratingYield').value = '';
+            }
+            document.getElementById('ratingCommentCount').textContent =
+                String(document.getElementById('ratingComment').value.length);
+            document.getElementById('ratingModalOverlay').style.display = 'flex';
+        }
+
+        function closeRatingModal() {
+            document.getElementById('ratingModalOverlay').style.display = 'none';
+        }
+
+        async function submitRating() {
+            const stars = parseInt(document.getElementById('ratingStarInput').dataset.stars, 10) || 0;
+            if (stars < 1 || stars > 5) {
+                alert('Please pick a star rating (1–5).');
+                return;
+            }
+            const editId = document.getElementById('ratingEditId').value;
+            const body = {
+                sprayProgramId: selectedProgram._id,
+                stars,
+                comment: document.getElementById('ratingComment').value,
+                crop: document.getElementById('ratingCrop').value || null,
+                seasonYear: document.getElementById('ratingSeasonYear').value || null,
+                weatherConditions: document.getElementById('ratingWeather').value,
+                yieldOutcome: document.getElementById('ratingYield').value,
+            };
+
+            try {
+                const url = editId ? `${API_URL}/api/ratings/${editId}` : `${API_URL}/api/ratings`;
+                const res = await fetch(url, {
+                    method: editId ? 'PUT' : 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${localStorage.getItem('token')}`,
+                    },
+                    body: JSON.stringify(body),
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    if (res.status === 409) {
+                        alert('You have already rated this program. Edit your existing rating below.');
+                        closeRatingModal();
+                        loadRatingsForSelectedProgram();
+                        return;
+                    }
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+                closeRatingModal();
+                loadRatingsForSelectedProgram();
+            } catch (err) {
+                alert('Rating submit failed: ' + err.message);
+            }
+        }
+
+        async function deleteOwnRating(id) {
+            if (!confirm('Delete your rating?')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/ratings/${id}`, {
+                    method: 'DELETE',
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` },
+                });
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                loadRatingsForSelectedProgram();
+            } catch (err) {
+                alert('Delete failed: ' + err.message);
+            }
+        }
+
+        // Cache current user id for own-rating detection (own-row edit/delete
+        // buttons). If /api/auth/me doesn't exist, best-effort decode fails
+        // silently — server is still authoritative on ownership.
+        async function primeCurrentUserId() {
+            try {
+                const res = await fetch(`${API_URL}/api/auth/me`, {
+                    headers: { Authorization: `Bearer ${localStorage.getItem('token')}` }
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    window.__currentUserId = data?.user?._id || data?._id || null;
+                }
+            } catch (e) { /* best-effort; server enforces ownership */ }
+        }
+
+        initRatingStarInput();
+        primeCurrentUserId();
 
         initActingAs();
         loadChemicals();

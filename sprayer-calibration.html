@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="Sprayer Calibration - Acre Profit">
+    <title>Sprayer Calibration - Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <script src="dialog.js"></script>
+    <style>
+        .calib-wrap { max-width: 960px; margin: 0 auto; padding: 24px 16px; }
+        .calib-header { margin-bottom: 24px; }
+        .calib-header h1 { margin: 0 0 4px 0; color: var(--primary, #2d5a27); font-size: 1.9rem; }
+        .calib-header p { margin: 0; color: #666; }
+        .calib-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+        .calib-section h2 { margin: 0 0 12px 0; font-size: 1.15rem; color: #2d5a27; }
+        .calib-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+        .calib-field label { display: block; font-weight: 600; margin-bottom: 6px; font-size: 0.88rem; }
+        .calib-field input { width: 100%; padding: 10px; border: 2px solid #e5e7eb; border-radius: 8px; font-size: 1rem; }
+        .calib-field .required { color: #c00; margin-left: 4px; }
+        .calib-actions { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 12px; }
+        .calib-btn { padding: 10px 18px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; border: 1px solid transparent; }
+        .calib-btn-primary { background: #2d5a27; color: #fff; }
+        .calib-btn-outline { background: #fff; color: #2d5a27; border-color: #2d5a27; }
+        .calib-btn-danger { background: #fff; color: #dc2626; border-color: #dc2626; }
+        .segments-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .segments-table th, .segments-table td { padding: 10px 8px; text-align: left; border-bottom: 1px solid #e5e7eb; font-size: 0.92rem; }
+        .segments-table th { background: #f8faf8; font-weight: 700; color: #2d5a27; font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.03em; }
+        .segments-table .num-cell { text-align: right; font-variant-numeric: tabular-nums; }
+        .segments-table input { width: 100%; padding: 8px; border: 1px solid #d1d5db; border-radius: 6px; font-size: 0.95rem; }
+        .segments-table input.invalid { border-color: #dc2626; background: #fef2f2; }
+        .segments-table .row-error { color: #dc2626; font-size: 0.78rem; margin-top: 4px; }
+        .segments-table .starting-row { background: #f8faf8; }
+        .segments-table .starting-row td { font-weight: 600; }
+        .segments-table .remove-btn { background: none; border: none; color: #dc2626; font-size: 1.2rem; cursor: pointer; padding: 0 6px; }
+        .running-totals { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 16px; padding: 14px; background: #f0f7ef; border-radius: 8px; }
+        .running-totals .total-item { }
+        .running-totals .total-label { display: block; font-size: 0.78rem; text-transform: uppercase; color: #6b7280; font-weight: 600; letter-spacing: 0.03em; }
+        .running-totals .total-value { display: block; font-size: 1.3rem; font-weight: 800; color: #2d5a27; font-variant-numeric: tabular-nums; }
+        .prose-section p { line-height: 1.6; color: #374151; }
+        .prose-section ol { padding-left: 22px; }
+        .prose-section ol li { margin-bottom: 10px; line-height: 1.55; color: #374151; }
+        .prose-section ul { padding-left: 22px; }
+        .prose-section ul li { margin-bottom: 6px; line-height: 1.5; color: #374151; }
+        .access-denied { max-width: 480px; margin: 80px auto; padding: 24px; background: #fef2f2; border: 1px solid #fecaca; border-radius: 12px; text-align: center; }
+        .access-denied h2 { margin-top: 0; color: #b91c1c; }
+
+        @media (max-width: 768px) {
+            .segments-table thead { display: none; }
+            .segments-table, .segments-table tbody, .segments-table tr, .segments-table td { display: block; width: 100%; }
+            .segments-table tr { border: 1px solid #e5e7eb; border-radius: 8px; padding: 10px; margin-bottom: 10px; background: #fff; }
+            .segments-table td { border-bottom: none; padding: 6px 0; }
+            .segments-table td::before { content: attr(data-label); display: block; font-weight: 700; color: #2d5a27; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.04em; }
+            .segments-table .num-cell { text-align: left; }
+        }
+    </style>
+</head>
+<body>
+    <nav class="navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo">
+                <img src="logo.svg" alt="Acre Profit">
+            </a>
+            <div class="nav-center">
+                <a href="/dashboard.html" class="nav-back">&larr; Dashboard</a>
+                <span class="nav-title">Sprayer Calibration</span>
+            </div>
+            <div class="nav-right">
+                <button id="logoutBtn" class="btn btn-outline btn-sm">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main id="calibApp" class="calib-wrap" style="display:none;">
+        <div class="calib-header">
+            <h1>Sprayer Calibration</h1>
+            <p>Dial in your sprayer's actual GPA. <span id="sprayerNameBadge" style="display:none; font-weight:600; color:#2d5a27;"></span></p>
+        </div>
+
+        <section class="calib-section">
+            <h2>1. Starting Point</h2>
+            <div class="calib-grid">
+                <div class="calib-field">
+                    <label for="sprayerName">Sprayer name (optional)</label>
+                    <input type="text" id="sprayerName" placeholder="e.g., Big John, Case 4430">
+                </div>
+                <div class="calib-field">
+                    <label for="startingVolume">Starting tank volume (gal)<span class="required">*</span></label>
+                    <input type="number" id="startingVolume" min="1" step="any" inputmode="decimal" placeholder="1000">
+                </div>
+            </div>
+            <div class="calib-actions">
+                <button type="button" class="calib-btn calib-btn-danger" id="resetBtn">Reset Session</button>
+            </div>
+        </section>
+
+        <section class="calib-section">
+            <h2>2. Segments</h2>
+            <div style="overflow-x: auto;">
+                <table class="segments-table" id="segmentsTable">
+                    <thead>
+                        <tr>
+                            <th>#</th>
+                            <th>Acres applied (cumulative)</th>
+                            <th>Volume remaining (gal)</th>
+                            <th>Segment GPA</th>
+                            <th>Running GPA</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="segmentsBody"></tbody>
+                </table>
+            </div>
+            <div class="calib-actions">
+                <button type="button" class="calib-btn calib-btn-primary" id="addSegmentBtn">+ Add segment</button>
+            </div>
+            <div class="running-totals">
+                <div class="total-item">
+                    <span class="total-label">Total acres covered</span>
+                    <span class="total-value" id="totalAcres">&mdash;</span>
+                </div>
+                <div class="total-item">
+                    <span class="total-label">Total gallons used</span>
+                    <span class="total-value" id="totalGallons">&mdash;</span>
+                </div>
+                <div class="total-item">
+                    <span class="total-label">Overall average GPA</span>
+                    <span class="total-value" id="overallGpa">&mdash;</span>
+                </div>
+            </div>
+        </section>
+
+        <section class="calib-section prose-section">
+            <h2>3. PWM Valve Explained</h2>
+            <p><strong>Understanding Your PWM Valve</strong></p>
+            <p>PWM stands for Pulse-Width Modulation. Modern sprayers use electronic solenoids at each nozzle that pulse open and closed rapidly &mdash; typically 10 times per second.</p>
+            <p>The "duty cycle" (also called PWM %) is the percentage of each cycle the solenoid stays open:</p>
+            <ul>
+                <li>100% duty cycle = fully open, maximum flow</li>
+                <li>50% duty cycle = open half the time, half the flow</li>
+                <li>20% duty cycle = open 20% of the time, ~20% of max flow</li>
+            </ul>
+            <p>More duty cycle = more flow = higher GPA.<br>Less duty cycle = less flow = lower GPA.</p>
+            <p>Your PWM rate controller automatically adjusts the duty cycle based on speed and target rate. Most controllers let you adjust a "cal value" (also called calibration factor or flow correction) that trims the output up or down.</p>
+            <ul>
+                <li>If your actual GPA is <strong>LOWER</strong> than target &rarr; raise the cal value</li>
+                <li>If your actual GPA is <strong>HIGHER</strong> than target &rarr; lower the cal value</li>
+            </ul>
+            <p>Common PWM systems: Raven Hawkeye, Case IH AIM Command, Capstan PinPoint, John Deere ExactApply, TeeJet DynaJet.</p>
+        </section>
+
+        <section class="calib-section prose-section">
+            <h2>4. How to Calibrate</h2>
+            <ol>
+                <li>Fill your tank with clean water to a known volume. Enter it in the "Starting tank volume" field above.</li>
+                <li>Drive and spray at your normal operating speed and target GPA. Keep speed consistent.</li>
+                <li>After covering some acres, stop. Check your monitor for acres applied (cumulative) and look at your tank level. Enter both as a new segment.</li>
+                <li>The page calculates your actual GPA for that segment.</li>
+                <li>Compare the actual GPA to your target GPA (the one your monitor is set to deliver):
+                    <ul>
+                        <li>If actual is within 5% of target: you're good. No adjustment needed.</li>
+                        <li>If actual is too <strong>LOW</strong> (under-applying): raise your PWM cal value on the controller by about 5% of the current value. Example: if cal is currently 200, try 210.</li>
+                        <li>If actual is too <strong>HIGH</strong> (over-applying): lower your cal value by about 5%. Example: 200 &rarr; 190.</li>
+                    </ul>
+                </li>
+                <li>Continue spraying. Add another segment every few passes to confirm the adjustment worked.</li>
+                <li>Repeat adjustments in 5% increments until actual GPA matches target within 5%.</li>
+            </ol>
+            <p><strong>Tips:</strong></p>
+            <ul>
+                <li>Calibrate with clean water before adding chemicals</li>
+                <li>Check nozzles for wear or clogs before calibrating; worn nozzles can add 5-15% over their rated flow</li>
+                <li>Recalibrate whenever you change nozzles, target GPA, or travel speed</li>
+                <li>For best accuracy, calibrate over at least 10-20 acres per segment</li>
+            </ul>
+        </section>
+    </main>
+
+    <main id="accessDenied" class="access-denied" style="display:none;">
+        <h2>Access Denied</h2>
+        <p>Sprayer Calibration is available to logged-in farmers, distributors, and admins.</p>
+        <a href="/dashboard.html" class="calib-btn calib-btn-outline" style="display:inline-block; text-decoration:none;">Back to Dashboard</a>
+    </main>
+
+    <script>
+        // ========= Auth gate =========
+        // Client-only — there's no API call to protect, so we just block the
+        // render when the visitor isn't logged in or doesn't hold an allowed
+        // role. Matches the pattern in chemicals.html (redirect on missing
+        // token) plus a role whitelist.
+        (function guard() {
+            const token = localStorage.getItem('token');
+            if (!token) {
+                window.location.href = '/login.html';
+                return;
+            }
+            let user = {};
+            try { user = JSON.parse(localStorage.getItem('user') || '{}'); } catch (e) { user = {}; }
+            const allowed = ['customer', 'distributor', 'admin', 'superadmin'];
+            if (!allowed.includes(user.role)) {
+                document.getElementById('accessDenied').style.display = 'block';
+                return;
+            }
+            document.getElementById('calibApp').style.display = 'block';
+        })();
+
+        document.getElementById('logoutBtn')?.addEventListener('click', () => {
+            localStorage.removeItem('token');
+            localStorage.removeItem('user');
+            window.location.href = '/login.html';
+        });
+
+        // ========= State =========
+        // Row 0 is the starting point (acres=0, remaining=startingVolume).
+        // User-added rows sit at index >= 1. Each holds the raw user input
+        // strings so we can round-trip them back into the inputs on re-render.
+        let segments = []; // [{ acres: number, remaining: number }]
+        let startingVolume = null;
+
+        const startingInput = document.getElementById('startingVolume');
+        const sprayerNameInput = document.getElementById('sprayerName');
+        const sprayerNameBadge = document.getElementById('sprayerNameBadge');
+
+        startingInput.addEventListener('input', () => {
+            const v = parseFloat(startingInput.value);
+            startingVolume = Number.isFinite(v) && v > 0 ? v : null;
+            renderSegments();
+        });
+
+        sprayerNameInput.addEventListener('input', () => {
+            const name = sprayerNameInput.value.trim();
+            if (name) {
+                sprayerNameBadge.textContent = `(${name})`;
+                sprayerNameBadge.style.display = 'inline';
+            } else {
+                sprayerNameBadge.style.display = 'none';
+            }
+        });
+
+        document.getElementById('addSegmentBtn').addEventListener('click', () => {
+            if (startingVolume == null) {
+                alert('Enter a starting tank volume first.');
+                startingInput.focus();
+                return;
+            }
+            segments.push({ acres: null, remaining: null });
+            renderSegments();
+            // Focus the acres input on the newly-added row for fast entry.
+            setTimeout(() => {
+                const rows = document.querySelectorAll('#segmentsBody tr[data-seg-idx]');
+                const last = rows[rows.length - 1];
+                last?.querySelector('input.acres-input')?.focus();
+            }, 0);
+        });
+
+        document.getElementById('resetBtn').addEventListener('click', () => {
+            if (!confirm('Clear all segments and starting values?')) return;
+            segments = [];
+            startingVolume = null;
+            startingInput.value = '';
+            sprayerNameInput.value = '';
+            sprayerNameBadge.style.display = 'none';
+            renderSegments();
+        });
+
+        // ========= Render =========
+        function renderSegments() {
+            const body = document.getElementById('segmentsBody');
+            body.innerHTML = '';
+
+            // Starting row is row 1 in the UI (index 0 in calc). Always shown
+            // once starting volume is set; before that, prompt the farmer to
+            // enter it.
+            if (startingVolume == null) {
+                body.innerHTML = '<tr><td colspan="6" style="text-align:center; color:#6b7280; padding:24px;">Enter a starting tank volume to begin.</td></tr>';
+                updateRunningTotals();
+                return;
+            }
+
+            // Starting row (read-only).
+            const startTr = document.createElement('tr');
+            startTr.className = 'starting-row';
+            startTr.innerHTML = `
+                <td data-label="#">1</td>
+                <td data-label="Acres applied" class="num-cell">0</td>
+                <td data-label="Volume remaining (gal)" class="num-cell">${startingVolume.toFixed(2)}</td>
+                <td data-label="Segment GPA" class="num-cell">&mdash;</td>
+                <td data-label="Running GPA" class="num-cell">&mdash;</td>
+                <td></td>
+            `;
+            body.appendChild(startTr);
+
+            segments.forEach((seg, i) => {
+                const idx = i; // index into segments[]
+                const rowNum = i + 2; // display #
+                const prev = i === 0
+                    ? { acres: 0, remaining: startingVolume }
+                    : segments[i - 1];
+
+                const validation = validateSegment(seg, prev);
+
+                const segmentGpa = validation.ok
+                    ? (prev.remaining - seg.remaining) / (seg.acres - prev.acres)
+                    : null;
+                const runningGpa = validation.ok
+                    ? (startingVolume - seg.remaining) / seg.acres
+                    : null;
+
+                const tr = document.createElement('tr');
+                tr.dataset.segIdx = String(idx); // used by updateSegmentCalcs for in-place updates
+                tr.innerHTML = `
+                    <td data-label="#">${rowNum}</td>
+                    <td data-label="Acres applied (cumulative)">
+                        <input type="number" class="acres-input${validation.acresInvalid ? ' invalid' : ''}" min="0" step="any" inputmode="decimal" value="${seg.acres ?? ''}" placeholder="e.g., 20">
+                    </td>
+                    <td data-label="Volume remaining (gal)">
+                        <input type="number" class="remaining-input${validation.remainingInvalid ? ' invalid' : ''}" min="0" step="any" inputmode="decimal" value="${seg.remaining ?? ''}" placeholder="e.g., 800">
+                        ${validation.error ? `<div class="row-error">${validation.error}</div>` : ''}
+                    </td>
+                    <td data-label="Segment GPA" class="num-cell">${segmentGpa != null ? segmentGpa.toFixed(2) : '&mdash;'}</td>
+                    <td data-label="Running GPA" class="num-cell">${runningGpa != null ? runningGpa.toFixed(2) : '&mdash;'}</td>
+                    <td><button type="button" class="remove-btn" title="Remove segment" data-remove="${idx}">&times;</button></td>
+                `;
+                body.appendChild(tr);
+
+                tr.querySelector('.acres-input').addEventListener('input', (e) => {
+                    const v = parseFloat(e.target.value);
+                    segments[idx].acres = Number.isFinite(v) ? v : null;
+                    updateSegmentCalcs();
+                });
+                tr.querySelector('.remaining-input').addEventListener('input', (e) => {
+                    const v = parseFloat(e.target.value);
+                    segments[idx].remaining = Number.isFinite(v) ? v : null;
+                    updateSegmentCalcs();
+                });
+                tr.querySelector('[data-remove]').addEventListener('click', () => {
+                    segments.splice(idx, 1);
+                    renderSegments();
+                });
+            });
+
+            updateRunningTotals();
+        }
+
+        // In-place update of derived cells (Segment GPA, Running GPA, validation
+        // errors) without rebuilding table rows. Called on every input keystroke
+        // so the farmer keeps focus while typing. Full renderSegments() is only
+        // needed when rows are added/removed or starting volume changes.
+        function updateSegmentCalcs() {
+            const rows = document.querySelectorAll('#segmentsBody tr[data-seg-idx]');
+            rows.forEach((tr, i) => {
+                const idx = parseInt(tr.dataset.segIdx);
+                const seg = segments[idx];
+                const prev = idx === 0
+                    ? { acres: 0, remaining: startingVolume }
+                    : segments[idx - 1];
+
+                const validation = validateSegment(seg, prev);
+                const segmentGpa = validation.ok
+                    ? (prev.remaining - seg.remaining) / (seg.acres - prev.acres)
+                    : null;
+                const runningGpa = validation.ok
+                    ? (startingVolume - seg.remaining) / seg.acres
+                    : null;
+
+                // Update GPA cells (4th and 5th td)
+                const cells = tr.querySelectorAll('td');
+                if (cells[3]) cells[3].innerHTML = segmentGpa != null ? segmentGpa.toFixed(2) : '&mdash;';
+                if (cells[4]) cells[4].innerHTML = runningGpa != null ? runningGpa.toFixed(2) : '&mdash;';
+
+                // Update validation styling on inputs
+                const acresInput = tr.querySelector('.acres-input');
+                const remainingInput = tr.querySelector('.remaining-input');
+                if (acresInput) acresInput.classList.toggle('invalid', validation.acresInvalid);
+                if (remainingInput) remainingInput.classList.toggle('invalid', validation.remainingInvalid);
+
+                // Update or create error message
+                let errorDiv = tr.querySelector('.row-error');
+                if (validation.error) {
+                    if (!errorDiv) {
+                        errorDiv = document.createElement('div');
+                        errorDiv.className = 'row-error';
+                        remainingInput?.parentElement?.appendChild(errorDiv);
+                    }
+                    errorDiv.textContent = validation.error;
+                } else if (errorDiv) {
+                    errorDiv.remove();
+                }
+            });
+            updateRunningTotals();
+        }
+
+        // Validation rules (per spec):
+        //  - acres must monotonically increase relative to the previous row
+        //  - remaining must monotonically decrease
+        //  - neither can be negative
+        // Null values mean "not yet entered" and suppress validation so the
+        // farmer isn't scolded mid-entry.
+        function validateSegment(seg, prev) {
+            const out = { ok: false, acresInvalid: false, remainingInvalid: false, error: '' };
+            if (seg.acres == null || seg.remaining == null) return out;
+            if (seg.acres < 0) { out.acresInvalid = true; out.error = 'Acres cannot be negative.'; return out; }
+            if (seg.remaining < 0) { out.remainingInvalid = true; out.error = 'Volume cannot be negative.'; return out; }
+            if (seg.acres <= prev.acres) {
+                out.acresInvalid = true;
+                out.error = `Acres must be greater than ${prev.acres.toFixed(2)}.`;
+                return out;
+            }
+            if (seg.remaining > prev.remaining) {
+                out.remainingInvalid = true;
+                out.error = `Volume cannot exceed previous reading of ${prev.remaining.toFixed(2)} gal.`;
+                return out;
+            }
+            out.ok = true;
+            return out;
+        }
+
+        function updateRunningTotals() {
+            const lastValid = findLastValidSegment();
+            const totalAcresEl = document.getElementById('totalAcres');
+            const totalGallonsEl = document.getElementById('totalGallons');
+            const overallGpaEl = document.getElementById('overallGpa');
+            if (!lastValid) {
+                totalAcresEl.innerHTML = '&mdash;';
+                totalGallonsEl.innerHTML = '&mdash;';
+                overallGpaEl.innerHTML = '&mdash;';
+                return;
+            }
+            const totalAcres = lastValid.acres;
+            const totalGallons = startingVolume - lastValid.remaining;
+            const gpa = totalGallons / totalAcres;
+            totalAcresEl.textContent = totalAcres.toFixed(2);
+            totalGallonsEl.textContent = totalGallons.toFixed(2);
+            overallGpaEl.textContent = gpa.toFixed(2);
+        }
+
+        function findLastValidSegment() {
+            for (let i = segments.length - 1; i >= 0; i--) {
+                const prev = i === 0 ? { acres: 0, remaining: startingVolume } : segments[i - 1];
+                if (validateSegment(segments[i], prev).ok) return segments[i];
+            }
+            return null;
+        }
+
+        renderSegments();
+    </script>
+</body>
+</html>

@@ -23,6 +23,12 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 
+const mainchemRouter = require('./routes/admin/mainchem');
+const sprayProgramsAdminRouter = require('./routes/admin/spray-programs');
+const ratingsRouter = require('./routes/ratings');
+const adminRatingsRouter = require('./routes/admin/ratings');
+const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
+
 // File upload handling
 let multer;
 try {
@@ -113,6 +119,11 @@ app.use(cors({
 // over `timestamp + body`. Mount the raw parser path-scoped BEFORE the global
 // JSON parser below so req.body arrives as a Buffer on the webhook route.
 app.use('/api/webhooks/sendgrid', express.raw({ type: 'application/json', limit: '2mb' }));
+
+// Stripe webhook: same pattern. stripe.webhooks.constructEvent() needs the
+// exact raw bytes to verify the HMAC-SHA256 signature header. Path-scoped so
+// the rest of the app keeps JSON parsing.
+app.use('/api/webhooks/stripe', express.raw({ type: 'application/json', limit: '2mb' }));
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ limit: '10mb', extended: true }));
@@ -430,6 +441,7 @@ const orderSchema = new mongoose.Schema({
         default: 'pending'
     },
     stripePaymentIntentId: String,
+    stripeCheckoutUrl: String, // Persisted so idempotent repeat-submits return the same Stripe URL
     checkNumber: String,
     checkReceivedDate: Date,
     paidAt: Date,
@@ -456,9 +468,20 @@ const orderSchema = new mongoose.Schema({
     quotedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     quoteResponse: String, // Admin's quote notes
 
+    // Idempotency key (scoped per-user via compound index below).
+    // Prevents duplicate orders from double-submits, network retries, or
+    // back-button resubmits. Client generates one UUID per cart; server
+    // returns the existing order on repeat submit instead of creating a new one.
+    idempotencyKey: { type: String, sparse: true },
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
+
+// Scoped uniqueness: same idempotencyKey can exist across different users
+// (avoids cross-user UUID collision being a submit-blocker), but a given
+// user cannot have two orders with the same key.
+orderSchema.index({ userId: 1, idempotencyKey: 1 }, { unique: true, sparse: true });
 
 const Order = mongoose.model('Order', orderSchema);
 
@@ -510,197 +533,12 @@ const repCommissionSchema = new mongoose.Schema({
 
 const RepCommission = mongoose.model('RepCommission', repCommissionSchema);
 
-// Chemical Pricing Model
-const chemicalSchema = new mongoose.Schema({
-    // Product info
-    productName: { type: String, required: true }, // e.g., "Dicamba DMA", "LV 6"
-    sourceSupplier: { type: String, required: true }, // Where we buy from: "CPD", "Agri-Star"
-    manufacturer: { type: String }, // Who makes it (from label): "Red Eagle", "ADAMA Essentials"
-    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }, // Link to supplier user account
-
-    // Category and crop info
-    category: { type: String, enum: ['herbicide', 'fungicide', 'insecticide', 'adjuvant', 'fertilizer', 'other'], default: 'herbicide' },
-    crops: [String], // Which crops this can be used on: ['corn', 'soybeans', 'wheat']
-
-    // Packaging
-    packSize: { type: String, required: true }, // e.g., "2x2.5", "Shuttle", "4x5", "20"
-    unit: { type: String, required: true }, // e.g., "gl" (gallon), "oz", "lb"
-    unitsPerPack: { type: Number }, // e.g., 250 for a Shuttle (250 gal)
-
-    // Pricing - 3-tier pricing model with two dollar amount margins
-    costPrice: { type: Number, required: true }, // Tier 1: What we pay the supplier (per unit)
-    adminMarginDollars: { type: Number, default: 0 }, // Admin margin $ - dollar amount added to cost
-    adminPrice: { type: Number }, // Tier 2: Cost + admin margin dollars (per unit)
-    marginDollars: { type: Number, default: 0 }, // Rep margin $ - dollar amount added to admin price
-    sellPrice: { type: Number, required: true }, // Tier 3: Retail price - what customer pays (per unit)
-    priceIsSpeculated: { type: Boolean, default: false }, // true = estimated price, not confirmed by PO
-    // Legacy fields (kept for backward compatibility)
-    adminMargin: { type: Number, default: 0 }, // Legacy: Admin margin % (no longer used)
-    regularMargin: { type: Number, default: 0 }, // Legacy: Regular margin %
-    margin: { type: Number }, // Total margin: (sellPrice - costPrice) / sellPrice * 100
-
-    // Application info (for program building)
-    defaultRate: { type: Number }, // Default application rate
-    rateUnit: { type: String }, // e.g., "oz/acre", "pt/acre", "qt/acre"
-    minRate: { type: Number },
-    maxRate: { type: Number },
-
-    // Version/date tracking
-    priceDate: { type: Date, default: Date.now },
-    priceVersion: { type: String }, // Optional identifier like "2026-Q1" or "v1"
-
-    // Comparison/equivalent data
-    equivalentProduct: String, // Product name this is equivalent to
-    equivalentSupplier: String, // Supplier of equivalent product
-    notes: String, // e.g., "Formulation equiv -11%", "Need to get equivalents"
-
-    // ============ REGULATORY COMPLIANCE FIELDS ============
-
-    // EPA Registration (REQUIRED for all pesticides)
-    epaRegistrationNumber: String, // e.g., "524-579", "100-1623"
-
-    // Restriction Classification
-    isRestrictedUse: { type: Boolean, default: false }, // RUP flag
-    rupStates: [String], // States where this is classified as RUP (2-letter codes)
-
-    // Signal Word (EPA mandated - appears on label)
-    signalWord: {
-        type: String,
-        enum: ['DANGER', 'DANGER-POISON', 'WARNING', 'CAUTION', 'NONE'],
-        default: 'CAUTION'
-    },
-
-    // Hazard Classifications
-    hazardClassifications: [{
-        type: String,
-        enum: [
-            'acute_oral_toxicity',
-            'acute_dermal_toxicity',
-            'acute_inhalation_toxicity',
-            'eye_irritant',
-            'skin_irritant',
-            'skin_sensitizer',
-            'carcinogen',
-            'reproductive_toxin',
-            'environmental_hazard_aquatic',
-            'environmental_hazard_bees',
-            'groundwater_advisory'
-        ]
-    }],
-
-    // Required Certifications to Purchase
-    requiredCertifications: [{
-        type: String,
-        enum: [
-            'private_applicator',      // State private applicator license
-            'commercial_applicator',   // State commercial applicator license
-            'paraquat_training',       // EPA-mandated Paraquat training
-            'dicamba_training',        // Annual Dicamba OTT training
-            'fumigant_training'        // Soil fumigant training
-        ]
-    }],
-
-    // Safety Data Sheet (SDS)
-    sdsUrl: String,        // URL to SDS PDF
-    sdsRevisionDate: Date, // Last SDS revision
-
-    // EPA Label
-    labelUrl: String,      // URL to EPA-approved label PDF
-    labelRevisionDate: Date,
-
-    // State Registrations (pesticides must be registered in each state)
-    stateRegistrations: [{
-        state: { type: String, maxlength: 2 }, // Two-letter state code
-        registrationNumber: String,
-        expirationDate: Date,
-        isRestricted: { type: Boolean, default: false }, // RUP in this state
-        restrictions: String // State-specific restrictions
-    }],
-
-    // Active Ingredients (for reporting and compliance)
-    activeIngredients: [{
-        name: String,              // e.g., "Glyphosate", "Atrazine"
-        percentage: Number,        // e.g., 41.0
-        poundsPerGallon: Number,   // e.g., 4.17 lb AE/gal
-        casNumber: String          // Chemical Abstracts Service number
-    }],
-
-    // DOT Transportation / Storage
-    dotHazClass: String,           // DOT hazardous materials class (e.g., "6.1", "8")
-    unNumber: String,              // UN identification number (e.g., "UN2902")
-    packingGroup: String,          // I, II, or III
-    storageRequirements: String,   // Special storage instructions
-    shelfLifeMonths: Number,       // Product shelf life
-
-    // Manufacturer Information
-    manufacturer: String,          // e.g., "BASF", "Bayer", "Syngenta"
-    manufacturerAddress: String,
-    manufacturerPhone: String,     // Emergency contact
-    epaEstablishmentNumber: String, // EPA Est. No. on label
-
-    // Additional Compliance Flags
-    requiresApplicatorVerification: { type: Boolean, default: false }, // Must verify license before sale
-    requiresAnnualTraining: { type: Boolean, default: false },         // Requires annual training (Dicamba)
-    hasBuyerAgreement: { type: Boolean, default: false },              // Requires signed agreement
-    isGroundwaterAdvisory: { type: Boolean, default: false },          // Has groundwater advisory
-    hasBufferZoneRequirements: { type: Boolean, default: false },      // Has application buffer zones
-    bufferZoneDetails: String,
-
-    // Compliance Notes
-    complianceNotes: String, // Internal notes about compliance requirements
-
-    // Status
-    isActive: { type: Boolean, default: true },
-    availableForOrder: { type: Boolean, default: true },
-
-    // Metadata
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-// Calculate prices from dollar margin amounts before save
-chemicalSchema.pre('save', function(next) {
-    if (this.costPrice) {
-        // Use adminPrice if explicitly set, otherwise calculate from dollar margin
-        if (!this.adminPrice && this.adminMarginDollars !== undefined) {
-            this.adminPrice = Math.round((this.costPrice + (this.adminMarginDollars || 0)) * 100) / 100;
-        } else if (!this.adminPrice) {
-            // Fallback: admin price = cost price if no margin set
-            this.adminPrice = this.costPrice;
-        }
-
-        // Calculate adminMarginDollars from adminPrice if not explicitly set
-        if (this.adminMarginDollars === undefined || this.adminMarginDollars === null) {
-            this.adminMarginDollars = Math.round((this.adminPrice - this.costPrice) * 100) / 100;
-        }
-
-        // Calculate marginDollars from sellPrice and adminPrice if not explicitly set
-        if ((this.marginDollars === undefined || this.marginDollars === null) && this.sellPrice && this.adminPrice) {
-            this.marginDollars = Math.round((this.sellPrice - this.adminPrice) * 100) / 100;
-        }
-
-        // Calculate total margin percentage for reference
-        if (this.sellPrice && this.sellPrice > 0) {
-            this.margin = Math.round(((this.sellPrice - this.costPrice) / this.sellPrice) * 100 * 100) / 100;
-        }
-    }
-    next();
-});
-
-// Index for quick lookups
-chemicalSchema.index({ productName: 1, sourceSupplier: 1, packSize: 1 });
-chemicalSchema.index({ sourceSupplier: 1 });
-chemicalSchema.index({ supplierId: 1 });
-chemicalSchema.index({ category: 1 });
-chemicalSchema.index({ crops: 1 });
-chemicalSchema.index({ priceDate: -1 });
-// Compliance indexes
-chemicalSchema.index({ isRestrictedUse: 1 });
-chemicalSchema.index({ epaRegistrationNumber: 1 });
-chemicalSchema.index({ 'stateRegistrations.state': 1 });
-
-const Chemical = mongoose.model('Chemical', chemicalSchema);
+// Chemical catalog model — extracted to server/models/Chemical.js. The merged
+// schema unions the legacy pricing/compliance fields with the AI-first MAINCHEM
+// fields (status, tradeName, activeIngredients class/lbPerGal, etc.). Required
+// constraints on costPrice/sellPrice relaxed — pricing gate is now the
+// rejectPendingChemicalOrders middleware keyed on status !== 'approved'.
+const Chemical = require('./models/Chemical');
 
 // Chemical Price History Model (for tracking price changes over time)
 const chemicalPriceHistorySchema = new mongoose.Schema({
@@ -733,6 +571,7 @@ const auditLogSchema = new mongoose.Schema({
             'margin_change',
             'ledger_entry_edit',
             'password_reset',
+            'force_password_change',
             'role_change',
             'customer_created',
             'cash_deposit',
@@ -740,7 +579,14 @@ const auditLogSchema = new mongoose.Schema({
             'inventory_adjustment',
             'rup_block',
             'license_change',
-            'login_failure'
+            'login_failure',
+            'supplier_delete',
+            'invoice_delete',
+            'invoice_voided',
+            'credit_note_issued',
+            'credit_note_refund_completed',
+            'credit_note_refund_failed',
+            'bid_sheet_sent'
         ]
     },
     performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -1239,11 +1085,15 @@ const chemicalOrderSchema = new mongoose.Schema({
     receivedAt: Date,
     deliveredAt: Date,
 
-    // Spray application parameters (from Build a Recipe)
+    // Spray application parameters (from Build a Recipe).
+    // tankSize + totalCarrierGallons replaced nozzle* on the INPUT form
+    // (2026-04-19); nozzle* kept here so historical orders still hydrate.
     sprayParams: {
         gallonsPerAcre: Number,
-        nozzlePressure: Number, // PSI
-        nozzleType: String,     // e.g., AIXR, TTI, XR
+        tankSize: Number,             // gal — sprayer tank capacity, drives load count
+        totalCarrierGallons: Number,  // gal — total water for the job, drives Hydrovant 0.1% v/v
+        nozzlePressure: Number,       // PSI — legacy, pre-2026-04-19
+        nozzleType: String,           // legacy, pre-2026-04-19 (e.g., AIXR, TTI, XR)
         crop: String,
         acres: Number
     },
@@ -1308,6 +1158,7 @@ async function initializeCounters() {
 
         await seedOne(`chemicalOrder-${year}`, mongoose.model('ChemicalOrder'), 'orderNumber', `CO-${year}-`);
         await seedOne(`invoice-${year}`, mongoose.model('Invoice'), 'invoiceNumber', `INV-${year}-`);
+        await seedOne(`creditNote-${year}`, mongoose.model('CreditNote'), 'creditNoteNumber', `CN-${year}-`);
         await seedOne(`quoteRequest-${year}`, mongoose.model('QuoteRequest'), 'quoteNumber', `QR-${year}-`);
         await seedOne(`supplierBidSheet-${year}`, mongoose.model('SupplierBidSheet'), 'bidNumber', `BID-${year}-`);
     } catch (err) {
@@ -1382,70 +1233,12 @@ async function createLedgerEntry({ representativeId, description, amount, type, 
     return entry;
 }
 
-// Spray Program Model (saved custom programs)
-// IMPORTANT: These are SUGGESTIONS only - each field requires its own evaluation
-const sprayProgramSchema = new mongoose.Schema({
-    name: { type: String, required: true }, // e.g., "Round 1 Corn Spray"
-    description: String,
-    roundNumber: { type: Number }, // Round 1, 2, 3, etc.
-
-    // Program type - NOTE: "suggestion" not "recommendation" (legal)
-    type: { type: String, enum: ['suggestion', 'custom', 'template'], default: 'suggestion' },
-    isPublic: { type: Boolean, default: false }, // Public programs visible to customers
-
-    // Target crop
-    crop: { type: String, required: true }, // corn, soybeans, wheat, etc.
-
-    // Disclaimer - required on all programs
-    disclaimer: {
-        type: String,
-        default: 'This is a suggestion only. Each field requires its own evaluation to determine if this chemical program will work for your specific conditions.'
-    },
-
-    // Program passes/applications (can have multiple chemicals per round)
-    applications: [{
-        name: String, // e.g., "Burndown", "Pre-emergent", "Post-emergent"
-        timing: String, // e.g., "14 days before planting", "At planting", "V4-V6"
-        deliveryWindow: String, // When product needs to arrive at rep location (e.g., "Late March", "Early May")
-        chemicals: [{
-            chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
-            productName: String,
-            suggestedRate: Number, // Use "suggested" not "recommended"
-            rateUnit: String, // oz/acre, pt/acre, qt/acre, gal/acre, lb/acre
-            packSize: String,
-            unit: String,
-            isAdjuvant: { type: Boolean, default: false }, // Flag adjuvants for cost and auto-calc handling
-            notes: String // e.g., "Adjust based on weed pressure"
-        }]
-    }],
-
-    // Program-level safety callouts - distinct from the per-chemical-derived
-    // rotationRestrictions / grazingRestrictions. Use for agronomic requirements
-    // that apply to the program as a whole (seed treatment requirements, timing
-    // windows, runoff advisories, etc). Rendered as a bulleted warning list on
-    // the program detail view.
-    precautions: [String],
-
-    // Cost estimate per acre (calculated)
-    estimatedCostPerAcre: Number,
-
-    // Auto-generated restriction fields
-    groundType: String, // Description of best ground/soil conditions for this program
-    rotationRestrictions: String, // Combined crop rotation restrictions from all chemicals
-    grazingRestrictions: String, // Combined grazing/forage restrictions from all chemicals
-
-    // Status
-    isActive: { type: Boolean, default: true },
-
-    // Owner
-    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-
-    // Metadata
-    createdAt: { type: Date, default: Date.now },
-    updatedAt: { type: Date, default: Date.now }
-});
-
-const SprayProgram = mongoose.model('SprayProgram', sprayProgramSchema);
+// Spray Program Model — consolidated file schema at server/models/SprayProgram.js.
+// Path 2 merge (PR #132 pattern): single source of truth with pre-save mirror
+// hook that keeps passes[]<->applications[], rate<->suggestedRate,
+// active<->isActive, rotationNotes<->rotationRestrictions populated in both
+// directions. See header of that file for full notes.
+const SprayProgram = require('./models/SprayProgram');
 
 // ============ CHEMICAL RESTRICTION DATA ============
 // Maps active ingredients/product names to their known restrictions
@@ -2179,6 +1972,9 @@ const invoiceSchema = new mongoose.Schema({
     // Payment tracking
     amountPaid: { type: Number, default: 0 },
     amountDue: Number,
+    // Sum of amounts on CreditNotes issued against this invoice. Denormalized
+    // for fast UI + report reads. Incremented by the credit note endpoint.
+    creditedAmount: { type: Number, default: 0 },
     paymentStatus: {
         type: String,
         enum: ['unpaid', 'partial', 'paid', 'refunded'],
@@ -2186,7 +1982,20 @@ const invoiceSchema = new mongoose.Schema({
     },
     paymentMethod: String,
     paymentDate: Date,
+    paidAt: Date,
     stripePaymentIntentId: String,
+    // Stripe Checkout Session for the Pay Now email button. Created on invoice
+    // send (and regenerated if the hosted URL expires before customer clicks).
+    // stripeHostedUrl is what we embed in the email; session-id is what the
+    // webhook correlates back to this invoice via metadata.invoiceId.
+    stripeCheckoutSessionId: String,
+    stripeHostedUrl: String,
+    stripeCheckoutExpiresAt: Date,
+    // Card convenience fee (3.5%) applied when customer chose card at the
+    // Pay Now chooser page. $0 for ACH / check / unpaid. Dollars, matches
+    // invoice.total convention. invoice.total stays the original product
+    // amount so AR reports stay clean.
+    surchargeAmount: { type: Number, default: 0 },
 
     // Dates
     invoiceDate: { type: Date, default: Date.now },
@@ -2195,9 +2004,13 @@ const invoiceSchema = new mongoose.Schema({
     // Status
     status: {
         type: String,
-        enum: ['draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled'],
+        enum: ['draft', 'sent', 'viewed', 'paid', 'overdue', 'cancelled', 'voided'],
         default: 'draft'
     },
+    // Void audit (inline for fast UI read; AuditLog entry is the compliance trail).
+    voidedAt: Date,
+    voidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    voidReason: String,
 
     // Delivery info
     deliveryStatus: {
@@ -2231,6 +2044,57 @@ invoiceSchema.index({ status: 1 });
 invoiceSchema.index({ invoiceDate: -1 });
 
 const Invoice = mongoose.model('Invoice', invoiceSchema);
+
+// ============ CREDIT NOTE MODEL ============
+// Sibling ledger entry to Invoice. Invoice stays paid; CreditNote captures
+// the credit/refund as its own record. One Invoice → many CreditNotes.
+// Amount capped at (amountPaid - creditedAmount) by the endpoint so credits
+// can't exceed money actually received. Store credit against a future
+// invoice is out of scope v1.
+const creditNoteSchema = new mongoose.Schema({
+    creditNoteNumber: { type: String, unique: true }, // e.g., CN-2026-00001
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice', required: true, index: true },
+    invoiceNumber: String, // denormalized for list views
+
+    customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    customerName: String,
+    customerEmail: String,
+
+    amount: { type: Number, required: true, min: 0.01 },
+    reason: { type: String, required: true },
+
+    // 'stripe' calls stripe.refunds.create; 'record_only' is a ledger-only
+    // entry (check reversal, manual ACH, etc. handled out-of-band).
+    refundMode: { type: String, enum: ['stripe', 'record_only'], required: true },
+    status: {
+        type: String,
+        enum: ['issued', 'refund_pending', 'refund_completed', 'refund_failed', 'record_only'],
+        default: 'issued'
+    },
+
+    // Stripe refund tracking (populated when refundMode === 'stripe')
+    stripePaymentIntentId: String, // copied from invoice at issue time
+    stripeRefundId: { type: String, sparse: true, unique: true },
+    stripeRefundStatus: String, // Stripe's own status: pending/succeeded/failed/canceled
+    stripeFailureReason: String,
+    refundCompletedAt: Date,
+
+    // Customer notification
+    customerEmailSent: { type: Boolean, default: false },
+    customerEmailSentAt: Date,
+    customerEmailError: String,
+
+    // Audit
+    issuedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    issuedByName: String,
+    issuedAt: { type: Date, default: Date.now },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+creditNoteSchema.index({ invoiceId: 1, createdAt: -1 });
+creditNoteSchema.index({ creditNoteNumber: 1 });
+
+const CreditNote = mongoose.model('CreditNote', creditNoteSchema);
 
 // ============ PROGRAM QUOTE MODEL ============
 // Snapshot of a spray program priced for a specific customer at a specific
@@ -2511,6 +2375,13 @@ async function generateInvoiceNumber() {
     return `INV-${year}-${String(seq).padStart(5, '0')}`;
 }
 
+// Helper: Generate credit note number (CN-YYYY-NNNNN)
+async function generateCreditNoteNumber() {
+    const year = new Date().getFullYear();
+    const seq = await nextSequence(`creditNote-${year}`);
+    return `CN-${year}-${String(seq).padStart(5, '0')}`;
+}
+
 // Helper: Generate program-quote number. Same atomic sequence pattern as
 // invoices so concurrent quote creations never collide on the unique index.
 async function generateQuoteNumber() {
@@ -2645,10 +2516,11 @@ async function autoGenerateInvoiceForPaidOrder(order) {
             paymentStatus: 'paid',
             paymentMethod: order.paymentMethod,
             paymentDate: order.paidAt || new Date(),
+            paidAt: order.paidAt || new Date(),
             stripePaymentIntentId: order.stripePaymentIntentId || null,
             status: 'paid',
             invoiceDate: new Date(),
-            dueDate: new Date(),
+            dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
             createdBy: order.createdBy || order.representativeId || null
         });
 
@@ -4135,6 +4007,23 @@ const supplierMiddleware = async (req, res, next) => {
     next();
 };
 
+// Mount MAINCHEM admin router with scope-specific prefix. Narrow prefix keeps
+// superAdminMiddleware gate off the 38 inline /api/admin/* routes that rely
+// on the permissive adminMiddleware (admin/distributor/superadmin).
+app.use('/api/admin/mainchem', authMiddleware, superAdminMiddleware, mainchemRouter);
+
+// Admin Programs editor — CRUD for SprayProgram docs, gated to superadmin
+// only. Same scope-specific prefix pattern as /api/admin/mainchem.
+app.use('/api/admin/spray-programs', authMiddleware, superAdminMiddleware, sprayProgramsAdminRouter);
+
+// Farmer rating endpoints. authMiddleware only — any logged-in role may
+// read and rate. Ownership + role checks live inside the router.
+app.use('/api/ratings', authMiddleware, ratingsRouter);
+
+// Superadmin moderation queue for ratings. Scope-specific prefix keeps the
+// strict superAdminMiddleware gate narrow.
+app.use('/api/admin/ratings', authMiddleware, superAdminMiddleware, adminRatingsRouter);
+
 // ============ ROUTES ============
 
 // Health check
@@ -5217,7 +5106,8 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
             crops: crops || [],
             representativeId: representativeId || 'kyle', // String rep ID for pickup location
             representative: req.user._id, // ObjectId of admin who created
-            role: 'customer'
+            role: 'customer',
+            mustChangePassword: true
         });
 
         await user.save();
@@ -5292,6 +5182,26 @@ function normalizeListOrder(doc, source) {
         if (o.totalCost === undefined || o.totalCost === null) {
             o.totalCost = o.total || 0;
         }
+    }
+    // Project a unified items[] shape so my-orders.html (and any other
+    // consumer of findOrdersInBothCollections) can render both collections
+    // with one template. Legacy Order stores line items in `chemicals[]`;
+    // ChemicalOrder already stores them in `items[]`.
+    // V1 scope: chemicals[] only. seeds[] and pivotBio[] deferred — self-
+    // serve calculator path doesn't populate them; add on demand.
+    if (source === 'legacy' && !Array.isArray(o.items)) {
+        o.items = (o.chemicals || []).map(c => ({
+            productName: c.name,
+            quantity: c.packagesNeeded,
+            unit: c.packageUnit || 'units',
+            totalPrice: c.totalPrice
+        }));
+    }
+    // Unified total field. Fixes a latent my-orders.html bug where
+    // `order.totalAmount` was read but existed on neither collection —
+    // the template only worked via the items.reduce() fallback.
+    if (o.totalAmount === undefined || o.totalAmount === null) {
+        o.totalAmount = o.totalCost || o.total || 0;
     }
     o._sourceCollection = source;
     return o;
@@ -6438,13 +6348,14 @@ app.put('/api/rep-applications/:id', authMiddleware, superAdminMiddleware, async
         if (status === 'approved') {
             const existingUser = await User.findOne({ email: application.email.toLowerCase() });
             if (!existingUser) {
-                const tempPassword = 'Farm2026!'; // They should change this
+                const tempPassword = 'Farm2026!'; // Forced rotation on first login via mustChangePassword
                 await User.create({
                     name: `${application.firstName} ${application.lastName}`,
                     email: application.email,
                     password: tempPassword,
                     phone: application.phone,
-                    role: 'distributor'
+                    role: 'distributor',
+                    mustChangePassword: true
                 });
             }
         }
@@ -6953,8 +6864,61 @@ app.post('/api/webhooks/sendgrid', async (req, res) => {
     res.json({ ok: true, processed: events.length });
 });
 
-// Stripe webhook for payment confirmations (including ACH)
-app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), async (req, res) => {
+// Webhook event idempotency. Stripe may retry a webhook if our handler
+// times out or returns non-2xx, which previously could double-flip an order
+// to paid / double-auto-generate an invoice / double-send a receipt email.
+// One row per Stripe event.id, TTL-cleaned after 30 days. Unique index gives
+// us safe concurrent de-dupe even under parallel retry bursts.
+const webhookEventSchema = new mongoose.Schema({
+    provider: { type: String, required: true },
+    eventId: { type: String, required: true },
+    eventType: String,
+    status: { type: String, enum: ['received', 'processed', 'failed'], default: 'received' },
+    receivedAt: { type: Date, default: Date.now },
+    processedAt: Date
+});
+webhookEventSchema.index({ provider: 1, eventId: 1 }, { unique: true });
+webhookEventSchema.index({ receivedAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
+const WebhookEvent = mongoose.model('WebhookEvent', webhookEventSchema);
+
+// Claim an event for processing. Returns true if we should process, false if
+// the event has already been seen (handled or in-flight on another worker).
+// Race-safe via the unique (provider, eventId) index.
+async function claimWebhookEvent(provider, event) {
+    try {
+        await WebhookEvent.create({
+            provider,
+            eventId: event.id,
+            eventType: event.type
+        });
+        return true;
+    } catch (err) {
+        if (err.code === 11000) {
+            console.log(`[${provider} webhook] duplicate event ${event.id} (${event.type}) - skipping`);
+            return false;
+        }
+        throw err;
+    }
+}
+
+async function markWebhookProcessed(provider, eventId) {
+    await WebhookEvent.updateOne(
+        { provider, eventId },
+        { $set: { status: 'processed', processedAt: new Date() } }
+    );
+}
+
+async function markWebhookFailed(provider, eventId) {
+    await WebhookEvent.updateOne(
+        { provider, eventId },
+        { $set: { status: 'failed' } }
+    );
+}
+
+// Stripe webhook for payment confirmations. Raw-body parser is mounted
+// path-scoped at the top of the file (alongside SendGrid) so req.body is a
+// Buffer for signature verification.
+app.post('/api/webhooks/stripe', async (req, res) => {
     const sig = req.headers['stripe-signature'];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -6962,138 +6926,378 @@ app.post('/api/webhooks/stripe', express.raw({ type: 'application/json' }), asyn
     try {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
     } catch (err) {
+        console.error('[stripe webhook] signature verification failed:', err.message);
         return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Helper to find order by ID
-    async function findOrder(orderId, orderType) {
-        if (orderType === 'chemical') {
-            return await ChemicalOrder.findById(orderId);
-        }
-        let order = await Order.findById(orderId);
-        if (!order) {
-            order = await ChemicalOrder.findById(orderId);
-        }
-        return order;
+    // Idempotency claim. If another delivery already processed this event.id,
+    // ack 200 immediately so Stripe stops retrying.
+    const claimed = await claimWebhookEvent('stripe', event);
+    if (!claimed) {
+        return res.json({ received: true, duplicate: true });
     }
 
-    // ACH payments go through processing state before succeeding
-    if (event.type === 'payment_intent.processing') {
-        const paymentIntent = event.data.object;
-        const orderId = paymentIntent.metadata.orderId;
-        const orderType = paymentIntent.metadata.orderType;
-
-        if (orderId) {
-            const order = await findOrder(orderId, orderType);
-            if (order) {
-                order.paymentStatus = 'processing';
-                order.paymentMethod = paymentIntent.payment_method_types?.includes('us_bank_account') ? 'stripe_ach' : order.paymentMethod;
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`ACH payment processing for order ${orderId}`);
-            }
-        }
+    try {
+        await dispatchStripeEvent(event);
+        await markWebhookProcessed('stripe', event.id);
+        res.json({ received: true });
+    } catch (err) {
+        await markWebhookFailed('stripe', event.id);
+        console.error(`[stripe webhook] handler failed for ${event.type} (${event.id}):`, err);
+        // Return 500 so Stripe retries. Next delivery will re-claim (the row
+        // flipped to 'failed' does not block re-entry because we upsert on
+        // claim via the unique index, but status !== 'processed' means we
+        // treat it as fresh. Simplest: delete the failed claim so retry
+        // succeeds.
+        await WebhookEvent.deleteOne({ provider: 'stripe', eventId: event.id, status: 'failed' });
+        res.status(500).json({ received: false });
     }
-
-    if (event.type === 'payment_intent.succeeded') {
-        const paymentIntent = event.data.object;
-        const orderId = paymentIntent.metadata.orderId;
-        const orderType = paymentIntent.metadata.orderType;
-        const isACH = paymentIntent.payment_method_types?.includes('us_bank_account');
-
-        if (orderId) {
-            const order = await findOrder(orderId, orderType);
-
-            if (order) {
-                order.paymentStatus = 'paid';
-                order.paidAt = new Date();
-                // Update status to payment_secured (matches admin workflow)
-                order.status = 'payment_secured';
-                order.paymentMethod = isACH ? 'stripe_ach' : (order.paymentMethod || 'stripe');
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
-
-                // Auto-generate invoice + promote pending RUP records (both idempotent)
-                await autoGenerateInvoiceForPaidOrder(order);
-                await promoteRupRecordsToCompleted(order);
-
-                // Send payment confirmation email to customer
-                try {
-                    const customer = await User.findById(order.userId);
-                    const transporter = createEmailTransporter();
-                    if (transporter && customer?.email) {
-                        const amount = (paymentIntent.amount / 100).toFixed(2);
-                        const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
-                        await transporter.sendMail({
-                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
-                            to: customer.email,
-                            subject: `Payment Confirmed - Acre Profit`,
-                            html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
-                                <h2 style="color: #2d5a27;">Payment Confirmed</h2>
-                                <p>Hi ${customer.name || 'Farmer'},</p>
-                                <p>Your payment of <strong>$${amount}</strong> has been received via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
-                                <p>Your order is now being processed. We'll notify you when your products are ready for pickup.</p>
-                                <p style="margin-top:18px;">View your invoice and order details: <a href="${invoiceUrl}" style="color:#2d5a27; font-weight:600;">${invoiceUrl}</a></p>
-                                <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
-                                <p style="color: #888; font-size: 0.9em;">Thank you for choosing Acre Profit.<br>Questions? Contact your local representative.</p>
-                            </div>`
-                        });
-                        console.log(`Payment confirmation email sent to ${customer.email}`);
-                    }
-                } catch (emailErr) {
-                    console.error('Failed to send payment confirmation email:', emailErr.message);
-                }
-            }
-        }
-    }
-
-    if (event.type === 'payment_intent.payment_failed') {
-        const paymentIntent = event.data.object;
-        const orderId = paymentIntent.metadata.orderId;
-        const orderType = paymentIntent.metadata.orderType;
-
-        if (orderId) {
-            const order = await findOrder(orderId, orderType);
-
-            if (order) {
-                order.paymentStatus = 'failed';
-                order.status = 'payment_pending'; // Reset to payment pending
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`Payment failed for order ${orderId}`);
-            }
-        }
-    }
-
-    // Handle charge events for ACH (backup confirmation)
-    if (event.type === 'charge.succeeded') {
-        const charge = event.data.object;
-        const orderId = charge.metadata?.orderId;
-        const orderType = charge.metadata?.orderType;
-        const isACH = charge.payment_method_details?.type === 'us_bank_account';
-
-        if (orderId && isACH) {
-            const order = await findOrder(orderId, orderType);
-            if (order && order.paymentStatus !== 'paid') {
-                order.paymentStatus = 'paid';
-                order.paidAt = new Date();
-                order.status = 'payment_secured';
-                order.paymentMethod = 'stripe_ach';
-                order.updatedAt = new Date();
-                await order.save();
-                console.log(`ACH charge confirmed for order ${orderId}`);
-
-                // Auto-generate invoice + promote pending RUP records (both idempotent -
-                // payment_intent.succeeded usually fires first)
-                await autoGenerateInvoiceForPaidOrder(order);
-                await promoteRupRecordsToCompleted(order);
-            }
-        }
-    }
-
-    res.json({ received: true });
 });
+
+// Shared order lookup for webhook handlers. Legacy Order and ChemicalOrder
+// both live in this monolith; metadata.orderType disambiguates when present.
+async function findOrderForWebhook(orderId, orderType) {
+    if (!orderId) return null;
+    if (orderType === 'chemical') {
+        return await ChemicalOrder.findById(orderId);
+    }
+    let order = await Order.findById(orderId);
+    if (!order) {
+        order = await ChemicalOrder.findById(orderId);
+    }
+    return order;
+}
+
+async function dispatchStripeEvent(event) {
+    switch (event.type) {
+        case 'payment_intent.processing':
+            return await handlePaymentIntentProcessing(event);
+        case 'payment_intent.succeeded':
+            return await handlePaymentIntentSucceeded(event);
+        case 'payment_intent.payment_failed':
+            return await handlePaymentIntentFailed(event);
+        case 'charge.succeeded':
+            return await handleChargeSucceeded(event);
+        case 'checkout.session.completed':
+            return await handleCheckoutSessionCompleted(event);
+        case 'charge.refunded':
+            return await handleChargeRefunded(event);
+        case 'charge.refund.updated':
+            return await handleChargeRefundUpdated(event);
+        default:
+            console.log(`[stripe webhook] unhandled event type ${event.type} (${event.id})`);
+    }
+}
+
+async function handlePaymentIntentProcessing(event) {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata.orderId;
+    const orderType = paymentIntent.metadata.orderType;
+    if (!orderId) return;
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order) return;
+    order.paymentStatus = 'processing';
+    order.paymentMethod = paymentIntent.payment_method_types?.includes('us_bank_account') ? 'stripe_ach' : order.paymentMethod;
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`ACH payment processing for order ${orderId}`);
+}
+
+async function handlePaymentIntentSucceeded(event) {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata.orderId;
+    const orderType = paymentIntent.metadata.orderType;
+    const isACH = paymentIntent.payment_method_types?.includes('us_bank_account');
+    if (!orderId) return;
+
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order) return;
+
+    order.paymentStatus = 'paid';
+    order.paidAt = new Date();
+    order.status = 'payment_secured';
+    order.paymentMethod = isACH ? 'stripe_ach' : (order.paymentMethod || 'stripe');
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`Payment ${isACH ? '(ACH) ' : ''}confirmed for order ${orderId} - status set to payment_secured`);
+
+    await autoGenerateInvoiceForPaidOrder(order);
+    await promoteRupRecordsToCompleted(order);
+
+    try {
+        const customer = await User.findById(order.userId);
+        const transporter = createEmailTransporter();
+        if (transporter && customer?.email) {
+            const amount = (paymentIntent.amount / 100).toFixed(2);
+            const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: customer.email,
+                subject: `Payment Confirmed - Acre Profit`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                    <h2 style="color: #2d5a27;">Payment Confirmed</h2>
+                    <p>Hi ${customer.name || 'Farmer'},</p>
+                    <p>Your payment of <strong>$${amount}</strong> has been received via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
+                    <p>Your order is now being processed. We'll notify you when your products are ready for pickup.</p>
+                    <p style="margin-top:18px;">View your invoice and order details: <a href="${invoiceUrl}" style="color:#2d5a27; font-weight:600;">${invoiceUrl}</a></p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="color: #888; font-size: 0.9em;">Thank you for choosing Acre Profit.<br>Questions? Contact your local representative.</p>
+                </div>`
+            });
+            console.log(`Payment confirmation email sent to ${customer.email}`);
+        }
+    } catch (emailErr) {
+        console.error('Failed to send payment confirmation email:', emailErr.message);
+    }
+}
+
+async function handlePaymentIntentFailed(event) {
+    const paymentIntent = event.data.object;
+    const orderId = paymentIntent.metadata.orderId;
+    const orderType = paymentIntent.metadata.orderType;
+    if (!orderId) return;
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order) return;
+    order.paymentStatus = 'failed';
+    order.status = 'payment_pending';
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`Payment failed for order ${orderId}`);
+}
+
+async function handleChargeSucceeded(event) {
+    const charge = event.data.object;
+    const orderId = charge.metadata?.orderId;
+    const orderType = charge.metadata?.orderType;
+    const isACH = charge.payment_method_details?.type === 'us_bank_account';
+    if (!orderId || !isACH) return;
+    const order = await findOrderForWebhook(orderId, orderType);
+    if (!order || order.paymentStatus === 'paid') return;
+    order.paymentStatus = 'paid';
+    order.paidAt = new Date();
+    order.status = 'payment_secured';
+    order.paymentMethod = 'stripe_ach';
+    order.updatedAt = new Date();
+    await order.save();
+    console.log(`ACH charge confirmed for order ${orderId}`);
+    await autoGenerateInvoiceForPaidOrder(order);
+    await promoteRupRecordsToCompleted(order);
+}
+
+// Pay Now: customer pays an admin-created Invoice via Stripe Checkout. No
+// underlying Order — invoice is the canonical record. metadata.invoiceId is
+// what we correlate back to.
+async function handleCheckoutSessionCompleted(event) {
+    const session = event.data.object;
+    const invoiceId = session.metadata?.invoiceId;
+    if (!invoiceId) {
+        console.log(`[stripe webhook] checkout.session.completed without invoiceId metadata (session ${session.id}) - ignoring`);
+        return;
+    }
+
+    const invoice = await Invoice.findById(invoiceId);
+    if (!invoice) {
+        console.warn(`[stripe webhook] invoice ${invoiceId} not found for session ${session.id}`);
+        return;
+    }
+
+    if (invoice.paymentStatus === 'paid') {
+        console.log(`[stripe webhook] invoice ${invoice.invoiceNumber} already paid - skipping`);
+        return;
+    }
+
+    // Void guard: a voided invoice must never accept payment even if a stale
+    // Checkout Session completes (customer had the tab open when admin voided).
+    if (invoice.status === 'voided') {
+        console.warn(`[stripe webhook] invoice ${invoice.invoiceNumber} is voided - rejecting payment (session ${session.id}, payment_intent ${session.payment_intent || 'n/a'})`);
+        return;
+    }
+
+    // Detect the actual payment method from the PaymentIntent's latest
+    // charge, not from session.payment_method_types (that's the list of
+    // ALLOWED methods on the session, not the one the customer used).
+    let methodType = null;
+    if (session.payment_intent) {
+        try {
+            const pi = await stripe.paymentIntents.retrieve(session.payment_intent, {
+                expand: ['latest_charge.payment_method_details']
+            });
+            methodType = pi.latest_charge?.payment_method_details?.type || null;
+        } catch (piErr) {
+            console.error(`[stripe webhook] failed to retrieve PaymentIntent ${session.payment_intent}:`, piErr.message);
+        }
+    }
+    // Fallback to the method the customer picked on the chooser page.
+    if (!methodType) {
+        methodType = session.metadata?.paymentMethodChoice === 'card' ? 'card' : 'us_bank_account';
+    }
+    const isACH = methodType === 'us_bank_account';
+
+    const surchargeAmount = Number(session.metadata?.surchargeAmount || 0);
+    const now = new Date();
+
+    invoice.paymentStatus = 'paid';
+    invoice.status = 'paid';
+    invoice.amountPaid = invoice.total;
+    invoice.amountDue = 0;
+    invoice.surchargeAmount = surchargeAmount;
+    invoice.paidAt = now;
+    invoice.paymentDate = now;
+    invoice.paymentMethod = isACH ? 'stripe_ach' : 'stripe';
+    invoice.stripePaymentIntentId = session.payment_intent || invoice.stripePaymentIntentId;
+    invoice.updatedAt = now;
+    await invoice.save();
+    console.log(`Invoice ${invoice.invoiceNumber} marked paid via Stripe (${isACH ? 'ACH' : 'Card'}, session ${session.id}${surchargeAmount > 0 ? `, surcharge $${surchargeAmount.toFixed(2)}` : ''})`);
+
+    // Receipt email to customer.
+    try {
+        const transporter = createEmailTransporter();
+        const customerEmail = invoice.customerEmail;
+        if (transporter && customerEmail) {
+            const invoiceAmount = Number(invoice.total || 0).toFixed(2);
+            const surchargeStr = surchargeAmount.toFixed(2);
+            const totalCharged = (Number(invoice.total || 0) + surchargeAmount).toFixed(2);
+            const ordersUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
+            const breakdownHtml = surchargeAmount > 0 ? `
+                    <table style="margin: 12px 0; border-collapse: collapse;">
+                        <tr><td style="padding: 4px 16px 4px 0; color: #444;">Invoice total:</td><td style="padding: 4px 0; text-align: right;">$${invoiceAmount}</td></tr>
+                        <tr><td style="padding: 4px 16px 4px 0; color: #444;">Card convenience fee (3.5%):</td><td style="padding: 4px 0; text-align: right;">$${surchargeStr}</td></tr>
+                        <tr><td style="padding: 8px 16px 4px 0; color: #2d5a27; font-weight: 600; border-top: 1px solid #e0e0e0;">Total charged:</td><td style="padding: 8px 0 4px 0; text-align: right; font-weight: 600; border-top: 1px solid #e0e0e0;">$${totalCharged}</td></tr>
+                    </table>` : `<p>Amount received: <strong>$${invoiceAmount}</strong></p>`;
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: customerEmail,
+                subject: `Payment Received - Invoice ${invoice.invoiceNumber}`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                    <h2 style="color: #2d5a27;">Payment Received</h2>
+                    <p>Hi ${invoice.customerName || 'Farmer'},</p>
+                    <p>Thank you — we've received your payment for invoice <strong>${invoice.invoiceNumber}</strong> via ${isACH ? 'ACH bank transfer' : 'card'}.</p>
+                    ${breakdownHtml}
+                    <p style="margin-top: 18px;">Your invoice is now marked <strong>PAID</strong>. Products are being prepared and you'll be notified when they're ready for pickup.</p>
+                    <p style="margin-top:18px;">View your invoices anytime: <a href="${ordersUrl}" style="color:#2d5a27; font-weight:600;">${ordersUrl}</a></p>
+                    <hr style="border: none; border-top: 1px solid #eee; margin: 20px 0;">
+                    <p style="color: #888; font-size: 0.9em;">Thank you for your business.<br>Questions? Contact your local representative or email contact@acreprofit.com.</p>
+                </div>`
+            });
+            console.log(`Receipt email sent to ${customerEmail} for invoice ${invoice.invoiceNumber}`);
+        }
+    } catch (emailErr) {
+        console.error('Failed to send invoice receipt email:', emailErr.message);
+    }
+
+    // Admin notification.
+    try {
+        const transporter = createEmailTransporter();
+        if (transporter) {
+            const invoiceAmount = Number(invoice.total || 0).toFixed(2);
+            const surchargeStr = surchargeAmount.toFixed(2);
+            const totalCharged = (Number(invoice.total || 0) + surchargeAmount).toFixed(2);
+            const methodLabel = isACH ? 'ACH' : 'Card';
+            const amountLine = surchargeAmount > 0
+                ? `$${invoiceAmount} invoice + $${surchargeStr} surcharge = $${totalCharged} charged (${methodLabel})`
+                : `$${invoiceAmount} (${methodLabel})`;
+            await transporter.sendMail({
+                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                to: 'contact@acreprofit.com',
+                subject: `[PAID] Invoice ${invoice.invoiceNumber} - $${invoiceAmount} (${methodLabel})`,
+                html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
+                    <h2 style="color: #2d5a27;">Invoice paid via Stripe</h2>
+                    <p><strong>Invoice:</strong> ${invoice.invoiceNumber}</p>
+                    <p><strong>Customer:</strong> ${invoice.customerName || '—'} (${invoice.customerEmail || '—'})</p>
+                    <p><strong>Payment:</strong> ${amountLine}</p>
+                    <p><strong>Stripe session:</strong> ${session.id}</p>
+                    <p><strong>Stripe payment intent:</strong> ${session.payment_intent || '—'}</p>
+                </div>`
+            });
+        }
+    } catch (emailErr) {
+        console.error('Failed to send admin payment notification:', emailErr.message);
+    }
+}
+
+// Stripe refund webhook handlers. The refund is created synchronously when
+// the admin issues a stripe-mode CreditNote (stripe.refunds.create returns
+// the refund ID immediately and we store it on the CreditNote). These
+// handlers flip CreditNote status as the refund settles. ACH refunds stay
+// in 'refund_pending' for 5-7 business days; card refunds typically
+// complete within minutes.
+async function applyRefundToCreditNote(refund, fallbackAction) {
+    if (!refund || !refund.id) return;
+    const creditNote = await CreditNote.findOne({ stripeRefundId: refund.id });
+    if (!creditNote) {
+        console.log(`[stripe webhook] no CreditNote for refund ${refund.id} - ignoring`);
+        return;
+    }
+    // Idempotency: if we already recorded terminal state, don't re-process.
+    if (creditNote.status === 'refund_completed' || creditNote.status === 'refund_failed') {
+        return;
+    }
+
+    creditNote.stripeRefundStatus = refund.status;
+
+    if (refund.status === 'succeeded') {
+        creditNote.status = 'refund_completed';
+        creditNote.refundCompletedAt = new Date();
+        await creditNote.save();
+        await logAudit({
+            action: 'credit_note_refund_completed',
+            entityType: 'CreditNote',
+            entityId: creditNote._id,
+            entityRef: creditNote.creditNoteNumber,
+            amount: creditNote.amount,
+            after: { status: 'refund_completed', stripeRefundStatus: refund.status }
+        });
+    } else if (refund.status === 'failed' || refund.status === 'canceled') {
+        creditNote.status = 'refund_failed';
+        creditNote.stripeFailureReason = refund.failure_reason || refund.status;
+        await creditNote.save();
+        await logAudit({
+            action: 'credit_note_refund_failed',
+            entityType: 'CreditNote',
+            entityId: creditNote._id,
+            entityRef: creditNote.creditNoteNumber,
+            amount: creditNote.amount,
+            reason: refund.failure_reason || refund.status,
+            after: { status: 'refund_failed', stripeRefundStatus: refund.status }
+        });
+        // Refund failed → roll back invoice.creditedAmount so admin can retry
+        // with a different refund mode. The CreditNote record is preserved
+        // for audit but its amount no longer counts against the invoice.
+        try {
+            await Invoice.updateOne(
+                { _id: creditNote.invoiceId },
+                { $inc: { creditedAmount: -creditNote.amount } }
+            );
+        } catch (rollbackErr) {
+            console.error(`[stripe webhook] invoice creditedAmount rollback failed for CN ${creditNote.creditNoteNumber}:`, rollbackErr.message);
+        }
+    } else {
+        // Intermediate state (pending, requires_action) — just persist latest
+        // stripeRefundStatus without changing our internal status.
+        await creditNote.save();
+    }
+}
+
+async function handleChargeRefunded(event) {
+    const charge = event.data.object;
+    // charge.refunds.data is the list of refunds on this charge. The newest
+    // one is typically the trigger for this event.
+    const refunds = charge.refunds?.data || [];
+    if (!refunds.length) {
+        console.log(`[stripe webhook] charge.refunded with no refunds on charge ${charge.id} - ignoring`);
+        return;
+    }
+    for (const refund of refunds) {
+        await applyRefundToCreditNote(refund, 'charge.refunded');
+    }
+}
+
+async function handleChargeRefundUpdated(event) {
+    // charge.refund.updated fires as ACH refunds transition pending →
+    // succeeded/failed. event.data.object is the Refund itself.
+    const refund = event.data.object;
+    await applyRefundToCreditNote(refund, 'charge.refund.updated');
+}
 
 // Update representative's check payment info
 app.put('/api/representatives/check-info', authMiddleware, adminMiddleware, async (req, res) => {
@@ -7611,6 +7815,20 @@ app.put('/api/chemicals/:id/distributor-margin', authMiddleware, async (req, res
         const chemical = await Chemical.findById(req.params.id);
         if (!chemical) return res.status(404).json({ error: 'Product not found' });
 
+        // MAINCHEM imports land with status='pending' and no pricing. This
+        // endpoint is outside the rejectPendingChemicalOrders middleware
+        // barrier, so without this guard undefined + marginDollars would
+        // silently save sellPrice as literal NaN.
+        if (chemical.adminPrice == null) {
+            return res.status(400).json({
+                ok: false,
+                error: 'product_missing_admin_price',
+                message: 'Cannot set distributor margin — product has no admin price. Admin must set cost and admin margin first.',
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+            });
+        }
+
         chemical.marginDollars = marginDollars;
         chemical.sellPrice = Math.round((chemical.adminPrice + marginDollars) * 100) / 100;
         chemical.margin = chemical.sellPrice > 0 ? Math.round(((chemical.sellPrice - chemical.costPrice) / chemical.sellPrice) * 10000) / 100 : 0;
@@ -7647,6 +7865,19 @@ app.put('/api/chemicals/:id/admin-margin', authMiddleware, async (req, res) => {
 
         if (costPrice !== undefined) chemical.costPrice = costPrice;
         if (adminMarginDollars !== undefined) chemical.adminMarginDollars = adminMarginDollars;
+
+        // Same NaN gate as distributor-margin — costPrice is optional on the
+        // schema now, but this endpoint must have it to compute adminPrice.
+        // Admin can pass costPrice in the body to set it for the first time.
+        if (chemical.costPrice == null) {
+            return res.status(400).json({
+                ok: false,
+                error: 'product_missing_cost_price',
+                message: 'Cost price required — cannot calculate admin price without it. Pass costPrice in the request body or set it on the product first.',
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+            });
+        }
 
         // Recalculate prices
         chemical.adminPrice = Math.round((chemical.costPrice + chemical.adminMarginDollars) * 100) / 100;
@@ -9426,7 +9657,54 @@ app.put('/api/admin/chemicals/:chemicalId/link-supplier/:supplierId', authMiddle
 // ---- CHEMICAL ORDER ROUTES ----
 
 // Create chemical order (customer)
-app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
+// PR-124: allowed rate units for program/order items. Anything not in this
+// set hits the 400 guard inside the route. Mirrors chemicals.html
+// calculateAmount accepted inputs. Add new units here + in
+// computeCanonicalAmount together.
+const ALLOWED_RATE_UNITS = new Set([
+    'fl oz/acre', 'oz/acre', 'pt/acre', 'qt/acre', 'lb/acre', 'gal/acre',
+    '% v/v', '%v/v', '%', 'lb/100gal'
+]);
+
+// PR-124: server-side volume calculator. Authoritative copy of the
+// chemicals.html calculateAmount math. Used to recompute order quantities
+// from rate/unit/acres/sprayVolume so stale-JS replay, tampered payloads,
+// and silent fall-through rateUnits can't push wrong volumes into
+// inventory reserve (the bug that made Hydrovant reserve 39 jugs for a
+// 1,926-acre order — see PR-124 / A-03).
+function computeCanonicalAmount(rate, rateUnit, acres, targetUnit, sprayVolume) {
+    const target = (targetUnit || 'gal').toLowerCase();
+    const unitNorm = (rateUnit || '').toLowerCase().replace(/\s+/g, '');
+    const gpa = sprayVolume || 10;
+
+    if (unitNorm === '%v/v' || unitNorm === '%') {
+        return acres * gpa * (rate / 100);
+    }
+    if (unitNorm === 'lb/100gal') {
+        return (acres * gpa / 100) * rate;
+    }
+
+    let totalNeeded = rate * acres;
+    if (target === 'gal' || target === 'gl') {
+        if (unitNorm.includes('floz') || unitNorm.startsWith('oz')) {
+            totalNeeded = totalNeeded / 128;
+        } else if (unitNorm.includes('pt')) {
+            totalNeeded = totalNeeded / 8;
+        } else if (unitNorm.includes('qt')) {
+            totalNeeded = totalNeeded / 4;
+        } else if (unitNorm === 'lb/acre') {
+            totalNeeded = totalNeeded / 10;
+        }
+        // gal/acre: no conversion
+    } else if (target === 'lb') {
+        if (unitNorm.startsWith('oz')) totalNeeded = totalNeeded / 16;
+    } else if (target === 'oz') {
+        if (unitNorm.includes('lb')) totalNeeded = totalNeeded * 16;
+    }
+    return totalNeeded;
+}
+
+app.post('/api/chemical-orders', authMiddleware, rejectPendingChemicalOrders, async (req, res) => {
     try {
         const {
             items,
@@ -9511,6 +9789,52 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
             const chemical = await Chemical.findById(item.chemicalId);
             if (!chemical) continue;
 
+            // PR-124: reject unknown rateUnits up front. Prevents silent
+            // fall-through (the '% v/v' / 'lb/100gal' bug family).
+            if (item.rateUnit && !ALLOWED_RATE_UNITS.has(item.rateUnit)) {
+                return res.status(400).json({
+                    error: `Unknown rateUnit "${item.rateUnit}" for product "${item.productName || chemical.productName}". ` +
+                           `Allowed: ${[...ALLOWED_RATE_UNITS].join(', ')}.`
+                });
+            }
+
+            // PR-124: recompute volume + quantity from authoritative inputs.
+            // Mirror of chemicals.html calculateAmount — never trust client
+            // values for inventory or charges.
+            const pkgSize = chemical.unitsPerPack || 1;
+            const itemAcres = item.acres || totalAcres || sprayParams?.acres || 0;
+            const serverAmount = item.rate && item.rateUnit && itemAcres
+                ? computeCanonicalAmount(
+                      item.rate, item.rateUnit, itemAcres,
+                      chemical.unit, sprayParams?.gallonsPerAcre
+                  )
+                : null;
+            const serverQuantity = serverAmount !== null
+                ? Math.ceil(serverAmount / pkgSize)
+                : item.quantity;
+
+            if (serverAmount !== null && item.calculatedAmount != null) {
+                const delta = Math.abs(serverAmount - item.calculatedAmount);
+                const deltaPct = item.calculatedAmount > 0
+                    ? (delta / item.calculatedAmount) * 100
+                    : 0;
+                if (deltaPct >= 5) {
+                    console.warn('[chemical-orders] volume mismatch', {
+                        userId: req.user._id.toString(),
+                        productName: chemical.productName,
+                        clientAmount: item.calculatedAmount,
+                        serverAmount: Math.round(serverAmount * 1000) / 1000,
+                        clientQuantity: item.quantity,
+                        serverQuantity,
+                        deltaPercent: Math.round(deltaPct * 100) / 100,
+                        rateUnit: item.rateUnit,
+                        rate: item.rate,
+                        acres: itemAcres,
+                        sprayVolume: sprayParams?.gallonsPerAcre || 10
+                    });
+                }
+            }
+
             // Determine base unit price from discount code
             let unitPrice = chemical.sellPrice;
             if (discountType === 'at_cost') {
@@ -9524,11 +9848,11 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
                 unitPrice = Math.max(chemical.costPrice || 0, unitPrice + applyMarginAdjust);
             }
 
-            const totalPrice = Math.round(item.quantity * unitPrice * 100) / 100;
+            const totalPrice = Math.round(serverQuantity * unitPrice * 100) / 100;
             subtotal += totalPrice;
 
             if (chemical.sellPrice) {
-                totalDiscount += (chemical.sellPrice - unitPrice) * item.quantity;
+                totalDiscount += (chemical.sellPrice - unitPrice) * serverQuantity;
             }
 
             orderItems.push({
@@ -9536,13 +9860,15 @@ app.post('/api/chemical-orders', authMiddleware, async (req, res) => {
                 productName: chemical.productName,
                 packSize: chemical.packSize,
                 unit: chemical.unit,
-                quantity: item.quantity,
+                quantity: serverQuantity,
                 unitPrice,
                 totalPrice,
-                acres: item.acres,
+                acres: itemAcres,
                 rate: item.rate,
                 rateUnit: item.rateUnit,
-                calculatedAmount: item.calculatedAmount
+                calculatedAmount: serverAmount !== null
+                    ? Math.round(serverAmount * 1000) / 1000
+                    : item.calculatedAmount
             });
         }
 
@@ -9631,12 +9957,32 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             deliveryOption,
             deliveryAddress,
             marginAdjustment,
-            marginAdjustmentReason
+            marginAdjustmentReason,
+            customerId,
+            actingAsCustomerId
         } = req.body;
 
         // Only admin/distributor/superadmin can adjust margins
         const isAdminOrDistributor = ['admin', 'superadmin', 'distributor'].includes(req.user.role);
         const applyMarginAdjust = isAdminOrDistributor && marginAdjustment ? parseFloat(marginAdjustment) : 0;
+
+        // Acting-as customer: mirror the logic in POST /api/chemical-orders
+        // (line ~9780) so checkout-flow orders link to the intended customer
+        // under userId. Pre-fix, orderUserId was read at ~line 10060 without
+        // ever being declared — throwing ReferenceError on every call and
+        // silently 400'ing the endpoint since 2026-04-14. Accept both field
+        // names because checkout.html posts `customerId` and the other
+        // endpoint posts `actingAsCustomerId` — don't care which, first match wins.
+        const actingAsId = actingAsCustomerId || customerId || null;
+        let orderUserId = req.user._id;
+        let orderRepId = req.user.representative;
+        if (actingAsId && isAdminOrDistributor) {
+            const customer = await User.findById(actingAsId);
+            if (customer && customer.role === 'customer') {
+                orderUserId = customer._id;
+                orderRepId = req.user.role === 'distributor' ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
+            }
+        }
 
         // Freight: minimum $400 for delivery
         const freightCharge = deliveryOption === 'delivery' ? 400 : 0;
@@ -9787,10 +10133,12 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                 (marginAdjustmentReason ? ` - ${marginAdjustmentReason}` : '');
         }
 
-        // Create the order
+        // Create the order. userId = the customer when admin/distributor is
+        // acting-as; otherwise the authenticated user. representativeId stays
+        // the location-resolved rep unless acting-as overrode it above.
         const order = new ChemicalOrder({
-            userId: req.user._id,
-            representativeId: representativeId,
+            userId: orderUserId,
+            representativeId: orderRepId || representativeId,
             orderType: 'direct',
             items: orderItems,
             totalAcres: 0,
@@ -9950,8 +10298,12 @@ app.get('/api/stripe/config', (req, res) => {
 // Get customer's chemical orders
 app.get('/api/chemical-orders', authMiddleware, async (req, res) => {
     try {
-        const orders = await ChemicalOrder.find({ userId: req.user._id })
-            .sort({ createdAt: -1 });
+        // Returns orders from BOTH collections (legacy Order + ChemicalOrder),
+        // scoped to this user. Before this unification, customers' legacy
+        // orders from the calculator submit path were invisible on my-orders.html.
+        // Route name kept for backward compatibility; proper rename deferred
+        // to a future cleanup PR with a redirect.
+        const { orders } = await findOrdersInBothCollections({ userId: req.user._id });
         res.json(orders);
     } catch (error) {
         res.status(400).json({ error: error.message });
@@ -11658,6 +12010,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
         }
 
         const orderLines = [];
+        const unpricedLines = [];
         let totalConfirmedPrice = 0;
         let hasNeedsQuote = false;
         let valorWarning = false;
@@ -11729,9 +12082,22 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             });
             const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
 
-            // Determine status
+            // Determine status. MAINCHEM imports land with no sellPrice
+            // (status='pending' until admin enters pricing). Don't NaN the
+            // quote line — surface them as 'unpriced' so UI can display
+            // "pricing pending" instead of showing literal NaN to farmers.
             let status, pricePerPackage, lineTotal;
-            if (onHandQuantity >= packagesNeeded) {
+            if (chemical.sellPrice == null) {
+                status = 'unpriced';
+                pricePerPackage = null;
+                lineTotal = null;
+                hasNeedsQuote = true;
+                unpricedLines.push({
+                    chemicalId: chemical._id,
+                    productName: chemical.productName,
+                    chemicalStatus: chemical.status || null,
+                });
+            } else if (onHandQuantity >= packagesNeeded) {
                 status = 'confirmed';
                 pricePerPackage = chemical.sellPrice * packageSize;
                 lineTotal = packagesNeeded * pricePerPackage;
@@ -11781,9 +12147,20 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
                 });
                 const hvOnHand = hvInventory ? hvInventory.quantityAvailable : 0;
 
-                const hvStatus = hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote';
+                // If Hydrovant itself is unpriced (pending MAINCHEM import),
+                // fall through to needs_quote rather than NaN-ing the line.
+                const hvUnpriced = hydrovant.sellPrice == null;
+                const hvStatus = hvUnpriced ? 'unpriced'
+                    : (hvOnHand >= hvPackagesNeeded ? 'confirmed' : 'needs_quote');
                 const hvPricePerPack = hvStatus === 'confirmed' ? (hydrovant.sellPrice * hvPackageSize) : null;
                 const hvLineTotal = hvStatus === 'confirmed' ? (hvPackagesNeeded * hvPricePerPack) : null;
+                if (hvUnpriced) {
+                    unpricedLines.push({
+                        chemicalId: hydrovant._id,
+                        productName: hydrovant.productName,
+                        chemicalStatus: hydrovant.status || null,
+                    });
+                }
 
                 if (hvStatus === 'confirmed' && hvLineTotal) {
                     totalConfirmedPrice += hvLineTotal;
@@ -11819,6 +12196,7 @@ app.post('/api/spray-programs/calculate', authMiddleware, async (req, res) => {
             totalWaterVolume,
             orderLines,
             hydrovant: hydrovantLine,
+            unpriced: unpricedLines,
             valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
             orderStatus,
             totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
@@ -11836,15 +12214,187 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
     try {
         const {
             acres, gpa, orderLines, hydrovant, orderStatus,
-            totalConfirmedPrice, crop, programName
+            crop, programName, idempotencyKey
         } = req.body;
 
         if (!acres || !orderLines || orderLines.length === 0) {
             return res.status(400).json({ error: 'Invalid order data' });
         }
 
-        // Build chemicals array for order
-        const chemicals = orderLines.map(line => ({
+        // Whitelist orderStatus — unexpected values shouldn't silently
+        // slip through the checkout-vs-quote branch below.
+        if (orderStatus && !['ready_for_checkout', 'quote_pending'].includes(orderStatus)) {
+            return res.status(400).json({ error: 'Invalid orderStatus' });
+        }
+
+        // Idempotent response builder — returns the existing order's state
+        // to the client. Uses stripeCheckoutUrl presence as the signal for
+        // a live Stripe session (vs quote_pending). Never relies on the
+        // orderStatus schema field since we don't explicitly set it on save.
+        const buildIdempotentResponse = (existing) => {
+            if (existing.stripeCheckoutUrl) {
+                return {
+                    success: true,
+                    orderStatus: 'checkout',
+                    checkoutUrl: existing.stripeCheckoutUrl,
+                    orderId: existing._id,
+                    idempotent: true
+                };
+            }
+            return {
+                success: true,
+                orderStatus: 'quote_pending',
+                orderId: existing._id,
+                idempotent: true,
+                message: existing.notes && existing.notes.startsWith('Card processing')
+                    ? 'Order received. Card processing is temporarily unavailable — we\'ll send you a payment link shortly.'
+                    : 'Quote request submitted. You will be contacted within 24 hours.'
+            };
+        };
+
+        // --- 1. Idempotency check ---
+        // If the client already submitted this cart (double-click, retry,
+        // back-button resubmit), return the existing order instead of
+        // creating a duplicate + double-reserving inventory.
+        if (idempotencyKey) {
+            const existing = await Order.findOne({
+                userId: req.user._id,
+                idempotencyKey
+            });
+            if (existing) {
+                return res.json(buildIdempotentResponse(existing));
+            }
+        }
+
+        // --- 2. Server-side price re-validation ---
+        // Never trust client-sent prices. Look up each confirmed line's
+        // chemical, compute authoritative price, overwrite the client value.
+        // console.warn on any delta — forensic signal for stale JS or tampering.
+        const chemicalIds = [
+            ...orderLines.map(l => l.chemicalId).filter(Boolean),
+            hydrovant?.chemicalId
+        ].filter(Boolean);
+
+        const chemicalDocs = chemicalIds.length > 0
+            ? await Chemical.find({ _id: { $in: chemicalIds } })
+                .select('_id productName sellPrice unitsPerPack isActive status labelUrl sdsUrl')
+            : [];
+        const chemMap = {};
+        chemicalDocs.forEach(c => { chemMap[c._id.toString()] = c; });
+
+        // Belt-and-suspenders: reject the whole submit if any confirmed
+        // line references a chem with no sellPrice. The calculate endpoint
+        // marks these 'unpriced', but a stale client could still POST them
+        // as 'confirmed'. Without this guard the arithmetic below saves
+        // NaN line totals and the mismatch-check at line ~12271 doesn't
+        // catch NaN (it only compares client vs server numbers).
+        const unpricedConfirmed = [];
+        for (const line of orderLines) {
+            if (line.status !== 'confirmed' || !line.chemicalId) continue;
+            const chem = chemMap[line.chemicalId.toString()];
+            if (chem && chem.sellPrice == null) {
+                unpricedConfirmed.push({
+                    chemicalId: chem._id,
+                    productName: chem.productName,
+                    chemicalStatus: chem.status || null,
+                });
+            }
+        }
+        if (unpricedConfirmed.length > 0) {
+            return res.status(400).json({
+                ok: false,
+                error: 'order_contains_unpriced_chemicals',
+                message: 'Cannot submit — some confirmed lines reference products that are not yet priced. Admin must approve pricing first.',
+                unpriced: unpricedConfirmed,
+            });
+        }
+
+        const validatedLines = [];
+        for (const line of orderLines) {
+            if (!line.chemicalId) continue;
+            const chem = chemMap[line.chemicalId.toString()];
+            if (!chem) {
+                return res.status(400).json({
+                    error: `Product "${line.productName || 'unknown'}" is no longer available. Please recalculate.`
+                });
+            }
+            if (chem.isActive === false) {
+                return res.status(400).json({
+                    error: `Product "${chem.productName}" has been deactivated. Please recalculate.`
+                });
+            }
+
+            if (line.status === 'confirmed') {
+                const pkgSize = chem.unitsPerPack || line.packageSize || 1;
+                const pkgsNeeded = line.packagesNeeded;
+                const serverPricePerPackage = Math.round(chem.sellPrice * pkgSize * 100) / 100;
+                const serverLineTotal = Math.round(serverPricePerPackage * pkgsNeeded * 100) / 100;
+
+                // Forensic warn — never block, just log.
+                if (line.pricePerPackage != null &&
+                    Math.abs(line.pricePerPackage - serverPricePerPackage) >= 0.01) {
+                    console.warn('[submit-order] price mismatch', {
+                        userId: req.user._id.toString(),
+                        productName: chem.productName,
+                        clientPrice: line.pricePerPackage,
+                        serverPrice: serverPricePerPackage,
+                        deltaPercent: line.pricePerPackage > 0
+                            ? Math.round(((line.pricePerPackage - serverPricePerPackage) / line.pricePerPackage) * 10000) / 100
+                            : null,
+                        packagesNeeded: pkgsNeeded
+                    });
+                }
+
+                validatedLines.push({
+                    ...line,
+                    pricePerPackage: serverPricePerPackage,
+                    lineTotal: serverLineTotal
+                });
+            } else {
+                validatedLines.push({ ...line });
+            }
+        }
+
+        // Validate Hydrovant line the same way.
+        let validatedHydrovant = null;
+        if (hydrovant && hydrovant.chemicalId) {
+            const hvChem = chemMap[hydrovant.chemicalId.toString()];
+            if (!hvChem || hvChem.isActive === false) {
+                return res.status(400).json({
+                    error: 'Hydrovant is no longer available. Please recalculate.'
+                });
+            }
+            if (hydrovant.status === 'confirmed') {
+                const hvPkgSize = hvChem.unitsPerPack || hydrovant.packageSize || 2.5;
+                const hvPrice = Math.round(hvChem.sellPrice * hvPkgSize * 100) / 100;
+                const hvTotal = Math.round(hvPrice * hydrovant.packagesNeeded * 100) / 100;
+
+                if (hydrovant.pricePerPackage != null &&
+                    Math.abs(hydrovant.pricePerPackage - hvPrice) >= 0.01) {
+                    console.warn('[submit-order] price mismatch', {
+                        userId: req.user._id.toString(),
+                        productName: 'Hydrovant',
+                        clientPrice: hydrovant.pricePerPackage,
+                        serverPrice: hvPrice,
+                        deltaPercent: hydrovant.pricePerPackage > 0
+                            ? Math.round(((hydrovant.pricePerPackage - hvPrice) / hydrovant.pricePerPackage) * 10000) / 100
+                            : null,
+                        packagesNeeded: hydrovant.packagesNeeded
+                    });
+                }
+
+                validatedHydrovant = {
+                    ...hydrovant,
+                    pricePerPackage: hvPrice,
+                    lineTotal: hvTotal
+                };
+            } else {
+                validatedHydrovant = { ...hydrovant };
+            }
+        }
+
+        // --- 3. Build chemicals array from server-validated values ---
+        const chemicals = validatedLines.map(line => ({
             name: line.productName,
             chemicalId: line.chemicalId,
             rate: line.rate,
@@ -11859,120 +12409,260 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
             status: line.status
         }));
 
-        // Add Hydrovant if present
-        if (hydrovant) {
+        if (validatedHydrovant) {
             chemicals.push({
-                name: hydrovant.productName,
-                chemicalId: hydrovant.chemicalId,
+                name: validatedHydrovant.productName,
+                chemicalId: validatedHydrovant.chemicalId,
                 rate: 0.1,
                 rateUnit: '% v/v',
-                totalAmount: hydrovant.gallonsNeeded,
+                totalAmount: validatedHydrovant.gallonsNeeded,
                 totalUnit: 'gal',
-                packageSize: hydrovant.packageSize,
-                packageUnit: hydrovant.packageUnit,
-                packagesNeeded: hydrovant.packagesNeeded,
-                pricePerPackage: hydrovant.pricePerPackage,
-                totalPrice: hydrovant.lineTotal,
-                status: hydrovant.status,
+                packageSize: validatedHydrovant.packageSize,
+                packageUnit: validatedHydrovant.packageUnit,
+                packagesNeeded: validatedHydrovant.packagesNeeded,
+                pricePerPackage: validatedHydrovant.pricePerPackage,
+                totalPrice: validatedHydrovant.lineTotal,
+                status: validatedHydrovant.status,
                 isAutoAdded: true
             });
         }
 
-        if (orderStatus === 'ready_for_checkout') {
-            // All items confirmed — proceed to Stripe checkout
-            if (!stripe) {
-                return res.status(500).json({ error: 'Payment processing not configured' });
-            }
-
-            // Create or get Stripe customer
-            let customerId = req.user.stripeCustomerId;
-            if (!customerId) {
-                const customer = await stripe.customers.create({
-                    email: req.user.email,
-                    name: req.user.name,
-                    metadata: { userId: req.user._id.toString() }
-                });
-                customerId = customer.id;
-                await User.findByIdAndUpdate(req.user._id, { stripeCustomerId: customerId });
-            }
-
-            // Create line items for Stripe
-            const lineItems = chemicals
+        // Recompute total from overwritten server values — never trust client total.
+        const serverTotalConfirmedPrice = Math.round(
+            chemicals
                 .filter(c => c.status === 'confirmed' && c.totalPrice)
-                .map(c => ({
-                    price_data: {
-                        currency: 'usd',
-                        product_data: {
-                            name: c.name,
-                            description: `${c.packagesNeeded} x ${c.packageSize} ${c.packageUnit}`
-                        },
-                        unit_amount: Math.round(c.totalPrice * 100) // Stripe uses cents
-                    },
-                    quantity: 1
-                }));
+                .reduce((sum, c) => sum + c.totalPrice, 0) * 100
+        ) / 100;
 
-            // Create Stripe checkout session
-            const session = await stripe.checkout.sessions.create({
-                customer: customerId,
-                payment_method_types: ['card'],
-                line_items: lineItems,
-                mode: 'payment',
-                success_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/order-success?session_id={CHECKOUT_SESSION_ID}`,
-                cancel_url: `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/calculator`,
-                metadata: {
-                    userId: req.user._id.toString(),
-                    acres: acres.toString(),
-                    crop: crop || 'unknown'
+        // --- 4. Atomic: save order + reserve inventory for confirmed lines ---
+        let order;
+        const dbSession = await mongoose.startSession();
+        try {
+            await dbSession.withTransaction(async () => {
+                order = new Order({
+                    userId: req.user._id,
+                    representativeId: req.user.representative || req.user._id,
+                    crop: crop || 'unknown',
+                    program: programName || 'Custom Order',
+                    acres,
+                    gpa,
+                    chemicals,
+                    totalCost: serverTotalConfirmedPrice,
+                    costPerAcre: acres > 0 ? serverTotalConfirmedPrice / acres : 0,
+                    status: 'draft',
+                    paymentStatus: 'pending',
+                    idempotencyKey: idempotencyKey || undefined,
+                    notes: orderStatus === 'ready_for_checkout'
+                        ? undefined
+                        : 'Quote requested - some items need pricing'
+                });
+                await order.save({ session: dbSession });
+
+                // Reserve inventory for confirmed lines only — needs_quote
+                // lines don't touch inventory until they're quoted and accepted.
+                for (const c of chemicals) {
+                    if (c.status === 'confirmed' && c.chemicalId && c.packagesNeeded > 0) {
+                        await reserveInventory({
+                            chemicalId: c.chemicalId,
+                            quantity: c.packagesNeeded,
+                            location: 'main',
+                            orderId: order._id,
+                            orderNumber: `ORD-${order._id.toString().slice(-8).toUpperCase()}`,
+                            userId: req.user._id,
+                            notes: 'Self-serve order',
+                            session: dbSession
+                        });
+                    }
                 }
             });
-
-            // Save order as draft with Stripe session
-            const order = new Order({
-                userId: req.user._id,
-                representativeId: req.user.representative || req.user._id,
-                crop: crop || 'unknown',
-                program: programName || 'Custom Order',
-                acres,
-                gpa,
-                chemicals,
-                totalCost: totalConfirmedPrice,
-                costPerAcre: acres > 0 ? totalConfirmedPrice / acres : 0,
-                status: 'draft',
-                paymentStatus: 'pending',
-                stripePaymentIntentId: session.payment_intent
+        } catch (txErr) {
+            await dbSession.endSession();
+            // Mongoose duplicate-key on idempotencyKey: another request with
+            // the same key raced and won. Return that order.
+            if (txErr.code === 11000 && idempotencyKey) {
+                const racedOrder = await Order.findOne({
+                    userId: req.user._id,
+                    idempotencyKey
+                });
+                if (racedOrder) {
+                    return res.json(buildIdempotentResponse(racedOrder));
+                }
+            }
+            console.error('Submit-order transaction failed - rolled back:', txErr.message);
+            return res.status(500).json({
+                error: 'Order could not be completed. No changes saved. Please try again.'
             });
+        }
+        await dbSession.endSession();
+
+        const transporter = createEmailTransporter();
+        const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        const confirmedItems = chemicals.filter(c => c.status === 'confirmed');
+        const needsQuoteItems = chemicals.filter(c => c.status === 'needs_quote');
+
+        // --- 5. Stripe path (only when all lines confirmed) ---
+        // On Stripe outage or failure, fall through to quote_pending so the
+        // customer's intent is preserved — admin can follow up with a
+        // manual payment link. Order + inventory reserve already committed.
+        if (orderStatus === 'ready_for_checkout') {
+            let checkoutSession = null;
+            let stripeFailureReason = null;
+
+            if (!stripe) {
+                stripeFailureReason = 'stripe not configured';
+            } else {
+                try {
+                    let customerId = req.user.stripeCustomerId;
+                    if (!customerId) {
+                        const stripeCustomer = await stripe.customers.create({
+                            email: req.user.email,
+                            name: req.user.name,
+                            metadata: { userId: req.user._id.toString() }
+                        });
+                        customerId = stripeCustomer.id;
+                        await User.findByIdAndUpdate(req.user._id, { stripeCustomerId: customerId });
+                    }
+
+                    const lineItems = chemicals
+                        .filter(c => c.status === 'confirmed' && c.totalPrice)
+                        .map(c => ({
+                            price_data: {
+                                currency: 'usd',
+                                product_data: {
+                                    name: c.name,
+                                    description: `${c.packagesNeeded} x ${c.packageSize} ${c.packageUnit}`
+                                },
+                                unit_amount: Math.round(c.totalPrice * 100)
+                            },
+                            quantity: 1
+                        }));
+
+                    checkoutSession = await stripe.checkout.sessions.create({
+                        customer: customerId,
+                        payment_method_types: ['card'],
+                        line_items: lineItems,
+                        mode: 'payment',
+                        success_url: `${frontendUrl}/order-success?session_id={CHECKOUT_SESSION_ID}`,
+                        cancel_url: `${frontendUrl}/calculator`,
+                        metadata: {
+                            userId: req.user._id.toString(),
+                            orderId: order._id.toString(),
+                            acres: acres.toString(),
+                            crop: crop || 'unknown'
+                        }
+                    });
+
+                    order.stripePaymentIntentId = checkoutSession.payment_intent;
+                    order.stripeCheckoutUrl = checkoutSession.url;
+                    await order.save();
+                } catch (stripeErr) {
+                    stripeFailureReason = stripeErr.message || 'stripe session creation failed';
+                    console.error('[submit-order] Stripe failure — falling through to quote_pending:', stripeFailureReason);
+                }
+            }
+
+            if (checkoutSession) {
+                // Success path — send customer + admin confirmation emails.
+                if (transporter) {
+                    try {
+                        const itemsList = confirmedItems.map(c =>
+                            `<li>${c.name} — ${c.packagesNeeded} × ${c.packageSize} ${c.packageUnit} — $${c.totalPrice?.toFixed(2) || '0.00'}</li>`
+                        ).join('');
+
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                            to: req.user.email,
+                            subject: `Order Confirmed — ${crop || 'Custom'} (${acres} acres)`,
+                            html: `
+                                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                                    <div style="background: #2d5a27; color: white; padding: 20px; text-align: center;">
+                                        <h1 style="margin: 0;">Acre Profit</h1>
+                                    </div>
+                                    <div style="padding: 20px; background: #f9f9f9;">
+                                        <h2>Order Confirmed</h2>
+                                        <p>Hi ${req.user.name},</p>
+                                        <p>Your order has been received and is proceeding to checkout. You'll complete payment via Stripe's secure checkout.</p>
+                                        <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                                            <h3 style="margin-top: 0;">Order Details</h3>
+                                            <p><strong>Crop:</strong> ${crop || 'Custom'}</p>
+                                            <p><strong>Acres:</strong> ${acres}</p>
+                                            <p><strong>Total:</strong> $${serverTotalConfirmedPrice.toFixed(2)}</p>
+                                            <h4>Products:</h4>
+                                            <ul>${itemsList}</ul>
+                                        </div>
+                                        <p>Log in to your dashboard to view your order:</p>
+                                        <p><a href="${frontendUrl}/my-orders.html" style="background: #2d5a27; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; display: inline-block;">View My Orders</a></p>
+                                    </div>
+                                </div>
+                            `
+                        });
+
+                        await transporter.sendMail({
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                            to: 'contact@acreprofit.com',
+                            subject: `New Self-Serve Order — ${req.user.name} — $${serverTotalConfirmedPrice.toFixed(2)}`,
+                            html: `
+                                <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+                                    <div style="background-color: #2d5a27; padding: 20px; text-align: center;">
+                                        <h1 style="color: white; margin: 0;">Self-Serve Order</h1>
+                                    </div>
+                                    <div style="padding: 30px; background-color: #f9f9f9;">
+                                        <h2>Customer</h2>
+                                        <p><strong>Name:</strong> ${req.user.name}</p>
+                                        <p><strong>Email:</strong> ${req.user.email}</p>
+                                        <p><strong>Phone:</strong> ${req.user.phone || 'Not provided'}</p>
+                                        <h2 style="margin-top: 20px;">Order</h2>
+                                        <p><strong>Crop:</strong> ${crop || 'Not specified'}</p>
+                                        <p><strong>Acres:</strong> ${acres}</p>
+                                        <p><strong>Total:</strong> $${serverTotalConfirmedPrice.toFixed(2)}</p>
+                                        <h3>Products</h3>
+                                        <ul>${itemsList}</ul>
+                                        <p style="margin-top: 20px; padding: 12px; background: #e8f5e9; border-radius: 4px;">
+                                            Customer is at Stripe checkout. Order ID: ${order._id}
+                                        </p>
+                                    </div>
+                                </div>
+                            `
+                        });
+                    } catch (emailErr) {
+                        console.error('[submit-order] Confirmation email failed:', emailErr.message);
+                        // Non-blocking — order success is not contingent on email.
+                    }
+                }
+
+                return res.json({
+                    success: true,
+                    orderStatus: 'checkout',
+                    checkoutUrl: checkoutSession.url,
+                    orderId: order._id
+                });
+            }
+
+            // Stripe fell through — convert to quote_pending with a payment note.
+            order.notes = 'Card processing temporarily unavailable — admin will send payment link';
+            order.status = 'quote_pending';
             await order.save();
+        }
 
-            return res.json({
-                success: true,
-                orderStatus: 'checkout',
-                checkoutUrl: session.url,
-                orderId: order._id
-            });
+        // --- 6. Quote-pending path (or Stripe fall-through) ---
+        // Notify admin and send customer a receipt acknowledging the request.
+        if (transporter) {
+            try {
+                const needsTable = needsQuoteItems.map(item => `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packageSize} ${item.packageUnit}</td>
+                    </tr>
+                `).join('');
 
-        } else {
-            // Has items needing quotes — save and notify admin
-            const order = new Order({
-                userId: req.user._id,
-                representativeId: req.user.representative || req.user._id,
-                crop: crop || 'unknown',
-                program: programName || 'Custom Order',
-                acres,
-                gpa,
-                chemicals,
-                totalCost: totalConfirmedPrice,
-                costPerAcre: acres > 0 ? totalConfirmedPrice / acres : 0,
-                status: 'draft',
-                paymentStatus: 'pending',
-                notes: 'Quote requested - some items need pricing'
-            });
-            await order.save();
-
-            // Send email notification to admin
-            const transporter = createEmailTransporter();
-            if (transporter) {
-                const needsQuoteItems = chemicals.filter(c => c.status === 'needs_quote');
-                const confirmedItems = chemicals.filter(c => c.status === 'confirmed');
+                const confirmedTable = confirmedItems.map(item => `
+                    <tr>
+                        <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
+                        <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${item.totalPrice?.toFixed(2) || 'N/A'}</td>
+                    </tr>
+                `).join('');
 
                 await transporter.sendMail({
                     from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
@@ -11988,12 +12678,11 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                 <p><strong>Name:</strong> ${req.user.name}</p>
                                 <p><strong>Email:</strong> ${req.user.email}</p>
                                 <p><strong>Phone:</strong> ${req.user.phone || 'Not provided'}</p>
-
                                 <h2 style="color: #333; margin-top: 20px;">Order Details</h2>
                                 <p><strong>Crop:</strong> ${crop || 'Not specified'}</p>
                                 <p><strong>Acres:</strong> ${acres}</p>
                                 <p><strong>GPA:</strong> ${gpa}</p>
-
+                                ${needsQuoteItems.length > 0 ? `
                                 <h3 style="color: #c00; margin-top: 20px;">Items Needing Quote (${needsQuoteItems.length})</h3>
                                 <table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
                                     <tr style="background-color: #fdd;">
@@ -12001,15 +12690,9 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Packages Needed</th>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Size</th>
                                     </tr>
-                                    ${needsQuoteItems.map(item => `
-                                        <tr>
-                                            <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packageSize} ${item.packageUnit}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${needsTable}
                                 </table>
-
+                                ` : ''}
                                 ${confirmedItems.length > 0 ? `
                                 <h3 style="color: #2d5a27; margin-top: 20px;">Confirmed Items (${confirmedItems.length})</h3>
                                 <table style="width: 100%; border-collapse: collapse;">
@@ -12018,35 +12701,71 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Qty</th>
                                         <th style="padding: 8px; border: 1px solid #ddd;">Price</th>
                                     </tr>
-                                    ${confirmedItems.map(item => `
-                                        <tr>
-                                            <td style="padding: 8px; border: 1px solid #ddd;">${item.name}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: center;">${item.packagesNeeded}</td>
-                                            <td style="padding: 8px; border: 1px solid #ddd; text-align: right;">$${item.totalPrice?.toFixed(2) || 'N/A'}</td>
-                                        </tr>
-                                    `).join('')}
+                                    ${confirmedTable}
                                 </table>
                                 <p style="text-align: right; font-weight: bold; margin-top: 10px;">
-                                    Confirmed Total: $${totalConfirmedPrice.toFixed(2)}
+                                    Confirmed Total: $${serverTotalConfirmedPrice.toFixed(2)}
                                 </p>
                                 ` : ''}
-
+                                ${order.notes ? `
+                                <p style="margin-top: 20px; padding: 12px; background: #fee; border-left: 4px solid #c00; border-radius: 4px;">
+                                    <strong>Note:</strong> ${order.notes}
+                                </p>
+                                ` : ''}
                                 <p style="margin-top: 30px; padding: 15px; background-color: #fff3cd; border-radius: 4px;">
-                                    <strong>Action Required:</strong> Please provide quotes for the items listed above and contact the customer.
+                                    <strong>Action Required:</strong> Please follow up with the customer. Order ID: ${order._id}
                                 </p>
                             </div>
                         </div>
                     `
                 });
-            }
 
-            return res.json({
-                success: true,
-                orderStatus: 'quote_pending',
-                orderId: order._id,
-                message: 'Quote request submitted. You will be contacted within 24 hours.'
-            });
+                // Customer acknowledgement — sets expectation.
+                const customerSubject = order.notes && order.notes.startsWith('Card processing')
+                    ? 'Order Received — Payment Link Coming Soon'
+                    : 'Quote Request Received';
+
+                await transporter.sendMail({
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    to: req.user.email,
+                    subject: customerSubject,
+                    html: `
+                        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+                            <div style="background: #2d5a27; color: white; padding: 20px; text-align: center;">
+                                <h1 style="margin: 0;">Acre Profit</h1>
+                            </div>
+                            <div style="padding: 20px; background: #f9f9f9;">
+                                <h2>${customerSubject}</h2>
+                                <p>Hi ${req.user.name},</p>
+                                ${order.notes && order.notes.startsWith('Card processing') ? `
+                                    <p>We've received your order, but card processing is temporarily unavailable. A member of our team will send you a secure payment link shortly.</p>
+                                ` : `
+                                    <p>We've received your request. A member of our team will review the items needing quotes and contact you within 24 hours.</p>
+                                `}
+                                <div style="background: white; padding: 15px; border-radius: 5px; margin: 15px 0;">
+                                    <p><strong>Crop:</strong> ${crop || 'Custom'}</p>
+                                    <p><strong>Acres:</strong> ${acres}</p>
+                                    ${confirmedItems.length > 0 ? `<p><strong>Confirmed Items Total:</strong> $${serverTotalConfirmedPrice.toFixed(2)}</p>` : ''}
+                                </div>
+                                <p>If you have questions in the meantime, reply to this email or contact your representative.</p>
+                            </div>
+                        </div>
+                    `
+                });
+            } catch (emailErr) {
+                console.error('[submit-order] Quote email failed:', emailErr.message);
+                // Non-blocking.
+            }
         }
+
+        return res.json({
+            success: true,
+            orderStatus: 'quote_pending',
+            orderId: order._id,
+            message: order.notes && order.notes.startsWith('Card processing')
+                ? 'Order received. Card processing is temporarily unavailable — we\'ll send you a payment link shortly.'
+                : 'Quote request submitted. You will be contacted within 24 hours.'
+        });
     } catch (error) {
         console.error('Submit order error:', error);
         res.status(400).json({ error: error.message });
@@ -12126,6 +12845,7 @@ app.post('/api/spray-programs/:id/calculate', authMiddleware, async (req, res) =
 // Helper function for order calculation (reusable)
 async function calculateOrder(acres, gpa, products) {
     const orderLines = [];
+    const unpricedLines = [];
     let totalConfirmedPrice = 0;
     let hasNeedsQuote = false;
     let valorWarning = false;
@@ -12162,7 +12882,17 @@ async function calculateOrder(acres, gpa, products) {
         const onHandQuantity = inventory ? inventory.quantityAvailable : 0;
 
         let status, pricePerPackage, lineTotal;
-        if (onHandQuantity >= packagesNeeded) {
+        if (chemical.sellPrice == null) {
+            status = 'unpriced';
+            pricePerPackage = null;
+            lineTotal = null;
+            hasNeedsQuote = true;
+            unpricedLines.push({
+                chemicalId: chemical._id,
+                productName: chemical.productName,
+                chemicalStatus: chemical.status || null,
+            });
+        } else if (onHandQuantity >= packagesNeeded) {
             status = 'confirmed';
             pricePerPackage = chemical.sellPrice * packageSize;
             lineTotal = packagesNeeded * pricePerPackage;
@@ -12203,12 +12933,24 @@ async function calculateOrder(acres, gpa, products) {
             const hvPkgs = Math.ceil(hvGallons / hvPkgSize);
             const hvInv = await Inventory.findOne({ chemicalId: hvChem._id, location: 'main' });
             const hvOnHand = hvInv ? hvInv.quantityAvailable : 0;
-            const hvStatus = hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote';
+            // Same unpriced guard as the inline endpoint — if Hydrovant itself
+            // has no sellPrice, fall through rather than NaN the line total.
+            const hvUnpriced = hvChem.sellPrice == null;
+            const hvStatus = hvUnpriced ? 'unpriced'
+                : (hvOnHand >= hvPkgs ? 'confirmed' : 'needs_quote');
             const hvPrice = hvStatus === 'confirmed' ? hvChem.sellPrice * hvPkgSize : null;
             const hvTotal = hvStatus === 'confirmed' ? hvPkgs * hvPrice : null;
 
             if (hvStatus === 'confirmed' && hvTotal) totalConfirmedPrice += hvTotal;
             else hasNeedsQuote = true;
+
+            if (hvUnpriced) {
+                unpricedLines.push({
+                    chemicalId: hvChem._id,
+                    productName: hvChem.productName,
+                    chemicalStatus: hvChem.status || null,
+                });
+            }
 
             hydrovant = {
                 chemicalId: hvChem._id,
@@ -12229,6 +12971,7 @@ async function calculateOrder(acres, gpa, products) {
         totalWaterVolume,
         orderLines,
         hydrovant,
+        unpriced: unpricedLines,
         valorWarning: valorWarning ? 'Valor requires application 7–30 days preplant. Minimum 1/4 inch rainfall required before planting.' : null,
         orderStatus: hasNeedsQuote ? 'pending_quote' : 'ready_for_checkout',
         totalConfirmedPrice: Math.round(totalConfirmedPrice * 100) / 100,
@@ -13552,6 +14295,471 @@ app.delete('/api/admin/invoices/:id', authMiddleware, adminMiddleware, async (re
     }
 });
 
+// Void a sent or draft invoice. Unlike DELETE (which hard-deletes drafts only),
+// void preserves the record for audit and blocks any future Stripe payment
+// attempt. Never permitted on paid invoices — those require a Credit Note
+// (not yet implemented). amountPaid / amountDue are preserved as-is so a
+// partial-pay history is not erased.
+app.post('/api/admin/invoices/:id/void', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (invoice.status === 'voided') {
+            return res.status(400).json({ error: 'Invoice is already voided' });
+        }
+        if (invoice.paymentStatus === 'paid' || invoice.status === 'paid') {
+            return res.status(400).json({ error: 'Cannot void a paid invoice. Use a credit note instead.' });
+        }
+
+        const reason = (req.body && typeof req.body.reason === 'string') ? req.body.reason.trim() : '';
+        const notifyCustomer = req.body && req.body.notifyCustomer !== false; // default true
+        const before = { status: invoice.status, paymentStatus: invoice.paymentStatus };
+
+        const now = new Date();
+        invoice.status = 'voided';
+        invoice.voidedAt = now;
+        invoice.voidedBy = req.user._id;
+        invoice.voidReason = reason || undefined;
+        invoice.updatedAt = now;
+        await invoice.save();
+
+        await logAudit({
+            action: 'invoice_voided',
+            req,
+            entityType: 'Invoice',
+            entityId: invoice._id,
+            entityRef: invoice.invoiceNumber,
+            before,
+            after: { status: 'voided', voidedAt: now, voidedBy: req.user._id },
+            reason: reason || `Invoice voided by ${req.user.name}`
+        });
+
+        if (notifyCustomer && invoice.customerEmail) {
+            try {
+                const transporter = createEmailTransporter();
+                if (transporter) {
+                    const reasonBlock = reason
+                        ? `<p style="margin: 12px 0; color: #555;"><strong>Reason provided:</strong> ${reason.replace(/[<>]/g, '')}</p>`
+                        : '';
+                    await transporter.sendMail({
+                        from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                        to: invoice.customerEmail,
+                        subject: `Invoice ${invoice.invoiceNumber} has been voided`,
+                        html: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                                <h2 style="color: #2d5a27;">Invoice Voided</h2>
+                                <p>Hello ${invoice.customerName || 'there'},</p>
+                                <p>Invoice <strong>${invoice.invoiceNumber}</strong>${invoice.total ? ` for $${Number(invoice.total).toFixed(2)}` : ''} has been voided and <strong>no payment is due</strong>.</p>
+                                ${reasonBlock}
+                                <p>If you previously clicked the Pay Now link in the original invoice email, that link will no longer accept payment. If you have questions, reply to this email or contact your representative.</p>
+                                <p style="margin-top: 24px; color: #666; font-size: 13px;">Questions? Contact us at contact@acreprofit.com</p>
+                            </div>
+                        `
+                    });
+                }
+            } catch (emailErr) {
+                console.error('[invoice void] customer notification email failed (non-blocking):', emailErr.message);
+            }
+        }
+
+        res.json({
+            message: `Invoice ${invoice.invoiceNumber} voided`,
+            invoiceId: invoice._id,
+            customerNotified: Boolean(notifyCustomer && invoice.customerEmail)
+        });
+    } catch (error) {
+        console.error('[invoice void]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Issue a Credit Note against a paid invoice. Invoice stays paid; CreditNote
+// is a sibling ledger entry. Amount capped server-side at the remaining
+// uncredited balance so credits can never exceed money received. Stripe
+// refund mode calls stripe.refunds.create synchronously; webhook flips
+// CreditNote status on settlement. Record-only mode is terminal on issue.
+app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (invoice.status === 'voided') {
+            return res.status(400).json({ error: 'Cannot issue a credit note against a voided invoice' });
+        }
+        if (invoice.paymentStatus !== 'paid') {
+            return res.status(400).json({ error: 'Credit notes can only be issued against paid invoices' });
+        }
+
+        const amount = Number(req.body?.amount);
+        const reason = (typeof req.body?.reason === 'string') ? req.body.reason.trim() : '';
+        const refundMode = req.body?.refundMode;
+        const notifyCustomer = req.body?.notifyCustomer !== false; // default true
+
+        if (!Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Amount must be a positive number' });
+        }
+        if (!reason) {
+            return res.status(400).json({ error: 'Reason is required' });
+        }
+        if (refundMode !== 'stripe' && refundMode !== 'record_only') {
+            return res.status(400).json({ error: "refundMode must be 'stripe' or 'record_only'" });
+        }
+
+        const amountPaid = Number(invoice.amountPaid || 0);
+        const alreadyCredited = Number(invoice.creditedAmount || 0);
+        // Snapshot pre-mutation state for the AuditLog before/after fields.
+        // Read these up-front — invoice.paymentStatus is mutated below on
+        // full credits, and AuditLog must record the true pre-state.
+        const beforePaymentStatus = invoice.paymentStatus;
+        const beforeCreditedAmount = alreadyCredited;
+        const remaining = Math.round((amountPaid - alreadyCredited) * 100) / 100;
+        const roundedAmount = Math.round(amount * 100) / 100;
+        if (roundedAmount > remaining) {
+            return res.status(400).json({
+                error: `Credit amount $${roundedAmount.toFixed(2)} exceeds remaining uncredited balance $${remaining.toFixed(2)}`
+            });
+        }
+
+        if (refundMode === 'stripe') {
+            if (!stripe) {
+                return res.status(400).json({ error: 'Stripe not configured — use record_only mode' });
+            }
+            if (!invoice.stripePaymentIntentId) {
+                return res.status(400).json({ error: 'No Stripe payment intent on invoice — use record_only mode' });
+            }
+        }
+
+        const creditNoteNumber = await generateCreditNoteNumber();
+        const creditNote = new CreditNote({
+            creditNoteNumber,
+            invoiceId: invoice._id,
+            invoiceNumber: invoice.invoiceNumber,
+            customerId: invoice.customerId,
+            customerName: invoice.customerName,
+            customerEmail: invoice.customerEmail,
+            amount: roundedAmount,
+            reason,
+            refundMode,
+            status: refundMode === 'record_only' ? 'record_only' : 'issued',
+            stripePaymentIntentId: invoice.stripePaymentIntentId,
+            issuedBy: req.user._id,
+            issuedByName: req.user.name
+        });
+
+        if (refundMode === 'stripe') {
+            try {
+                const refund = await stripe.refunds.create({
+                    payment_intent: invoice.stripePaymentIntentId,
+                    amount: Math.round(roundedAmount * 100),
+                    metadata: {
+                        creditNoteNumber,
+                        invoiceId: String(invoice._id),
+                        invoiceNumber: invoice.invoiceNumber || ''
+                    }
+                });
+                creditNote.stripeRefundId = refund.id;
+                creditNote.stripeRefundStatus = refund.status;
+                // ACH refunds return status='pending'; card usually 'succeeded' or 'pending'.
+                if (refund.status === 'succeeded') {
+                    creditNote.status = 'refund_completed';
+                    creditNote.refundCompletedAt = new Date();
+                } else {
+                    creditNote.status = 'refund_pending';
+                }
+            } catch (stripeErr) {
+                console.error('[credit note] stripe.refunds.create failed:', stripeErr.message);
+                return res.status(502).json({ error: `Stripe refund failed: ${stripeErr.message}` });
+            }
+        }
+
+        await creditNote.save();
+
+        // Increment invoice.creditedAmount. If cumulative credits reach the
+        // full amountPaid, flip paymentStatus to 'refunded' so filters/reports
+        // can surface fully-refunded invoices.
+        invoice.creditedAmount = Math.round((alreadyCredited + roundedAmount) * 100) / 100;
+        if (invoice.creditedAmount >= amountPaid - 0.005) {
+            invoice.paymentStatus = 'refunded';
+        }
+        invoice.updatedAt = new Date();
+        await invoice.save();
+
+        await logAudit({
+            action: 'credit_note_issued',
+            req,
+            entityType: 'CreditNote',
+            entityId: creditNote._id,
+            entityRef: creditNoteNumber,
+            amount: roundedAmount,
+            before: { invoiceCreditedAmount: beforeCreditedAmount, invoicePaymentStatus: beforePaymentStatus },
+            after: { invoiceCreditedAmount: invoice.creditedAmount, creditNoteStatus: creditNote.status, refundMode },
+            reason
+        });
+
+        if (notifyCustomer && invoice.customerEmail) {
+            try {
+                const transporter = createEmailTransporter();
+                if (transporter) {
+                    // Defensive: invoice.paymentMethod is a freeform String (no enum).
+                    // Current Stripe webhook writes 'stripe_ach' / 'stripe' consistently,
+                    // but admin endpoints and legacy data can produce bare values like
+                    // 'ach'. Match on substring so ACH is detected regardless of prefix.
+                    const pm = (invoice.paymentMethod || '').toLowerCase();
+                    const isAch = pm.includes('ach') || pm.includes('bank');
+                    const settlementNote = refundMode === 'stripe'
+                        ? (isAch
+                            ? '<p>Funds will return to your bank account via ACH in 5–7 business days.</p>'
+                            : '<p>Funds will return to your card in 5–10 business days, depending on your bank.</p>')
+                        : '<p>Your representative will coordinate the refund with you directly.</p>';
+                    const safeReason = reason.replace(/[<>]/g, '');
+                    await transporter.sendMail({
+                        from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                        to: invoice.customerEmail,
+                        subject: `Credit issued on invoice ${invoice.invoiceNumber}`,
+                        html: `
+                            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px;">
+                                <h2 style="color: #2d5a27;">Credit Note Issued</h2>
+                                <p>Hello ${invoice.customerName || 'there'},</p>
+                                <p>A credit of <strong>$${roundedAmount.toFixed(2)}</strong> has been issued against invoice <strong>${invoice.invoiceNumber}</strong>.</p>
+                                <p><strong>Credit note:</strong> ${creditNoteNumber}<br>
+                                <strong>Reason:</strong> ${safeReason}</p>
+                                ${settlementNote}
+                                <p style="margin-top: 24px; color: #666; font-size: 13px;">Questions? Reply to this email or contact us at contact@acreprofit.com</p>
+                            </div>
+                        `
+                    });
+                    creditNote.customerEmailSent = true;
+                    creditNote.customerEmailSentAt = new Date();
+                    await creditNote.save();
+                }
+            } catch (emailErr) {
+                console.error('[credit note] customer email failed:', emailErr.message);
+                creditNote.customerEmailError = emailErr.message;
+                await creditNote.save();
+            }
+        }
+
+        res.json({
+            message: `Credit note ${creditNoteNumber} issued for $${roundedAmount.toFixed(2)}`,
+            creditNoteId: creditNote._id,
+            creditNoteNumber,
+            status: creditNote.status,
+            invoiceCreditedAmount: invoice.creditedAmount,
+            invoicePaymentStatus: invoice.paymentStatus,
+            customerNotified: Boolean(notifyCustomer && invoice.customerEmail && creditNote.customerEmailSent)
+        });
+    } catch (error) {
+        console.error('[credit note issue]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// List credit notes for an invoice (admin-only).
+app.get('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const notes = await CreditNote.find({ invoiceId: req.params.id })
+            .sort({ createdAt: -1 })
+            .lean();
+        res.json({ creditNotes: notes });
+    } catch (error) {
+        console.error('[credit note list]', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Card payments carry a 3.5% convenience fee passed through to the
+// customer as a separate line item. ACH has no surcharge. Rate is a
+// constant so the chooser page and the mint path can't drift.
+const CARD_SURCHARGE_RATE = 0.035;
+
+// Mint a fresh Stripe Checkout Session for the invoice. Called from the
+// Pay Now chooser page once the customer has picked 'ach' or 'card'.
+// Always mints fresh (no reuse) because ACH and card sessions carry
+// different totals and allowed payment methods. Stores session id + hosted
+// URL on the invoice for informational tracking; webhook correlation is
+// via metadata.invoiceId, not via the stored ID.
+
+async function ensureInvoiceCheckoutSession(invoice, method) {
+    if (!stripe) {
+        throw new Error('Stripe not configured (STRIPE_SECRET_KEY missing)');
+    }
+    if (!invoice) {
+        throw new Error('Invoice required');
+    }
+    if (invoice.paymentStatus === 'paid' || invoice.paymentStatus === 'refunded') {
+        return { session: null, url: null, alreadyPaid: true };
+    }
+    if (invoice.status === 'voided') {
+        return { session: null, url: null, voided: true };
+    }
+    if (method !== 'ach' && method !== 'card') {
+        throw new Error(`Invalid payment method: ${method}. Must be 'ach' or 'card'.`);
+    }
+
+    const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
+    const invoiceTotal = Number(invoice.total || 0);
+    const amountCents = Math.round(invoiceTotal * 100);
+    if (!amountCents || amountCents < 50) {
+        // Stripe minimum is $0.50. Guard against zero-total invoices.
+        throw new Error(`Invoice total must be at least $0.50 to accept Stripe payment (got $${(amountCents / 100).toFixed(2)})`);
+    }
+
+    const surchargeCents = method === 'card'
+        ? Math.round(invoiceTotal * CARD_SURCHARGE_RATE * 100)
+        : 0;
+    const surchargeDollars = surchargeCents / 100;
+
+    const lineItems = [{
+        quantity: 1,
+        price_data: {
+            currency: 'usd',
+            unit_amount: amountCents,
+            product_data: {
+                name: `Invoice ${invoice.invoiceNumber}`,
+                description: invoice.customerName ? `Acre Profit - ${invoice.customerName}` : 'Acre Profit'
+            }
+        }
+    }];
+    if (surchargeCents > 0) {
+        lineItems.push({
+            quantity: 1,
+            price_data: {
+                currency: 'usd',
+                unit_amount: surchargeCents,
+                product_data: {
+                    name: 'Card processing fee',
+                    description: '3.5% convenience fee (waived on ACH bank transfers)'
+                }
+            }
+        });
+    }
+
+    const paymentMethodTypes = method === 'card' ? ['card'] : ['us_bank_account'];
+
+    // 23 hours out — Stripe caps session.expires_at at 24h.
+    const expiresAt = Math.floor(Date.now() / 1000) + 23 * 60 * 60;
+
+    const sharedMetadata = {
+        invoiceId: invoice._id.toString(),
+        invoiceNumber: invoice.invoiceNumber || '',
+        customerId: invoice.customerId ? invoice.customerId.toString() : '',
+        paymentMethodChoice: method,
+        surchargeAmount: surchargeDollars.toFixed(2)
+    };
+
+    const session = await stripe.checkout.sessions.create({
+        mode: 'payment',
+        payment_method_types: paymentMethodTypes,
+        customer_email: invoice.customerEmail || undefined,
+        client_reference_id: invoice._id.toString(),
+        expires_at: expiresAt,
+        line_items: lineItems,
+        metadata: sharedMetadata,
+        payment_intent_data: {
+            metadata: sharedMetadata
+        },
+        success_url: `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}`,
+        cancel_url: `${frontend}/invoice-cancel.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}`
+    });
+
+    invoice.stripeCheckoutSessionId = session.id;
+    invoice.stripeHostedUrl = session.url;
+    invoice.stripeCheckoutExpiresAt = new Date(session.expires_at * 1000);
+    await invoice.save();
+
+    return { session, url: session.url };
+}
+
+// Admin-triggered checkout session creation. Requires a method choice
+// (ach or card) since these produce different Stripe sessions with
+// different totals (card adds a 3.5% convenience fee).
+app.post('/api/admin/invoices/:id/checkout-session', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        const method = (req.body && req.body.method) || (req.query && req.query.method);
+        const { url, alreadyPaid, voided } = await ensureInvoiceCheckoutSession(invoice, method);
+        if (alreadyPaid) {
+            return res.status(400).json({ error: 'Invoice is already paid' });
+        }
+        if (voided) {
+            return res.status(400).json({ error: 'Invoice has been voided' });
+        }
+        res.json({ checkoutUrl: url });
+    } catch (err) {
+        console.error('[checkout-session]', err.message);
+        res.status(400).json({ error: err.message });
+    }
+});
+
+// Public invoice fetch for the Pay Now chooser page. Returns only the
+// fields needed to display the choice and price. Invoice _id is a 24-char
+// Mongo ObjectId, same threat model as the email's Pay Now link.
+app.get('/api/public/invoice/:id', async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        const total = Number(invoice.total || 0);
+        const surchargeCard = Math.round(total * CARD_SURCHARGE_RATE * 100) / 100;
+        const totalWithCardSurcharge = Math.round((total + surchargeCard) * 100) / 100;
+        res.json({
+            invoiceNumber: invoice.invoiceNumber || '',
+            customerName: invoice.customerName || '',
+            total,
+            surchargeCard,
+            totalWithCardSurcharge,
+            surchargeRate: CARD_SURCHARGE_RATE,
+            paymentStatus: invoice.paymentStatus,
+            status: invoice.status,
+            stripeEnabled: !!stripe
+        });
+    } catch (err) {
+        console.error('[public invoice]', err.message);
+        res.status(500).json({ error: 'Unable to fetch invoice' });
+    }
+});
+
+// Public Pay Now redirect. The email button sends customers to the
+// chooser page on the frontend; the chooser's ACH/Card links hit this
+// endpoint with ?method=ach|card. No method param → redirect back to the
+// chooser page (graceful fallback for direct links / old bookmarks).
+app.get('/pay-invoice/:id', async (req, res) => {
+    try {
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).send('Invoice not found');
+        }
+        const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        if (invoice.paymentStatus === 'paid' || invoice.paymentStatus === 'refunded') {
+            return res.redirect(302, `${frontend}/invoice-paid.html?invoice=${encodeURIComponent(invoice.invoiceNumber || '')}&status=already-paid`);
+        }
+        // Voided: bounce back to the chooser page, which renders a voided state
+        // from /api/public/invoice/:id instead of attempting to mint a session.
+        if (invoice.status === 'voided') {
+            return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
+        }
+        const method = req.query.method;
+        if (method !== 'ach' && method !== 'card') {
+            return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
+        }
+        const { url, voided } = await ensureInvoiceCheckoutSession(invoice, method);
+        if (voided) {
+            return res.redirect(302, `${frontend}/pay-invoice.html?invoice=${encodeURIComponent(invoice._id.toString())}`);
+        }
+        return res.redirect(302, url);
+    } catch (err) {
+        console.error('[pay-invoice]', err.message);
+        res.status(500).send('Unable to start payment. Please contact your representative.');
+    }
+});
+
 // Send invoice to customer
 app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async (req, res) => {
     try {
@@ -13597,6 +14805,16 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         const crop = order?.programName || 'General';
         const acres = order?.totalAcres || 0;
         const year = order?.year || new Date().getFullYear();
+
+        const frontend = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        // Pay Now button sends customers to the chooser page on the frontend
+        // domain. The chooser fetches invoice totals and lets the customer
+        // pick ACH (free) or card (3.5% convenience fee); the session is
+        // minted on method selection, not here. Button shows only if Stripe
+        // is configured and the invoice isn't already paid — the chooser
+        // page handles stripe-unconfigured gracefully via stripeEnabled flag.
+        const showPayNow = !!stripe && invoice.paymentStatus !== 'paid';
+        const payNowRedirectUrl = `${frontend}/pay-invoice.html?invoice=${invoice._id}`;
 
         // Build professional invoice email HTML
         const emailHtml = `
@@ -13670,7 +14888,7 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
                         <p style="margin: 0; font-weight: 700; font-size: 18px;">Acre Profit LLC</p>
                         <p style="margin: 4px 0; color: #666;">Agricultural Chemical Distribution</p>
                         <p style="margin: 4px 0; color: #666;">Haxtun, CO</p>
-                        <p style="margin: 4px 0; color: #666;">info@acreprofit.com</p>
+                        <p style="margin: 4px 0; color: #666;">contact@acreprofit.com</p>
                     </td>
                 </tr>
             </table>
@@ -13718,19 +14936,34 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
             </div>
 
             <!-- Payment Info -->
+            ${invoice.paymentStatus === 'paid' ? `
+            <div style="background: #d1fae5; border: 1px solid #10b981; border-radius: 12px; padding: 20px; margin: 28px 0; text-align: center;">
+                <h4 style="margin: 0 0 4px 0; color: #065f46; font-size: 20px;">PAID</h4>
+                <p style="margin: 4px 0; color: #047857; font-size: 14px;">Thank you — no further action needed.</p>
+            </div>
+            ` : `
             <div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 12px; padding: 20px; margin: 28px 0;">
-                <h4 style="margin: 0 0 8px 0; color: #92400e;">Payment Information</h4>
-                <p style="margin: 4px 0; color: #78350f; font-size: 14px;">Please make payment via check or ACH transfer:</p>
+                <h4 style="margin: 0 0 12px 0; color: #92400e;">Payment Options</h4>
+                ${showPayNow ? `
+                <div style="text-align: center; margin: 16px 0 20px 0;">
+                    <a href="${payNowRedirectUrl}" style="display: inline-block; background: #2d5a27; color: #ffffff; text-decoration: none; padding: 14px 32px; border-radius: 8px; font-size: 16px; font-weight: 700; letter-spacing: 0.5px;">Pay Now &rarr;</a>
+                    <p style="margin: 10px 0 0 0; font-size: 12px; color: #78350f;">You'll choose ACH (free) or card (3.5% convenience fee) on the next page. Secure payment via Stripe.</p>
+                </div>
+                <div style="text-align: center; color: #78350f; font-size: 13px; margin: 12px 0;">&mdash; or &mdash;</div>
+                ` : ''}
+                <p style="margin: 4px 0; color: #78350f; font-size: 14px;">Pay by check or manual ACH transfer:</p>
                 <div style="margin-top: 12px; padding: 12px; background: rgba(255,255,255,0.7); border-radius: 8px;">
-                    <p style="margin: 0; font-weight: 700;">Acre Profit LLC</p>
-                    <p style="margin: 4px 0; font-size: 14px; color: #666;">Contact your representative for ACH details or mail check to your pickup location.</p>
+                    <p style="margin: 0; font-weight: 700;">AcreProfit LLC</p>
+                    <p style="margin: 4px 0; font-size: 14px; color: #666;">34549 HWY 59</p>
+                    <p style="margin: 4px 0; font-size: 14px; color: #666;">Haxtun, CO 80731</p>
                 </div>
             </div>
+            `}
 
             <!-- Footer -->
             <div style="text-align: center; padding-top: 20px; border-top: 2px solid #e0e0e0;">
                 <p style="margin: 4px 0; color: #2d5a27; font-weight: 600;">Thank you for your business!</p>
-                <p style="margin: 4px 0; color: #666; font-size: 14px;">Questions? Contact us at info@acreprofit.com</p>
+                <p style="margin: 4px 0; color: #666; font-size: 14px;">Questions? Contact us at contact@acreprofit.com</p>
             </div>
         </div>
 

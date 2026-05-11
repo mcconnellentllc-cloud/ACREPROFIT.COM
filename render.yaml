@@ -53,6 +53,20 @@ services:
         sync: false
       - key: EMAIL_FROM
         sync: false
+      # Stripe (Pay Now on invoices + existing ACH/card order payment flow).
+      # STRIPE_MODE gates live vs test behaviour and is echoed in logs; the
+      # actual keys below determine which Stripe account we hit. Flip to
+      # "live" only after the first successful test-mode end-to-end.
+      - key: STRIPE_MODE
+        value: test
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      # Webhook signing secret from Stripe Dashboard > Developers > Webhooks
+      # for the endpoint at {FRONTEND_URL}/api/webhooks/stripe.
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
 
   # Static Site (optional - if not using GitHub Pages)
   # - type: web
