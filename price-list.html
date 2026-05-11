@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>AcreProfit Price List</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: Arial, Helvetica, sans-serif; font-size: 10pt; color: #111; padding: 0.5in; }
+        .header { text-align: center; margin-bottom: 20px; border-bottom: 2px solid #000; padding-bottom: 12px; }
+        .header h1 { font-size: 18pt; letter-spacing: 2px; margin-bottom: 4px; }
+        .header .subtitle { font-size: 9pt; color: #444; }
+        .header .date { font-size: 8pt; color: #666; margin-top: 4px; }
+        .section-title { font-size: 11pt; font-weight: 700; margin: 16px 0 6px 0; padding: 4px 8px; background: #f0f0f0; border-left: 3px solid #2d5a27; }
+        table { width: 100%; border-collapse: collapse; margin-bottom: 12px; }
+        th { text-align: left; font-size: 8pt; text-transform: uppercase; letter-spacing: 0.04em; border-bottom: 2px solid #000; padding: 4px 6px; }
+        td { padding: 5px 6px; border-bottom: 1px solid #ddd; font-size: 9.5pt; }
+        tr:last-child td { border-bottom: 1px solid #999; }
+        .price { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+        .pack { color: #444; }
+        .notes { font-size: 8pt; color: #555; }
+        .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #999; font-size: 8pt; color: #666; text-align: center; }
+        @media print {
+            body { padding: 0.3in; }
+            .no-print { display: none; }
+        }
+        .print-btn { display: block; margin: 0 auto 20px; padding: 10px 24px; background: #2d5a27; color: white; border: none; border-radius: 6px; font-size: 12pt; font-weight: 600; cursor: pointer; }
+        .print-btn:hover { background: #1f4019; }
+    </style>
+</head>
+<body>
+    <button class="print-btn no-print" onclick="window.print()">Print / Save as PDF</button>
+
+    <div class="header">
+        <h1>ACRE PROFIT</h1>
+        <div class="subtitle">Agricultural Chemical Solutions &mdash; NE Colorado</div>
+        <div class="date">Price List &mdash; April 2026 &mdash; Prices subject to change</div>
+    </div>
+
+    <div class="section-title">Herbicides</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Pack Size</th>
+                <th class="price">Price/Gal</th>
+                <th class="price">Price/Pack</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>XSATE Glyphosate 53.8%</td><td class="pack">265 gal Shuttle</td><td class="price">$12.90</td><td class="price">$3,418.50</td><td class="notes">Generic glyphosate 4.17 lb AE/gal</td></tr>
+            <tr><td>Glystar Supreme</td><td class="pack">265 gal Shuttle</td><td class="price">$14.50</td><td class="price">$3,842.50</td><td class="notes">Premium glyphosate</td></tr>
+            <tr><td>Dicamba 49.8% SL</td><td class="pack">265 gal Shuttle</td><td class="price">$28.25</td><td class="price">$7,486.25</td><td class="notes">Broadleaf control</td></tr>
+            <tr><td>LV 6 (2,4-D Ester)</td><td class="pack">265 gal Shuttle</td><td class="price">$27.90</td><td class="price">$7,393.50</td><td class="notes">2,4-D LV ester</td></tr>
+            <tr><td>Atrazine 4L</td><td class="pack">265 gal Shuttle</td><td class="price">$13.35</td><td class="price">$3,537.75</td><td class="notes">4 lb/gal (Grp 5) - Corn/Sorghum</td></tr>
+            <tr><td>Paraquat 3SL</td><td class="pack">265 gal Shuttle</td><td class="price">$16.00</td><td class="price">$4,240.00</td><td class="notes">Contact burndown (RUP)</td></tr>
+            <tr><td>Glufosinate 2.34</td><td class="pack">265 gal Shuttle</td><td class="price">$16.50</td><td class="price">$4,372.50</td><td class="notes">Liberty link systems</td></tr>
+            <tr><td>Meso 4SC</td><td class="pack">2x2.5 gal case</td><td class="price">$48.25</td><td class="price">$241.25</td><td class="notes">Callisto generic - Corn</td></tr>
+            <tr><td>Clethodim 2EC</td><td class="pack">2x2.5 gal case</td><td class="price">$33.50</td><td class="price">$167.50</td><td class="notes">Grass control in broadleafs</td></tr>
+            <tr><td>Sulfentrazone 4SC</td><td class="pack">2x2.5 gal case</td><td class="price">$70.50</td><td class="price">$352.50</td><td class="notes">Pre-emerge residual</td></tr>
+            <tr><td>Flumioxazin 51% WDG</td><td class="pack">4x5 lb case</td><td class="price">$14.25/lb</td><td class="price">$285.00</td><td class="notes">Burndown + residual</td></tr>
+            <tr><td>Autumn Super</td><td class="pack">4x5 lb case</td><td class="price">$11.42/lb</td><td class="price">$228.40</td><td class="notes">Fall burndown wheat</td></tr>
+            <tr><td>Level Best Pro</td><td class="pack">265 gal Shuttle</td><td class="price">$10.15</td><td class="price">$2,689.75</td><td class="notes">2,4-D + Dicamba premix</td></tr>
+            <tr><td>Tapran (Trifluralin)</td><td class="pack">265 gal Shuttle</td><td class="price">$16.45</td><td class="price">$4,359.25</td><td class="notes">Pre-emerge grass control</td></tr>
+            <tr><td>Aggrestrol 4L</td><td class="pack">265 gal Shuttle</td><td class="price">$10.35</td><td class="price">$2,742.75</td><td class="notes">MCPA ester</td></tr>
+            <tr><td>Artect FI</td><td class="pack">2x2.5 gal case</td><td class="price">$11.30</td><td class="price">$56.50</td><td class="notes">Broadleaf burndown</td></tr>
+            <tr><td>FulTime NXT</td><td class="pack">2x2.5 gal case</td><td class="price">$20.00</td><td class="price">$100.00</td><td class="notes">Acetochlor+Atrazine (Grp 15+5)</td></tr>
+            <tr><td>S-Metolachlor (Dual II Magnum)</td><td class="pack">2x2.5 gal case</td><td class="price">$38.00</td><td class="price">$190.00</td><td class="notes">S-Metolachlor 7.62 lb/gal (Grp 15)</td></tr>
+            <tr><td>Clarifier</td><td class="pack">2x2.5 gal case</td><td class="price">$32.00</td><td class="price">$160.00</td><td class="notes">Dicamba DGA 4lb AE + safener (Grp 4)</td></tr>
+            <tr><td>Impact</td><td class="pack">1 gal jug</td><td class="price">$340.00</td><td class="price">$340.00</td><td class="notes">Topramezone (Grp 27) - Corn late post</td></tr>
+            <tr><td>StareDown</td><td class="pack">2x2.5 gal case</td><td class="price">$100.00</td><td class="price">$500.00</td><td class="notes">Fluroxypyr (Grp 4) - Sorghum</td></tr>
+            <tr><td>Ally XP</td><td class="pack">10x1 oz box</td><td class="price">$8.00/oz</td><td class="price">$80.00</td><td class="notes">Metsulfuron-methyl 60% WDG - Wheat</td></tr>
+        </tbody>
+    </table>
+
+    <div class="section-title">Adjuvants &amp; Surfactants</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Pack Size</th>
+                <th class="price">Price/Unit</th>
+                <th class="price">Price/Pack</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>Hydrovant fA</td><td class="pack">2x2.5 gal case</td><td class="price">$110.00/gal</td><td class="price">$550.00</td><td class="notes">NIS/DRA - 0.1% v/v</td></tr>
+            <tr><td>MSO (Methylated Seed Oil)</td><td class="pack">2x2.5 gal case</td><td class="price">$12.50/gal</td><td class="price">$62.50</td><td class="notes">Spray adjuvant</td></tr>
+            <tr><td>Crop Oil Concentrate</td><td class="pack">2x2.5 gal case</td><td class="price">$8.75/gal</td><td class="price">$43.75</td><td class="notes">Spray adjuvant</td></tr>
+            <tr><td>AMS (Ammonium Sulfate)</td><td class="pack">50 lb bag</td><td class="price">$0.35/lb</td><td class="price">$17.50</td><td class="notes">Water conditioner</td></tr>
+            <tr><td>NIS (Non-ionic Surfactant)</td><td class="pack">2x2.5 gal case</td><td class="price">$14.00/gal</td><td class="price">$70.00</td><td class="notes">Spray adjuvant</td></tr>
+        </tbody>
+    </table>
+
+    <div class="section-title">Fertilizers</div>
+    <table>
+        <thead>
+            <tr>
+                <th>Product</th>
+                <th>Pack Size</th>
+                <th class="price">Price/Gal</th>
+                <th class="price">Price/Pack</th>
+                <th>Notes</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr><td>32-0-0 (UAN)</td><td class="pack">265 gal Shuttle</td><td class="price">$2.32</td><td class="price">$614.80</td><td class="notes">Urea Ammonium Nitrate</td></tr>
+            <tr><td>12-0-0-26 (Thiosol)</td><td class="pack">265 gal Shuttle</td><td class="price">$2.99</td><td class="price">$792.35</td><td class="notes">Ammonium Thiosulfate</td></tr>
+        </tbody>
+    </table>
+
+    <div class="footer">
+        <strong>AcreProfit LLC</strong> &mdash; NE Colorado<br>
+        Prices subject to change without notice. Contact your rep for current availability.<br>
+        Volume discounts available on shuttle+ quantities. Call for quote on unlisted products.
+    </div>
+</body>
+</html>

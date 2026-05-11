@@ -6,3 +6,7 @@ node_modules/
 # Local-dev upload directories (production uses Render persistent disk at /var/data)
 purchase-orders/
 licenses/
+AcreProfit_Price_List_April_2026.pdf
+node_modules/
+*.pdf
+package-lock.json
