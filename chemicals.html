@@ -104,7 +104,7 @@
                                 <th>Category</th>
                                 <th>Package Size</th>
                                 <th>Price/Unit</th>
-                                <th>Qty (Packs)</th>
+                                <th>Qty</th>
                                 <th>Subtotal</th>
                                 <th></th>
                             </tr>
@@ -1570,6 +1570,7 @@
                     <td class="qty-cell">
                         <input type="number" min="0" value="0" data-chem-id="${chem._id}"
                                class="qty-input" onchange="updateRowSubtotal('${chem._id}')">
+                        <span class="qty-unit-label">&times; ${chem.packSize}</span>
                     </td>
                     <td class="subtotal-cell" id="subtotal-${chem._id}">$0.00</td>
                     <td>
@@ -4470,6 +4471,13 @@ Acre Profit Group Purchasing`;
         .qty-input:focus {
             border-color: var(--primary);
             outline: none;
+        }
+
+        .qty-unit-label {
+            margin-left: 6px;
+            color: #888;
+            font-size: 0.85em;
+            white-space: nowrap;
         }
 
         .subtotal-cell {
