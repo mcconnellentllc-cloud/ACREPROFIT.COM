@@ -59,6 +59,7 @@
                     <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
                     <span id="suppliersNavTop"><a href="#suppliers" class="admin-tab" data-tab="suppliers">Suppliers</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
+                    <a href="#receivables" class="admin-tab" data-tab="receivables">Receivables</a>
                     <a href="/distributor-invoices.html" class="admin-tab" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">Invoicing</a>
                     <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
                     <a href="#price-mining" class="admin-tab" data-tab="price-mining" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">Price Mining</a>
@@ -113,6 +114,24 @@
                             <div class="overview-card-sub">
                                 <span><strong id="pendingOrders">0</strong> pending</span>
                                 <span><strong id="totalRevenue">$0</strong> revenue</span>
+                            </div>
+                        </div>
+                        <div class="overview-card-arrow">→</div>
+                    </div>
+
+                    <div class="overview-card" onclick="switchTab('receivables')" style="cursor: pointer;">
+                        <div class="overview-card-icon" style="background: #fee2e2; color: #b91c1c;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="12" y1="1" x2="12" y2="23"></line><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path></svg>
+                        </div>
+                        <div class="overview-card-content">
+                            <h2>Accounts Receivable</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="arTotalOutstanding">$0</span>
+                                <span class="stat-detail">Outstanding</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span><strong id="arInvoiceCount">0</strong> open invoices</span>
+                                <span><strong id="arPastDue">$0</strong> past due</span>
                             </div>
                         </div>
                         <div class="overview-card-arrow">→</div>
@@ -1721,6 +1740,61 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Accounts Receivable Tab -->
+            <div id="receivablesTab" class="tab-content">
+                <div class="tab-header">
+                    <h1>Accounts Receivable</h1>
+                    <p class="tab-subtitle">Outstanding balance (invoice total minus amount paid) across all sent invoices. Drafts and voided/cancelled invoices are excluded. Aged by days past the due date.</p>
+                </div>
+
+                <div style="margin-bottom:20px;">
+                    <span style="font-size:0.85rem; color:#666;">Total Outstanding</span><br>
+                    <span style="font-size:2rem; font-weight:800;" id="arDetailTotal">$0</span>
+                    <span style="color:#666;" id="arDetailCount">0 invoices</span>
+                </div>
+
+                <div style="display:flex; gap:12px; flex-wrap:wrap; margin-bottom:24px;">
+                    <div style="flex:1; min-width:130px; background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:14px;">
+                        <div style="font-size:0.8rem; color:#166534; font-weight:600;">Current</div>
+                        <div style="font-size:1.3rem; font-weight:700;" id="arAgeCurrent">$0</div>
+                    </div>
+                    <div style="flex:1; min-width:130px; background:#fefce8; border:1px solid #fde68a; border-radius:8px; padding:14px;">
+                        <div style="font-size:0.8rem; color:#854d0e; font-weight:600;">1&ndash;30 days</div>
+                        <div style="font-size:1.3rem; font-weight:700;" id="arAge1_30">$0</div>
+                    </div>
+                    <div style="flex:1; min-width:130px; background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:14px;">
+                        <div style="font-size:0.8rem; color:#9a3412; font-weight:600;">31&ndash;60 days</div>
+                        <div style="font-size:1.3rem; font-weight:700;" id="arAge31_60">$0</div>
+                    </div>
+                    <div style="flex:1; min-width:130px; background:#fef2f2; border:1px solid #fecaca; border-radius:8px; padding:14px;">
+                        <div style="font-size:0.8rem; color:#991b1b; font-weight:600;">61&ndash;90 days</div>
+                        <div style="font-size:1.3rem; font-weight:700;" id="arAge61_90">$0</div>
+                    </div>
+                    <div style="flex:1; min-width:130px; background:#fee2e2; border:1px solid #fca5a5; border-radius:8px; padding:14px;">
+                        <div style="font-size:0.8rem; color:#7f1d1d; font-weight:600;">90+ days</div>
+                        <div style="font-size:1.3rem; font-weight:700;" id="arAge90plus">$0</div>
+                    </div>
+                </div>
+
+                <h3 style="margin:18px 0 8px;">By Distributor</h3>
+                <table class="admin-table" style="width:100%; margin-bottom:24px;">
+                    <thead><tr><th>Distributor</th><th style="text-align:right;">Open Invoices</th><th style="text-align:right;">Outstanding</th></tr></thead>
+                    <tbody id="arByDistributorBody"><tr><td colspan="3">Loading&hellip;</td></tr></tbody>
+                </table>
+
+                <h3 style="margin:18px 0 8px;">By Customer</h3>
+                <table class="admin-table" style="width:100%; margin-bottom:24px;">
+                    <thead><tr><th>Customer</th><th style="text-align:right;">Open Invoices</th><th style="text-align:right;">Outstanding</th></tr></thead>
+                    <tbody id="arByCustomerBody"><tr><td colspan="3">Loading&hellip;</td></tr></tbody>
+                </table>
+
+                <h3 style="margin:18px 0 8px;">Outstanding Invoices</h3>
+                <table class="admin-table" style="width:100%;">
+                    <thead><tr><th>Invoice</th><th>Customer</th><th>Distributor</th><th style="text-align:right;">Total</th><th style="text-align:right;">Paid</th><th style="text-align:right;">Owed</th><th>Due</th><th style="text-align:right;">Days Past</th><th>Aging</th></tr></thead>
+                    <tbody id="arInvoicesBody"><tr><td colspan="9">Loading&hellip;</td></tr></tbody>
+                </table>
             </div>
 
             <!-- Purchase Orders Tab -->
@@ -3852,6 +3926,7 @@
             // Lazy-load tab data
             if (tabName === 'products' && allProducts.length === 0) loadProducts();
             if (tabName === 'ledger') loadLedger();
+            if (tabName === 'receivables') loadAccountsReceivable();
             if (tabName === 'audit-log') loadAuditLog();
             if (tabName === 'purchase-orders') loadPurchaseOrders();
             if (tabName === 'compliance') loadComplianceDashboard();
@@ -3917,6 +3992,69 @@
         });
 
         // Load and render distributors from API
+        // Populates the Overview "Accounts Receivable" tile. Lightweight; called
+        // on dashboard load. Failure leaves the tile at its $0 default.
+        async function loadARSummary() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/accounts-receivable`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const ar = await res.json();
+                const pastDue = (ar.aging.d1_30 || 0) + (ar.aging.d31_60 || 0) + (ar.aging.d61_90 || 0) + (ar.aging.d90_plus || 0);
+                document.getElementById('arTotalOutstanding').textContent = fmtMoneyLocale(ar.totalOutstanding);
+                document.getElementById('arInvoiceCount').textContent = ar.invoiceCount;
+                document.getElementById('arPastDue').textContent = fmtMoneyLocale(pastDue);
+            } catch (e) {
+                console.error('loadARSummary error:', e);
+            }
+        }
+
+        // Full Accounts Receivable detail view (aging buckets + by-distributor +
+        // by-customer + outstanding invoice list). Loaded when the tab opens.
+        async function loadAccountsReceivable() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/accounts-receivable`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load receivables');
+                const ar = await res.json();
+
+                document.getElementById('arDetailTotal').textContent = fmtMoneyLocale(ar.totalOutstanding);
+                document.getElementById('arDetailCount').textContent = `${ar.invoiceCount} invoice${ar.invoiceCount === 1 ? '' : 's'}`;
+                document.getElementById('arAgeCurrent').textContent = fmtMoneyLocale(ar.aging.current);
+                document.getElementById('arAge1_30').textContent = fmtMoneyLocale(ar.aging.d1_30);
+                document.getElementById('arAge31_60').textContent = fmtMoneyLocale(ar.aging.d31_60);
+                document.getElementById('arAge61_90').textContent = fmtMoneyLocale(ar.aging.d61_90);
+                document.getElementById('arAge90plus').textContent = fmtMoneyLocale(ar.aging.d90_plus);
+
+                document.getElementById('arByDistributorBody').innerHTML = ar.byDistributor.length
+                    ? ar.byDistributor.map(d => `<tr><td>${escapeHtml(d.name)}</td><td style="text-align:right;">${d.invoiceCount}</td><td style="text-align:right;">${fmtMoneyLocale(d.outstanding)}</td></tr>`).join('')
+                    : '<tr><td colspan="3" style="text-align:center; color:#666;">No outstanding balances</td></tr>';
+
+                document.getElementById('arByCustomerBody').innerHTML = ar.byCustomer.length
+                    ? ar.byCustomer.map(c => `<tr><td>${escapeHtml(c.name)}</td><td style="text-align:right;">${c.invoiceCount}</td><td style="text-align:right;">${fmtMoneyLocale(c.outstanding)}</td></tr>`).join('')
+                    : '<tr><td colspan="3" style="text-align:center; color:#666;">No outstanding balances</td></tr>';
+
+                const bucketLabel = { current: 'Current', d1_30: '1–30', d31_60: '31–60', d61_90: '61–90', d90_plus: '90+' };
+                document.getElementById('arInvoicesBody').innerHTML = ar.invoices.length
+                    ? ar.invoices.map(i => `<tr>
+                        <td>${escapeHtml(i.invoiceNumber || '')}</td>
+                        <td>${escapeHtml(i.customerName)}</td>
+                        <td>${escapeHtml(i.distributorName)}</td>
+                        <td style="text-align:right;">${fmtMoneyLocale(i.total)}</td>
+                        <td style="text-align:right;">${fmtMoneyLocale(i.amountPaid)}</td>
+                        <td style="text-align:right; font-weight:600;">${fmtMoneyLocale(i.amountOwed)}</td>
+                        <td>${i.dueDate ? new Date(i.dueDate).toLocaleDateString() : '—'}</td>
+                        <td style="text-align:right;">${i.daysPastDue}</td>
+                        <td>${bucketLabel[i.bucket] || ''}</td>
+                    </tr>`).join('')
+                    : '<tr><td colspan="9" style="text-align:center; color:#666;">No outstanding invoices</td></tr>';
+            } catch (err) {
+                console.error('loadAccountsReceivable error:', err);
+            }
+        }
+
         async function loadDistributors() {
             const grid = document.getElementById('distributorsGrid');
             try {
@@ -4356,6 +4494,10 @@
 
                 const totalRevenue = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
                 document.getElementById('totalRevenue').textContent = fmtMoneyLocale(totalRevenue);
+
+                // Accounts Receivable summary tile (invoice-based, separate from the
+                // order-based revenue number above).
+                loadARSummary();
 
                 // Recent orders
                 const recentOrders = orders.slice(0, 5);

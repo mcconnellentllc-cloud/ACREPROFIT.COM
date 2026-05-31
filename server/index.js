@@ -6589,6 +6589,104 @@ app.get('/api/admin/stats', authMiddleware, adminMiddleware, async (req, res) =>
     }
 });
 
+// Accounts Receivable: outstanding balance = sum(total - amountPaid) across
+// invoices that are billed (NOT draft) and still collectible (NOT voided/
+// cancelled). Drafts and voided/cancelled are excluded. Aged by days past
+// dueDate and grouped by customer and by distributor. Distributors see only
+// their own book (representativeId scope). Does not change the existing
+// order-based "revenue" number - this is a separate invoice-based metric.
+app.get('/api/admin/accounts-receivable', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const EXCLUDED = ['draft', 'voided', 'cancelled'];
+        const match = { status: { $nin: EXCLUDED } };
+        if (isDistributor(req.user)) {
+            match.representativeId = req.user._id;
+        }
+
+        const invoices = await Invoice.find(match)
+            .select('invoiceNumber customerName customerId representativeId total amountPaid status paymentStatus dueDate invoiceDate')
+            .populate('customerId', 'name')
+            .populate('representativeId', 'name')
+            .lean();
+
+        const now = Date.now();
+        const DAY = 24 * 60 * 60 * 1000;
+        const round2 = (n) => Number(new Decimal(n || 0).toFixed(2));
+
+        let totalOutstanding = new Decimal(0);
+        const aging = { current: new Decimal(0), d1_30: new Decimal(0), d31_60: new Decimal(0), d61_90: new Decimal(0), d90_plus: new Decimal(0) };
+        const byCustomer = {};
+        const byDistributor = {};
+        const outstandingInvoices = [];
+
+        for (const inv of invoices) {
+            const owed = new Decimal(inv.total || 0).minus(inv.amountPaid || 0);
+            if (owed.lte(0)) continue; // fully paid or credited - nothing receivable
+
+            totalOutstanding = totalOutstanding.plus(owed);
+
+            // Aging by whole days past dueDate (no dueDate -> treated as current).
+            const due = inv.dueDate ? new Date(inv.dueDate).getTime() : null;
+            const daysPastDue = due ? Math.floor((now - due) / DAY) : 0;
+            let bucket;
+            if (daysPastDue <= 0) bucket = 'current';
+            else if (daysPastDue <= 30) bucket = 'd1_30';
+            else if (daysPastDue <= 60) bucket = 'd31_60';
+            else if (daysPastDue <= 90) bucket = 'd61_90';
+            else bucket = 'd90_plus';
+            aging[bucket] = aging[bucket].plus(owed);
+
+            const custName = inv.customerName || inv.customerId?.name || 'Unknown';
+            const custKey = (inv.customerId?._id || inv.customerId || custName).toString();
+            if (!byCustomer[custKey]) byCustomer[custKey] = { customerId: custKey, name: custName, outstanding: new Decimal(0), invoiceCount: 0 };
+            byCustomer[custKey].outstanding = byCustomer[custKey].outstanding.plus(owed);
+            byCustomer[custKey].invoiceCount++;
+
+            const repName = inv.representativeId?.name || 'Unassigned';
+            const repKey = (inv.representativeId?._id || inv.representativeId || 'unassigned').toString();
+            if (!byDistributor[repKey]) byDistributor[repKey] = { distributorId: repKey, name: repName, outstanding: new Decimal(0), invoiceCount: 0 };
+            byDistributor[repKey].outstanding = byDistributor[repKey].outstanding.plus(owed);
+            byDistributor[repKey].invoiceCount++;
+
+            outstandingInvoices.push({
+                invoiceId: inv._id,
+                invoiceNumber: inv.invoiceNumber,
+                customerName: custName,
+                distributorName: repName,
+                total: round2(inv.total),
+                amountPaid: round2(inv.amountPaid),
+                amountOwed: round2(owed),
+                status: inv.status,
+                paymentStatus: inv.paymentStatus,
+                dueDate: inv.dueDate,
+                daysPastDue: Math.max(0, daysPastDue),
+                bucket
+            });
+        }
+
+        res.json({
+            totalOutstanding: round2(totalOutstanding),
+            invoiceCount: outstandingInvoices.length,
+            aging: {
+                current: round2(aging.current),
+                d1_30: round2(aging.d1_30),
+                d31_60: round2(aging.d31_60),
+                d61_90: round2(aging.d61_90),
+                d90_plus: round2(aging.d90_plus)
+            },
+            byCustomer: Object.values(byCustomer)
+                .map((c) => ({ ...c, outstanding: round2(c.outstanding) }))
+                .sort((a, b) => b.outstanding - a.outstanding),
+            byDistributor: Object.values(byDistributor)
+                .map((d) => ({ ...d, outstanding: round2(d.outstanding) }))
+                .sort((a, b) => b.outstanding - a.outstanding),
+            invoices: outstandingInvoices.sort((a, b) => b.daysPastDue - a.daysPastDue || b.amountOwed - a.amountOwed)
+        });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
 // ---- REP APPLICATION ROUTES ----
 
 // Submit rep application (public)
