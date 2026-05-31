@@ -2105,6 +2105,9 @@ const invoiceSchema = new mongoose.Schema({
 
     // Line items
     items: [{
+        // Authoritative reference to the catalog product. Required for discount
+        // codes to recompute prices by identity (product names are not unique).
+        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
         productName: String,
         description: String,
         packSize: String,
@@ -14484,18 +14487,47 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
 // Create manual invoice
 app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { customerId, items, discount, discountReason, notes, dueDate, representativeId } = req.body;
+        const { customerId, items, discount, discountReason, discountCode, notes, dueDate, representativeId } = req.body;
 
         const customer = await User.findById(customerId);
         if (!customer) {
             return res.status(404).json({ error: 'Customer not found' });
         }
 
+        // Server authority for discount codes: when a code is applied, recompute
+        // each line's unit price from the authoritative Chemical record keyed by
+        // productId - never trust the client price, and never match by name
+        // (product names are not unique, so a name match can bill off the wrong
+        // record). NoDistMarg -> adminPrice (distributor margin removed);
+        // AtcostAP -> costPrice (no markup). All-or-nothing: any line that can't
+        // be priced rejects the whole invoice rather than billing a wrong amount.
+        const code = (discountCode || '').trim().toUpperCase();
+        let pricedItems = items;
+        if (code === 'NODISTMARG' || code === 'ATCOSTAP') {
+            const field = code === 'NODISTMARG' ? 'adminPrice' : 'costPrice';
+            const label = field === 'adminPrice' ? 'distributor-margin (admin) price' : 'cost price';
+            pricedItems = [];
+            for (const item of items) {
+                if (!item.productId) {
+                    return res.status(400).json({ error: `Cannot apply ${discountCode}: line "${item.productName || 'unknown'}" has no product reference. Remove and re-add the item, then re-apply the code.` });
+                }
+                const chem = await Chemical.findById(item.productId);
+                if (!chem) {
+                    return res.status(400).json({ error: `Cannot apply ${discountCode}: product not found for "${item.productName || item.productId}".` });
+                }
+                const authPrice = Number(chem[field]);
+                if (!(authPrice > 0)) {
+                    return res.status(400).json({ error: `Cannot apply ${discountCode}: no ${label} on file for "${chem.productName}".` });
+                }
+                pricedItems.push({ ...item, unitPrice: authPrice });
+            }
+        }
+
         const invoiceNumber = await generateInvoiceNumber();
 
-        // Calculate totals
-        const subtotal = Number(items.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0)).toFixed(2));
-        const total = subtotal - (discount || 0);
+        // Calculate totals from the (server-priced) items
+        const subtotal = Number(pricedItems.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0)).toFixed(2));
+        const total = Number(new Decimal(subtotal).minus(discount || 0).toFixed(2));
 
         // Determine representative: allow superadmin to specify, otherwise use customer's rep or current user
         let repId = customer.representative || req.user._id;
@@ -14511,9 +14543,9 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
             customerPhone: customer.phone,
             customerAddress: customer.address,
             representativeId: repId,
-            items: items.map(item => ({
+            items: pricedItems.map(item => ({
                 ...item,
-                totalPrice: item.quantity * item.unitPrice
+                totalPrice: Number(new Decimal(item.quantity || 0).times(item.unitPrice || 0).toFixed(2))
             })),
             subtotal,
             discount: discount || 0,
