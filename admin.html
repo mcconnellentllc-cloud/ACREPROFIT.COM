@@ -5110,7 +5110,8 @@
 
             document.getElementById('modalCustomerOrders').innerHTML = ordersHtml;
 
-            // Render invoices (read-only summary - click-through is separate scope)
+            // Render invoices. Each row deep-links to the existing invoice viewer
+            // on the invoicing page (no separate viewer is built here).
             const invoicesHtml = customer.invoices && customer.invoices.length ? customer.invoices.map(inv => {
                 const invDate = new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString();
                 const paidBadge = inv.paymentStatus === 'paid'
@@ -5119,7 +5120,7 @@
                         ? ' <span class="order-status status-partial">PARTIAL</span>'
                         : '';
                 return `
-                <div class="customer-order-item">
+                <div class="customer-order-item" style="cursor:pointer;" title="View invoice" onclick="window.location.href='/distributor-invoices.html?view=${inv._id}'">
                     <div class="order-item-info">
                         <span class="invoice-number"><strong>${inv.invoiceNumber || 'DRAFT'}</strong></span>
                         <span class="order-date">${invDate}</span>
