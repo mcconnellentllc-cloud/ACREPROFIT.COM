@@ -10289,7 +10289,7 @@
                     throw new Error('Failed to load inventory');
                 }
                 allInventory = await res.json();
-                renderInventory(allInventory);
+                filterInventory();
                 updateInventoryStats();
             } catch (error) {
                 console.error('Error loading inventory:', error);
