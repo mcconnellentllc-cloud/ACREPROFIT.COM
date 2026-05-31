@@ -1382,7 +1382,7 @@
                         </select>
                         <select id="productStockFilter" onchange="filterProducts()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
                             <option value="">All Stock</option>
-                            <option value="in_stock">In Stock</option>
+                            <option value="in_stock" selected>In Stock</option>
                             <option value="out_of_stock">Out of Stock</option>
                             <option value="needs_pricing">Needs Pricing</option>
                             <option value="ready_to_sell">Ready to Sell</option>
@@ -1967,6 +1967,11 @@
                             <option value="seed">Seed</option>
                             <option value="equipment">Equipment</option>
                             <option value="other">Other</option>
+                        </select>
+                        <select id="inventoryStockFilter" onchange="filterInventory()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                            <option value="">All Stock</option>
+                            <option value="in_stock" selected>In Stock</option>
+                            <option value="out_of_stock">Out of Stock</option>
                         </select>
                     </div>
                 </div>
@@ -5874,7 +5879,7 @@
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
                 allProducts = await res.json();
-                renderProducts(allProducts);
+                filterProducts();
             } catch (error) {
                 console.error('Error loading products:', error);
                 // Fallback to regular products endpoint
@@ -5883,7 +5888,7 @@
                         headers: { 'Authorization': `Bearer ${token}` }
                     });
                     allProducts = await res.json();
-                    renderProducts(allProducts);
+                    filterProducts();
                 } catch (e) {
                     console.error('Fallback also failed:', e);
                 }
@@ -10284,7 +10289,7 @@
                     throw new Error('Failed to load inventory');
                 }
                 allInventory = await res.json();
-                renderInventory(allInventory);
+                filterInventory();
                 updateInventoryStats();
             } catch (error) {
                 console.error('Error loading inventory:', error);
@@ -10806,6 +10811,7 @@
         function filterInventory() {
             const searchTerm = document.getElementById('inventorySearch').value.toLowerCase();
             const categoryFilter = document.getElementById('inventoryCategoryFilter').value;
+            const stockFilter = document.getElementById('inventoryStockFilter')?.value || '';
 
             let filtered = allInventory;
 
@@ -10819,6 +10825,17 @@
 
             if (categoryFilter) {
                 filtered = filtered.filter(item => item.category === categoryFilter);
+            }
+
+            if (stockFilter) {
+                filtered = filtered.filter(item => {
+                    const qty = item.quantityAvailable ?? item.quantityOnHand ?? 0;
+                    switch (stockFilter) {
+                        case 'in_stock': return qty > 0;
+                        case 'out_of_stock': return qty === 0;
+                        default: return true;
+                    }
+                });
             }
 
             renderInventory(filtered);
