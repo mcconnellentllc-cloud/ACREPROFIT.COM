@@ -12,9 +12,10 @@
 // those slugs to build the slug -> _id map. If no distributor slugs are found,
 // the script aborts.
 //
-// USAGE (run from Render Shell, which has MONGODB_URI in the environment):
-//   node scripts/backfill-rep-attribution.js            # DRY RUN - reports only, writes nothing
-//   node scripts/backfill-rep-attribution.js --commit   # applies the changes
+// USAGE (run from the repo root in Render Shell, which has MONGODB_URI set).
+// The script lives under server/ so it resolves mongoose from server/node_modules:
+//   node server/scripts/backfill-rep-attribution.js            # DRY RUN - reports only, writes nothing
+//   node server/scripts/backfill-rep-attribution.js --commit   # applies the changes
 //
 // SAFETY PROPERTIES:
 //   - Dry-run by default. Writes NOTHING unless --commit is passed.
