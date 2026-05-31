@@ -357,6 +357,7 @@
         let selectedCustomer = null;
         let selectedDistributor = null;
         let invoiceItems = [];
+        let activeDiscountCode = null; // 'NODISTMARG' | 'ATCOSTAP' | null - sent to server to recompute prices
 
         // Check authentication
         if (!token || !['admin', 'distributor', 'superadmin'].includes(user.role)) {
@@ -553,8 +554,16 @@
             document.getElementById('productSearch').value = '';
             document.getElementById('productDropdown').style.display = 'none';
 
-            renderInvoiceItems();
-            updateTotals();
+            // A newly added line comes in at full sell price. If a discount code
+            // is active, re-run it so the new line is repriced too (or the code
+            // loudly un-applies if the new product can't be priced) - never leave
+            // a half-discounted invoice.
+            if (activeDiscountCode) {
+                applyDiscountCode();
+            } else {
+                renderInvoiceItems();
+                updateTotals();
+            }
             updateActionButtons();
         }
 
@@ -609,50 +618,67 @@
             updateActionButtons();
         }
 
+        // Reset every line back to its catalog sell price, keyed by product id.
+        function resetPricesToSell() {
+            invoiceItems.forEach(item => {
+                const prod = products.find(p => p._id === item.productId);
+                if (prod) {
+                    item.unitPrice = Number(new Decimal(prod.sellPrice || prod.price || item.unitPrice));
+                    item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
+                }
+            });
+        }
+
         function applyDiscountCode() {
             const code = (document.getElementById('discountCode').value || '').trim().toUpperCase();
             const statusEl = document.getElementById('discountCodeStatus');
 
             if (!code) {
+                activeDiscountCode = null;
                 statusEl.textContent = '';
-                // Reset prices to sellPrice
-                invoiceItems.forEach(item => {
-                    const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
-                    if (prod) {
-                        item.unitPrice = Number(new Decimal(prod.sellPrice || prod.price || item.unitPrice));
-                        item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
-                    }
-                });
+                resetPricesToSell();
                 renderInvoiceItems();
                 updateTotals();
                 return;
             }
 
-            if (code === 'NODISTMARG') {
-                statusEl.innerHTML = '<span style="color:#059669; font-weight:600;">Applied: No distributor margin (admin price)</span>';
-                invoiceItems.forEach(item => {
-                    const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
-                    if (prod && prod.adminPrice) {
-                        item.unitPrice = Number(new Decimal(prod.adminPrice));
-                        item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
-                    }
-                });
-                document.getElementById('discountReason').value = 'No distributor margin (admin price)';
-            } else if (code === 'ATCOSTAP') {
-                statusEl.innerHTML = '<span style="color:#059669; font-weight:600;">Applied: At cost (no markup)</span>';
-                invoiceItems.forEach(item => {
-                    const prod = products.find(p => p.productName === item.productName || p.name === item.productName);
-                    if (prod && prod.costPrice) {
-                        item.unitPrice = Number(new Decimal(prod.costPrice));
-                        item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
-                    }
-                });
-                document.getElementById('discountReason').value = 'At cost (no markup)';
-            } else {
+            let priceField, label;
+            if (code === 'NODISTMARG') { priceField = 'adminPrice'; label = 'No distributor margin (admin price)'; }
+            else if (code === 'ATCOSTAP') { priceField = 'costPrice'; label = 'At cost (no markup)'; }
+            else {
+                activeDiscountCode = null;
                 statusEl.innerHTML = '<span style="color:#dc2626;">Invalid code</span>';
                 return;
             }
 
+            // All-or-nothing: validate EVERY line can be repriced from authoritative
+            // catalog data (matched by product id, never by name) BEFORE changing any
+            // price. If even one line can't, change nothing and say why - a discount
+            // must never be silently partial.
+            const unpriceable = [];
+            invoiceItems.forEach(item => {
+                const prod = products.find(p => p._id === item.productId);
+                const price = prod ? Number(prod[priceField]) : NaN;
+                if (!prod || !(price > 0)) unpriceable.push(item.productName);
+            });
+            if (unpriceable.length) {
+                activeDiscountCode = null;
+                resetPricesToSell();
+                renderInvoiceItems();
+                updateTotals();
+                const what = priceField === 'adminPrice' ? 'distributor-margin/admin price' : 'cost price';
+                statusEl.innerHTML = `<span style="color:#dc2626; font-weight:600;">Not applied - no ${what} on file for: ${unpriceable.join(', ')}. Nothing changed, to avoid billing the wrong amount.</span>`;
+                return;
+            }
+
+            invoiceItems.forEach(item => {
+                const prod = products.find(p => p._id === item.productId);
+                item.unitPrice = Number(new Decimal(prod[priceField]));
+                item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
+            });
+            activeDiscountCode = code;
+            document.getElementById('discountReason').value = label;
+            statusEl.innerHTML = `<span style="color:#059669; font-weight:600;">Applied: ${label}</span>`;
             renderInvoiceItems();
             updateTotals();
         }
@@ -731,6 +757,7 @@
                 const invoiceData = {
                     customerId: selectedCustomer._id,
                     items: invoiceItems.map(item => ({
+                        productId: item.productId,
                         productName: item.productName,
                         description: item.description,
                         packSize: item.packSize,
@@ -738,6 +765,7 @@
                         quantity: item.quantity,
                         unitPrice: item.unitPrice
                     })),
+                    discountCode: activeDiscountCode || null,
                     discount: parseFloat(document.getElementById('discountAmount').value) || 0,
                     discountReason: document.getElementById('discountReason').value,
                     notes: document.getElementById('invoiceNotes').value,
@@ -797,6 +825,9 @@
             document.getElementById('customerSelect').value = '';
             selectedCustomer = null;
             invoiceItems = [];
+            activeDiscountCode = null;
+            document.getElementById('discountCode').value = '';
+            document.getElementById('discountCodeStatus').textContent = '';
             document.getElementById('discountAmount').value = '0';
             document.getElementById('discountReason').value = '';
             document.getElementById('invoiceNotes').value = '';
