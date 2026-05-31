@@ -2107,7 +2107,7 @@ const invoiceSchema = new mongoose.Schema({
     items: [{
         // Authoritative reference to the catalog product. Required for discount
         // codes to recompute prices by identity (product names are not unique).
-        productId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
         productName: String,
         description: String,
         packSize: String,
@@ -14496,7 +14496,7 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
 
         // Server authority for discount codes: when a code is applied, recompute
         // each line's unit price from the authoritative Chemical record keyed by
-        // productId - never trust the client price, and never match by name
+        // chemicalId - never trust the client price, and never match by name
         // (product names are not unique, so a name match can bill off the wrong
         // record). NoDistMarg -> adminPrice (distributor margin removed);
         // AtcostAP -> costPrice (no markup). All-or-nothing: any line that can't
@@ -14508,12 +14508,12 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
             const label = field === 'adminPrice' ? 'distributor-margin (admin) price' : 'cost price';
             pricedItems = [];
             for (const item of items) {
-                if (!item.productId) {
+                if (!item.chemicalId) {
                     return res.status(400).json({ error: `Cannot apply ${discountCode}: line "${item.productName || 'unknown'}" has no product reference. Remove and re-add the item, then re-apply the code.` });
                 }
-                const chem = await Chemical.findById(item.productId);
+                const chem = await Chemical.findById(item.chemicalId);
                 if (!chem) {
-                    return res.status(400).json({ error: `Cannot apply ${discountCode}: product not found for "${item.productName || item.productId}".` });
+                    return res.status(400).json({ error: `Cannot apply ${discountCode}: product not found for "${item.productName || item.chemicalId}".` });
                 }
                 const authPrice = Number(chem[field]);
                 if (!(authPrice > 0)) {

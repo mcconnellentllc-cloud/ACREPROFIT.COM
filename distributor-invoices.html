@@ -532,14 +532,14 @@
             if (!product) return;
 
             // Check if already added
-            const existing = invoiceItems.find(i => i.productId === productId);
+            const existing = invoiceItems.find(i => i.chemicalId === productId);
             if (existing) {
                 existing.quantity++;
                 existing.total = Number(new Decimal(existing.unitPrice).times(existing.quantity).toFixed(2));
             } else {
                 const unitPrice = Number(new Decimal(product.effectivePrice || product.baseRetailPrice || product.sellPrice || product.price || 0));
                 invoiceItems.push({
-                    productId: product._id,
+                    chemicalId: product._id,
                     productName: product.productName,
                     description: `${product.packSize} ${product.unit}`,
                     packSize: product.packSize,
@@ -621,7 +621,7 @@
         // Reset every line back to its catalog sell price, keyed by product id.
         function resetPricesToSell() {
             invoiceItems.forEach(item => {
-                const prod = products.find(p => p._id === item.productId);
+                const prod = products.find(p => p._id === item.chemicalId);
                 if (prod) {
                     item.unitPrice = Number(new Decimal(prod.sellPrice || prod.price || item.unitPrice));
                     item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
@@ -657,7 +657,7 @@
             // must never be silently partial.
             const unpriceable = [];
             invoiceItems.forEach(item => {
-                const prod = products.find(p => p._id === item.productId);
+                const prod = products.find(p => p._id === item.chemicalId);
                 const price = prod ? Number(prod[priceField]) : NaN;
                 if (!prod || !(price > 0)) unpriceable.push(item.productName);
             });
@@ -672,7 +672,7 @@
             }
 
             invoiceItems.forEach(item => {
-                const prod = products.find(p => p._id === item.productId);
+                const prod = products.find(p => p._id === item.chemicalId);
                 item.unitPrice = Number(new Decimal(prod[priceField]));
                 item.total = Number(new Decimal(item.unitPrice).times(item.quantity).toFixed(2));
             });
@@ -757,7 +757,7 @@
                 const invoiceData = {
                     customerId: selectedCustomer._id,
                     items: invoiceItems.map(item => ({
-                        productId: item.productId,
+                        chemicalId: item.chemicalId,
                         productName: item.productName,
                         description: item.description,
                         packSize: item.packSize,
