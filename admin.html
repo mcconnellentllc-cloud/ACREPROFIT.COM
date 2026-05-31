@@ -1332,16 +1332,7 @@
                         <button class="btn btn-primary btn-sm" onclick="openAddReminderModal()">+ Add Reminder</button>
                     </div>
                     <div id="remindersContainer" style="padding: 16px;">
-                        <div class="reminder-item" style="display: flex; justify-content: space-between; align-items: center; padding: 16px; background: #fff3cd; border-radius: 8px; margin-bottom: 12px;">
-                            <div>
-                                <strong>Pesticide Dealer License Renewal</strong>
-                                <p style="color: #856404; font-size: 0.9rem; margin-top: 4px;">Renew Colorado Pesticide Dealer License before December 31</p>
-                                <span style="font-size: 0.85rem; color: #666;">Due: December 1, 2026</span>
-                            </div>
-                            <div style="display: flex; gap: 8px;">
-                                <button class="btn btn-sm btn-outline" onclick="completeReminder(this)">Mark Complete</button>
-                            </div>
-                        </div>
+                        <p style="color: var(--text-muted);">Loading reminders&hellip;</p>
                     </div>
                 </div>
 
@@ -4527,8 +4518,20 @@
                 const totalRevenue = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
                 document.getElementById('totalRevenue').textContent = fmtMoneyLocale(totalRevenue);
 
+                // Week / month revenue tiles (were never wired). Same order-based
+                // basis as the Revenue number, date-sliced - display only.
+                const nowD = new Date();
+                const weekAgo = new Date(nowD.getTime() - 7 * 24 * 60 * 60 * 1000);
+                const monthStart = new Date(nowD.getFullYear(), nowD.getMonth(), 1);
+                const weekRev = orders.reduce((s, o) => s + (o.createdAt && new Date(o.createdAt) >= weekAgo ? (o.totalCost || 0) : 0), 0);
+                const monthRev = orders.reduce((s, o) => s + (o.createdAt && new Date(o.createdAt) >= monthStart ? (o.totalCost || 0) : 0), 0);
+                document.getElementById('weekRevenue').textContent = fmtMoneyLocale(weekRev);
+                document.getElementById('monthRevenue').textContent = fmtMoneyLocale(monthRev);
+
                 // Inventory tile (was never wired - showed a static 0 / $0).
                 loadInventorySummary();
+                // New-customers-this-month + distributor-count tiles (were never wired).
+                loadOverviewStats();
 
                 // Accounts Receivable summary tile (invoice-based, separate from the
                 // order-based revenue number above).
@@ -4560,6 +4563,55 @@
         }
 
         // Load rep applications (superadmin only)
+        // Wires the previously-dead Overview tiles: new customers this month and
+        // active distributor count. Self-contained; display only.
+        async function loadOverviewStats() {
+            try {
+                const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+                const [custRes, distRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/customers`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_URL}/api/admin/distributors`, { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+                if (custRes.ok) {
+                    const data = await custRes.json();
+                    const list = Array.isArray(data) ? data : (data.customers || []);
+                    const n = list.filter(c => c.createdAt && new Date(c.createdAt) >= monthStart).length;
+                    document.getElementById('newCustomersMonth').textContent = n;
+                }
+                if (distRes.ok) {
+                    const dists = await distRes.json();
+                    const count = Array.isArray(dists) ? dists.filter(d => d.role === 'distributor').length : 0;
+                    document.getElementById('totalDistributorsCount').textContent = count;
+                }
+            } catch (e) {
+                console.error('loadOverviewStats error:', e);
+            }
+        }
+
+        // Rep application approve/reject (were dead onclick handlers). Both PUT the
+        // existing /api/rep-applications/:id status endpoint, then refresh the list.
+        async function approveApp(id) {
+            await updateRepApplicationStatus(id, 'approved');
+        }
+        async function rejectApp(id) {
+            if (!confirm('Reject this rep application?')) return;
+            await updateRepApplicationStatus(id, 'rejected');
+        }
+        async function updateRepApplicationStatus(id, status) {
+            try {
+                const res = await fetch(`${API_URL}/api/rep-applications/${id}`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ status })
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to update application');
+                if (typeof toast === 'function') toast(`Application ${status}.`, 'success');
+                loadApplications();
+            } catch (e) {
+                alert('Error: ' + e.message);
+            }
+        }
+
         async function loadApplications() {
             if (userData.role !== 'superadmin') return;
 
