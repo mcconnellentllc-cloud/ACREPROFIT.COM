@@ -847,6 +847,11 @@
                     <td>
                         <span class="status-badge status-${inv.status || 'draft'}">${inv.status || 'draft'}</span>
                         ${inv.paymentStatus === 'paid' ? '<span class="status-badge status-paid">Paid</span>' : ''}
+                        ${inv.viewedAt
+                            ? `<div class="engagement-badge eng-viewed" title="Customer opened the invoice page on ${new Date(inv.viewedAt).toLocaleString()}">&#128065; Viewed ${new Date(inv.viewedAt).toLocaleDateString()}</div>`
+                            : (inv.emailOpenedAt
+                                ? `<div class="engagement-badge eng-opened" title="Email opened ${new Date(inv.emailOpenedAt).toLocaleString()} — soft signal; mail-privacy pixel pre-loading can inflate this">&#9993; Opened ${new Date(inv.emailOpenedAt).toLocaleDateString()}</div>`
+                                : '')}
                     </td>
                     <td>${new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString()}</td>
                     <td>
@@ -1734,9 +1739,21 @@
 
         .status-draft { background: #f3f4f6; color: #6b7280; }
         .status-sent { background: #dbeafe; color: #1e40af; }
+        .status-viewed { background: #ede9fe; color: #5b21b6; }
         .status-paid { background: #dcfce7; color: #166534; }
         .status-overdue { background: #fee2e2; color: #991b1b; }
         .status-voided { background: #e5e7eb; color: #4b5563; text-decoration: line-through; opacity: 0.85; }
+
+        /* Engagement indicators (collections signal) shown under the status badge. */
+        .engagement-badge {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .eng-viewed { color: #5b21b6; }
+        .eng-opened { color: #6b7280; }
 
         .action-buttons {
             display: flex;

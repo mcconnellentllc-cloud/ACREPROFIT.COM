@@ -2170,6 +2170,16 @@ const invoiceSchema = new mongoose.Schema({
     voidedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     voidReason: String,
 
+    // Engagement tracking (collections signal).
+    // viewedAt: first time the customer loaded the pay-invoice page. Hard signal.
+    // emailMessageId: SendGrid short message id from the most recent send; used to
+    //   correlate 'open' events from the event webhook back to this invoice.
+    // emailOpenedAt: first 'open' event after the most recent send. Soft signal -
+    //   unreliable due to Apple Mail Privacy Protection pre-fetching tracking pixels.
+    viewedAt: Date,
+    emailMessageId: String,
+    emailOpenedAt: Date,
+
     // Delivery info
     deliveryStatus: {
         type: String,
@@ -4402,7 +4412,7 @@ const emailLogSchema = new mongoose.Schema({
     transport: { type: String, enum: ['sendgrid', 'smtp', 'gmail'] },
     status: {
         type: String,
-        enum: ['sent', 'failed', 'delivered', 'bounced', 'complained'],
+        enum: ['sent', 'failed', 'delivered', 'bounced', 'complained', 'opened'],
         default: 'sent',
         index: true
     },
@@ -7074,11 +7084,32 @@ app.post('/api/webhooks/sendgrid', async (req, res) => {
     };
 
     for (const ev of events) {
-        const newStatus = statusMap[ev?.event];
-        if (!newStatus) continue;
         const sgMessageId = String(ev?.sg_message_id || '');
         const shortId = sgMessageId.split('.')[0];
         if (!shortId) continue;
+
+        // Open tracking. Soft engagement signal (Apple Mail Privacy Protection
+        // pre-fetches pixels, so opens can be false positives). Advance EmailLog
+        // to 'opened' only from sent/delivered so we never overwrite a terminal
+        // bounced/complained, and stamp the correlated invoice's first open.
+        if (ev?.event === 'open') {
+            try {
+                await EmailLog.findOneAndUpdate(
+                    { providerId: shortId, status: { $in: ['sent', 'delivered'] } },
+                    { status: 'opened', updatedAt: new Date() }
+                );
+                await Invoice.updateOne(
+                    { emailMessageId: shortId, emailOpenedAt: null },
+                    { $set: { emailOpenedAt: new Date() } }
+                );
+            } catch (e) {
+                console.error('[SendGrid webhook] open tracking failed:', e.message);
+            }
+            continue;
+        }
+
+        const newStatus = statusMap[ev?.event];
+        if (!newStatus) continue;
         try {
             await EmailLog.findOneAndUpdate(
                 { providerId: shortId },
@@ -14972,6 +15003,22 @@ app.get('/api/public/invoice/:id', async (req, res) => {
         if (!invoice) {
             return res.status(404).json({ error: 'Invoice not found' });
         }
+
+        // Engagement signal: a customer loading their pay page is a trustworthy
+        // "they saw it" event. Stamp viewedAt on the first view always, and only
+        // advance status sent->viewed so we never clobber paid/overdue/voided.
+        // Best-effort: a failure here must never break the customer's pay page.
+        try {
+            const viewUpdate = {};
+            if (!invoice.viewedAt) viewUpdate.viewedAt = new Date();
+            if (invoice.status === 'sent') viewUpdate.status = 'viewed';
+            if (Object.keys(viewUpdate).length) {
+                await Invoice.updateOne({ _id: invoice._id }, { $set: viewUpdate });
+            }
+        } catch (e) {
+            console.error('[public invoice] view-stamp failed:', e.message);
+        }
+
         const total = Number(invoice.total || 0);
         const surchargeCard = Number(new Decimal(total).times(CARD_SURCHARGE_RATE).toFixed(2));
         const totalWithCardSurcharge = Math.round((total + surchargeCard) * 100) / 100;
@@ -15249,7 +15296,7 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         // Send email
         const transporter = createEmailTransporter();
         if (transporter) {
-            await transporter.sendMail({
+            const sendResult = await transporter.sendMail({
                 from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
                 to: customerEmail,
                 subject: `Invoice ${invoice.invoiceNumber} from Acre Profit - $${total.toFixed(2)} Due`,
@@ -15259,6 +15306,11 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
             invoice.status = 'sent';
             invoice.sentAt = new Date();
             invoice.sentBy = req.user._id;
+            // Store the SendGrid message id so the event webhook can correlate
+            // 'open' events back to this invoice. Reset the prior open stamp so
+            // "opened" tracks the most recent send, not a stale earlier one.
+            invoice.emailMessageId = sendResult?.messageId || null;
+            invoice.emailOpenedAt = null;
             await invoice.save();
 
             res.json({ message: 'Invoice sent successfully', invoice });
@@ -15267,6 +15319,8 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
             invoice.status = 'sent';
             invoice.sentAt = new Date();
             invoice.sentBy = req.user._id;
+            invoice.emailMessageId = null;
+            invoice.emailOpenedAt = null;
             await invoice.save();
 
             res.json({
