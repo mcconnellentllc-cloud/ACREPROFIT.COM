@@ -278,6 +278,35 @@
         </div>
     </div>
 
+    <!-- Mark Paid Modal -->
+    <div id="markPaidModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
+        <div style="background:#fff; max-width:520px; width:92%; border-radius:8px; padding:24px; position:relative;">
+            <button onclick="closeMarkPaidModal()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+            <h3 style="margin:0 0 4px 0; color:#166534;">Record Payment</h3>
+            <p style="margin:0 0 16px 0; color:#666;">Mark this invoice settled with an offline payment (check, cash, ACH, wire). No receipt email is sent.</p>
+            <div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:6px; padding:12px; margin-bottom:16px; font-size:0.9rem;">
+                <div><strong>Invoice:</strong> <span id="mpInvoiceNumber"></span></div>
+                <div><strong>Invoice total:</strong> $<span id="mpInvoiceTotal">0.00</span></div>
+            </div>
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Amount received ($)</label>
+            <input type="number" id="mpAmountInput" class="form-control" step="0.01" min="0.01" placeholder="0.00" style="width:100%; margin-bottom:16px;">
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Payment method</label>
+            <select id="mpMethodInput" class="form-control" style="width:100%; margin-bottom:16px;">
+                <option value="check">Check</option>
+                <option value="cash">Cash</option>
+                <option value="ach">ACH bank transfer</option>
+                <option value="wire">Wire transfer</option>
+                <option value="other">Other</option>
+            </select>
+            <label style="display:block; margin-bottom:8px; font-weight:600;">Notes (optional)</label>
+            <textarea id="mpNotesInput" class="form-control" rows="2" placeholder="e.g., check #1234, paid at counter" style="width:100%; margin-bottom:20px;"></textarea>
+            <div style="display:flex; justify-content:flex-end; gap:8px;">
+                <button class="btn btn-outline" onclick="closeMarkPaidModal()">Cancel</button>
+                <button class="btn btn-success" id="confirmMarkPaidBtn" onclick="submitMarkPaid()">Record Payment</button>
+            </div>
+        </div>
+    </div>
+
     <div id="creditNoteModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
         <div style="background:#fff; max-width:560px; width:92%; border-radius:8px; padding:24px; position:relative;">
             <button onclick="closeCreditNoteModal()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
@@ -818,6 +847,11 @@
                     <td>
                         <span class="status-badge status-${inv.status || 'draft'}">${inv.status || 'draft'}</span>
                         ${inv.paymentStatus === 'paid' ? '<span class="status-badge status-paid">Paid</span>' : ''}
+                        ${inv.viewedAt
+                            ? `<div class="engagement-badge eng-viewed" title="Customer opened the invoice page on ${new Date(inv.viewedAt).toLocaleString()}">&#128065; Viewed ${new Date(inv.viewedAt).toLocaleDateString()}</div>`
+                            : (inv.emailOpenedAt
+                                ? `<div class="engagement-badge eng-opened" title="Email opened ${new Date(inv.emailOpenedAt).toLocaleString()} — soft signal; mail-privacy pixel pre-loading can inflate this">&#9993; Opened ${new Date(inv.emailOpenedAt).toLocaleDateString()}</div>`
+                                : '')}
                     </td>
                     <td>${new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString()}</td>
                     <td>
@@ -827,6 +861,10 @@
                             <button class="btn btn-sm btn-outline" onclick="viewInvoice('${inv._id}')">View</button>
                             ${inv.status === 'draft' ?
                                 `<button class="btn btn-sm btn-danger" onclick="deleteInvoice('${inv._id}', '${inv.invoiceNumber}')">Delete</button>` : ''}
+                            ${['sent', 'viewed', 'overdue'].includes(inv.status) && inv.paymentStatus !== 'paid' ?
+                                `<button class="btn btn-sm btn-primary" onclick="resendInvoice('${inv._id}', '${(inv.customerEmail || inv.customerId?.email || '').replace(/'/g, '&#39;')}')">Resend</button>` : ''}
+                            ${['sent', 'viewed', 'overdue'].includes(inv.status) && inv.paymentStatus !== 'paid' ?
+                                `<button class="btn btn-sm btn-success" onclick="openMarkPaidModal('${inv._id}', '${(inv.invoiceNumber || '').replace(/'/g, '&#39;')}', ${Number(inv.total || 0)})">Mark Paid</button>` : ''}
                             ${['sent', 'viewed', 'overdue'].includes(inv.status) && inv.paymentStatus !== 'paid' ?
                                 `<button class="btn btn-sm btn-danger" onclick="openVoidModal('${inv._id}', '${(inv.invoiceNumber || '').replace(/'/g, '&#39;')}', '${(inv.customerEmail || inv.customerId?.email || '').replace(/'/g, '&#39;')}')">Void</button>` : ''}
                             ${inv.paymentStatus === 'paid' && inv.status !== 'voided' ?
@@ -1049,6 +1087,77 @@
             } catch (err) {
                 btn.disabled = false;
                 btn.textContent = 'Void Invoice';
+                alert('Error: ' + err.message);
+            }
+        }
+
+        async function resendInvoice(invoiceId, email) {
+            if (!confirm(`Resend invoice to ${email || 'the customer'}? The branded invoice email will be sent again.`)) return;
+            try {
+                const response = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}/send`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error || 'Failed to resend invoice');
+                }
+                loadInvoices();
+                alert('Invoice resent.');
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
+        let pendingMarkPaidInvoiceId = null;
+
+        function openMarkPaidModal(invoiceId, invoiceNumber, total) {
+            pendingMarkPaidInvoiceId = invoiceId;
+            document.getElementById('mpInvoiceNumber').textContent = invoiceNumber || '';
+            document.getElementById('mpInvoiceTotal').textContent = new Decimal(total || 0).toFixed(2);
+            document.getElementById('mpAmountInput').value = new Decimal(total || 0).toFixed(2);
+            document.getElementById('mpMethodInput').value = 'check';
+            document.getElementById('mpNotesInput').value = '';
+            document.getElementById('confirmMarkPaidBtn').disabled = false;
+            document.getElementById('confirmMarkPaidBtn').textContent = 'Record Payment';
+            document.getElementById('markPaidModal').style.display = 'flex';
+        }
+
+        function closeMarkPaidModal() {
+            document.getElementById('markPaidModal').style.display = 'none';
+            pendingMarkPaidInvoiceId = null;
+        }
+
+        async function submitMarkPaid() {
+            if (!pendingMarkPaidInvoiceId) return;
+            const amount = parseFloat(document.getElementById('mpAmountInput').value);
+            const method = document.getElementById('mpMethodInput').value;
+            const notes = document.getElementById('mpNotesInput').value.trim();
+            if (!(amount > 0)) {
+                alert('Enter a payment amount greater than zero.');
+                return;
+            }
+            const btn = document.getElementById('confirmMarkPaidBtn');
+            btn.disabled = true;
+            btn.textContent = 'Recording...';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/invoices/${pendingMarkPaidInvoiceId}/payment`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ amount, method, notes })
+                });
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || 'Failed to record payment');
+                closeMarkPaidModal();
+                loadInvoices();
+                const fullyPaid = result.invoice && result.invoice.paymentStatus === 'paid';
+                alert(fullyPaid ? 'Payment recorded. Invoice marked paid.' : 'Partial payment recorded.');
+            } catch (err) {
+                btn.disabled = false;
+                btn.textContent = 'Record Payment';
                 alert('Error: ' + err.message);
             }
         }
@@ -1630,9 +1739,21 @@
 
         .status-draft { background: #f3f4f6; color: #6b7280; }
         .status-sent { background: #dbeafe; color: #1e40af; }
+        .status-viewed { background: #ede9fe; color: #5b21b6; }
         .status-paid { background: #dcfce7; color: #166534; }
         .status-overdue { background: #fee2e2; color: #991b1b; }
         .status-voided { background: #e5e7eb; color: #4b5563; text-decoration: line-through; opacity: 0.85; }
+
+        /* Engagement indicators (collections signal) shown under the status badge. */
+        .engagement-badge {
+            display: inline-block;
+            margin-top: 4px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .eng-viewed { color: #5b21b6; }
+        .eng-opened { color: #6b7280; }
 
         .action-buttons {
             display: flex;
