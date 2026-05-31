@@ -386,6 +386,12 @@
             loadProducts();
             loadInvoices();
             setupLogout();
+
+            // Deep-link support: /distributor-invoices.html?view=<invoiceId> opens
+            // that invoice directly in the existing View modal (used by the
+            // customer card's invoice rows in admin.html).
+            const viewId = new URLSearchParams(window.location.search).get('view');
+            if (viewId) viewInvoice(viewId);
         });
 
         async function loadDistributors() {
