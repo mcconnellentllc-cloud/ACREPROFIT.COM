@@ -14604,6 +14604,38 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
 });
 
 // Create manual invoice
+// Server-authoritative discount recompute, shared by invoice create and draft
+// edit. When a discount code is applied, recompute each line's unit price from
+// the authoritative Chemical record keyed by chemicalId - never trust the
+// client price, and never match by name (names aren't unique). NoDistMarg ->
+// adminPrice (distributor margin removed); AtcostAP -> costPrice (no markup).
+// All-or-nothing: returns { error } (a 400 message) if any line can't be
+// priced, otherwise { pricedItems }.
+async function priceInvoiceItemsForDiscount(items, discountCode) {
+    const code = (discountCode || '').trim().toUpperCase();
+    if (code !== 'NODISTMARG' && code !== 'ATCOSTAP') {
+        return { pricedItems: items };
+    }
+    const field = code === 'NODISTMARG' ? 'adminPrice' : 'costPrice';
+    const label = field === 'adminPrice' ? 'distributor-margin (admin) price' : 'cost price';
+    const pricedItems = [];
+    for (const item of items) {
+        if (!item.chemicalId) {
+            return { error: `Cannot apply ${discountCode}: line "${item.productName || 'unknown'}" has no product reference. Remove and re-add the item, then re-apply the code.` };
+        }
+        const chem = await Chemical.findById(item.chemicalId);
+        if (!chem) {
+            return { error: `Cannot apply ${discountCode}: product not found for "${item.productName || item.chemicalId}".` };
+        }
+        const authPrice = Number(chem[field]);
+        if (!(authPrice > 0)) {
+            return { error: `Cannot apply ${discountCode}: no ${label} on file for "${chem.productName}".` };
+        }
+        pricedItems.push({ ...item, unitPrice: authPrice });
+    }
+    return { pricedItems };
+}
+
 app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { customerId, items, discount, discountReason, discountCode, notes, dueDate, representativeId } = req.body;
@@ -14613,34 +14645,9 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Server authority for discount codes: when a code is applied, recompute
-        // each line's unit price from the authoritative Chemical record keyed by
-        // chemicalId - never trust the client price, and never match by name
-        // (product names are not unique, so a name match can bill off the wrong
-        // record). NoDistMarg -> adminPrice (distributor margin removed);
-        // AtcostAP -> costPrice (no markup). All-or-nothing: any line that can't
-        // be priced rejects the whole invoice rather than billing a wrong amount.
-        const code = (discountCode || '').trim().toUpperCase();
-        let pricedItems = items;
-        if (code === 'NODISTMARG' || code === 'ATCOSTAP') {
-            const field = code === 'NODISTMARG' ? 'adminPrice' : 'costPrice';
-            const label = field === 'adminPrice' ? 'distributor-margin (admin) price' : 'cost price';
-            pricedItems = [];
-            for (const item of items) {
-                if (!item.chemicalId) {
-                    return res.status(400).json({ error: `Cannot apply ${discountCode}: line "${item.productName || 'unknown'}" has no product reference. Remove and re-add the item, then re-apply the code.` });
-                }
-                const chem = await Chemical.findById(item.chemicalId);
-                if (!chem) {
-                    return res.status(400).json({ error: `Cannot apply ${discountCode}: product not found for "${item.productName || item.chemicalId}".` });
-                }
-                const authPrice = Number(chem[field]);
-                if (!(authPrice > 0)) {
-                    return res.status(400).json({ error: `Cannot apply ${discountCode}: no ${label} on file for "${chem.productName}".` });
-                }
-                pricedItems.push({ ...item, unitPrice: authPrice });
-            }
-        }
+        // Server authority for discount codes (see priceInvoiceItemsForDiscount).
+        const { pricedItems, error: priceError } = await priceInvoiceItemsForDiscount(items, discountCode);
+        if (priceError) return res.status(400).json({ error: priceError });
 
         const invoiceNumber = await generateInvoiceNumber();
 
@@ -14679,6 +14686,69 @@ app.post('/api/admin/invoices', authMiddleware, adminMiddleware, async (req, res
         await invoice.save();
 
         res.status(201).json(invoice);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Edit a DRAFT invoice in place. Reuses the same server-authoritative discount
+// recompute as create, so re-saving a stale draft reprices it against current
+// catalog rules. Only drafts are editable; sent/paid/voided are immutable here.
+// Updates the existing document - same _id and invoiceNumber (never a new one).
+app.put('/api/admin/invoices/:id/edit', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { customerId, items, discount, discountReason, discountCode, notes, dueDate, representativeId } = req.body;
+
+        const invoice = await Invoice.findById(req.params.id);
+        if (!invoice) {
+            return res.status(404).json({ error: 'Invoice not found' });
+        }
+        if (invoice.status !== 'draft') {
+            return res.status(400).json({ error: `Only draft invoices can be edited (this one is "${invoice.status}").` });
+        }
+        if (!Array.isArray(items) || items.length === 0) {
+            return res.status(400).json({ error: 'At least one line item is required.' });
+        }
+
+        const customer = await User.findById(customerId || invoice.customerId);
+        if (!customer) {
+            return res.status(404).json({ error: 'Customer not found' });
+        }
+
+        // Server authority for discount codes (see priceInvoiceItemsForDiscount).
+        const { pricedItems, error: priceError } = await priceInvoiceItemsForDiscount(items, discountCode);
+        if (priceError) return res.status(400).json({ error: priceError });
+
+        const subtotal = Number(pricedItems.reduce((sum, item) => sum.plus(new Decimal(item.quantity || 0).times(item.unitPrice || 0)), new Decimal(0)).toFixed(2));
+        const total = Number(new Decimal(subtotal).minus(discount || 0).toFixed(2));
+
+        let repId = customer.representative || invoice.representativeId || req.user._id;
+        if (req.user.role === 'superadmin' && representativeId) {
+            repId = representativeId;
+        }
+
+        // Update in place - keep _id and invoiceNumber.
+        invoice.customerId = customer._id;
+        invoice.customerName = customer.name;
+        invoice.customerEmail = customer.email;
+        invoice.customerPhone = customer.phone;
+        invoice.customerAddress = customer.address;
+        invoice.representativeId = repId;
+        invoice.items = pricedItems.map(item => ({
+            ...item,
+            totalPrice: Number(new Decimal(item.quantity || 0).times(item.unitPrice || 0).toFixed(2))
+        }));
+        invoice.subtotal = subtotal;
+        invoice.discount = discount || 0;
+        invoice.discountReason = discountReason;
+        invoice.total = total;
+        invoice.amountDue = Number(new Decimal(total).minus(invoice.amountPaid || 0).toFixed(2));
+        if (dueDate) invoice.dueDate = new Date(dueDate);
+        invoice.notes = notes;
+        invoice.updatedAt = new Date();
+
+        await invoice.save();
+        res.json(invoice);
     } catch (error) {
         res.status(400).json({ error: error.message });
     }

@@ -358,6 +358,7 @@
         let selectedDistributor = null;
         let invoiceItems = [];
         let activeDiscountCode = null; // 'NODISTMARG' | 'ATCOSTAP' | null - sent to server to recompute prices
+        let editingInvoiceId = null;   // when set, the builder is editing this draft (PUT) instead of creating (POST)
 
         // Check authentication
         if (!token || !['admin', 'distributor', 'superadmin'].includes(user.role)) {
@@ -783,18 +784,25 @@
                     invoiceData.representativeId = selectedDistributor._id;
                 }
 
-                const response = await fetch(`${API_URL}/api/admin/invoices`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${token}`
-                    },
-                    body: JSON.stringify(invoiceData)
-                });
+                // Edit mode updates the existing draft in place (PUT); otherwise
+                // create a new invoice (POST). Both route through the same
+                // server-side discount/price recompute.
+                const isEdit = !!editingInvoiceId;
+                const response = await fetch(
+                    isEdit ? `${API_URL}/api/admin/invoices/${editingInvoiceId}/edit` : `${API_URL}/api/admin/invoices`,
+                    {
+                        method: isEdit ? 'PUT' : 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${token}`
+                        },
+                        body: JSON.stringify(invoiceData)
+                    }
+                );
 
                 if (!response.ok) {
                     const err = await response.json();
-                    throw new Error(err.error || 'Failed to create invoice');
+                    throw new Error(err.error || (isEdit ? 'Failed to update invoice' : 'Failed to create invoice'));
                 }
 
                 const invoice = await response.json();
@@ -827,7 +835,87 @@
             }
         }
 
+        // Load a draft invoice back into the builder for in-place editing. The
+        // save then PUTs to .../edit (same _id, same INV number) and the server
+        // reprices against current catalog rules.
+        async function editInvoice(invoiceId) {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/invoices/${invoiceId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to load invoice');
+                const inv = await res.json();
+                if (inv.status !== 'draft') {
+                    alert('Only draft invoices can be edited.');
+                    return;
+                }
+
+                closeViewInvoice();
+
+                // Customer: select from the loaded list, falling back to the
+                // invoice's denormalized fields if not present.
+                const custId = (inv.customerId?._id || inv.customerId || '').toString();
+                document.getElementById('customerSelect').value = custId;
+                selectedCustomer = customers.find(c => c._id === custId)
+                    || (custId ? { _id: custId, name: inv.customerName, email: inv.customerEmail, phone: inv.customerPhone } : null);
+                selectCustomer();
+                if (selectedCustomer && !customers.find(c => c._id === custId)) {
+                    document.getElementById('customerName').textContent = selectedCustomer.name || '';
+                    document.getElementById('customerEmail').textContent = selectedCustomer.email || '';
+                    document.getElementById('previewCustomerName').textContent = selectedCustomer.name || '';
+                    document.getElementById('previewCustomerEmail').textContent = selectedCustomer.email || '';
+                    document.getElementById('customerInfo').style.display = 'block';
+                }
+
+                // Line items (carry chemicalId so the discount recompute can key on it).
+                invoiceItems = (inv.items || []).map(i => ({
+                    chemicalId: i.chemicalId || null,
+                    productName: i.productName,
+                    description: i.description || `${i.packSize || ''} ${i.unit || ''}`.trim(),
+                    packSize: i.packSize,
+                    unit: i.unit,
+                    quantity: i.quantity || 0,
+                    unitPrice: i.unitPrice || 0,
+                    total: Number(new Decimal(i.quantity || 0).times(i.unitPrice || 0).toFixed(2))
+                }));
+
+                document.getElementById('discountAmount').value = inv.discount || 0;
+                document.getElementById('discountReason').value = inv.discountReason || '';
+                document.getElementById('dueDate').value = inv.dueDate ? new Date(inv.dueDate).toISOString().split('T')[0] : '';
+                document.getElementById('invoiceNotes').value = inv.notes || '';
+
+                // The discount code isn't stored on the invoice; reconstruct it from
+                // the reason text so saving reprices against current catalog rules.
+                const reason = (inv.discountReason || '').toLowerCase();
+                if (reason.includes('no distributor margin') || reason.includes('admin price')) {
+                    activeDiscountCode = 'NODISTMARG';
+                    document.getElementById('discountCode').value = 'NoDistMarg';
+                } else if (reason.includes('at cost') || reason.includes('no markup')) {
+                    activeDiscountCode = 'ATCOSTAP';
+                    document.getElementById('discountCode').value = 'AtcostAP';
+                } else {
+                    activeDiscountCode = null;
+                    document.getElementById('discountCode').value = '';
+                }
+                document.getElementById('discountCodeStatus').textContent = '';
+
+                editingInvoiceId = invoiceId;
+                document.getElementById('saveDraftBtn').textContent = 'Update Draft';
+                document.getElementById('sendInvoiceBtn').textContent = 'Update & Send';
+
+                renderInvoiceItems();
+                updateTotals();
+                updateActionButtons();
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+            } catch (err) {
+                alert('Error: ' + err.message);
+            }
+        }
+
         function resetForm() {
+            editingInvoiceId = null;
+            document.getElementById('saveDraftBtn').textContent = 'Save as Draft';
+            document.getElementById('sendInvoiceBtn').innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 2L11 13"></path><path d="M22 2l-7 20-4-9-9-4 20-7z"></path></svg> Send Invoice';
             document.getElementById('customerSelect').value = '';
             selectedCustomer = null;
             invoiceItems = [];
@@ -959,7 +1047,12 @@
                 const invDate = new Date(inv.invoiceDate || inv.createdAt).toLocaleDateString();
 
                 content.innerHTML = `
-                    <h2 style="margin:0 0 4px 0; color:#2d5a27;">${inv.invoiceNumber}</h2>
+                    <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px;">
+                        <h2 style="margin:0 0 4px 0; color:#2d5a27;">${inv.invoiceNumber}</h2>
+                        ${inv.status === 'draft'
+                            ? `<button class="btn btn-sm btn-primary" onclick="editInvoice('${inv._id}')">Edit Draft</button>`
+                            : ''}
+                    </div>
                     <div style="color:#666; font-size:0.9rem; margin-bottom:16px;">
                         Status: <strong>${inv.status || 'draft'}</strong>
                         ${inv.paymentStatus === 'paid' ? ' · Paid' : ''}
