@@ -3255,13 +3255,16 @@ async function generatePONumber() {
 // ============ INITIALIZE ADMIN USERS ============
 
 async function initializeAdmins() {
+    // slug: the string rep id ("kyle"/"ty"/...) the customer dropdown sends.
+    // Stored on the distributor's User record so a customer's selected slug can
+    // be resolved to this distributor's real _id at write time (attribution FK).
     const admins = [
         { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', phone: '970-571-1015', role: 'superadmin' },
-        { name: 'Kyle McConnell',    email: 'office@togoag.com',       phone: '970-571-1015', role: 'distributor' },
-        { name: 'Ty Mollohan',       email: 'tymollohan77@gmail.com',  phone: '970-520-2340', role: 'distributor' },
-        { name: 'Chad Bamford',      email: 'ckbamford@yahoo.com',     phone: '970-520-3716', role: 'distributor' },
-        { name: 'Seth Rolfs',        email: 'seth@acreprofit.com',     phone: '785-531-0680', role: 'distributor' },
-        { name: 'Tyson',             email: 'fyeagllc@gmail.com',                             role: 'distributor' }
+        { name: 'Kyle McConnell',    email: 'office@togoag.com',       phone: '970-571-1015', role: 'distributor', slug: 'kyle' },
+        { name: 'Ty Mollohan',       email: 'tymollohan77@gmail.com',  phone: '970-520-2340', role: 'distributor', slug: 'ty' },
+        { name: 'Chad Bamford',      email: 'ckbamford@yahoo.com',     phone: '970-520-3716', role: 'distributor', slug: 'chad' },
+        { name: 'Seth Rolfs',        email: 'seth@acreprofit.com',     phone: '785-531-0680', role: 'distributor', slug: 'seth' },
+        { name: 'Tyson',             email: 'fyeagllc@gmail.com',                             role: 'distributor', slug: 'tyson' }
     ];
 
     for (const admin of admins) {
@@ -3274,6 +3277,7 @@ async function initializeAdmins() {
                 const tempPassword = crypto.randomBytes(9).toString('base64').replace(/[+/=]/g, '').slice(0, 12);
                 await User.create({
                     ...admin,
+                    representativeId: admin.slug, // store the slug as the rep id (undefined for non-distributors)
                     password: tempPassword,
                     mustChangePassword: true
                 });
@@ -3297,6 +3301,13 @@ async function initializeAdmins() {
 
             if (existing.role !== admin.role) {
                 existing.role = admin.role;
+                changed = true;
+            }
+
+            // Additively backfill the rep slug onto existing distributor records
+            // so slug -> _id resolution works for already-seeded distributors.
+            if (admin.slug && existing.representativeId !== admin.slug) {
+                existing.representativeId = admin.slug;
                 changed = true;
             }
 
@@ -5322,6 +5333,16 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
             return res.status(400).json({ error: 'Email already registered' });
         }
 
+        // Resolve the selected pickup/distributor slug (e.g. "kyle") to that
+        // distributor's actual User _id so the customer's `representative` is a
+        // real foreign key the dashboard/commission rollups join on. This is the
+        // attribution fix: previously `representative` was set to the creating
+        // admin's id, so customers never attributed to their distributor. Fall
+        // back to the creating admin only if the slug can't be resolved, so
+        // customer creation never fails.
+        const repSlug = representativeId || 'kyle';
+        const distributor = await User.findOne({ role: 'distributor', representativeId: repSlug }).select('_id');
+
         const user = new User({
             name,
             email: email.toLowerCase(),
@@ -5333,8 +5354,8 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
                 state: state || ''
             },
             crops: crops || [],
-            representativeId: representativeId || 'kyle', // String rep ID for pickup location
-            representative: req.user._id, // ObjectId of admin who created
+            representativeId: repSlug, // String slug - pickup location (kept, additive)
+            representative: distributor ? distributor._id : req.user._id, // ObjectId FK to the distributor
             role: 'customer',
             mustChangePassword: true
         });
