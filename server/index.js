@@ -4155,32 +4155,50 @@ const MUST_CHANGE_PASSWORD_ALLOWED_PATHS = new Set([
 ]);
 
 const authMiddleware = async (req, res, next) => {
-    try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-        if (!token) {
-            return res.status(401).json({ error: 'Authentication required' });
-        }
-        const decoded = jwt.verify(token, JWT_SECRET);
-        const user = await User.findById(decoded.userId);
-        if (!user) {
-            return res.status(401).json({ error: 'User not found' });
-        }
-
-        // S1: block everything except the change-password / me routes while
-        // the user is still on a temp password.
-        if (user.mustChangePassword && !MUST_CHANGE_PASSWORD_ALLOWED_PATHS.has(req.path)) {
-            return res.status(403).json({
-                error: 'Password change required',
-                passwordChangeRequired: true
-            });
-        }
-
-        req.user = user;
-        req.token = token;
-        next();
-    } catch (error) {
-        res.status(401).json({ error: 'Invalid token' });
+    const token = req.header('Authorization')?.replace('Bearer ', '');
+    if (!token) {
+        return res.status(401).json({ error: 'Authentication required' });
     }
+
+    // Case 1: token verification. A missing/expired/tampered token is a
+    // genuine auth failure -> 401.
+    let decoded;
+    try {
+        decoded = jwt.verify(token, JWT_SECRET);
+    } catch (error) {
+        return res.status(401).json({ error: 'Invalid token' });
+    }
+
+    // The user lookup is isolated from verification so an infra/DB failure
+    // here is never mislabeled as an auth failure (see case 3). A dropped
+    // Atlas connection used to surface to the client as a 401 "logged out".
+    let user;
+    try {
+        user = await User.findById(decoded.userId);
+    } catch (error) {
+        // Case 3: DB/lookup/infra failure. The token is valid - do NOT report
+        // this as 401. Tell the client to retry, and log it for diagnosis.
+        console.error('[authMiddleware] non-auth error:', error);
+        return res.status(503).json({ error: 'Service temporarily unavailable, please retry' });
+    }
+
+    // Case 2: token valid but user genuinely gone -> 401.
+    if (!user) {
+        return res.status(401).json({ error: 'User not found' });
+    }
+
+    // S1: block everything except the change-password / me routes while
+    // the user is still on a temp password.
+    if (user.mustChangePassword && !MUST_CHANGE_PASSWORD_ALLOWED_PATHS.has(req.path)) {
+        return res.status(403).json({
+            error: 'Password change required',
+            passwordChangeRequired: true
+        });
+    }
+
+    req.user = user;
+    req.token = token;
+    next();
 };
 
 const adminMiddleware = async (req, res, next) => {
