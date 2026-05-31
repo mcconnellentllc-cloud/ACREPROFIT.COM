@@ -4478,6 +4478,38 @@
         }
 
         // Load dashboard data
+        // Populates the Overview "Inventory" tile (Products in Stock / low stock /
+        // value). These were hardcoded to 0/$0 in the HTML and never wired to data;
+        // this reads the flat Inventory model (the populated source of truth).
+        async function loadInventorySummary() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const rows = await res.json();
+                if (!Array.isArray(rows)) return;
+                const inStock = new Set();
+                let value = 0;
+                let lowStock = 0;
+                rows.forEach(r => {
+                    const qty = Number(r.quantityOnHand || 0);
+                    const cost = Number(r.averageCost || r.lastCost || r.chemicalId?.costPrice || 0);
+                    if (qty > 0) {
+                        inStock.add((r.chemicalId?._id || r.chemicalId || r._id || '').toString());
+                        value += qty * cost;
+                    }
+                    const reorder = Number(r.reorderPoint || 0);
+                    if (reorder > 0 && qty <= reorder) lowStock++;
+                });
+                document.getElementById('totalProductsCount').textContent = inStock.size;
+                document.getElementById('lowStockProducts').textContent = lowStock;
+                document.getElementById('inventoryValue').textContent = fmtMoneyLocale(value);
+            } catch (e) {
+                console.error('loadInventorySummary error:', e);
+            }
+        }
+
         async function loadDashboardData() {
             try {
                 // Load orders (use admin endpoint to see all orders)
@@ -4494,6 +4526,9 @@
 
                 const totalRevenue = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
                 document.getElementById('totalRevenue').textContent = fmtMoneyLocale(totalRevenue);
+
+                // Inventory tile (was never wired - showed a static 0 / $0).
+                loadInventorySummary();
 
                 // Accounts Receivable summary tile (invoice-based, separate from the
                 // order-based revenue number above).
