@@ -15582,6 +15582,17 @@ app.post('/api/admin/invoices/:id/payment', authMiddleware, adminMiddleware, asy
             return res.status(404).json({ error: 'Invoice not found' });
         }
 
+        // Server-side guard (the gate; the client check is only UX). Reject a
+        // non-numeric, non-finite, non-positive, or over-payment amount before
+        // it can be recorded against the invoice.
+        if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+            return res.status(400).json({ error: 'Payment amount must be a positive number' });
+        }
+        const outstanding = Number(new Decimal(invoice.total || 0).minus(invoice.amountPaid || 0).toFixed(2));
+        if (amount > outstanding) {
+            return res.status(400).json({ error: `Payment amount ($${amount.toFixed(2)}) exceeds the amount due ($${outstanding.toFixed(2)})` });
+        }
+
         const newAmountPaid = (invoice.amountPaid || 0) + amount;
         invoice.amountPaid = newAmountPaid;
         invoice.amountDue = Number(new Decimal(invoice.total).minus(newAmountPaid).toFixed(2));
