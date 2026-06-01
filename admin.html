@@ -4515,16 +4515,32 @@
                 // Legacy 'pending' kept as fallback for any un-migrated legacy Order docs.
                 document.getElementById('pendingOrders').textContent = orders.filter(o => ['submitted', 'payment_pending', 'pending'].includes(o.status)).length;
 
-                const totalRevenue = orders.reduce((sum, o) => sum + (o.totalCost || 0), 0);
+                // Revenue is INVOICE-based (the sale), not order-based (the cart).
+                // Orders are carts/requests and no longer feed revenue; money counts
+                // only once an order is invoiced. This is the fix for the old
+                // double-count (orders + their auto-generated invoices both summed).
+                // Revenue = invoiced sales = sum of invoice.total for invoices that
+                // are not draft and not voided/cancelled.
+                let revInvoices = [];
+                try {
+                    const invRes = await fetch(`${API_URL}/api/admin/invoices`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (invRes.ok) revInvoices = await invRes.json();
+                } catch (e) { console.error('revenue invoices fetch failed:', e); }
+                const billed = (Array.isArray(revInvoices) ? revInvoices : [])
+                    .filter(i => !['draft', 'voided', 'cancelled'].includes(i.status));
+
+                const totalRevenue = billed.reduce((sum, i) => sum + (i.total || 0), 0);
                 document.getElementById('totalRevenue').textContent = fmtMoneyLocale(totalRevenue);
 
-                // Week / month revenue tiles (were never wired). Same order-based
-                // basis as the Revenue number, date-sliced - display only.
+                // Week / month revenue, sliced by invoice date (same invoice basis).
                 const nowD = new Date();
                 const weekAgo = new Date(nowD.getTime() - 7 * 24 * 60 * 60 * 1000);
                 const monthStart = new Date(nowD.getFullYear(), nowD.getMonth(), 1);
-                const weekRev = orders.reduce((s, o) => s + (o.createdAt && new Date(o.createdAt) >= weekAgo ? (o.totalCost || 0) : 0), 0);
-                const monthRev = orders.reduce((s, o) => s + (o.createdAt && new Date(o.createdAt) >= monthStart ? (o.totalCost || 0) : 0), 0);
+                const invDate = i => new Date(i.invoiceDate || i.createdAt);
+                const weekRev = billed.reduce((s, i) => s + (invDate(i) >= weekAgo ? (i.total || 0) : 0), 0);
+                const monthRev = billed.reduce((s, i) => s + (invDate(i) >= monthStart ? (i.total || 0) : 0), 0);
                 document.getElementById('weekRevenue').textContent = fmtMoneyLocale(weekRev);
                 document.getElementById('monthRevenue').textContent = fmtMoneyLocale(monthRev);
 

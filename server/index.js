@@ -349,6 +349,9 @@ const User = mongoose.model('User', userSchema);
 const orderSchema = new mongoose.Schema({
     userId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
     representativeId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    // Lifecycle link to the invoice this order became (see chemicalOrderSchema).
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
+    invoicedAt: { type: Date },
     crop: { type: String, required: true },
     program: { type: String },
     acres: { type: Number, required: true },
@@ -1092,6 +1095,11 @@ const chemicalOrderSchema = new mongoose.Schema({
 
     // Order details
     orderNumber: { type: String, unique: true },
+    // Lifecycle link: the invoice this order was turned into (the "sale"). Its
+    // presence means the order has been invoiced (cart -> sale). Bidirectional
+    // with invoice.orderId; set when an invoice is generated from this order.
+    invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
+    invoicedAt: { type: Date },
     orderType: { type: String, enum: ['direct', 'program', 'custom'], default: 'direct' },
 
     // Items ordered
@@ -2601,6 +2609,21 @@ async function generateQuoteNumber() {
 // and from the admin check-received route. Idempotent - one invoice per order.
 // Never throws - logs and returns null on failure so it can't break the
 // payment confirmation flow.
+// Set the bidirectional order -> invoice link (the cart -> sale transition).
+// invoice.orderId already points at the order; this sets order.invoiceId back.
+// Idempotent and best-effort: a link failure must never break invoicing.
+async function linkOrderToInvoice(order, invoice) {
+    try {
+        if (!order || !invoice) return;
+        if (order.invoiceId && order.invoiceId.toString() === invoice._id.toString()) return;
+        order.invoiceId = invoice._id;
+        if (!order.invoicedAt) order.invoicedAt = new Date();
+        await order.save();
+    } catch (e) {
+        console.error(`linkOrderToInvoice failed for order ${order?._id}:`, e.message);
+    }
+}
+
 async function autoGenerateInvoiceForPaidOrder(order) {
     try {
         if (!order) return null;
@@ -2609,9 +2632,12 @@ async function autoGenerateInvoiceForPaidOrder(order) {
             return null;
         }
 
-        // Idempotency - one invoice per order
+        // Idempotency - one invoice per order. Backfill the back-link if missing.
         const existing = await Invoice.findOne({ orderId: order._id });
-        if (existing) return existing;
+        if (existing) {
+            await linkOrderToInvoice(order, existing);
+            return existing;
+        }
 
         // Detect which order collection this is (ChemicalOrder vs legacy Order)
         const isChemicalOrder = order.constructor?.modelName === 'ChemicalOrder'
@@ -2736,6 +2762,7 @@ async function autoGenerateInvoiceForPaidOrder(order) {
         });
 
         await invoice.save();
+        await linkOrderToInvoice(order, invoice);
         console.log(`Invoice ${invoice.invoiceNumber} auto-generated for order ${order._id}`);
         return invoice;
     } catch (err) {
@@ -14480,9 +14507,11 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
             return res.status(404).json({ error: 'Order not found' });
         }
 
-        // Check if invoice already exists for this order
+        // Check if invoice already exists for this order (idempotency). Backfill
+        // the order -> invoice back-link before reporting it already exists.
         const existing = await Invoice.findOne({ orderId: order._id });
         if (existing) {
+            await linkOrderToInvoice(order, existing);
             return res.status(400).json({ error: 'Invoice already exists for this order', invoiceId: existing._id });
         }
 
@@ -14596,6 +14625,7 @@ app.post('/api/admin/invoices/from-order/:orderId', authMiddleware, adminMiddlew
         });
 
         await invoice.save();
+        await linkOrderToInvoice(order, invoice);
 
         res.status(201).json(invoice);
     } catch (error) {
