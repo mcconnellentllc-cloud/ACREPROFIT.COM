@@ -1921,6 +1921,31 @@ purchaseOrderSplitSchema.pre('validate', function (next) { coerceMoneyFields(thi
 
 const PurchaseOrderSplit = mongoose.model('PurchaseOrderSplit', purchaseOrderSplitSchema);
 
+// ============ DISTRIBUTOR SETTLEMENT MODEL ============
+// A directional ledger of value/money moved between two distributors so the net
+// "who owes whom" can be reconciled and edited. Each entry means fromDistributor
+// gave toDistributor `amount` of value, so toDistributor owes fromDistributor
+// that amount. Net for a pair = sum(A->B) - sum(B->A). A 'payment'/settle-up is
+// just an entry in the opposite direction that nets the balance down.
+const distributorSettlementSchema = new mongoose.Schema({
+    fromDistributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    fromName: String,
+    toDistributorId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    toName: String,
+    amount: { type: Number, required: true }, // positive dollars
+    date: { type: Date, default: Date.now },
+    category: { type: String, enum: ['transfer', 'payment', 'adjustment'], default: 'transfer' },
+    description: String,
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+distributorSettlementSchema.index({ fromDistributorId: 1, toDistributorId: 1, date: -1 });
+const DISTRIBUTOR_SETTLEMENT_MONEY_PATHS = { 'amount': 2 };
+distributorSettlementSchema.set('toJSON', { transform: decimalToJSONTransform });
+distributorSettlementSchema.pre('validate', function (next) { coerceMoneyFields(this, DISTRIBUTOR_SETTLEMENT_MONEY_PATHS); next(); });
+const DistributorSettlement = mongoose.model('DistributorSettlement', distributorSettlementSchema);
+
 // ============ INVENTORY MODEL ============
 // Tracks actual stock levels by product and location
 const inventorySchema = new mongoose.Schema({
@@ -11990,6 +12015,131 @@ app.get('/api/admin/distributors', authMiddleware, adminMiddleware, async (req, 
         }));
 
         res.json(enriched);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// ============ DISTRIBUTOR SETTLEMENTS ============
+// List all settlement entries + the net "who owes whom" per distributor pair.
+app.get('/api/admin/settlements', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const entries = await DistributorSettlement.find()
+            .populate('fromDistributorId', 'name')
+            .populate('toDistributorId', 'name')
+            .sort({ date: -1 })
+            .lean();
+
+        // Net per unordered pair, computed from a's perspective (a = lexically
+        // smaller id). +amount when value flowed a->b, -amount when b->a.
+        const pairs = {};
+        for (const e of entries) {
+            const fromId = (e.fromDistributorId?._id || e.fromDistributorId || '').toString();
+            const toId = (e.toDistributorId?._id || e.toDistributorId || '').toString();
+            if (!fromId || !toId) continue;
+            const fromName = e.fromDistributorId?.name || e.fromName || 'Unknown';
+            const toName = e.toDistributorId?.name || e.toName || 'Unknown';
+            const [a, b] = [fromId, toId].sort();
+            const key = `${a}|${b}`;
+            if (!pairs[key]) {
+                pairs[key] = {
+                    aId: a, bId: b,
+                    aName: a === fromId ? fromName : toName,
+                    bName: b === fromId ? fromName : toName,
+                    net: 0
+                };
+            }
+            const amt = Number(e.amount || 0);
+            pairs[key].net += (fromId === a ? amt : -amt);
+        }
+
+        const balances = Object.values(pairs).map(p => {
+            const net = Number(new Decimal(p.net).toFixed(2));
+            // net > 0 => b owes a; net < 0 => a owes b; 0 => settled.
+            let owedBy = null, owedTo = null;
+            if (net > 0) { owedBy = p.bName; owedTo = p.aName; }
+            else if (net < 0) { owedBy = p.aName; owedTo = p.bName; }
+            return { aId: p.aId, bId: p.bId, aName: p.aName, bName: p.bName, net, owedBy, owedTo, amount: Math.abs(net), settled: net === 0 };
+        }).sort((x, y) => y.amount - x.amount);
+
+        res.json({ entries, balances });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Create a settlement entry.
+app.post('/api/admin/settlements', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { fromDistributorId, toDistributorId, amount, date, category, description } = req.body;
+        if (!fromDistributorId || !toDistributorId) return res.status(400).json({ error: 'From and to distributors are required.' });
+        if (fromDistributorId === toDistributorId) return res.status(400).json({ error: 'From and to must be different distributors.' });
+        const amt = Number(amount);
+        if (!(amt > 0)) return res.status(400).json({ error: 'Amount must be a positive number.' });
+        const [from, to] = await Promise.all([
+            User.findById(fromDistributorId).select('name'),
+            User.findById(toDistributorId).select('name')
+        ]);
+        if (!from || !to) return res.status(404).json({ error: 'Distributor not found.' });
+
+        const entry = await DistributorSettlement.create({
+            fromDistributorId, fromName: from.name,
+            toDistributorId, toName: to.name,
+            amount: amt,
+            date: date ? new Date(date) : new Date(),
+            category: ['transfer', 'payment', 'adjustment'].includes(category) ? category : 'transfer',
+            description: description || '',
+            createdBy: req.user._id
+        });
+        res.status(201).json(entry);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Edit a settlement entry.
+app.put('/api/admin/settlements/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const entry = await DistributorSettlement.findById(req.params.id);
+        if (!entry) return res.status(404).json({ error: 'Settlement entry not found.' });
+        const { fromDistributorId, toDistributorId, amount, date, category, description } = req.body;
+
+        const newFrom = fromDistributorId || entry.fromDistributorId.toString();
+        const newTo = toDistributorId || entry.toDistributorId.toString();
+        if (newFrom === newTo) return res.status(400).json({ error: 'From and to must be different distributors.' });
+
+        if (amount !== undefined) {
+            const amt = Number(amount);
+            if (!(amt > 0)) return res.status(400).json({ error: 'Amount must be a positive number.' });
+            entry.amount = amt;
+        }
+        if (fromDistributorId) {
+            const from = await User.findById(fromDistributorId).select('name');
+            if (!from) return res.status(404).json({ error: 'From distributor not found.' });
+            entry.fromDistributorId = fromDistributorId; entry.fromName = from.name;
+        }
+        if (toDistributorId) {
+            const to = await User.findById(toDistributorId).select('name');
+            if (!to) return res.status(404).json({ error: 'To distributor not found.' });
+            entry.toDistributorId = toDistributorId; entry.toName = to.name;
+        }
+        if (date) entry.date = new Date(date);
+        if (category && ['transfer', 'payment', 'adjustment'].includes(category)) entry.category = category;
+        if (description !== undefined) entry.description = description;
+        entry.updatedAt = new Date();
+        await entry.save();
+        res.json(entry);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Delete a settlement entry.
+app.delete('/api/admin/settlements/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const entry = await DistributorSettlement.findByIdAndDelete(req.params.id);
+        if (!entry) return res.status(404).json({ error: 'Settlement entry not found.' });
+        res.json({ message: 'Entry deleted' });
     } catch (error) {
         res.status(400).json({ error: error.message });
     }
