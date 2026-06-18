@@ -59,6 +59,7 @@
                     <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
                     <span id="suppliersNavTop"><a href="#suppliers" class="admin-tab" data-tab="suppliers">Suppliers</a></span>
                     <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
+                    <a href="#settlements" class="admin-tab" data-tab="settlements">Settlements</a>
                     <a href="#receivables" class="admin-tab" data-tab="receivables">Receivables</a>
                     <a href="/distributor-invoices.html" class="admin-tab" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">Invoicing</a>
                     <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
@@ -1731,6 +1732,39 @@
                         </tbody>
                     </table>
                 </div>
+            </div>
+
+            <!-- Distributor Settlements Tab -->
+            <div id="settlementsTab" class="tab-content">
+                <div class="tab-header">
+                    <h1>Distributor Settlements</h1>
+                    <p class="tab-subtitle">Money owed between distributors. Each entry means the <strong>From</strong> distributor gave value to the <strong>To</strong> distributor, so <strong>To owes From</strong>. A payment/settle-up is just an entry the other direction. Net balances are at the top.</p>
+                </div>
+
+                <div id="settlementBalances" style="margin-bottom:24px;">Loading&hellip;</div>
+
+                <div class="card" style="padding:16px; margin-bottom:20px;">
+                    <h3 id="settlementFormTitle" style="margin-top:0;">Add Entry</h3>
+                    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+                        <div><label style="font-size:0.8rem; color:#666;">From (gave value)</label><br><select id="setFrom" style="padding:8px;"></select></div>
+                        <div><label style="font-size:0.8rem; color:#666;">To (owes)</label><br><select id="setTo" style="padding:8px;"></select></div>
+                        <div><label style="font-size:0.8rem; color:#666;">Amount ($)</label><br><input type="number" id="setAmount" step="0.01" min="0.01" style="width:110px; padding:8px;"></div>
+                        <div><label style="font-size:0.8rem; color:#666;">Date</label><br><input type="date" id="setDate" style="padding:8px;"></div>
+                        <div><label style="font-size:0.8rem; color:#666;">Type</label><br><select id="setCategory" style="padding:8px;"><option value="transfer">Inventory transfer</option><option value="payment">Payment / settle-up</option><option value="adjustment">Adjustment</option></select></div>
+                        <div style="flex:1; min-width:180px;"><label style="font-size:0.8rem; color:#666;">Description</label><br><input type="text" id="setDesc" style="width:100%; padding:8px;" placeholder="e.g., 200 gal glyphosate"></div>
+                        <div style="display:flex; gap:8px;">
+                            <button class="btn btn-primary" id="settlementSaveBtn" onclick="addSettlement()">Add</button>
+                            <button class="btn btn-outline" id="settlementCancelBtn" onclick="resetSettlementForm()" style="display:none;">Cancel</button>
+                        </div>
+                    </div>
+                    <div id="setFormStatus" style="margin-top:8px; font-size:0.9rem;"></div>
+                </div>
+
+                <h3>All Entries</h3>
+                <table class="admin-table" style="width:100%;">
+                    <thead><tr><th>Date</th><th>From</th><th>To</th><th style="text-align:right;">Amount</th><th>Type</th><th>Description</th><th>Actions</th></tr></thead>
+                    <tbody id="settlementsBody"><tr><td colspan="7">Loading&hellip;</td></tr></tbody>
+                </table>
             </div>
 
             <!-- Accounts Receivable Tab -->
@@ -3917,6 +3951,7 @@
             // Lazy-load tab data
             if (tabName === 'products' && allProducts.length === 0) loadProducts();
             if (tabName === 'ledger') loadLedger();
+            if (tabName === 'settlements') loadSettlements();
             if (tabName === 'receivables') loadAccountsReceivable();
             if (tabName === 'audit-log') loadAuditLog();
             if (tabName === 'purchase-orders') loadPurchaseOrders();
@@ -4625,6 +4660,130 @@
                 loadApplications();
             } catch (e) {
                 alert('Error: ' + e.message);
+            }
+        }
+
+        // ===== Distributor Settlements =====
+        let settlementEntries = [];
+        let editingSettlementId = null;
+
+        async function loadSettlements() {
+            try {
+                await populateSettlementDistributors();
+                const res = await fetch(`${API_URL}/api/admin/settlements`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error('Failed to load settlements');
+                const data = await res.json();
+                settlementEntries = data.entries || [];
+
+                const bWrap = document.getElementById('settlementBalances');
+                if (!data.balances || data.balances.length === 0) {
+                    bWrap.innerHTML = '<p style="color:var(--text-muted);">No entries yet. Add transfers and payments below to see who owes whom.</p>';
+                } else {
+                    bWrap.innerHTML = data.balances.map(b => b.settled
+                        ? `<div style="background:#f0fdf4; border:1px solid #bbf7d0; border-radius:8px; padding:14px; margin-bottom:8px;"><strong>${escapeHtml(b.aName)} &harr; ${escapeHtml(b.bName)}:</strong> Settled up</div>`
+                        : `<div style="background:#fff7ed; border:1px solid #fed7aa; border-radius:8px; padding:16px; margin-bottom:8px; font-size:1.1rem;"><strong>${escapeHtml(b.owedBy)}</strong> owes <strong>${escapeHtml(b.owedTo)}</strong> <strong style="color:#9a3412;">${fmtMoneyLocale(b.amount)}</strong></div>`
+                    ).join('');
+                }
+
+                const catLabel = { transfer: 'Inventory transfer', payment: 'Payment', adjustment: 'Adjustment' };
+                document.getElementById('settlementsBody').innerHTML = settlementEntries.length
+                    ? settlementEntries.map(e => `<tr>
+                        <td>${new Date(e.date).toLocaleDateString()}</td>
+                        <td>${escapeHtml(e.fromDistributorId?.name || e.fromName || '')}</td>
+                        <td>${escapeHtml(e.toDistributorId?.name || e.toName || '')}</td>
+                        <td style="text-align:right;">${fmtMoneyLocale(e.amount)}</td>
+                        <td>${catLabel[e.category] || e.category}</td>
+                        <td>${escapeHtml(e.description || '')}</td>
+                        <td style="white-space:nowrap;">
+                            <button class="btn btn-sm btn-outline" onclick="editSettlement('${e._id}')">Edit</button>
+                            <button class="btn btn-sm btn-danger" onclick="deleteSettlement('${e._id}')">Delete</button>
+                        </td>
+                    </tr>`).join('')
+                    : '<tr><td colspan="7" style="text-align:center; color:#666;">No entries yet</td></tr>';
+            } catch (err) {
+                console.error('loadSettlements error:', err);
+            }
+        }
+
+        async function populateSettlementDistributors() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/distributors`, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) return;
+                const dists = (await res.json()).filter(d => d.role === 'distributor');
+                const opts = '<option value="">Select&hellip;</option>' + dists.map(d => `<option value="${d._id}">${escapeHtml(d.name)}</option>`).join('');
+                const from = document.getElementById('setFrom'), to = document.getElementById('setTo');
+                if (from && !from.dataset.filled) { from.innerHTML = opts; from.dataset.filled = '1'; }
+                if (to && !to.dataset.filled) { to.innerHTML = opts; to.dataset.filled = '1'; }
+            } catch (e) { console.error('populateSettlementDistributors error:', e); }
+        }
+
+        async function addSettlement() {
+            const fromDistributorId = document.getElementById('setFrom').value;
+            const toDistributorId = document.getElementById('setTo').value;
+            const amount = parseFloat(document.getElementById('setAmount').value);
+            const date = document.getElementById('setDate').value;
+            const category = document.getElementById('setCategory').value;
+            const description = document.getElementById('setDesc').value;
+            const status = document.getElementById('setFormStatus');
+
+            if (!fromDistributorId || !toDistributorId) { status.innerHTML = '<span style="color:#dc2626;">Pick both distributors.</span>'; return; }
+            if (fromDistributorId === toDistributorId) { status.innerHTML = '<span style="color:#dc2626;">From and to must be different.</span>'; return; }
+            if (!(amount > 0)) { status.innerHTML = '<span style="color:#dc2626;">Enter an amount greater than 0.</span>'; return; }
+
+            try {
+                const isEdit = !!editingSettlementId;
+                const res = await fetch(`${API_URL}/api/admin/settlements${isEdit ? '/' + editingSettlementId : ''}`, {
+                    method: isEdit ? 'PUT' : 'POST',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ fromDistributorId, toDistributorId, amount, date, category, description })
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed to save entry');
+                resetSettlementForm();
+                loadSettlements();
+            } catch (err) {
+                status.innerHTML = `<span style="color:#dc2626;">${err.message}</span>`;
+            }
+        }
+
+        function editSettlement(id) {
+            const e = settlementEntries.find(x => x._id === id);
+            if (!e) return;
+            document.getElementById('setFrom').value = (e.fromDistributorId?._id || e.fromDistributorId || '').toString();
+            document.getElementById('setTo').value = (e.toDistributorId?._id || e.toDistributorId || '').toString();
+            document.getElementById('setAmount').value = e.amount;
+            document.getElementById('setDate').value = e.date ? new Date(e.date).toISOString().split('T')[0] : '';
+            document.getElementById('setCategory').value = e.category || 'transfer';
+            document.getElementById('setDesc').value = e.description || '';
+            editingSettlementId = id;
+            document.getElementById('settlementFormTitle').textContent = 'Edit Entry';
+            document.getElementById('settlementSaveBtn').textContent = 'Update';
+            document.getElementById('settlementCancelBtn').style.display = '';
+            document.getElementById('setFormStatus').textContent = '';
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function resetSettlementForm() {
+            editingSettlementId = null;
+            document.getElementById('setFrom').value = '';
+            document.getElementById('setTo').value = '';
+            document.getElementById('setAmount').value = '';
+            document.getElementById('setDate').value = '';
+            document.getElementById('setCategory').value = 'transfer';
+            document.getElementById('setDesc').value = '';
+            document.getElementById('setFormStatus').textContent = '';
+            document.getElementById('settlementFormTitle').textContent = 'Add Entry';
+            document.getElementById('settlementSaveBtn').textContent = 'Add';
+            document.getElementById('settlementCancelBtn').style.display = 'none';
+        }
+
+        async function deleteSettlement(id) {
+            if (!confirm('Delete this settlement entry?')) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/settlements/${id}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) throw new Error((await res.json()).error || 'Delete failed');
+                loadSettlements();
+            } catch (err) {
+                alert('Error: ' + err.message);
             }
         }
 
