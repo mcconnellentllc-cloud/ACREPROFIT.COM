@@ -801,8 +801,9 @@
                 );
 
                 if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || (isEdit ? 'Failed to update invoice' : 'Failed to create invoice'));
+                    const msg = await describeApiError(response, isEdit ? 'Failed to update invoice' : 'Failed to create invoice');
+                    if (msg === null) return null; // auth failure - handled
+                    throw new Error(msg);
                 }
 
                 const invoice = await response.json();
@@ -815,8 +816,9 @@
                     });
 
                     if (!sendRes.ok) {
-                        const err = await sendRes.json();
-                        throw new Error(err.error || 'Invoice created but failed to send email');
+                        const msg = await describeApiError(sendRes, 'Invoice saved but failed to send email');
+                        if (msg === null) return null; // auth failure - handled
+                        throw new Error(msg);
                     }
                 }
 
@@ -1000,6 +1002,27 @@
             `).join('');
         }
 
+        // Build a clear, status-aware message from a failed response. Reads the
+        // body as text first (so a non-JSON/edge response doesn't throw on .json()),
+        // then tries JSON. On a genuine auth failure (401/403) it surfaces the real
+        // status and offers to send the user to log in again instead of a cryptic
+        // "Unauthorized". Returns a message string for other failures, or null when
+        // it already handled things (caller should stop).
+        async function describeApiError(response, fallback) {
+            let bodyText = '';
+            try { bodyText = await response.text(); } catch (e) {}
+            let serverMsg = bodyText;
+            try { const p = JSON.parse(bodyText); serverMsg = p.error || bodyText; } catch (e) {}
+
+            if (response.status === 401 || response.status === 403) {
+                if (confirm(`Your session was rejected (HTTP ${response.status}: ${serverMsg || 'Unauthorized'}).\n\nThis usually means you need to log in again. Go to the login page now?`)) {
+                    window.location.href = '/login.html';
+                }
+                return null; // handled
+            }
+            return `${fallback} — HTTP ${response.status}${serverMsg ? ': ' + serverMsg : ''}`;
+        }
+
         async function sendInvoice(invoiceId, email) {
             if (!confirm(`Send invoice to ${email}?`)) return;
 
@@ -1010,8 +1033,9 @@
                 });
 
                 if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error || 'Failed to send invoice');
+                    const msg = await describeApiError(response, 'Failed to send invoice');
+                    if (msg === null) return; // auth failure - handled (re-login offered)
+                    throw new Error(msg);
                 }
 
                 alert('Invoice sent successfully!');
