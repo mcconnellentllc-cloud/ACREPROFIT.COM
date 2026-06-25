@@ -4855,7 +4855,7 @@ app.post('/api/auth/forgot-password', passwordResetLimiter, async (req, res) => 
 
         if (transporter) {
             await transporter.sendMail({
-                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                 to: user.email,
                 subject: 'Reset Your Acre Profit Password',
                 html: `
@@ -6147,7 +6147,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                 const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
 
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                     to: customer.email,
                     subject: `Order Created - ${crop} (${acres} acres)`,
                     html: `
@@ -6629,7 +6629,7 @@ app.post('/api/admin/orders/:orderId/send-payment-request', authMiddleware, admi
         const frontendUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
 
         await transporter.sendMail({
-            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+            from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
             to: customer.email,
             subject: `Payment Request - $${total.toLocaleString(undefined, {minimumFractionDigits: 2})} - Acre Profit`,
             html: `
@@ -7683,7 +7683,7 @@ async function handlePaymentIntentSucceeded(event) {
             const amount = (paymentIntent.amount / 100).toFixed(2);
             const invoiceUrl = `${process.env.FRONTEND_URL || 'https://acreprofit.com'}/my-orders.html`;
             await transporter.sendMail({
-                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                 to: customer.email,
                 subject: `Payment Confirmed - Acre Profit`,
                 html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -7817,7 +7817,7 @@ async function handleCheckoutSessionCompleted(event) {
                         <tr><td style="padding: 8px 16px 4px 0; color: #2d5a27; font-weight: 600; border-top: 1px solid #e0e0e0;">Total charged:</td><td style="padding: 8px 0 4px 0; text-align: right; font-weight: 600; border-top: 1px solid #e0e0e0;">$${totalCharged}</td></tr>
                     </table>` : `<p>Amount received: <strong>$${invoiceAmount}</strong></p>`;
             await transporter.sendMail({
-                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                 to: customerEmail,
                 subject: `Payment Received - Invoice ${invoice.invoiceNumber}`,
                 html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -7849,7 +7849,7 @@ async function handleCheckoutSessionCompleted(event) {
                 ? `$${invoiceAmount} invoice + $${surchargeStr} surcharge = $${totalCharged} charged (${methodLabel})`
                 : `$${invoiceAmount} (${methodLabel})`;
             await transporter.sendMail({
-                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                 to: 'contact@acreprofit.com',
                 subject: `[PAID] Invoice ${invoice.invoiceNumber} - $${invoiceAmount} (${methodLabel})`,
                 html: `<div style="font-family: Arial, sans-serif; max-width: 600px;">
@@ -10883,7 +10883,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                 ).join('');
 
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                     to: toEmail,
                     subject: `Order Confirmation - ${order.orderNumber} - Acre Profit`,
                     html: `<div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
@@ -13378,7 +13378,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                         ).join('');
 
                         await transporter.sendMail({
-                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                             to: req.user.email,
                             subject: `Order Confirmed — ${crop || 'Custom'} (${acres} acres)`,
                             html: `
@@ -13406,7 +13406,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                         });
 
                         await transporter.sendMail({
-                            from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                            from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                             to: 'contact@acreprofit.com',
                             subject: `New Self-Serve Order — ${req.user.name} — $${serverTotalConfirmedPrice.toFixed(2)}`,
                             html: `
@@ -13473,7 +13473,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                 `).join('');
 
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                     to: 'contact@acreprofit.com',
                     subject: `New Quote Request — ${req.user.name} — ${acres} acres`,
                     html: `
@@ -13534,7 +13534,7 @@ app.post('/api/spray-programs/submit-order', authMiddleware, async (req, res) =>
                     : 'Quote Request Received';
 
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                     to: req.user.email,
                     subject: customerSubject,
                     html: `
@@ -15254,7 +15254,7 @@ app.post('/api/admin/invoices/:id/void', authMiddleware, adminMiddleware, async 
                         ? `<p style="margin: 12px 0; color: #555;"><strong>Reason provided:</strong> ${reason.replace(/[<>]/g, '')}</p>`
                         : '';
                     await transporter.sendMail({
-                        from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                        from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                         to: invoice.customerEmail,
                         subject: `Invoice ${invoice.invoiceNumber} has been voided`,
                         html: `
@@ -15427,7 +15427,7 @@ app.post('/api/admin/invoices/:id/credit-notes', authMiddleware, adminMiddleware
                         : '<p>Your representative will coordinate the refund with you directly.</p>';
                     const safeReason = reason.replace(/[<>]/g, '');
                     await transporter.sendMail({
-                        from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                        from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                         to: invoice.customerEmail,
                         subject: `Credit issued on invoice ${invoice.invoiceNumber}`,
                         html: `
@@ -15913,7 +15913,7 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
         const transporter = createEmailTransporter();
         if (transporter) {
             const sendResult = await transporter.sendMail({
-                from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                 to: customerEmail,
                 subject: `Invoice ${invoice.invoiceNumber} from Acre Profit - $${total.toFixed(2)} Due`,
                 html: emailHtml
@@ -16032,7 +16032,7 @@ app.post('/api/admin/quotes', authMiddleware, adminMiddleware, async (req, res) 
         if (transporter && customer.email) {
             try {
                 await transporter.sendMail({
-                    from: process.env.EMAIL_FROM || '"Acre Profit" <noreply@acreprofit.com>',
+                    from: process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>',
                     to: customer.email,
                     subject: `Program Quote ${quote.quoteNumber} — ${quote.programName || 'AcreProfit'}`,
                     html: `
