@@ -34,6 +34,8 @@ const mainchemRouter = require('./routes/admin/mainchem');
 const sprayProgramsAdminRouter = require('./routes/admin/spray-programs');
 const ratingsRouter = require('./routes/ratings');
 const adminRatingsRouter = require('./routes/admin/ratings');
+const supplierInvoicesRouter = require('./routes/admin/supplier-invoices');
+const inventoryLifecycleRouter = require('./routes/admin/inventory-lifecycle');
 const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
 
 // File upload handling
@@ -1117,7 +1119,22 @@ const chemicalOrderSchema = new mongoose.Schema({
         acres: Number,
         rate: Number,
         rateUnit: String,
-        calculatedAmount: Number // Total amount needed before rounding to packs
+        calculatedAmount: Number, // Total amount needed before rounding to packs
+
+        // Inventory allocation - which batch(es) this item will be fulfilled from
+        batchAllocations: [{
+            batchId: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryBatch' },
+            poNumber: String,
+            lotNumber: String,
+            quantityFromBatch: Number,
+            allocatedAt: { type: Date, default: Date.now }
+        }],
+        // Inventory fulfillment status for this line item
+        inventoryStatus: {
+            type: String,
+            enum: ['pending_allocation', 'allocated', 'picked', 'delivered', 'backordered'],
+            default: 'pending_allocation'
+        }
     }],
 
     // Program reference (if ordering from a program)
@@ -1160,6 +1177,22 @@ const chemicalOrderSchema = new mongoose.Schema({
     // Payment
     paymentStatus: { type: String, enum: ['pending', 'processing', 'paid', 'partial', 'failed'], default: 'pending' },
     paymentMethod: { type: String, enum: ['ach', 'check', 'card', 'stripe_ach'], default: 'check' },
+
+    // Payment verification (distributor confirms payment received before release)
+    paymentVerified: { type: Boolean, default: false },
+    paymentVerifiedAt: Date,
+    paymentVerifiedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    paymentVerificationNotes: String,
+
+    // Overall inventory status for the order
+    inventoryStatus: {
+        type: String,
+        enum: ['pending_allocation', 'partially_allocated', 'fully_allocated', 'picked', 'delivered'],
+        default: 'pending_allocation'
+    },
+    inventoryAllocatedAt: Date,
+    inventoryPickedAt: Date,
+    pickedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
 
     // Dates
     submittedAt: Date,
@@ -2092,11 +2125,31 @@ const inventoryBatchSchema = new mongoose.Schema({
     supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
     supplierName: String,
 
+    // Link to supplier invoice (tracks what we paid supplier)
+    supplierInvoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'SupplierInvoice' },
+
+    // Additional tracking
+    manufactureDate: Date,
+
+    // Sales allocations - tracks which customer orders pulled from this batch
+    salesAllocations: [{
+        orderId: { type: mongoose.Schema.Types.ObjectId, ref: 'ChemicalOrder' },
+        orderNumber: String,
+        invoiceId: { type: mongoose.Schema.Types.ObjectId, ref: 'Invoice' },
+        invoiceNumber: String,
+        quantitySold: Number,
+        saleDate: { type: Date, default: Date.now },
+        customerId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        customerName: String,
+        paymentVerified: { type: Boolean, default: false }
+    }],
+
     createdAt: { type: Date, default: Date.now },
     updatedAt: { type: Date, default: Date.now }
 });
 
 inventoryBatchSchema.index({ chemicalId: 1, status: 1 });
+inventoryBatchSchema.index({ supplierInvoiceId: 1 });
 inventoryBatchSchema.index({ poNumber: 1 });
 inventoryBatchSchema.index({ productName: 1 });
 inventoryBatchSchema.index({ status: 1, quantityRemaining: 1 });
@@ -2109,6 +2162,135 @@ inventoryBatchSchema.set('toJSON', { transform: decimalToJSONTransform });
 inventoryBatchSchema.pre('validate', function (next) { coerceMoneyFields(this, INVENTORY_BATCH_MONEY_PATHS); next(); });
 
 const InventoryBatch = mongoose.model('InventoryBatch', inventoryBatchSchema);
+
+// ============ SUPPLIER INVOICE MODEL ============
+// Tracks invoices received FROM suppliers - links PO receipt to inventory batches
+// This is the "purchase" side of inventory lifecycle tracking
+const supplierInvoiceSchema = new mongoose.Schema({
+    // Invoice identification
+    invoiceNumber: { type: String, required: true },          // Supplier's invoice number
+    internalReference: { type: String, unique: true },        // Our internal ref: SI-2026-00001
+
+    // Link to Purchase Order
+    purchaseOrderId: { type: mongoose.Schema.Types.ObjectId, ref: 'PurchaseOrder' },
+    poNumber: String,
+
+    // Supplier info
+    supplierId: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    supplierName: { type: String, required: true },
+    supplierContact: String,
+
+    // Line items received
+    items: [{
+        chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical' },
+        productName: { type: String, required: true },
+        packSize: String,
+        unit: String,
+        quantityOrdered: Number,                              // What was on the PO
+        quantityReceived: { type: Number, required: true },   // What actually arrived
+        quantityDamaged: { type: Number, default: 0 },        // Damaged on arrival
+        unitCost: { type: Number, required: true },           // Cost per unit
+        totalCost: Number,                                    // Extended cost
+        lotNumber: String,                                    // Supplier's lot number
+        expirationDate: Date,
+        manufactureDate: Date,
+        // Link to inventory batch created from this line item
+        inventoryBatchId: { type: mongoose.Schema.Types.ObjectId, ref: 'InventoryBatch' }
+    }],
+
+    // Financial totals
+    subtotal: { type: Number, required: true },
+    freight: { type: Number, default: 0 },
+    otherFees: { type: Number, default: 0 },
+    taxAmount: { type: Number, default: 0 },
+    totalAmount: { type: Number, required: true },
+
+    // Payment tracking (what WE owe the supplier)
+    paymentStatus: {
+        type: String,
+        enum: ['unpaid', 'partial', 'paid', 'disputed'],
+        default: 'unpaid'
+    },
+    amountPaid: { type: Number, default: 0 },
+    paymentDueDate: Date,
+    paymentTerms: String,                                     // e.g., "Net 30", "2/10 Net 30"
+    payments: [{
+        amount: Number,
+        date: { type: Date, default: Date.now },
+        method: { type: String, enum: ['check', 'ach', 'wire', 'card'] },
+        checkNumber: String,
+        reference: String,
+        recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+
+    // Document storage
+    documentUrl: String,                                      // Scanned/uploaded invoice PDF
+    documentName: String,
+
+    // Receiving info
+    receivedDate: { type: Date, default: Date.now },          // When goods arrived
+    receivedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    receivedByName: String,
+    receivingLocation: { type: String, default: 'main' },     // Which warehouse
+    receivingNotes: String,
+
+    // Dates
+    invoiceDate: Date,                                        // Date on supplier's invoice
+
+    // Status
+    status: {
+        type: String,
+        enum: ['draft', 'received', 'verified', 'paid', 'disputed', 'voided'],
+        default: 'received'
+    },
+
+    // Audit
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: { type: Date, default: Date.now }
+});
+
+supplierInvoiceSchema.index({ invoiceNumber: 1, supplierId: 1 });
+supplierInvoiceSchema.index({ internalReference: 1 });
+supplierInvoiceSchema.index({ purchaseOrderId: 1 });
+supplierInvoiceSchema.index({ paymentStatus: 1 });
+supplierInvoiceSchema.index({ status: 1 });
+supplierInvoiceSchema.index({ receivedDate: -1 });
+
+// Auto-generate internal reference number
+supplierInvoiceSchema.pre('save', async function(next) {
+    if (!this.internalReference) {
+        const year = new Date().getFullYear();
+        const seq = await nextSequence(`supplierInvoice-${year}`);
+        this.internalReference = `SI-${year}-${String(seq).padStart(5, '0')}`;
+    }
+    // Calculate totals
+    if (this.items && this.items.length > 0) {
+        this.items.forEach(item => {
+            if (item.unitCost && item.quantityReceived) {
+                item.totalCost = Math.round(item.unitCost * item.quantityReceived * 100) / 100;
+            }
+        });
+    }
+    this.updatedAt = Date.now();
+    next();
+});
+
+const SUPPLIER_INVOICE_MONEY_PATHS = {
+    'items.unitCost': 4,
+    'items.totalCost': 2,
+    'subtotal': 2,
+    'freight': 2,
+    'otherFees': 2,
+    'taxAmount': 2,
+    'totalAmount': 2,
+    'amountPaid': 2,
+    'payments.amount': 2,
+};
+supplierInvoiceSchema.set('toJSON', { transform: decimalToJSONTransform });
+supplierInvoiceSchema.pre('validate', function (next) { coerceMoneyFields(this, SUPPLIER_INVOICE_MONEY_PATHS); next(); });
+
+const SupplierInvoice = mongoose.model('SupplierInvoice', supplierInvoiceSchema);
 
 // ============ CUSTOMER INVOICE MODEL ============
 // Generated invoices for customer orders
@@ -4299,6 +4481,14 @@ const supplierMiddleware = async (req, res, next) => {
     next();
 };
 
+// Inventory management access - distributors and superadmins only
+const inventoryAccessMiddleware = async (req, res, next) => {
+    if (req.user.role !== 'distributor' && req.user.role !== 'superadmin') {
+        return res.status(403).json({ error: 'Distributor or Super Admin access required for inventory management' });
+    }
+    next();
+};
+
 // Mount MAINCHEM admin router with scope-specific prefix. Narrow prefix keeps
 // superAdminMiddleware gate off the 38 inline /api/admin/* routes that rely
 // on the permissive adminMiddleware (admin/distributor/superadmin).
@@ -4311,6 +4501,13 @@ app.use('/api/admin/spray-programs', authMiddleware, superAdminMiddleware, spray
 // Farmer rating endpoints. authMiddleware only — any logged-in role may
 // read and rate. Ownership + role checks live inside the router.
 app.use('/api/ratings', authMiddleware, ratingsRouter);
+
+// ============ INVENTORY LIFECYCLE ROUTES ============
+// Supplier invoices - receive goods from suppliers, track what we owe
+app.use('/api/admin/supplier-invoices', authMiddleware, inventoryAccessMiddleware, supplierInvoicesRouter);
+
+// Inventory lifecycle - allocation, fulfillment, payment verification
+app.use('/api/admin/inventory-lifecycle', authMiddleware, inventoryAccessMiddleware, inventoryLifecycleRouter);
 
 // Superadmin moderation queue for ratings. Scope-specific prefix keeps the
 // strict superAdminMiddleware gate narrow.
