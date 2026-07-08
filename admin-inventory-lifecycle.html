@@ -1,0 +1,1033 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Inventory Lifecycle | Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h1 { margin: 0; }
+
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .tab { padding: 0.75rem 1.5rem; border: none; background: white; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600; color: #666; transition: all 0.2s; }
+        .tab.active { background: #2d5a27; color: white; }
+        .tab:hover:not(.active) { background: #eee; }
+        .tab .badge { display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; background: #dc3545; color: white; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.8rem; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; color: #2d5a27; }
+        .stat-card.warning .value { color: #856404; }
+        .stat-card.danger .value { color: #721c24; }
+
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; overflow: hidden; }
+        .card-header { padding: 1rem 1.5rem; background: #1a1a2e; color: white; display: flex; justify-content: space-between; align-items: center; }
+        .card-header h2 { margin: 0; font-size: 1.1rem; }
+        .card-body { padding: 1.5rem; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #eee; }
+        .data-table th { background: #f8f9fa; font-weight: 600; color: #333; font-size: 0.85rem; text-transform: uppercase; }
+        .data-table tr:hover { background: #f9f9f9; }
+        .data-table .actions { display: flex; gap: 0.5rem; }
+
+        .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-allocated { background: #cce5ff; color: #004085; }
+        .status-verified { background: #d4edda; color: #155724; }
+        .status-delivered { background: #2d5a27; color: white; }
+        .status-unpaid { background: #f8d7da; color: #721c24; }
+        .status-paid { background: #d4edda; color: #155724; }
+
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+        .btn-outline { background: transparent; border: 2px solid currentColor; }
+
+        .toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .toolbar input, .toolbar select { padding: 0.6rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+        .toolbar input { flex: 1; min-width: 200px; max-width: 350px; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; max-width: 800px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+        .modal-header h2 { margin: 0; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+
+        .items-list { border: 1px solid #ddd; border-radius: 8px; margin-top: 1rem; }
+        .items-list-header { padding: 0.75rem 1rem; background: #f8f9fa; font-weight: 600; border-bottom: 1px solid #ddd; display: flex; justify-content: space-between; }
+        .item-row { padding: 1rem; border-bottom: 1px solid #eee; display: grid; grid-template-columns: 2fr 1fr 1fr 1fr 1fr auto; gap: 0.75rem; align-items: center; }
+        .item-row:last-child { border-bottom: none; }
+        .item-row input { padding: 0.5rem; border: 1px solid #ddd; border-radius: 4px; }
+        .item-row .remove-btn { background: #dc3545; color: white; border: none; padding: 0.4rem 0.6rem; border-radius: 4px; cursor: pointer; }
+
+        .lifecycle-view { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        .lifecycle-section { background: white; border-radius: 8px; padding: 1.5rem; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .lifecycle-section h3 { margin: 0 0 1rem; color: #333; font-size: 1rem; text-transform: uppercase; letter-spacing: 0.5px; }
+
+        .batch-card { border: 1px solid #eee; border-radius: 6px; padding: 1rem; margin-bottom: 0.75rem; }
+        .batch-card:last-child { margin-bottom: 0; }
+        .batch-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .batch-po { font-weight: 600; color: #2d5a27; }
+        .batch-qty { font-size: 1.1rem; font-weight: 700; }
+        .batch-details { font-size: 0.85rem; color: #666; }
+        .batch-expiring { border-color: #ffc107; background: #fffbeb; }
+        .batch-expired { border-color: #dc3545; background: #fff5f5; }
+
+        .progress-bar { height: 8px; background: #eee; border-radius: 4px; overflow: hidden; margin-top: 0.5rem; }
+        .progress-fill { height: 100%; background: #2d5a27; transition: width 0.3s; }
+
+        .empty-state { text-align: center; padding: 3rem; color: #666; }
+        .empty-state h3 { margin: 0 0 0.5rem; color: #333; }
+
+        .loading { text-align: center; padding: 3rem; color: #666; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .lifecycle-view { grid-template-columns: 1fr; }
+            .item-row { grid-template-columns: 1fr; }
+            .data-table { display: block; overflow-x: auto; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin-inventory.html" class="nav-link">Products</a>
+                <a href="/admin-inventory-lifecycle.html" class="nav-link active">Inventory</a>
+                <a href="/admin.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">Admin</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="admin-header">
+                <h1>Inventory Lifecycle</h1>
+                <button class="btn btn-primary" onclick="openReceiveModal()">+ Receive Shipment</button>
+            </div>
+
+            <div id="message"></div>
+
+            <div class="stats-row">
+                <div class="stat-card">
+                    <h3>Pending Allocation</h3>
+                    <div class="value" id="pendingAllocation">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Awaiting Payment</h3>
+                    <div class="value" id="awaitingPayment">0</div>
+                </div>
+                <div class="stat-card warning">
+                    <h3>Expiring Soon</h3>
+                    <div class="value" id="expiringSoon">0</div>
+                </div>
+                <div class="stat-card danger">
+                    <h3>Low Stock</h3>
+                    <div class="value" id="lowStock">0</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Unpaid to Suppliers</h3>
+                    <div class="value" id="unpaidSuppliers">$0</div>
+                </div>
+            </div>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="orders">Orders <span class="badge" id="ordersBadge" style="display:none">0</span></button>
+                <button class="tab" data-tab="receive">Supplier Invoices</button>
+                <button class="tab" data-tab="lifecycle">Product Lookup</button>
+                <button class="tab" data-tab="alerts">Alerts</button>
+            </div>
+
+            <!-- Orders Tab -->
+            <div class="tab-content active" id="ordersTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Orders Pending Action</h2>
+                        <select id="orderFilter" onchange="filterOrders()">
+                            <option value="all">All Pending</option>
+                            <option value="allocation">Needs Allocation</option>
+                            <option value="payment">Needs Payment Verification</option>
+                            <option value="fulfillment">Ready to Fulfill</option>
+                        </select>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table" id="ordersTable">
+                            <thead>
+                                <tr>
+                                    <th>Order #</th>
+                                    <th>Customer</th>
+                                    <th>Date</th>
+                                    <th>Total</th>
+                                    <th>Inventory</th>
+                                    <th>Payment</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ordersBody">
+                                <tr><td colspan="7" class="loading">Loading orders...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Supplier Invoices Tab -->
+            <div class="tab-content" id="receiveTab">
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Supplier Invoices</h2>
+                        <button class="btn btn-primary btn-sm" onclick="openReceiveModal()">+ Receive Shipment</button>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table" id="supplierInvoicesTable">
+                            <thead>
+                                <tr>
+                                    <th>Reference</th>
+                                    <th>Supplier Invoice #</th>
+                                    <th>Supplier</th>
+                                    <th>Received</th>
+                                    <th>Total</th>
+                                    <th>Payment</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="supplierInvoicesBody">
+                                <tr><td colspan="7" class="loading">Loading...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Product Lifecycle Tab -->
+            <div class="tab-content" id="lifecycleTab">
+                <div class="toolbar">
+                    <input type="text" id="productSearch" placeholder="Search product by name..." onkeyup="searchProducts(event)">
+                    <select id="productSelect" onchange="loadProductLifecycle()">
+                        <option value="">Select a product...</option>
+                    </select>
+                </div>
+                <div id="lifecycleContent">
+                    <div class="empty-state">
+                        <h3>Select a Product</h3>
+                        <p>Choose a product to view its complete inventory lifecycle</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alerts Tab -->
+            <div class="tab-content" id="alertsTab">
+                <div class="lifecycle-view">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Expiring Within 90 Days</h2>
+                        </div>
+                        <div class="card-body" id="expiringList">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Low Stock Alerts</h2>
+                        </div>
+                        <div class="card-body" id="lowStockList">
+                            <div class="loading">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Receive Shipment Modal -->
+    <div class="modal" id="receiveModal">
+        <div class="modal-content" style="max-width: 900px;">
+            <div class="modal-header">
+                <h2>Receive Shipment</h2>
+                <button class="close-btn" onclick="closeReceiveModal()">&times;</button>
+            </div>
+            <form id="receiveForm" onsubmit="submitReceive(event)">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Supplier Name *</label>
+                        <input type="text" id="supplierName" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Supplier Invoice # *</label>
+                        <input type="text" id="invoiceNumber" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Invoice Date</label>
+                        <input type="date" id="invoiceDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Due Date</label>
+                        <input type="date" id="paymentDueDate">
+                    </div>
+                    <div class="form-group">
+                        <label>Payment Terms</label>
+                        <input type="text" id="paymentTerms" placeholder="e.g., Net 30">
+                    </div>
+                    <div class="form-group">
+                        <label>Receiving Location</label>
+                        <select id="receivingLocation">
+                            <option value="main">Main Warehouse</option>
+                            <option value="haxtun">Haxtun</option>
+                            <option value="otis">Otis</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="items-list">
+                    <div class="items-list-header">
+                        <span>Line Items</span>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addReceiveItem()">+ Add Item</button>
+                    </div>
+                    <div id="receiveItems">
+                        <!-- Items added dynamically -->
+                    </div>
+                </div>
+
+                <div class="form-grid" style="margin-top: 1.5rem;">
+                    <div class="form-group">
+                        <label>Freight</label>
+                        <input type="number" id="freight" step="0.01" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Other Fees</label>
+                        <input type="number" id="otherFees" step="0.01" value="0">
+                    </div>
+                    <div class="form-group full-width">
+                        <label>Notes</label>
+                        <textarea id="receivingNotes" rows="2"></textarea>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 1.5rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                    <div>
+                        <strong>Total: </strong><span id="receiveTotal">$0.00</span>
+                    </div>
+                    <div style="display: flex; gap: 0.5rem;">
+                        <button type="button" class="btn btn-secondary" onclick="closeReceiveModal()">Cancel</button>
+                        <button type="submit" class="btn btn-primary">Receive & Create Inventory</button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Payment Verification Modal -->
+    <div class="modal" id="verifyPaymentModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Verify Payment</h2>
+                <button class="close-btn" onclick="closeVerifyModal()">&times;</button>
+            </div>
+            <form id="verifyForm" onsubmit="submitVerifyPayment(event)">
+                <input type="hidden" id="verifyOrderId">
+                <div class="form-group">
+                    <label>Order</label>
+                    <p id="verifyOrderInfo" style="margin: 0; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;"></p>
+                </div>
+                <div class="form-group">
+                    <label>Payment Status</label>
+                    <select id="verifyPaymentStatus">
+                        <option value="paid">Paid in Full</option>
+                        <option value="partial">Partial Payment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Notes (optional)</label>
+                    <textarea id="verifyNotes" rows="2" placeholder="Check #, confirmation, etc."></textarea>
+                </div>
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeVerifyModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success">Verify Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Record Supplier Payment Modal -->
+    <div class="modal" id="supplierPaymentModal">
+        <div class="modal-content" style="max-width: 500px;">
+            <div class="modal-header">
+                <h2>Record Payment to Supplier</h2>
+                <button class="close-btn" onclick="closeSupplierPaymentModal()">&times;</button>
+            </div>
+            <form id="supplierPaymentForm" onsubmit="submitSupplierPayment(event)">
+                <input type="hidden" id="supplierInvoiceId">
+                <div class="form-group">
+                    <label>Invoice</label>
+                    <p id="supplierInvoiceInfo" style="margin: 0; padding: 0.5rem; background: #f8f9fa; border-radius: 4px;"></p>
+                </div>
+                <div class="form-group">
+                    <label>Amount *</label>
+                    <input type="number" id="paymentAmount" step="0.01" required>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="paymentMethod">
+                        <option value="check">Check</option>
+                        <option value="ach">ACH</option>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="card">Card</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Check # / Reference</label>
+                    <input type="text" id="paymentReference">
+                </div>
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end;">
+                    <button type="button" class="btn btn-secondary" onclick="closeSupplierPaymentModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Record Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let token = localStorage.getItem('token');
+        let products = [];
+        let pendingOrders = [];
+
+        // Check auth
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            setupTabs();
+            loadDashboard();
+        });
+
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Not authenticated');
+                const user = await res.json();
+
+                if (user.role !== 'distributor' && user.role !== 'superadmin') {
+                    showMessage('Access denied. Distributor or Super Admin access required.', 'error');
+                    setTimeout(() => window.location.href = '/dashboard.html', 2000);
+                    return;
+                }
+
+                document.getElementById('userName').textContent = user.name || user.email;
+            } catch (err) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        function setupTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+
+                    if (tab.dataset.tab === 'lifecycle') loadProducts();
+                    if (tab.dataset.tab === 'alerts') loadAlerts();
+                    if (tab.dataset.tab === 'receive') loadSupplierInvoices();
+                });
+            });
+        }
+
+        async function loadDashboard() {
+            await Promise.all([
+                loadOrders(),
+                loadStats(),
+                loadProducts()
+            ]);
+        }
+
+        async function loadStats() {
+            try {
+                const [pendingAlloc, pendingPayment, expiring, lowStock, unpaid] = await Promise.all([
+                    fetch(`${API_BASE}/admin/inventory-lifecycle/orders/pending-allocation`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch(`${API_BASE}/admin/inventory-lifecycle/orders/pending-payment`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch(`${API_BASE}/admin/inventory-lifecycle/expiring?days=90`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch(`${API_BASE}/admin/inventory-lifecycle/low-stock`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch(`${API_BASE}/admin/supplier-invoices/status/unpaid`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()).catch(() => ({ totalOwed: 0 }))
+                ]);
+
+                document.getElementById('pendingAllocation').textContent = pendingAlloc.count || 0;
+                document.getElementById('awaitingPayment').textContent = pendingPayment.count || 0;
+                document.getElementById('expiringSoon').textContent = expiring.totalBatches || 0;
+                document.getElementById('lowStock').textContent = lowStock.count || 0;
+                document.getElementById('unpaidSuppliers').textContent = formatMoney(unpaid.totalOwed || 0);
+
+                const totalPending = (pendingAlloc.count || 0) + (pendingPayment.count || 0);
+                const badge = document.getElementById('ordersBadge');
+                if (totalPending > 0) {
+                    badge.textContent = totalPending;
+                    badge.style.display = 'inline-block';
+                }
+            } catch (err) {
+                console.error('Error loading stats:', err);
+            }
+        }
+
+        async function loadOrders() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/orders`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const orders = await res.json();
+
+                pendingOrders = orders.filter(o =>
+                    o.status !== 'delivered' &&
+                    o.status !== 'cancelled' &&
+                    o.status !== 'draft'
+                );
+
+                renderOrders(pendingOrders);
+            } catch (err) {
+                document.getElementById('ordersBody').innerHTML = `<tr><td colspan="7" class="error-msg">Error loading orders: ${err.message}</td></tr>`;
+            }
+        }
+
+        function filterOrders() {
+            const filter = document.getElementById('orderFilter').value;
+            let filtered = pendingOrders;
+
+            if (filter === 'allocation') {
+                filtered = pendingOrders.filter(o => !o.inventoryStatus || o.inventoryStatus === 'pending_allocation' || o.inventoryStatus === 'partially_allocated');
+            } else if (filter === 'payment') {
+                filtered = pendingOrders.filter(o => !o.paymentVerified && o.paymentStatus !== 'paid');
+            } else if (filter === 'fulfillment') {
+                filtered = pendingOrders.filter(o => (o.paymentVerified || o.paymentStatus === 'paid') && o.inventoryStatus === 'fully_allocated');
+            }
+
+            renderOrders(filtered);
+        }
+
+        function renderOrders(orders) {
+            const tbody = document.getElementById('ordersBody');
+            if (!orders.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No pending orders</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = orders.map(order => {
+                const invStatus = order.inventoryStatus || 'pending_allocation';
+                const invClass = invStatus === 'fully_allocated' ? 'status-allocated' :
+                                 invStatus === 'delivered' ? 'status-delivered' : 'status-pending';
+
+                const payStatus = order.paymentVerified ? 'Verified' :
+                                  order.paymentStatus === 'paid' ? 'Paid' :
+                                  order.paymentStatus || 'Pending';
+                const payClass = (order.paymentVerified || order.paymentStatus === 'paid') ? 'status-paid' : 'status-unpaid';
+
+                const canAllocate = invStatus === 'pending_allocation' || invStatus === 'partially_allocated';
+                const canFulfill = (order.paymentVerified || order.paymentStatus === 'paid') && invStatus === 'fully_allocated';
+                const canVerify = !order.paymentVerified && order.paymentStatus !== 'paid';
+
+                return `<tr>
+                    <td><strong>${order.orderNumber}</strong></td>
+                    <td>${order.contactInfo?.name || 'N/A'}</td>
+                    <td>${new Date(order.createdAt).toLocaleDateString()}</td>
+                    <td>${formatMoney(order.total)}</td>
+                    <td><span class="status-badge ${invClass}">${invStatus.replace(/_/g, ' ')}</span></td>
+                    <td><span class="status-badge ${payClass}">${payStatus}</span></td>
+                    <td class="actions">
+                        ${canAllocate ? `<button class="btn btn-sm btn-secondary" onclick="allocateOrder('${order._id}')">Allocate</button>` : ''}
+                        ${canVerify ? `<button class="btn btn-sm btn-warning" onclick="openVerifyModal('${order._id}', '${order.orderNumber}', ${order.total})">Verify Pay</button>` : ''}
+                        ${canFulfill ? `<button class="btn btn-sm btn-success" onclick="fulfillOrder('${order._id}')">Fulfill</button>` : ''}
+                    </td>
+                </tr>`;
+            }).join('');
+        }
+
+        async function allocateOrder(orderId) {
+            if (!confirm('Allocate inventory to this order using FIFO?')) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/inventory-lifecycle/allocate-order/${orderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ location: 'main' })
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error);
+
+                showMessage(result.message, 'success');
+                loadOrders();
+                loadStats();
+            } catch (err) {
+                showMessage('Error allocating: ' + err.message, 'error');
+            }
+        }
+
+        function openVerifyModal(orderId, orderNumber, total) {
+            document.getElementById('verifyOrderId').value = orderId;
+            document.getElementById('verifyOrderInfo').textContent = `${orderNumber} - ${formatMoney(total)}`;
+            document.getElementById('verifyPaymentModal').classList.add('active');
+        }
+
+        function closeVerifyModal() {
+            document.getElementById('verifyPaymentModal').classList.remove('active');
+        }
+
+        async function submitVerifyPayment(e) {
+            e.preventDefault();
+            const orderId = document.getElementById('verifyOrderId').value;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/inventory-lifecycle/verify-payment/${orderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        paymentStatus: document.getElementById('verifyPaymentStatus').value,
+                        notes: document.getElementById('verifyNotes').value
+                    })
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error);
+
+                showMessage('Payment verified!', 'success');
+                closeVerifyModal();
+                loadOrders();
+                loadStats();
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            }
+        }
+
+        async function fulfillOrder(orderId) {
+            if (!confirm('Mark this order as fulfilled? This will decrement inventory.')) return;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/inventory-lifecycle/fulfill-order/${orderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ location: 'main' })
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error);
+
+                showMessage('Order fulfilled!', 'success');
+                loadOrders();
+                loadStats();
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            }
+        }
+
+        // Supplier Invoices
+        async function loadSupplierInvoices() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/supplier-invoices`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+
+                const tbody = document.getElementById('supplierInvoicesBody');
+                if (!data.invoices || !data.invoices.length) {
+                    tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No supplier invoices yet</td></tr>';
+                    return;
+                }
+
+                tbody.innerHTML = data.invoices.map(inv => {
+                    const payClass = inv.paymentStatus === 'paid' ? 'status-paid' :
+                                     inv.paymentStatus === 'partial' ? 'status-pending' : 'status-unpaid';
+                    const balance = (inv.totalAmount || 0) - (inv.amountPaid || 0);
+
+                    return `<tr>
+                        <td><strong>${inv.internalReference}</strong></td>
+                        <td>${inv.invoiceNumber}</td>
+                        <td>${inv.supplierName}</td>
+                        <td>${new Date(inv.receivedDate).toLocaleDateString()}</td>
+                        <td>${formatMoney(inv.totalAmount)}</td>
+                        <td><span class="status-badge ${payClass}">${inv.paymentStatus}${balance > 0 ? ` (${formatMoney(balance)} due)` : ''}</span></td>
+                        <td class="actions">
+                            ${inv.paymentStatus !== 'paid' ? `<button class="btn btn-sm btn-primary" onclick="openSupplierPaymentModal('${inv._id}', '${inv.internalReference}', ${inv.totalAmount}, ${inv.amountPaid || 0})">Pay</button>` : ''}
+                        </td>
+                    </tr>`;
+                }).join('');
+            } catch (err) {
+                document.getElementById('supplierInvoicesBody').innerHTML = `<tr><td colspan="7" class="error-msg">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function openSupplierPaymentModal(id, ref, total, paid) {
+            document.getElementById('supplierInvoiceId').value = id;
+            document.getElementById('supplierInvoiceInfo').textContent = `${ref} - Total: ${formatMoney(total)}, Paid: ${formatMoney(paid)}, Due: ${formatMoney(total - paid)}`;
+            document.getElementById('paymentAmount').value = (total - paid).toFixed(2);
+            document.getElementById('supplierPaymentModal').classList.add('active');
+        }
+
+        function closeSupplierPaymentModal() {
+            document.getElementById('supplierPaymentModal').classList.remove('active');
+        }
+
+        async function submitSupplierPayment(e) {
+            e.preventDefault();
+            const id = document.getElementById('supplierInvoiceId').value;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/supplier-invoices/${id}/payment`, {
+                    method: 'PATCH',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        amount: parseFloat(document.getElementById('paymentAmount').value),
+                        method: document.getElementById('paymentMethod').value,
+                        reference: document.getElementById('paymentReference').value
+                    })
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error);
+
+                showMessage(result.message, 'success');
+                closeSupplierPaymentModal();
+                loadSupplierInvoices();
+                loadStats();
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            }
+        }
+
+        // Receive Shipment
+        function openReceiveModal() {
+            document.getElementById('receiveForm').reset();
+            document.getElementById('receiveItems').innerHTML = '';
+            addReceiveItem();
+            document.getElementById('receiveModal').classList.add('active');
+        }
+
+        function closeReceiveModal() {
+            document.getElementById('receiveModal').classList.remove('active');
+        }
+
+        let receiveItemIndex = 0;
+        function addReceiveItem() {
+            const container = document.getElementById('receiveItems');
+            const productOptions = products.map(p => `<option value="${p._id}" data-name="${p.productName}" data-unit="${p.unit}">${p.productName} (${p.packSize})</option>`).join('');
+
+            const html = `<div class="item-row" data-index="${receiveItemIndex}">
+                <select name="product" onchange="updateItemName(this)" required>
+                    <option value="">Select product...</option>
+                    ${productOptions}
+                </select>
+                <input type="number" name="quantity" placeholder="Qty" step="0.01" required onchange="updateReceiveTotal()">
+                <input type="number" name="unitCost" placeholder="Cost/unit" step="0.0001" required onchange="updateReceiveTotal()">
+                <input type="text" name="lotNumber" placeholder="Lot #">
+                <input type="date" name="expirationDate" placeholder="Exp date">
+                <button type="button" class="remove-btn" onclick="removeReceiveItem(this)">&times;</button>
+            </div>`;
+
+            container.insertAdjacentHTML('beforeend', html);
+            receiveItemIndex++;
+        }
+
+        function removeReceiveItem(btn) {
+            btn.closest('.item-row').remove();
+            updateReceiveTotal();
+        }
+
+        function updateItemName(select) {
+            const option = select.selectedOptions[0];
+            select.closest('.item-row').dataset.productName = option.dataset.name || '';
+            select.closest('.item-row').dataset.unit = option.dataset.unit || '';
+        }
+
+        function updateReceiveTotal() {
+            let subtotal = 0;
+            document.querySelectorAll('#receiveItems .item-row').forEach(row => {
+                const qty = parseFloat(row.querySelector('[name="quantity"]').value) || 0;
+                const cost = parseFloat(row.querySelector('[name="unitCost"]').value) || 0;
+                subtotal += qty * cost;
+            });
+
+            const freight = parseFloat(document.getElementById('freight').value) || 0;
+            const other = parseFloat(document.getElementById('otherFees').value) || 0;
+            const total = subtotal + freight + other;
+
+            document.getElementById('receiveTotal').textContent = formatMoney(total);
+        }
+
+        async function submitReceive(e) {
+            e.preventDefault();
+
+            const items = [];
+            document.querySelectorAll('#receiveItems .item-row').forEach(row => {
+                const select = row.querySelector('[name="product"]');
+                const option = select.selectedOptions[0];
+
+                items.push({
+                    chemicalId: select.value,
+                    productName: option?.dataset?.name || option?.textContent?.split('(')[0]?.trim(),
+                    unit: option?.dataset?.unit || 'gal',
+                    quantityReceived: parseFloat(row.querySelector('[name="quantity"]').value),
+                    unitCost: parseFloat(row.querySelector('[name="unitCost"]').value),
+                    lotNumber: row.querySelector('[name="lotNumber"]').value,
+                    expirationDate: row.querySelector('[name="expirationDate"]').value || null
+                });
+            });
+
+            const subtotal = items.reduce((sum, i) => sum + (i.quantityReceived * i.unitCost), 0);
+            const freight = parseFloat(document.getElementById('freight').value) || 0;
+            const otherFees = parseFloat(document.getElementById('otherFees').value) || 0;
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/supplier-invoices`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        supplierName: document.getElementById('supplierName').value,
+                        invoiceNumber: document.getElementById('invoiceNumber').value,
+                        invoiceDate: document.getElementById('invoiceDate').value,
+                        paymentDueDate: document.getElementById('paymentDueDate').value,
+                        paymentTerms: document.getElementById('paymentTerms').value,
+                        receivingLocation: document.getElementById('receivingLocation').value,
+                        receivingNotes: document.getElementById('receivingNotes').value,
+                        items,
+                        subtotal,
+                        freight,
+                        otherFees,
+                        totalAmount: subtotal + freight + otherFees
+                    })
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error);
+
+                showMessage(`Shipment received! ${result.batchesCreated} items added to inventory.`, 'success');
+                closeReceiveModal();
+                loadSupplierInvoices();
+                loadStats();
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            }
+        }
+
+        // Products & Lifecycle
+        async function loadProducts() {
+            try {
+                const res = await fetch(`${API_BASE}/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                products = await res.json();
+
+                const select = document.getElementById('productSelect');
+                select.innerHTML = '<option value="">Select a product...</option>' +
+                    products.map(p => `<option value="${p._id}">${p.productName} (${p.packSize || p.unit || ''})</option>`).join('');
+            } catch (err) {
+                console.error('Error loading products:', err);
+            }
+        }
+
+        function searchProducts(e) {
+            const term = e.target.value.toLowerCase();
+            const select = document.getElementById('productSelect');
+            const filtered = products.filter(p => p.productName.toLowerCase().includes(term));
+
+            select.innerHTML = '<option value="">Select a product...</option>' +
+                filtered.map(p => `<option value="${p._id}">${p.productName} (${p.packSize || p.unit || ''})</option>`).join('');
+        }
+
+        async function loadProductLifecycle() {
+            const chemicalId = document.getElementById('productSelect').value;
+            if (!chemicalId) return;
+
+            const container = document.getElementById('lifecycleContent');
+            container.innerHTML = '<div class="loading">Loading lifecycle data...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/inventory-lifecycle/lifecycle/${chemicalId}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error);
+
+                const batchesHtml = data.batches.length ? data.batches.map(b => {
+                    const isExpiring = b.expirationDate && new Date(b.expirationDate) <= new Date(Date.now() + 90*24*60*60*1000);
+                    const isExpired = b.expirationDate && new Date(b.expirationDate) < new Date();
+                    const batchClass = isExpired ? 'batch-expired' : isExpiring ? 'batch-expiring' : '';
+                    const pctRemaining = b.quantityReceived > 0 ? (b.quantityRemaining / b.quantityReceived * 100) : 0;
+
+                    return `<div class="batch-card ${batchClass}">
+                        <div class="batch-header">
+                            <span class="batch-po">${b.poNumber}</span>
+                            <span class="batch-qty">${b.quantityRemaining} / ${b.quantityReceived} ${b.unit || 'units'}</span>
+                        </div>
+                        <div class="batch-details">
+                            ${b.lotNumber ? `Lot: ${b.lotNumber} | ` : ''}
+                            Cost: ${formatMoney(b.costPerUnit)}/unit |
+                            Received: ${new Date(b.receivedDate).toLocaleDateString()}
+                            ${b.expirationDate ? ` | Exp: ${new Date(b.expirationDate).toLocaleDateString()}` : ''}
+                        </div>
+                        <div class="progress-bar"><div class="progress-fill" style="width: ${pctRemaining}%"></div></div>
+                    </div>`;
+                }).join('') : '<p class="empty-state">No batches on hand</p>';
+
+                const transactionsHtml = data.recentTransactions.slice(0, 10).map(t => `
+                    <tr>
+                        <td>${new Date(t.createdAt).toLocaleDateString()}</td>
+                        <td><span class="status-badge status-${t.type === 'receive' ? 'verified' : t.type === 'sale' ? 'delivered' : 'pending'}">${t.type}</span></td>
+                        <td>${t.quantityChange > 0 ? '+' : ''}${t.quantityChange}</td>
+                        <td>${t.referenceNumber || '-'}</td>
+                    </tr>
+                `).join('');
+
+                container.innerHTML = `
+                    <div class="lifecycle-view">
+                        <div class="lifecycle-section">
+                            <h3>Current Stock</h3>
+                            <div class="stats-row" style="margin-bottom: 1rem;">
+                                <div class="stat-card">
+                                    <h3>On Hand</h3>
+                                    <div class="value">${data.inventory.quantityOnHand || 0}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <h3>Reserved</h3>
+                                    <div class="value">${data.inventory.quantityReserved || 0}</div>
+                                </div>
+                                <div class="stat-card">
+                                    <h3>Available</h3>
+                                    <div class="value">${data.inventory.quantityAvailable || 0}</div>
+                                </div>
+                            </div>
+                            <h3 style="margin-top: 1.5rem;">Batches</h3>
+                            ${batchesHtml}
+                        </div>
+                        <div class="lifecycle-section">
+                            <h3>Summary</h3>
+                            <table class="data-table">
+                                <tr><td>Total Received</td><td><strong>${data.summary.totalReceived}</strong></td></tr>
+                                <tr><td>Total Sold</td><td><strong>${data.summary.totalSold}</strong></td></tr>
+                                <tr><td>Active Batches</td><td><strong>${data.summary.activeBatchCount}</strong></td></tr>
+                                <tr><td>Avg Cost</td><td><strong>${formatMoney(data.summary.averageCost)}</strong></td></tr>
+                                <tr><td>Last Cost</td><td><strong>${formatMoney(data.summary.lastCost)}</strong></td></tr>
+                            </table>
+                            <h3 style="margin-top: 1.5rem;">Recent Activity</h3>
+                            <table class="data-table">
+                                <thead><tr><th>Date</th><th>Type</th><th>Qty</th><th>Ref</th></tr></thead>
+                                <tbody>${transactionsHtml || '<tr><td colspan="4">No recent activity</td></tr>'}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+            } catch (err) {
+                container.innerHTML = `<div class="error-msg">Error: ${err.message}</div>`;
+            }
+        }
+
+        // Alerts
+        async function loadAlerts() {
+            try {
+                const [expiring, lowStock] = await Promise.all([
+                    fetch(`${API_BASE}/admin/inventory-lifecycle/expiring?days=90`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json()),
+                    fetch(`${API_BASE}/admin/inventory-lifecycle/low-stock`, { headers: { 'Authorization': `Bearer ${token}` } }).then(r => r.json())
+                ]);
+
+                document.getElementById('expiringList').innerHTML = expiring.products?.length ?
+                    expiring.products.map(p => `
+                        <div class="batch-card batch-expiring">
+                            <div class="batch-header">
+                                <span class="batch-po">${p.productName}</span>
+                                <span class="batch-qty">${p.totalExpiring} units</span>
+                            </div>
+                            <div class="batch-details">${p.batches.length} batch(es) expiring</div>
+                        </div>
+                    `).join('') : '<p class="empty-state">No products expiring soon</p>';
+
+                document.getElementById('lowStockList').innerHTML = lowStock.products?.length ?
+                    lowStock.products.map(p => `
+                        <div class="batch-card">
+                            <div class="batch-header">
+                                <span class="batch-po">${p.productName}</span>
+                                <span class="batch-qty">${p.quantityAvailable} available</span>
+                            </div>
+                            <div class="batch-details">Reorder point: ${p.reorderPoint}</div>
+                        </div>
+                    `).join('') : '<p class="empty-state">No low stock alerts</p>';
+            } catch (err) {
+                console.error('Error loading alerts:', err);
+            }
+        }
+
+        // Utilities
+        function formatMoney(amount) {
+            if (typeof Decimal !== 'undefined' && typeof formatUSD === 'function') {
+                return formatUSD(amount);
+            }
+            return '$' + (amount || 0).toFixed(2);
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        });
+
+        // Update totals when freight/fees change
+        document.getElementById('freight')?.addEventListener('change', updateReceiveTotal);
+        document.getElementById('otherFees')?.addEventListener('change', updateReceiveTotal);
+    </script>
+</body>
+</html>

@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Warehouse Management | Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h1 { margin: 0; }
+
+        .tabs { display: flex; gap: 0.5rem; margin-bottom: 2rem; flex-wrap: wrap; }
+        .tab { padding: 0.75rem 1.5rem; border: none; background: white; border-radius: 8px 8px 0 0; cursor: pointer; font-weight: 600; color: #666; transition: all 0.2s; }
+        .tab.active { background: #2d5a27; color: white; }
+        .tab:hover:not(.active) { background: #eee; }
+        .tab .badge { display: inline-block; margin-left: 0.5rem; padding: 0.15rem 0.5rem; border-radius: 10px; font-size: 0.75rem; background: #dc3545; color: white; }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .stat-card { background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.8rem; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; color: #2d5a27; }
+        .stat-card.warning .value { color: #856404; }
+        .stat-card.danger .value { color: #721c24; }
+
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; overflow: hidden; }
+        .card-header { padding: 1rem 1.5rem; background: #1a1a2e; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .card-header h2 { margin: 0; font-size: 1.1rem; }
+        .card-body { padding: 1.5rem; overflow-x: auto; }
+
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #eee; white-space: nowrap; }
+        .data-table th { background: #f8f9fa; font-weight: 600; color: #333; font-size: 0.85rem; text-transform: uppercase; position: sticky; top: 0; z-index: 1; }
+        .data-table tr:hover { background: #f9f9f9; }
+        .data-table .text-right { text-align: right; }
+        .data-table .text-center { text-align: center; }
+        .data-table tfoot td { font-weight: 700; background: #f8f9fa; border-top: 2px solid #ddd; }
+
+        .status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .status-received { background: #d4edda; color: #155724; }
+        .status-partial { background: #fff3cd; color: #856404; }
+        .status-pending { background: #fff3cd; color: #856404; }
+        .status-ordered { background: #cce5ff; color: #004085; }
+        .status-cancelled { background: #e2e3e5; color: #383d41; }
+        .status-paid { background: #d4edda; color: #155724; }
+        .status-unpaid { background: #f8d7da; color: #721c24; }
+
+        .stock-zero { color: #dc3545; font-weight: 700; }
+        .stock-low { color: #e67e22; font-weight: 700; }
+        .stock-healthy { color: #2d5a27; font-weight: 600; }
+
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+        .btn-outline { background: transparent; border: 2px solid currentColor; }
+
+        .toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .toolbar input, .toolbar select { padding: 0.6rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+        .toolbar input { flex: 1; min-width: 200px; max-width: 350px; }
+
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+        .modal-header h2 { margin: 0; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; }
+        .form-group textarea { resize: vertical; min-height: 60px; }
+        .form-group .error-text { color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem; }
+
+        .warehouse-section { margin-bottom: 2rem; }
+        .warehouse-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
+        .warehouse-section-header h3 { margin: 0; color: #1a1a2e; font-size: 1.1rem; text-transform: capitalize; }
+
+        .location-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
+        .location-chip { padding: 0.5rem 1rem; border: 2px solid #ddd; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 0.9rem; background: white; transition: all 0.2s; }
+        .location-chip.active { border-color: #2d5a27; background: #2d5a27; color: white; }
+        .location-chip:hover:not(.active) { border-color: #2d5a27; color: #2d5a27; }
+
+        /* Customer accounting */
+        .customer-card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; overflow: hidden; }
+        .customer-header { padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; border-bottom: 1px solid #eee; transition: background 0.2s; flex-wrap: wrap; gap: 0.5rem; }
+        .customer-header:hover { background: #f9f9f9; }
+        .customer-name { font-weight: 700; font-size: 1.1rem; color: #1a1a2e; }
+        .customer-summary { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; }
+        .customer-stat { text-align: right; }
+        .customer-stat .label { font-size: 0.75rem; color: #666; text-transform: uppercase; }
+        .customer-stat .amount { font-size: 1.1rem; font-weight: 700; }
+        .customer-stat .amount.text-green { color: #2d5a27; }
+        .customer-stat .amount.text-red { color: #dc3545; }
+        .customer-stat .amount.text-orange { color: #e67e22; }
+        .balance-due-large { font-size: 1.4rem; font-weight: 800; color: #dc3545; }
+        .balance-due-zero { font-size: 1.4rem; font-weight: 800; color: #2d5a27; }
+        .customer-details { display: none; padding: 1rem 1.5rem; border-top: 1px solid #eee; }
+        .customer-details.open { display: block; }
+        .expand-icon { font-size: 1.2rem; color: #666; transition: transform 0.2s; margin-left: 0.5rem; }
+        .expand-icon.open { transform: rotate(180deg); }
+
+        .payment-badge { display: inline-block; padding: 0.3rem 0.9rem; border-radius: 4px; font-size: 0.85rem; font-weight: 700; }
+        .payment-paid { background: #d4edda; color: #155724; }
+        .payment-partial { background: #fff3cd; color: #856404; }
+        .payment-unpaid { background: #f8d7da; color: #721c24; }
+
+        .ar-summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .ar-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .ar-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.8rem; text-transform: uppercase; }
+        .ar-card .ar-value { font-size: 2rem; font-weight: 800; }
+        .ar-card .ar-value.ar-danger { color: #dc3545; }
+        .ar-card .ar-value.ar-warning { color: #e67e22; }
+        .ar-card .ar-value.ar-success { color: #2d5a27; }
+
+        .loading { text-align: center; padding: 3rem; color: #666; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .empty-state { text-align: center; padding: 3rem; color: #666; }
+        .empty-state h3 { margin: 0 0 0.5rem; color: #333; }
+
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .data-table { display: block; overflow-x: auto; }
+            .customer-summary { gap: 0.75rem; }
+            .ar-summary-row { grid-template-columns: 1fr 1fr; }
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .tab { padding: 0.6rem 1rem; font-size: 0.85rem; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin-inventory.html" class="nav-link">Products</a>
+                <a href="/admin-inventory-lifecycle.html" class="nav-link">Inventory</a>
+                <a href="/admin-warehouse.html" class="nav-link active">Warehouse</a>
+                <a href="/admin.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">Admin</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="admin-header">
+                <h1>Warehouse Management</h1>
+            </div>
+
+            <div id="message"></div>
+
+            <div class="tabs">
+                <button class="tab active" data-tab="overview">Warehouse Overview</button>
+                <button class="tab" data-tab="purchases">Purchases</button>
+                <button class="tab" data-tab="transfers">Transfers</button>
+                <button class="tab" data-tab="accounting">Customer Accounting</button>
+            </div>
+
+            <!-- Tab 1: Warehouse Overview -->
+            <div class="tab-content active" id="overviewTab">
+                <div class="stats-row" id="overviewStats">
+                    <div class="stat-card">
+                        <h3>Total Inventory Value</h3>
+                        <div class="value" id="totalInventoryValue">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Products</h3>
+                        <div class="value" id="totalProductCount">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total On Hand</h3>
+                        <div class="value" id="totalOnHand">--</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <h3>Low Stock Items</h3>
+                        <div class="value" id="overviewLowStock">--</div>
+                    </div>
+                </div>
+
+                <div class="location-filters" id="overviewLocationFilters">
+                    <button class="location-chip active" data-location="all" onclick="filterOverviewLocation('all')">All Locations</button>
+                    <button class="location-chip" data-location="main" onclick="filterOverviewLocation('main')">Main</button>
+                    <button class="location-chip" data-location="haxtun" onclick="filterOverviewLocation('haxtun')">Haxtun</button>
+                    <button class="location-chip" data-location="otis" onclick="filterOverviewLocation('otis')">Otis</button>
+                </div>
+
+                <div id="overviewContent">
+                    <div class="loading">Loading warehouse data...</div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Purchases -->
+            <div class="tab-content" id="purchasesTab">
+                <div class="stats-row" id="purchaseStats">
+                    <div class="stat-card">
+                        <h3>Total POs</h3>
+                        <div class="value" id="totalPOs">--</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Purchased</h3>
+                        <div class="value" id="totalPurchasedValue">--</div>
+                    </div>
+                    <div class="stat-card warning">
+                        <h3>Pending Receipt</h3>
+                        <div class="value" id="pendingReceiptCount">--</div>
+                    </div>
+                </div>
+
+                <div class="location-filters" id="purchaseLocationFilters">
+                    <button class="location-chip active" data-location="all" onclick="filterPurchaseLocation('all')">All Locations</button>
+                    <button class="location-chip" data-location="main" onclick="filterPurchaseLocation('main')">Main</button>
+                    <button class="location-chip" data-location="haxtun" onclick="filterPurchaseLocation('haxtun')">Haxtun</button>
+                    <button class="location-chip" data-location="otis" onclick="filterPurchaseLocation('otis')">Otis</button>
+                </div>
+
+                <div id="purchasesContent">
+                    <div class="loading">Loading purchase orders...</div>
+                </div>
+            </div>
+
+            <!-- Tab 3: Transfers -->
+            <div class="tab-content" id="transfersTab">
+                <div style="margin-bottom: 1.5rem;">
+                    <button class="btn btn-primary" onclick="openTransferModal()">+ Transfer Product</button>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <h2>Transfer History</h2>
+                    </div>
+                    <div class="card-body">
+                        <table class="data-table" id="transfersTable">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Product</th>
+                                    <th>From</th>
+                                    <th>To</th>
+                                    <th class="text-right">Quantity</th>
+                                    <th>Notes</th>
+                                    <th>By</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transfersBody">
+                                <tr><td colspan="7" class="loading">Loading transfers...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 4: Customer Accounting -->
+            <div class="tab-content" id="accountingTab">
+                <div class="ar-summary-row" id="arSummary">
+                    <div class="ar-card">
+                        <h3>Total Accounts Receivable</h3>
+                        <div class="ar-value ar-danger" id="totalAR">--</div>
+                    </div>
+                    <div class="ar-card">
+                        <h3>Customers With Balance</h3>
+                        <div class="ar-value ar-warning" id="customersWithBalance">--</div>
+                    </div>
+                    <div class="ar-card">
+                        <h3>Total Collected</h3>
+                        <div class="ar-value ar-success" id="totalCollected">--</div>
+                    </div>
+                    <div class="ar-card">
+                        <h3>Total Invoiced</h3>
+                        <div class="ar-value" id="totalInvoiced" style="color: #1a1a2e;">--</div>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <input type="text" id="customerSearch" placeholder="Search customers..." oninput="filterCustomers()">
+                    <select id="customerStatusFilter" onchange="filterCustomers()">
+                        <option value="all">All Customers</option>
+                        <option value="unpaid">Unpaid Only</option>
+                        <option value="partial">Partial Only</option>
+                        <option value="paid">Paid Only</option>
+                    </select>
+                </div>
+
+                <div id="accountingContent">
+                    <div class="loading">Loading customer data...</div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Transfer Product Modal -->
+    <div class="modal" id="transferModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Transfer Product</h2>
+                <button class="close-btn" onclick="closeTransferModal()">&times;</button>
+            </div>
+            <form id="transferForm" onsubmit="submitTransfer(event)">
+                <div class="form-group">
+                    <label>Product *</label>
+                    <select id="transferProduct" required>
+                        <option value="">Select a product...</option>
+                    </select>
+                </div>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>From Location *</label>
+                        <select id="transferFrom" required onchange="validateTransferLocations()">
+                            <option value="">Select...</option>
+                            <option value="main">Main Warehouse</option>
+                            <option value="haxtun">Haxtun</option>
+                            <option value="otis">Otis</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>To Location *</label>
+                        <select id="transferTo" required onchange="validateTransferLocations()">
+                            <option value="">Select...</option>
+                            <option value="main">Main Warehouse</option>
+                            <option value="haxtun">Haxtun</option>
+                            <option value="otis">Otis</option>
+                        </select>
+                        <div class="error-text" id="transferLocationError" style="display:none;">From and To locations must be different.</div>
+                    </div>
+                </div>
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="transferQty" step="0.01" min="0.01" required placeholder="Enter quantity">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="transferNotes" rows="2" placeholder="Reason for transfer, truck info, etc."></textarea>
+                </div>
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="transferSubmitBtn">Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let token = localStorage.getItem('token');
+        let products = [];
+        let warehouseData = null;
+        let purchasesData = null;
+        let transfersData = null;
+        let customerData = null;
+        let allCustomers = [];
+        let selectedOverviewLocation = 'all';
+        let selectedPurchaseLocation = 'all';
+
+        // Auth check
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            setupTabs();
+            loadProducts();
+            loadOverview();
+        });
+
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Not authenticated');
+                const user = await res.json();
+
+                if (user.role !== 'distributor' && user.role !== 'superadmin') {
+                    showMessage('Access denied. Distributor or Super Admin access required.', 'error');
+                    setTimeout(() => window.location.href = '/dashboard.html', 2000);
+                    return;
+                }
+
+                document.getElementById('userName').textContent = user.name || user.email;
+            } catch (err) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        function setupTabs() {
+            document.querySelectorAll('.tab').forEach(tab => {
+                tab.addEventListener('click', () => {
+                    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                    document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                    tab.classList.add('active');
+                    document.getElementById(tab.dataset.tab + 'Tab').classList.add('active');
+
+                    if (tab.dataset.tab === 'overview') loadOverview();
+                    if (tab.dataset.tab === 'purchases') loadPurchases();
+                    if (tab.dataset.tab === 'transfers') loadTransfers();
+                    if (tab.dataset.tab === 'accounting') loadAccounting();
+                });
+            });
+        }
+
+        // ========================================
+        // Products (for dropdowns)
+        // ========================================
+        async function loadProducts() {
+            try {
+                const res = await fetch(`${API_BASE}/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                products = await res.json();
+            } catch (err) {
+                console.error('Error loading products:', err);
+            }
+        }
+
+        // ========================================
+        // Tab 1: Warehouse Overview
+        // ========================================
+        async function loadOverview() {
+            const container = document.getElementById('overviewContent');
+            container.innerHTML = '<div class="loading">Loading warehouse data...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/warehouse-summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load warehouse summary');
+                warehouseData = await res.json();
+                renderOverview();
+            } catch (err) {
+                container.innerHTML = `<div class="error-msg">Error loading warehouse data: ${err.message}</div>`;
+            }
+        }
+
+        function renderOverview() {
+            if (!warehouseData) return;
+
+            const data = warehouseData;
+            const warehouses = data.warehouses || data.locations || [];
+            const locationFilter = selectedOverviewLocation;
+
+            // Compute totals
+            let totalValue = 0;
+            let totalProducts = 0;
+            let totalOnHand = 0;
+            let lowStockCount = 0;
+
+            const filteredWarehouses = warehouses.filter(w => {
+                const loc = (w.location || w.name || '').toLowerCase();
+                return locationFilter === 'all' || loc === locationFilter;
+            });
+
+            filteredWarehouses.forEach(w => {
+                const wValue = w.totalValue || 0;
+                totalValue += wValue;
+                const prods = w.products || w.items || [];
+                totalProducts += prods.length;
+                prods.forEach(p => {
+                    const onHand = p.onHand || p.quantityOnHand || 0;
+                    totalOnHand += onHand;
+                    if (onHand <= 0) lowStockCount++;
+                });
+            });
+
+            document.getElementById('totalInventoryValue').textContent = formatMoney(totalValue);
+            document.getElementById('totalProductCount').textContent = totalProducts;
+            document.getElementById('totalOnHand').textContent = totalOnHand;
+            document.getElementById('overviewLowStock').textContent = lowStockCount;
+
+            // Render each warehouse as a card
+            const container = document.getElementById('overviewContent');
+            if (!filteredWarehouses.length) {
+                container.innerHTML = '<div class="empty-state"><h3>No warehouse data</h3><p>No inventory found for the selected location.</p></div>';
+                return;
+            }
+
+            let html = '';
+            filteredWarehouses.forEach(w => {
+                const loc = w.location || w.name || 'Unknown';
+                const prods = w.products || w.items || [];
+                const wValue = w.totalValue || 0;
+
+                html += `
+                <div class="card warehouse-section">
+                    <div class="card-header">
+                        <h2>${capitalize(loc)} Warehouse</h2>
+                        <span style="font-size: 0.9rem;">Value: ${formatMoney(wValue)} | ${prods.length} product${prods.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="card-body">`;
+
+                if (!prods.length) {
+                    html += '<div class="empty-state">No products at this location</div>';
+                } else {
+                    html += `<table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Product Name</th>
+                                <th class="text-right">On Hand</th>
+                                <th class="text-right">Reserved</th>
+                                <th class="text-right">Available</th>
+                                <th class="text-right">Avg Cost</th>
+                                <th class="text-right">Value</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                    prods.forEach(p => {
+                        const onHand = p.onHand || p.quantityOnHand || 0;
+                        const reserved = p.reserved || p.quantityReserved || 0;
+                        const available = p.available || p.quantityAvailable || (onHand - reserved);
+                        const avgCost = p.avgCost || p.averageCost || 0;
+                        const value = p.value || p.totalValue || (onHand * avgCost);
+
+                        let stockClass = 'stock-healthy';
+                        if (onHand <= 0) stockClass = 'stock-zero';
+                        else if (onHand < 10) stockClass = 'stock-low';
+
+                        html += `<tr>
+                            <td><strong>${p.productName || p.name || 'Unknown'}</strong></td>
+                            <td class="text-right ${stockClass}">${onHand}</td>
+                            <td class="text-right">${reserved}</td>
+                            <td class="text-right">${available}</td>
+                            <td class="text-right">${formatMoney(avgCost)}</td>
+                            <td class="text-right"><strong>${formatMoney(value)}</strong></td>
+                        </tr>`;
+                    });
+
+                    html += `</tbody></table>`;
+                }
+
+                html += `</div></div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function filterOverviewLocation(location) {
+            selectedOverviewLocation = location;
+            document.querySelectorAll('#overviewLocationFilters .location-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.location === location);
+            });
+            renderOverview();
+        }
+
+        // ========================================
+        // Tab 2: Purchases
+        // ========================================
+        async function loadPurchases() {
+            const container = document.getElementById('purchasesContent');
+            container.innerHTML = '<div class="loading">Loading purchase orders...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/purchases-by-warehouse`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load purchase data');
+                purchasesData = await res.json();
+                renderPurchases();
+            } catch (err) {
+                container.innerHTML = `<div class="error-msg">Error loading purchases: ${err.message}</div>`;
+            }
+        }
+
+        function renderPurchases() {
+            if (!purchasesData) return;
+
+            const data = purchasesData;
+            const warehouses = data.warehouses || data.locations || [];
+            const locationFilter = selectedPurchaseLocation;
+
+            const filteredWarehouses = warehouses.filter(w => {
+                const loc = (w.location || w.name || '').toLowerCase();
+                return locationFilter === 'all' || loc === locationFilter;
+            });
+
+            // Stats
+            let totalPOs = 0;
+            let totalPurchasedValue = 0;
+            let pendingReceipt = 0;
+
+            filteredWarehouses.forEach(w => {
+                const orders = w.purchaseOrders || w.orders || [];
+                totalPOs += orders.length;
+                orders.forEach(o => {
+                    totalPurchasedValue += o.totalCost || 0;
+                    const qtyOrdered = o.qtyOrdered || o.quantityOrdered || 0;
+                    const qtyReceived = o.qtyReceived || o.quantityReceived || 0;
+                    if (qtyReceived < qtyOrdered) pendingReceipt++;
+                });
+            });
+
+            document.getElementById('totalPOs').textContent = totalPOs;
+            document.getElementById('totalPurchasedValue').textContent = formatMoney(totalPurchasedValue);
+            document.getElementById('pendingReceiptCount').textContent = pendingReceipt;
+
+            const container = document.getElementById('purchasesContent');
+            if (!filteredWarehouses.length) {
+                container.innerHTML = '<div class="empty-state"><h3>No purchase data</h3><p>No purchase orders found for the selected location.</p></div>';
+                return;
+            }
+
+            let html = '';
+            filteredWarehouses.forEach(w => {
+                const loc = w.location || w.name || 'Unknown';
+                const orders = w.purchaseOrders || w.orders || [];
+
+                html += `
+                <div class="card">
+                    <div class="card-header">
+                        <h2>${capitalize(loc)} Warehouse - Purchase Orders</h2>
+                        <span style="font-size: 0.9rem;">${orders.length} order${orders.length !== 1 ? 's' : ''}</span>
+                    </div>
+                    <div class="card-body">`;
+
+                if (!orders.length) {
+                    html += '<div class="empty-state">No purchase orders for this location</div>';
+                } else {
+                    html += `<table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>PO Number</th>
+                                <th>Supplier</th>
+                                <th>Product</th>
+                                <th class="text-right">Qty Ordered</th>
+                                <th class="text-right">Qty Received</th>
+                                <th class="text-right">Unit Cost</th>
+                                <th class="text-right">Total Cost</th>
+                                <th>Location</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                    let locationTotal = 0;
+                    orders.forEach(o => {
+                        const poNum = o.poNumber || o.referenceNumber || '--';
+                        const supplier = o.supplier || o.supplierName || '--';
+                        const product = o.productName || o.product || '--';
+                        const qtyOrdered = o.qtyOrdered || o.quantityOrdered || 0;
+                        const qtyReceived = o.qtyReceived || o.quantityReceived || 0;
+                        const unitCost = o.unitCost || o.costPerUnit || 0;
+                        const totalCost = o.totalCost || (qtyOrdered * unitCost);
+                        const location = o.location || loc;
+                        const status = o.status || (qtyReceived >= qtyOrdered ? 'received' : qtyReceived > 0 ? 'partial' : 'ordered');
+
+                        let statusClass = 'status-ordered';
+                        if (status === 'received' || status === 'complete') statusClass = 'status-received';
+                        else if (status === 'partial') statusClass = 'status-partial';
+                        else if (status === 'cancelled') statusClass = 'status-cancelled';
+
+                        locationTotal += totalCost;
+
+                        html += `<tr>
+                            <td><strong>${poNum}</strong></td>
+                            <td>${supplier}</td>
+                            <td>${product}</td>
+                            <td class="text-right">${qtyOrdered}</td>
+                            <td class="text-right">${qtyReceived}</td>
+                            <td class="text-right">${formatMoney(unitCost)}</td>
+                            <td class="text-right">${formatMoney(totalCost)}</td>
+                            <td>${capitalize(location)}</td>
+                            <td><span class="status-badge ${statusClass}">${capitalize(status)}</span></td>
+                        </tr>`;
+                    });
+
+                    html += `</tbody>
+                        <tfoot>
+                            <tr>
+                                <td colspan="6" class="text-right">Total for ${capitalize(loc)}:</td>
+                                <td class="text-right">${formatMoney(locationTotal)}</td>
+                                <td colspan="2"></td>
+                            </tr>
+                        </tfoot>
+                    </table>`;
+                }
+
+                html += `</div></div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function filterPurchaseLocation(location) {
+            selectedPurchaseLocation = location;
+            document.querySelectorAll('#purchaseLocationFilters .location-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.location === location);
+            });
+            renderPurchases();
+        }
+
+        // ========================================
+        // Tab 3: Transfers
+        // ========================================
+        async function loadTransfers() {
+            const tbody = document.getElementById('transfersBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading transfers...</td></tr>';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/transfers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load transfers');
+                transfersData = await res.json();
+                renderTransfers();
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="7" class="error-msg">Error: ${err.message}</td></tr>`;
+            }
+        }
+
+        function renderTransfers() {
+            const tbody = document.getElementById('transfersBody');
+            const transfers = transfersData?.transfers || transfersData || [];
+
+            if (!transfers.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No transfers recorded yet. Use the button above to transfer products between locations.</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = transfers.map(t => {
+                const date = t.date || t.createdAt || t.transferDate;
+                return `<tr>
+                    <td>${date ? new Date(date).toLocaleDateString() : '--'}</td>
+                    <td><strong>${t.productName || t.product || '--'}</strong></td>
+                    <td>${capitalize(t.fromLocation || t.from || '--')}</td>
+                    <td>${capitalize(t.toLocation || t.to || '--')}</td>
+                    <td class="text-right">${t.quantity || 0}</td>
+                    <td>${t.notes || '--'}</td>
+                    <td>${t.transferredBy || t.by || t.userName || '--'}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function openTransferModal() {
+            document.getElementById('transferForm').reset();
+            document.getElementById('transferLocationError').style.display = 'none';
+
+            // Populate product dropdown
+            const select = document.getElementById('transferProduct');
+            select.innerHTML = '<option value="">Select a product...</option>' +
+                products.map(p => `<option value="${p._id}">${p.productName}${p.packSize ? ' (' + p.packSize + ')' : ''}</option>`).join('');
+
+            document.getElementById('transferModal').classList.add('active');
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferModal').classList.remove('active');
+        }
+
+        function validateTransferLocations() {
+            const from = document.getElementById('transferFrom').value;
+            const to = document.getElementById('transferTo').value;
+            const errorEl = document.getElementById('transferLocationError');
+            const submitBtn = document.getElementById('transferSubmitBtn');
+
+            if (from && to && from === to) {
+                errorEl.style.display = 'block';
+                submitBtn.disabled = true;
+                return false;
+            } else {
+                errorEl.style.display = 'none';
+                submitBtn.disabled = false;
+                return true;
+            }
+        }
+
+        async function submitTransfer(e) {
+            e.preventDefault();
+
+            if (!validateTransferLocations()) {
+                showMessage('From and To locations must be different.', 'error');
+                return;
+            }
+
+            const productSelect = document.getElementById('transferProduct');
+            const selectedOption = productSelect.selectedOptions[0];
+
+            const payload = {
+                chemicalId: productSelect.value,
+                productName: selectedOption ? selectedOption.textContent.split('(')[0].trim() : '',
+                fromLocation: document.getElementById('transferFrom').value,
+                toLocation: document.getElementById('transferTo').value,
+                quantity: parseFloat(document.getElementById('transferQty').value),
+                notes: document.getElementById('transferNotes').value
+            };
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/transfer`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || result.message || 'Transfer failed');
+
+                showMessage('Transfer completed successfully!', 'success');
+                closeTransferModal();
+                loadTransfers();
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ========================================
+        // Tab 4: Customer Accounting
+        // ========================================
+        async function loadAccounting() {
+            const container = document.getElementById('accountingContent');
+            container.innerHTML = '<div class="loading">Loading customer data...</div>';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/customer-accounting`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load customer accounting');
+                customerData = await res.json();
+                allCustomers = customerData.customers || customerData || [];
+                renderAccounting(allCustomers);
+            } catch (err) {
+                container.innerHTML = `<div class="error-msg">Error loading customer data: ${err.message}</div>`;
+            }
+        }
+
+        function renderAccounting(customers) {
+            // Summary stats
+            let totalAR = 0;
+            let totalCollected = 0;
+            let totalInvoiced = 0;
+            let withBalance = 0;
+
+            customers.forEach(c => {
+                const invoiced = c.totalInvoiced || 0;
+                const paid = c.totalPaid || 0;
+                const balance = c.balanceDue != null ? c.balanceDue : (invoiced - paid);
+                totalInvoiced += invoiced;
+                totalCollected += paid;
+                totalAR += Math.max(0, balance);
+                if (balance > 0.01) withBalance++;
+            });
+
+            document.getElementById('totalAR').textContent = formatMoney(totalAR);
+            document.getElementById('customersWithBalance').textContent = withBalance;
+            document.getElementById('totalCollected').textContent = formatMoney(totalCollected);
+            document.getElementById('totalInvoiced').textContent = formatMoney(totalInvoiced);
+
+            const container = document.getElementById('accountingContent');
+
+            if (!customers.length) {
+                container.innerHTML = '<div class="empty-state"><h3>No customer data</h3><p>Customer accounting data will appear here once invoices are created.</p></div>';
+                return;
+            }
+
+            // Sort: unpaid first, then by balance descending
+            const sorted = [...customers].sort((a, b) => {
+                const balA = (a.balanceDue != null ? a.balanceDue : ((a.totalInvoiced || 0) - (a.totalPaid || 0)));
+                const balB = (b.balanceDue != null ? b.balanceDue : ((b.totalInvoiced || 0) - (b.totalPaid || 0)));
+                return balB - balA;
+            });
+
+            let html = '';
+            sorted.forEach((c, idx) => {
+                const name = c.customerName || c.name || 'Unknown Customer';
+                const invoiced = c.totalInvoiced || 0;
+                const paid = c.totalPaid || 0;
+                const balance = c.balanceDue != null ? c.balanceDue : (invoiced - paid);
+                const invoices = c.invoices || c.orders || [];
+
+                let paymentStatus, badgeClass;
+                if (balance <= 0.01) {
+                    paymentStatus = 'Paid';
+                    badgeClass = 'payment-paid';
+                } else if (paid > 0) {
+                    paymentStatus = 'Partial';
+                    badgeClass = 'payment-partial';
+                } else {
+                    paymentStatus = 'Unpaid';
+                    badgeClass = 'payment-unpaid';
+                }
+
+                const balanceClass = balance > 0.01 ? 'balance-due-large' : 'balance-due-zero';
+
+                html += `
+                <div class="customer-card">
+                    <div class="customer-header" onclick="toggleCustomerDetails(${idx})">
+                        <div style="display: flex; align-items: center; gap: 1rem; flex-wrap: wrap;">
+                            <span class="customer-name">${name}</span>
+                            <span class="payment-badge ${badgeClass}">${paymentStatus}</span>
+                        </div>
+                        <div class="customer-summary">
+                            <div class="customer-stat">
+                                <div class="label">Invoiced</div>
+                                <div class="amount">${formatMoney(invoiced)}</div>
+                            </div>
+                            <div class="customer-stat">
+                                <div class="label">Paid</div>
+                                <div class="amount text-green">${formatMoney(paid)}</div>
+                            </div>
+                            <div class="customer-stat">
+                                <div class="label">Balance Due</div>
+                                <div class="${balanceClass}">${formatMoney(balance)}</div>
+                            </div>
+                            <span class="expand-icon" id="expandIcon${idx}">&#9660;</span>
+                        </div>
+                    </div>
+                    <div class="customer-details" id="customerDetails${idx}">`;
+
+                // Products table
+                const products = c.products || [];
+                if (products.length) {
+                    html += `<h4 style="margin: 0 0 0.75rem; color: #333;">Products Invoiced</h4>
+                    <table class="data-table" style="margin-bottom: 1rem;">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="text-right">Quantity</th>
+                                <th class="text-right">Unit Price</th>
+                                <th class="text-right">Total</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                    products.forEach(p => {
+                        html += `<tr>
+                            <td>${p.productName || p.name || '--'}</td>
+                            <td class="text-right">${p.quantity || 0}</td>
+                            <td class="text-right">${formatMoney(p.unitPrice || p.price || 0)}</td>
+                            <td class="text-right"><strong>${formatMoney(p.total || p.lineTotal || 0)}</strong></td>
+                        </tr>`;
+                    });
+
+                    html += `</tbody></table>`;
+                }
+
+                // Invoices detail
+                if (invoices.length) {
+                    html += `<h4 style="margin: 1rem 0 0.75rem; color: #333;">Invoices</h4>
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Invoice #</th>
+                                <th>Date</th>
+                                <th class="text-right">Amount</th>
+                                <th class="text-right">Paid</th>
+                                <th class="text-right">Balance</th>
+                                <th>Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>`;
+
+                    invoices.forEach(inv => {
+                        const invAmount = inv.total || inv.amount || 0;
+                        const invPaid = inv.amountPaid || inv.paid || 0;
+                        const invBalance = inv.balance != null ? inv.balance : (invAmount - invPaid);
+                        const invNum = inv.invoiceNumber || inv.orderNumber || '--';
+                        const invDate = inv.date || inv.createdAt || inv.invoiceDate;
+
+                        let invStatusClass = 'status-paid';
+                        let invStatus = 'Paid';
+                        if (invBalance > 0.01) {
+                            if (invPaid > 0) {
+                                invStatusClass = 'status-pending';
+                                invStatus = 'Partial';
+                            } else {
+                                invStatusClass = 'status-unpaid';
+                                invStatus = 'Unpaid';
+                            }
+                        }
+
+                        html += `<tr>
+                            <td><strong>${invNum}</strong></td>
+                            <td>${invDate ? new Date(invDate).toLocaleDateString() : '--'}</td>
+                            <td class="text-right">${formatMoney(invAmount)}</td>
+                            <td class="text-right">${formatMoney(invPaid)}</td>
+                            <td class="text-right" style="${invBalance > 0.01 ? 'color: #dc3545; font-weight: 700;' : ''}">${formatMoney(invBalance)}</td>
+                            <td><span class="status-badge ${invStatusClass}">${invStatus}</span></td>
+                        </tr>`;
+                    });
+
+                    html += `</tbody></table>`;
+                }
+
+                if (!products.length && !invoices.length) {
+                    html += '<p style="color: #666; margin: 0;">No detailed invoice data available.</p>';
+                }
+
+                html += `</div></div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function toggleCustomerDetails(idx) {
+            const details = document.getElementById(`customerDetails${idx}`);
+            const icon = document.getElementById(`expandIcon${idx}`);
+            if (details.classList.contains('open')) {
+                details.classList.remove('open');
+                icon.classList.remove('open');
+            } else {
+                details.classList.add('open');
+                icon.classList.add('open');
+            }
+        }
+
+        function filterCustomers() {
+            const search = (document.getElementById('customerSearch').value || '').toLowerCase();
+            const status = document.getElementById('customerStatusFilter').value;
+
+            let filtered = allCustomers;
+
+            if (search) {
+                filtered = filtered.filter(c => {
+                    const name = (c.customerName || c.name || '').toLowerCase();
+                    return name.includes(search);
+                });
+            }
+
+            if (status !== 'all') {
+                filtered = filtered.filter(c => {
+                    const invoiced = c.totalInvoiced || 0;
+                    const paid = c.totalPaid || 0;
+                    const balance = c.balanceDue != null ? c.balanceDue : (invoiced - paid);
+
+                    if (status === 'unpaid') return balance > 0.01 && paid <= 0.01;
+                    if (status === 'partial') return balance > 0.01 && paid > 0.01;
+                    if (status === 'paid') return balance <= 0.01;
+                    return true;
+                });
+            }
+
+            renderAccounting(filtered);
+        }
+
+        // ========================================
+        // Utilities
+        // ========================================
+        function formatMoney(amount) {
+            if (typeof Decimal !== 'undefined' && typeof formatUSD === 'function') {
+                return formatUSD(amount);
+            }
+            return '$' + (Number(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function capitalize(str) {
+            if (!str) return '';
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        });
+    </script>
+</body>
+</html>
