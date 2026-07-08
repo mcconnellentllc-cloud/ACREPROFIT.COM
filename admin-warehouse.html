@@ -87,6 +87,44 @@
         .warehouse-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
         .warehouse-section-header h3 { margin: 0; color: #1a1a2e; font-size: 1.1rem; text-transform: capitalize; }
 
+        /* Chemical Cards */
+        .chem-card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; overflow: hidden; }
+        .chem-card-header { padding: 1rem 1.25rem; background: #1a1a2e; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .chem-card-header h3 { margin: 0; font-size: 1.1rem; }
+        .chem-purchased-badge { background: #2d5a27; color: white; padding: 0.35rem 0.75rem; border-radius: 4px; font-weight: 700; font-size: 1rem; }
+        .chem-tier { padding: 0 1.25rem; }
+        .chem-tier-section { padding: 0.85rem 0 0.85rem 1.25rem; border-bottom: 1px solid #eee; position: relative; }
+        .chem-tier-section:last-child { border-bottom: none; }
+        .chem-tier-section::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #ddd; }
+        .chem-tier-section:last-child::before { bottom: 50%; }
+        .chem-tier-section::after { content: ''; position: absolute; left: 0; top: 50%; width: 0.75rem; height: 2px; background: #ddd; }
+        .chem-tier-label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: #666; margin-bottom: 0.4rem; }
+        .chem-wh-grid { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .chem-wh-item { background: #f8f9fa; border: 1px solid #eee; border-radius: 5px; padding: 0.4rem 0.75rem; display: flex; gap: 0.5rem; align-items: center; }
+        .chem-wh-name { font-size: 0.8rem; color: #666; font-weight: 600; }
+        .chem-wh-qty { font-size: 1rem; font-weight: 700; }
+        .chem-wh-qty.has-stock { color: #2d5a27; }
+        .chem-wh-qty.no-stock { color: #999; }
+        .chem-sold-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .chem-sold-table th { text-align: left; padding: 0.35rem 0.5rem; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: #666; font-weight: 700; border-bottom: 1px solid #eee; }
+        .chem-sold-table th.r { text-align: right; }
+        .chem-sold-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f0f0f0; }
+        .chem-sold-table td.r { text-align: right; font-weight: 600; }
+        .chem-sold-table tr:last-child td { border-bottom: none; }
+        .chem-sold-total td { font-weight: 700; border-top: 2px solid #ddd; }
+        .chem-balance { padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; border-top: 2px solid #eee; background: #f8f9fa; }
+        .chem-balance-item { text-align: center; min-width: 80px; }
+        .chem-balance-label { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; color: #666; font-weight: 700; }
+        .chem-balance-num { font-size: 1.15rem; font-weight: 800; }
+        .chem-balance-op { font-size: 1.2rem; color: #999; }
+        .chem-status { padding: 0.6rem 1.25rem; font-weight: 700; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .chem-balanced { background: #d4edda; color: #155724; }
+        .chem-farmuse { background: #fff3cd; color: #856404; }
+        .chem-over { background: #f8d7da; color: #721c24; }
+        .pill-paid { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: #d4edda; color: #155724; }
+        .pill-unpaid { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: #f8d7da; color: #721c24; }
+        .pill-draft { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: #fff3cd; color: #856404; }
+
         .location-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
         .location-chip { padding: 0.5rem 1rem; border: 2px solid #ddd; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 0.9rem; background: white; transition: all 0.2s; }
         .location-chip.active { border-color: #2d5a27; background: #2d5a27; color: white; }
@@ -151,6 +189,7 @@
                 <a href="/admin-inventory.html" class="nav-link">Products</a>
                 <a href="/admin-inventory-lifecycle.html" class="nav-link">Inventory</a>
                 <a href="/admin-warehouse.html" class="nav-link active">Warehouse</a>
+                <a href="/admin-operations.html" class="nav-link">Operations</a>
                 <a href="/admin.html" class="nav-link">Orders</a>
             </div>
             <div class="nav-right">
@@ -179,32 +218,25 @@
             <div class="tab-content active" id="overviewTab">
                 <div class="stats-row" id="overviewStats">
                     <div class="stat-card">
-                        <h3>Total Inventory Value</h3>
+                        <h3>Chemicals Tracked</h3>
                         <div class="value" id="totalInventoryValue">--</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Total Products</h3>
+                        <h3>Total Purchased</h3>
                         <div class="value" id="totalProductCount">--</div>
                     </div>
                     <div class="stat-card">
                         <h3>Total On Hand</h3>
                         <div class="value" id="totalOnHand">--</div>
                     </div>
-                    <div class="stat-card warning">
-                        <h3>Low Stock Items</h3>
+                    <div class="stat-card danger">
+                        <h3>Total Sold</h3>
                         <div class="value" id="overviewLowStock">--</div>
                     </div>
                 </div>
 
-                <div class="location-filters" id="overviewLocationFilters">
-                    <button class="location-chip active" data-location="all" onclick="filterOverviewLocation('all')">All Locations</button>
-                    <button class="location-chip" data-location="main" onclick="filterOverviewLocation('main')">Main</button>
-                    <button class="location-chip" data-location="haxtun" onclick="filterOverviewLocation('haxtun')">Haxtun</button>
-                    <button class="location-chip" data-location="otis" onclick="filterOverviewLocation('otis')">Otis</button>
-                </div>
-
                 <div id="overviewContent">
-                    <div class="loading">Loading warehouse data...</div>
+                    <div class="loading">Loading inventory data...</div>
                 </div>
             </div>
 
@@ -437,128 +469,204 @@
         // ========================================
         async function loadOverview() {
             const container = document.getElementById('overviewContent');
-            container.innerHTML = '<div class="loading">Loading warehouse data...</div>';
+            container.innerHTML = '<div class="loading">Loading inventory data...</div>';
 
             try {
-                const res = await fetch(`${API_BASE}/admin/warehouse/warehouse-summary`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error('Failed to load warehouse summary');
-                warehouseData = await res.json();
-                renderOverview();
+                const [whRes, poRes, invRes] = await Promise.all([
+                    fetch(`${API_BASE}/admin/warehouse/warehouse-summary`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/admin/warehouse/purchases-by-warehouse`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/admin/warehouse/customer-accounting`, { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+
+                warehouseData = await whRes.json();
+                const poData = await poRes.json();
+                const custData = await invRes.json();
+
+                renderUnifiedOverview(warehouseData, poData, custData);
             } catch (err) {
-                container.innerHTML = `<div class="error-msg">Error loading warehouse data: ${err.message}</div>`;
+                container.innerHTML = `<div class="error-msg">Error loading data: ${err.message}</div>`;
             }
         }
 
-        function renderOverview() {
-            if (!warehouseData) return;
+        function renderUnifiedOverview(whData, poData, custData) {
+            const warehouses = whData.warehouses || whData.locations || [];
+            const purchaseOrders = poData.purchaseOrders || poData.locations || poData || [];
+            const customers = custData.customers || custData || [];
 
-            const data = warehouseData;
-            const warehouses = data.warehouses || data.locations || [];
-            const locationFilter = selectedOverviewLocation;
+            const chemMap = {};
 
-            // Compute totals
-            let totalValue = 0;
-            let totalProducts = 0;
-            let totalOnHand = 0;
-            let lowStockCount = 0;
-
-            const filteredWarehouses = warehouses.filter(w => {
-                const loc = (w.location || w.name || '').toLowerCase();
-                return locationFilter === 'all' || loc === locationFilter;
-            });
-
-            filteredWarehouses.forEach(w => {
-                const wValue = w.totalValue || 0;
-                totalValue += wValue;
-                const prods = w.products || w.items || [];
-                totalProducts += prods.length;
-                prods.forEach(p => {
-                    const onHand = p.onHand || p.quantityOnHand || 0;
-                    totalOnHand += onHand;
-                    if (onHand <= 0) lowStockCount++;
+            // 1. Gather purchases from POs (with PO details)
+            const allPOs = Array.isArray(purchaseOrders) ? purchaseOrders : Object.values(purchaseOrders).flat();
+            allPOs.forEach(po => {
+                const poItems = po.items || [];
+                poItems.forEach(item => {
+                    const name = item.productName || item.product || '';
+                    if (!name) return;
+                    const key = name.toLowerCase().replace(/\s+/g, '_');
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                    const qty = item.quantityOrdered || item.qty || 0;
+                    chemMap[key].purchased += qty;
+                    chemMap[key].poDetails.push({
+                        poNumber: po.poNumber,
+                        supplier: po.supplier?.name || po.supplier || '',
+                        qty,
+                        cost: item.pricePerUnit || 0
+                    });
                 });
             });
 
-            document.getElementById('totalInventoryValue').textContent = formatMoney(totalValue);
-            document.getElementById('totalProductCount').textContent = totalProducts;
-            document.getElementById('totalOnHand').textContent = totalOnHand;
-            document.getElementById('overviewLowStock').textContent = lowStockCount;
-
-            // Render each warehouse as a card
-            const container = document.getElementById('overviewContent');
-            if (!filteredWarehouses.length) {
-                container.innerHTML = '<div class="empty-state"><h3>No warehouse data</h3><p>No inventory found for the selected location.</p></div>';
-                return;
-            }
-
-            let html = '';
-            filteredWarehouses.forEach(w => {
-                const loc = w.location || w.name || 'Unknown';
+            // 2. Gather warehouse inventory
+            warehouses.forEach(w => {
+                const loc = w.location || w.name || 'unknown';
                 const prods = w.products || w.items || [];
-                const wValue = w.totalValue || 0;
+                prods.forEach(p => {
+                    const name = p.productName || p.name || '';
+                    if (!name) return;
+                    const key = name.toLowerCase().replace(/\s+/g, '_');
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                    const onHand = p.onHand || p.quantityOnHand || 0;
+                    chemMap[key].warehouses[loc] = (chemMap[key].warehouses[loc] || 0) + onHand;
+                });
+            });
 
-                html += `
-                <div class="card warehouse-section">
-                    <div class="card-header">
-                        <h2>${capitalize(loc)} Warehouse</h2>
-                        <span style="font-size: 0.9rem;">Value: ${formatMoney(wValue)} | ${prods.length} product${prods.length !== 1 ? 's' : ''}</span>
-                    </div>
-                    <div class="card-body">`;
+            // 3. Gather sales from customer accounting (with invoice details)
+            customers.forEach(cust => {
+                const custName = cust.customerName || cust.name || 'Unknown';
+                const invoices = cust.invoices || [];
+                invoices.forEach(inv => {
+                    const items = inv.items || [];
+                    const invStatus = inv.status || 'draft';
+                    const invPaid = inv.paymentStatus || 'unpaid';
+                    items.forEach(item => {
+                        const name = item.productName || item.name || '';
+                        if (!name) return;
+                        const key = name.toLowerCase().replace(/\s+/g, '_');
+                        if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                        const qty = item.quantity || 0;
+                        chemMap[key].sold += qty;
+                        chemMap[key].soldDetails.push({
+                            customer: custName,
+                            qty,
+                            invoice: inv.invoiceNumber || '',
+                            status: invStatus,
+                            paid: invPaid
+                        });
+                    });
+                });
+                // Fallback: if no invoices array, use products
+                if (!invoices.length) {
+                    const products = cust.products || [];
+                    products.forEach(p => {
+                        const name = p.productName || p.name || '';
+                        if (!name) return;
+                        const key = name.toLowerCase().replace(/\s+/g, '_');
+                        if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                        const qty = p.totalQuantity || p.quantity || 0;
+                        chemMap[key].sold += qty;
+                        chemMap[key].soldDetails.push({ customer: custName, qty, invoice: '', status: '', paid: '' });
+                    });
+                }
+            });
 
-                if (!prods.length) {
-                    html += '<div class="empty-state">No products at this location</div>';
-                } else {
-                    html += `<table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Product Name</th>
-                                <th class="text-right">On Hand</th>
-                                <th class="text-right">Reserved</th>
-                                <th class="text-right">Available</th>
-                                <th class="text-right">Avg Cost</th>
-                                <th class="text-right">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
+            // Calculate totals
+            let grandPurchased = 0, grandSold = 0, grandOnHand = 0;
+            const chemicals = Object.values(chemMap).sort((a, b) => a.name.localeCompare(b.name));
 
-                    prods.forEach(p => {
-                        const onHand = p.onHand || p.quantityOnHand || 0;
-                        const reserved = p.reserved || p.quantityReserved || 0;
-                        const available = p.available || p.quantityAvailable || (onHand - reserved);
-                        const avgCost = p.avgCost || p.averageCost || 0;
-                        const value = p.value || p.totalValue || (onHand * avgCost);
+            chemicals.forEach(c => {
+                c.totalOnHand = Object.values(c.warehouses).reduce((s, v) => s + v, 0);
+                c.unaccounted = c.purchased - c.sold - c.totalOnHand;
+                grandPurchased += c.purchased;
+                grandSold += c.sold;
+                grandOnHand += c.totalOnHand;
+            });
 
-                        let stockClass = 'stock-healthy';
-                        if (onHand <= 0) stockClass = 'stock-zero';
-                        else if (onHand < 10) stockClass = 'stock-low';
+            // Update stat cards
+            document.getElementById('totalInventoryValue').textContent = chemicals.length + ' chemicals';
+            document.getElementById('totalProductCount').textContent = grandPurchased.toLocaleString();
+            document.getElementById('totalOnHand').textContent = grandOnHand.toLocaleString();
+            document.getElementById('overviewLowStock').textContent = grandSold.toLocaleString();
 
-                        html += `<tr>
-                            <td><strong>${p.productName || p.name || 'Unknown'}</strong></td>
-                            <td class="text-right ${stockClass}">${onHand}</td>
-                            <td class="text-right">${reserved}</td>
-                            <td class="text-right">${available}</td>
-                            <td class="text-right">${formatMoney(avgCost)}</td>
-                            <td class="text-right"><strong>${formatMoney(value)}</strong></td>
+            // Build chemical cards
+            let cardsHtml = '';
+            chemicals.forEach(c => {
+                // Warehouse chips
+                const whHtml = Object.entries(c.warehouses).map(([loc, qty]) =>
+                    `<div class="chem-wh-item">
+                        <span class="chem-wh-name">${capitalize(loc)}</span>
+                        <span class="chem-wh-qty ${qty > 0 ? 'has-stock' : 'no-stock'}">${qty.toLocaleString()}</span>
+                    </div>`
+                ).join('');
+
+                // If no warehouses, show empty
+                const whDisplay = whHtml || '<div class="chem-wh-item"><span class="chem-wh-name">None</span><span class="chem-wh-qty no-stock">0</span></div>';
+
+                // Sold table rows
+                let soldRows = '';
+                if (c.soldDetails.length) {
+                    c.soldDetails.forEach(d => {
+                        const pillClass = d.paid === 'paid' ? 'pill-paid' : (d.status === 'draft' ? 'pill-draft' : 'pill-unpaid');
+                        const pillText = d.paid === 'paid' ? 'Paid' : (d.status === 'draft' ? 'Draft' : 'Sent');
+                        soldRows += `<tr>
+                            <td>${d.customer}</td>
+                            <td>${d.invoice}</td>
+                            <td><span class="${pillClass}">${pillText}</span></td>
+                            <td class="r">${d.qty.toLocaleString()}</td>
                         </tr>`;
                     });
-
-                    html += `</tbody></table>`;
+                    soldRows += `<tr class="chem-sold-total"><td colspan="3">Total Sold</td><td class="r">${c.sold.toLocaleString()}</td></tr>`;
+                } else {
+                    soldRows = '<tr><td colspan="4" style="color:#999; font-style:italic;">No sales recorded</td></tr>';
                 }
 
-                html += `</div></div>`;
+                // Status bar
+                let statusClass, statusText;
+                if (Math.abs(c.unaccounted) < 1) {
+                    statusClass = 'chem-balanced';
+                    statusText = 'Balanced';
+                } else if (c.unaccounted > 0) {
+                    statusClass = 'chem-farmuse';
+                    statusText = `${c.unaccounted.toLocaleString()} unaccounted (farm use)`;
+                } else {
+                    statusClass = 'chem-over';
+                    statusText = `${Math.abs(c.unaccounted).toLocaleString()} over — missing PO?`;
+                }
+
+                cardsHtml += `
+                <div class="chem-card">
+                    <div class="chem-card-header">
+                        <h3>${c.name}</h3>
+                        <div class="chem-purchased-badge">Purchased: ${c.purchased.toLocaleString()}</div>
+                    </div>
+                    <div class="chem-tier">
+                        <div class="chem-tier-section">
+                            <div class="chem-tier-label">Warehouse Locations</div>
+                            <div class="chem-wh-grid">${whDisplay}</div>
+                        </div>
+                        <div class="chem-tier-section">
+                            <div class="chem-tier-label">Sold To Customers</div>
+                            <table class="chem-sold-table">
+                                <thead><tr><th>Customer</th><th>Invoice</th><th>Status</th><th class="r">Qty</th></tr></thead>
+                                <tbody>${soldRows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="chem-balance">
+                        <div class="chem-balance-item"><div class="chem-balance-label">Purchased</div><div class="chem-balance-num">${c.purchased.toLocaleString()}</div></div>
+                        <div class="chem-balance-op">&minus;</div>
+                        <div class="chem-balance-item"><div class="chem-balance-label">Sold</div><div class="chem-balance-num">${c.sold.toLocaleString()}</div></div>
+                        <div class="chem-balance-op">&minus;</div>
+                        <div class="chem-balance-item"><div class="chem-balance-label">On Hand</div><div class="chem-balance-num" style="color:#2d5a27;">${c.totalOnHand.toLocaleString()}</div></div>
+                        <div class="chem-balance-op">=</div>
+                        <div class="chem-balance-item"><div class="chem-balance-label">Unaccounted</div><div class="chem-balance-num" style="color:${Math.abs(c.unaccounted) < 1 ? '#2d5a27' : c.unaccounted > 0 ? '#856404' : '#dc3545'};">${c.unaccounted.toLocaleString()}</div></div>
+                    </div>
+                    <div class="chem-status ${statusClass}">
+                        <span>${statusText}</span>
+                    </div>
+                </div>`;
             });
 
-            container.innerHTML = html;
-        }
-
-        function filterOverviewLocation(location) {
-            selectedOverviewLocation = location;
-            document.querySelectorAll('#overviewLocationFilters .location-chip').forEach(chip => {
-                chip.classList.toggle('active', chip.dataset.location === location);
-            });
-            renderOverview();
+            const container = document.getElementById('overviewContent');
+            container.innerHTML = cardsHtml || '<div class="empty-state"><h3>No chemical data</h3><p>No purchase orders or inventory found.</p></div>';
         }
 
         // ========================================

@@ -1,0 +1,954 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Product Transfers | Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h1 { margin: 0; color: #1a1a2e; }
+        .admin-header-sub { color: #666; font-size: 0.95rem; margin-top: 0.25rem; }
+
+        /* Layout: main + sidebar */
+        .page-layout { display: grid; grid-template-columns: 1fr 340px; gap: 1.5rem; align-items: start; }
+
+        .card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; overflow: hidden; }
+        .card-header { padding: 1rem 1.5rem; background: #1a1a2e; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .card-header h2 { margin: 0; font-size: 1.1rem; }
+        .card-body { padding: 1.5rem; overflow-x: auto; }
+
+        /* Stats row */
+        .stats-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 1rem; margin-bottom: 1.5rem; }
+        .stat-card { background: white; padding: 1.25rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .stat-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.8rem; text-transform: uppercase; }
+        .stat-card .value { font-size: 1.75rem; font-weight: 700; color: #2d5a27; }
+
+        /* Buttons */
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-sm { padding: 0.35rem 0.75rem; font-size: 0.85rem; }
+        .btn-outline { background: transparent; border: 2px solid currentColor; }
+        .btn-lg { padding: 0.75rem 1.75rem; font-size: 1rem; }
+
+        .new-transfer-bar { margin-bottom: 1.5rem; }
+
+        /* Table */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 0.75rem 1rem; text-align: left; border-bottom: 1px solid #eee; white-space: nowrap; }
+        .data-table th { background: #f8f9fa; font-weight: 600; color: #333; font-size: 0.8rem; text-transform: uppercase; position: sticky; top: 0; z-index: 1; cursor: pointer; user-select: none; }
+        .data-table th:hover { background: #eee; }
+        .data-table th .sort-icon { font-size: 0.7rem; margin-left: 0.3rem; color: #999; }
+        .data-table th.sorted .sort-icon { color: #2d5a27; }
+        .data-table tr:hover { background: #f9f9f9; }
+        .data-table .text-right { text-align: right; }
+        .data-table .text-center { text-align: center; }
+
+        /* Transfer arrow */
+        .transfer-route { display: flex; align-items: center; gap: 0.5rem; }
+        .transfer-arrow { color: #2d5a27; font-weight: 700; font-size: 1.1rem; }
+
+        /* Location badges */
+        .loc-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; white-space: nowrap; }
+        .loc-kyle, .loc-main { background: #cce5ff; color: #004085; }
+        .loc-ty, .loc-haxtun { background: #e8d5f5; color: #4a1a7a; }
+        .loc-seth, .loc-otis { background: #e2e3e5; color: #383d41; }
+        .loc-default { background: #fff3cd; color: #856404; }
+
+        /* Filters toolbar */
+        .filters-bar { display: flex; gap: 0.75rem; margin-bottom: 1rem; flex-wrap: wrap; align-items: center; }
+        .filters-bar input, .filters-bar select { padding: 0.5rem 0.75rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9rem; }
+        .filters-bar input[type="date"] { min-width: 140px; }
+        .filters-bar select { min-width: 150px; }
+        .filter-label { font-size: 0.8rem; font-weight: 600; color: #666; text-transform: uppercase; margin-right: -0.5rem; }
+        .filter-reset { background: none; border: none; color: #2d5a27; cursor: pointer; font-weight: 600; font-size: 0.85rem; text-decoration: underline; }
+        .filter-reset:hover { color: #1e3d1a; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; max-width: 560px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 2px solid #eee; }
+        .modal-header h2 { margin: 0; color: #1a1a2e; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+        .close-btn:hover { color: #333; }
+
+        /* Form */
+        .form-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
+        .form-group { margin-bottom: 1rem; }
+        .form-group.full-width { grid-column: 1 / -1; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; font-size: 0.9rem; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; }
+        .form-group input:focus, .form-group select:focus, .form-group textarea:focus { outline: none; border-color: #2d5a27; box-shadow: 0 0 0 2px rgba(45,90,39,0.15); }
+        .form-group textarea { resize: vertical; min-height: 60px; }
+        .form-group .error-text { color: #dc3545; font-size: 0.85rem; margin-top: 0.25rem; }
+        .form-group .help-text { color: #666; font-size: 0.85rem; margin-top: 0.25rem; }
+
+        .stock-info { background: #f0f7ef; border: 1px solid #c3ddbf; border-radius: 6px; padding: 0.75rem 1rem; margin-top: 0.5rem; font-size: 0.9rem; color: #2d5a27; font-weight: 600; display: none; }
+        .stock-info.visible { display: block; }
+
+        /* Product search dropdown */
+        .search-select-wrapper { position: relative; }
+        .search-select-input { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; }
+        .search-select-input:focus { outline: none; border-color: #2d5a27; box-shadow: 0 0 0 2px rgba(45,90,39,0.15); }
+        .search-select-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: white; border: 1px solid #ddd; border-top: none; border-radius: 0 0 6px 6px; max-height: 200px; overflow-y: auto; z-index: 10; display: none; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        .search-select-dropdown.open { display: block; }
+        .search-select-option { padding: 0.6rem 0.75rem; cursor: pointer; font-size: 0.9rem; border-bottom: 1px solid #f0f0f0; }
+        .search-select-option:hover, .search-select-option.highlighted { background: #f0f7ef; }
+        .search-select-option:last-child { border-bottom: none; }
+        .search-select-option .pack-size { color: #666; font-size: 0.8rem; }
+
+        /* Side panel: warehouse stock */
+        .stock-panel { position: sticky; top: 1rem; }
+        .stock-panel .card-header { background: #2d5a27; }
+        .stock-location { padding: 1rem 1.25rem; border-bottom: 1px solid #eee; }
+        .stock-location:last-child { border-bottom: none; }
+        .stock-location-name { font-weight: 700; font-size: 0.95rem; margin-bottom: 0.5rem; display: flex; align-items: center; gap: 0.5rem; }
+        .stock-location-total { font-size: 0.8rem; color: #666; margin-bottom: 0.5rem; }
+        .stock-product-row { display: flex; justify-content: space-between; align-items: center; padding: 0.3rem 0; font-size: 0.85rem; }
+        .stock-product-name { color: #333; max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .stock-product-qty { font-weight: 700; }
+        .stock-product-qty.has-stock { color: #2d5a27; }
+        .stock-product-qty.no-stock { color: #999; }
+
+        /* Messages */
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .loading { text-align: center; padding: 3rem; color: #666; }
+        .empty-state { text-align: center; padding: 3rem; color: #666; }
+        .empty-state h3 { margin: 0 0 0.5rem; color: #333; }
+
+        /* Responsive */
+        @media (max-width: 1024px) {
+            .page-layout { grid-template-columns: 1fr; }
+            .stock-panel { position: static; }
+        }
+        @media (max-width: 768px) {
+            .form-grid { grid-template-columns: 1fr; }
+            .data-table { display: block; overflow-x: auto; }
+            .stats-row { grid-template-columns: repeat(2, 1fr); }
+            .filters-bar { flex-direction: column; align-items: stretch; }
+            .filters-bar input, .filters-bar select { min-width: 0; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin-inventory.html" class="nav-link">Products</a>
+                <a href="/admin-inventory-lifecycle.html" class="nav-link">Inventory</a>
+                <a href="/admin-warehouse.html" class="nav-link">Warehouse</a>
+                <a href="/admin-transfers.html" class="nav-link active">Transfers</a>
+                <a href="/admin.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">Admin</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="admin-header">
+                <div>
+                    <h1>Product Transfers</h1>
+                    <div class="admin-header-sub">Move inventory between warehouse locations</div>
+                </div>
+                <button class="btn btn-primary btn-lg" onclick="openTransferModal()">+ New Transfer</button>
+            </div>
+
+            <div id="message"></div>
+
+            <!-- Stats -->
+            <div class="stats-row" id="transferStats">
+                <div class="stat-card">
+                    <h3>Total Transfers</h3>
+                    <div class="value" id="statTotalTransfers">--</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Units Moved (All Time)</h3>
+                    <div class="value" id="statUnitsMoved">--</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Products Transferred</h3>
+                    <div class="value" id="statProductsTransferred">--</div>
+                </div>
+                <div class="stat-card">
+                    <h3>Locations Active</h3>
+                    <div class="value" id="statLocationsActive">--</div>
+                </div>
+            </div>
+
+            <!-- Main layout: table + sidebar -->
+            <div class="page-layout">
+                <!-- Left: Transfer Log -->
+                <div class="main-content">
+                    <div class="card">
+                        <div class="card-header">
+                            <h2>Transfer Log</h2>
+                            <span style="font-size: 0.85rem; opacity: 0.8;" id="transferCount">--</span>
+                        </div>
+                        <div class="card-body" style="padding: 1rem 1.5rem 0;">
+                            <!-- Filters -->
+                            <div class="filters-bar">
+                                <span class="filter-label">Filter:</span>
+                                <input type="date" id="filterDateStart" title="Start date" onchange="applyFilters()">
+                                <input type="date" id="filterDateEnd" title="End date" onchange="applyFilters()">
+                                <select id="filterProduct" onchange="applyFilters()">
+                                    <option value="">All Products</option>
+                                </select>
+                                <select id="filterLocation" onchange="applyFilters()">
+                                    <option value="">All Locations</option>
+                                </select>
+                                <button class="filter-reset" onclick="resetFilters()">Reset</button>
+                            </div>
+                        </div>
+                        <div class="card-body" style="padding: 0 1.5rem 1.5rem;">
+                            <table class="data-table" id="transfersTable">
+                                <thead>
+                                    <tr>
+                                        <th data-sort="id">ID <span class="sort-icon">&#9650;&#9660;</span></th>
+                                        <th data-sort="date" class="sorted">Date <span class="sort-icon">&#9660;</span></th>
+                                        <th data-sort="product">Product <span class="sort-icon">&#9650;&#9660;</span></th>
+                                        <th data-sort="route">Route <span class="sort-icon">&#9650;&#9660;</span></th>
+                                        <th data-sort="quantity" class="text-right">Quantity <span class="sort-icon">&#9650;&#9660;</span></th>
+                                        <th>Notes</th>
+                                        <th data-sort="by">Transferred By <span class="sort-icon">&#9650;&#9660;</span></th>
+                                    </tr>
+                                </thead>
+                                <tbody id="transfersBody">
+                                    <tr><td colspan="7" class="loading">Loading transfers...</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right: Stock Summary -->
+                <div class="stock-panel">
+                    <div class="card">
+                        <div class="card-header" style="background: #2d5a27;">
+                            <h2>Current Stock by Location</h2>
+                        </div>
+                        <div id="stockPanelBody">
+                            <div class="loading" style="padding: 2rem;">Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- New Transfer Modal -->
+    <div class="modal" id="transferModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>New Transfer</h2>
+                <button class="close-btn" onclick="closeTransferModal()">&times;</button>
+            </div>
+            <form id="transferForm" onsubmit="submitTransfer(event)">
+                <!-- Product searchable dropdown -->
+                <div class="form-group full-width">
+                    <label>Product *</label>
+                    <div class="search-select-wrapper" id="productSearchWrapper">
+                        <input type="text" class="search-select-input" id="productSearchInput"
+                               placeholder="Search for a product..."
+                               autocomplete="off"
+                               oninput="filterProductDropdown()"
+                               onfocus="openProductDropdown()"
+                               required>
+                        <input type="hidden" id="transferProductId" required>
+                        <div class="search-select-dropdown" id="productDropdown"></div>
+                    </div>
+                    <div class="stock-info" id="sourceStockInfo"></div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>From Location *</label>
+                        <select id="transferFrom" required onchange="onLocationChange()">
+                            <option value="">Select origin...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>To Location *</label>
+                        <select id="transferTo" required onchange="onLocationChange()">
+                            <option value="">Select destination...</option>
+                        </select>
+                        <div class="error-text" id="transferLocationError" style="display:none;">From and To locations must be different.</div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Quantity *</label>
+                    <input type="number" id="transferQty" step="0.01" min="0.01" required placeholder="Enter quantity to transfer">
+                    <div class="help-text" id="qtyHelpText"></div>
+                </div>
+
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="transferNotes" rows="2" placeholder="Reason for transfer, truck info, etc."></textarea>
+                </div>
+
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid #eee;">
+                    <button type="button" class="btn btn-secondary" onclick="closeTransferModal()">Cancel</button>
+                    <button type="submit" class="btn btn-primary" id="transferSubmitBtn">Create Transfer</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let token = localStorage.getItem('token');
+        let products = [];
+        let allTransfers = [];
+        let filteredTransfers = [];
+        let warehouseSummary = null;
+        let knownLocations = [];
+        let currentSort = { field: 'date', dir: 'desc' };
+
+        // Auth check
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        // ============================================================
+        // Init
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            await Promise.all([loadProducts(), loadWarehouseSummary(), loadTransfers()]);
+            setupSortHeaders();
+        });
+
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Not authenticated');
+                const user = await res.json();
+
+                if (user.role !== 'distributor' && user.role !== 'superadmin') {
+                    showMessage('Access denied. Distributor or Super Admin access required.', 'error');
+                    setTimeout(() => window.location.href = '/dashboard.html', 2000);
+                    return;
+                }
+
+                document.getElementById('userName').textContent = user.name || user.email;
+            } catch (err) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        // ============================================================
+        // Products
+        // ============================================================
+        async function loadProducts() {
+            try {
+                const res = await fetch(`${API_BASE}/chemicals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                products = await res.json();
+            } catch (err) {
+                console.error('Error loading products:', err);
+            }
+        }
+
+        // ============================================================
+        // Warehouse Summary (side panel + form stock info)
+        // ============================================================
+        async function loadWarehouseSummary() {
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/warehouse-summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load warehouse summary');
+                warehouseSummary = await res.json();
+                renderStockPanel();
+                populateLocationDropdowns();
+            } catch (err) {
+                document.getElementById('stockPanelBody').innerHTML =
+                    `<div style="padding: 1rem; color: #721c24;">Error loading stock data</div>`;
+            }
+        }
+
+        function renderStockPanel() {
+            const container = document.getElementById('stockPanelBody');
+            const locations = warehouseSummary?.locations || [];
+
+            if (!locations.length) {
+                container.innerHTML = '<div class="empty-state" style="padding: 2rem;">No inventory data available.</div>';
+                return;
+            }
+
+            let html = '';
+            locations.forEach(loc => {
+                const name = loc.location || 'unknown';
+                const prods = loc.products || [];
+                const total = loc.totals?.totalQuantityOnHand || prods.reduce((s, p) => s + (p.quantityOnHand || 0), 0);
+
+                html += `<div class="stock-location">
+                    <div class="stock-location-name">
+                        <span class="loc-badge ${getLocClass(name)}">${formatLocationName(name)}</span>
+                    </div>
+                    <div class="stock-location-total">${prods.length} product${prods.length !== 1 ? 's' : ''} | ${total.toLocaleString()} total units</div>`;
+
+                const sorted = [...prods].sort((a, b) => (b.quantityOnHand || 0) - (a.quantityOnHand || 0));
+                sorted.forEach(p => {
+                    const qty = p.quantityOnHand || 0;
+                    const unit = p.unit ? ` ${p.unit}` : '';
+                    html += `<div class="stock-product-row">
+                        <span class="stock-product-name" title="${p.productName || ''}">${p.productName || 'Unknown'}</span>
+                        <span class="stock-product-qty ${qty > 0 ? 'has-stock' : 'no-stock'}">${qty.toLocaleString()}${unit}</span>
+                    </div>`;
+                });
+
+                html += '</div>';
+            });
+
+            container.innerHTML = html;
+        }
+
+        function populateLocationDropdowns() {
+            const locations = warehouseSummary?.locations || [];
+            knownLocations = locations.map(l => l.location || 'main');
+
+            // If no locations from warehouse, fallback
+            if (!knownLocations.length) {
+                knownLocations = ['main', 'haxtun', 'otis'];
+            }
+
+            const fromSel = document.getElementById('transferFrom');
+            const toSel = document.getElementById('transferTo');
+            const filterLoc = document.getElementById('filterLocation');
+
+            const optHtml = knownLocations.map(loc =>
+                `<option value="${loc}">${formatLocationName(loc)}</option>`
+            ).join('');
+
+            fromSel.innerHTML = '<option value="">Select origin...</option>' + optHtml;
+            toSel.innerHTML = '<option value="">Select destination...</option>' + optHtml;
+            filterLoc.innerHTML = '<option value="">All Locations</option>' + optHtml;
+        }
+
+        // ============================================================
+        // Transfers
+        // ============================================================
+        async function loadTransfers() {
+            const tbody = document.getElementById('transfersBody');
+            tbody.innerHTML = '<tr><td colspan="7" class="loading">Loading transfers...</td></tr>';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/transfers`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Failed to load transfers');
+                const data = await res.json();
+                const raw = data.transfers || data || [];
+
+                // Deduplicate: the API creates two InventoryTransaction records per transfer
+                // (outbound with negative quantityChange, inbound with positive).
+                // Show only outbound records (quantityChange < 0) or records where we can
+                // detect the outbound side. If quantityChange is not present, keep all.
+                allTransfers = raw.filter(t => {
+                    if (t.quantityChange !== undefined) {
+                        return t.quantityChange < 0;
+                    }
+                    return true;
+                });
+
+                // If filtering removed everything but we had raw records, it might be
+                // the API already returns deduplicated data. Fall back to raw.
+                if (allTransfers.length === 0 && raw.length > 0) {
+                    allTransfers = raw;
+                }
+
+                populateFilterDropdowns();
+                applyFilters();
+                updateStats();
+            } catch (err) {
+                tbody.innerHTML = `<tr><td colspan="7"><div class="error-msg">Error: ${err.message}</div></td></tr>`;
+            }
+        }
+
+        function populateFilterDropdowns() {
+            const productSet = new Set();
+            allTransfers.forEach(t => {
+                const name = t.productName || t.product || '';
+                if (name) productSet.add(name);
+            });
+
+            const filterProd = document.getElementById('filterProduct');
+            const currentVal = filterProd.value;
+            filterProd.innerHTML = '<option value="">All Products</option>' +
+                [...productSet].sort().map(p => `<option value="${p}">${p}</option>`).join('');
+            filterProd.value = currentVal;
+        }
+
+        function applyFilters() {
+            const dateStart = document.getElementById('filterDateStart').value;
+            const dateEnd = document.getElementById('filterDateEnd').value;
+            const product = document.getElementById('filterProduct').value;
+            const location = document.getElementById('filterLocation').value;
+
+            filteredTransfers = allTransfers.filter(t => {
+                const tDate = t.createdAt || t.date || t.transferDate;
+
+                if (dateStart && tDate) {
+                    if (new Date(tDate) < new Date(dateStart)) return false;
+                }
+                if (dateEnd && tDate) {
+                    const end = new Date(dateEnd);
+                    end.setHours(23, 59, 59, 999);
+                    if (new Date(tDate) > end) return false;
+                }
+                if (product) {
+                    const name = t.productName || t.product || '';
+                    if (name !== product) return false;
+                }
+                if (location) {
+                    const from = t.fromLocation || t.from || '';
+                    const to = t.toLocation || t.to || '';
+                    if (from !== location && to !== location) return false;
+                }
+
+                return true;
+            });
+
+            sortTransfers();
+            renderTransfers();
+        }
+
+        function resetFilters() {
+            document.getElementById('filterDateStart').value = '';
+            document.getElementById('filterDateEnd').value = '';
+            document.getElementById('filterProduct').value = '';
+            document.getElementById('filterLocation').value = '';
+            applyFilters();
+        }
+
+        function sortTransfers() {
+            const { field, dir } = currentSort;
+            const mult = dir === 'asc' ? 1 : -1;
+
+            filteredTransfers.sort((a, b) => {
+                let va, vb;
+                switch (field) {
+                    case 'id':
+                        // Sort by creation time as proxy for ID sequence
+                        va = new Date(a.createdAt || a.date || 0).getTime();
+                        vb = new Date(b.createdAt || b.date || 0).getTime();
+                        break;
+                    case 'date':
+                        va = new Date(a.createdAt || a.date || 0).getTime();
+                        vb = new Date(b.createdAt || b.date || 0).getTime();
+                        break;
+                    case 'product':
+                        va = (a.productName || a.product || '').toLowerCase();
+                        vb = (b.productName || b.product || '').toLowerCase();
+                        return va.localeCompare(vb) * mult;
+                    case 'route':
+                        va = (a.fromLocation || '') + (a.toLocation || '');
+                        vb = (b.fromLocation || '') + (b.toLocation || '');
+                        return va.localeCompare(vb) * mult;
+                    case 'quantity':
+                        va = Math.abs(a.quantityChange || a.quantity || 0);
+                        vb = Math.abs(b.quantityChange || b.quantity || 0);
+                        break;
+                    case 'by':
+                        va = getTransferredBy(a).toLowerCase();
+                        vb = getTransferredBy(b).toLowerCase();
+                        return va.localeCompare(vb) * mult;
+                    default:
+                        va = new Date(a.createdAt || 0).getTime();
+                        vb = new Date(b.createdAt || 0).getTime();
+                }
+                return (va - vb) * mult;
+            });
+        }
+
+        function renderTransfers() {
+            const tbody = document.getElementById('transfersBody');
+            const countEl = document.getElementById('transferCount');
+
+            countEl.textContent = `${filteredTransfers.length} transfer${filteredTransfers.length !== 1 ? 's' : ''}`;
+
+            if (!filteredTransfers.length) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">No transfers found. Click "+ New Transfer" to move products between locations.</td></tr>';
+                return;
+            }
+
+            // Assign sequence IDs based on original order (oldest first)
+            const allSortedByDate = [...allTransfers].sort((a, b) =>
+                new Date(a.createdAt || a.date || 0) - new Date(b.createdAt || b.date || 0)
+            );
+            const idMap = new Map();
+            allSortedByDate.forEach((t, i) => {
+                const key = t._id || (t.createdAt + t.productName);
+                idMap.set(key, i + 1);
+            });
+
+            tbody.innerHTML = filteredTransfers.map(t => {
+                const tDate = t.createdAt || t.date || t.transferDate;
+                const dateStr = tDate ? formatDate(new Date(tDate)) : '--';
+                const product = t.productName || t.product || '--';
+                const from = t.fromLocation || t.from || '--';
+                const to = t.toLocation || t.to || '--';
+                const qty = Math.abs(t.quantityChange || t.quantity || 0);
+                const unit = t.unit || '';
+                const notes = t.notes || '--';
+                const by = getTransferredBy(t);
+                const key = t._id || (t.createdAt + t.productName);
+                const seqId = idMap.get(key) || '--';
+                const trfId = 'TRF-' + String(seqId).padStart(3, '0');
+
+                return `<tr>
+                    <td><strong style="color: #2d5a27;">${trfId}</strong></td>
+                    <td>${dateStr}</td>
+                    <td><strong>${product}</strong></td>
+                    <td>
+                        <div class="transfer-route">
+                            <span class="loc-badge ${getLocClass(from)}">${formatLocationName(from)}</span>
+                            <span class="transfer-arrow">&rarr;</span>
+                            <span class="loc-badge ${getLocClass(to)}">${formatLocationName(to)}</span>
+                        </div>
+                    </td>
+                    <td class="text-right"><strong>${qty.toLocaleString()}</strong>${unit ? ' ' + unit : ''}</td>
+                    <td style="white-space: normal; max-width: 180px;">${notes}</td>
+                    <td>${by}</td>
+                </tr>`;
+            }).join('');
+        }
+
+        function updateStats() {
+            const totalTransfers = allTransfers.length;
+            let unitsMoved = 0;
+            const productSet = new Set();
+            const locationSet = new Set();
+
+            allTransfers.forEach(t => {
+                unitsMoved += Math.abs(t.quantityChange || t.quantity || 0);
+                const name = t.productName || t.product || '';
+                if (name) productSet.add(name);
+                const from = t.fromLocation || t.from || '';
+                const to = t.toLocation || t.to || '';
+                if (from) locationSet.add(from);
+                if (to) locationSet.add(to);
+            });
+
+            document.getElementById('statTotalTransfers').textContent = totalTransfers.toLocaleString();
+            document.getElementById('statUnitsMoved').textContent = unitsMoved.toLocaleString();
+            document.getElementById('statProductsTransferred').textContent = productSet.size;
+            document.getElementById('statLocationsActive').textContent = locationSet.size;
+        }
+
+        // ============================================================
+        // Sort headers
+        // ============================================================
+        function setupSortHeaders() {
+            document.querySelectorAll('#transfersTable th[data-sort]').forEach(th => {
+                th.addEventListener('click', () => {
+                    const field = th.dataset.sort;
+                    if (currentSort.field === field) {
+                        currentSort.dir = currentSort.dir === 'asc' ? 'desc' : 'asc';
+                    } else {
+                        currentSort.field = field;
+                        currentSort.dir = field === 'date' ? 'desc' : 'asc';
+                    }
+
+                    // Update header UI
+                    document.querySelectorAll('#transfersTable th').forEach(h => h.classList.remove('sorted'));
+                    th.classList.add('sorted');
+                    const icon = th.querySelector('.sort-icon');
+                    if (icon) icon.innerHTML = currentSort.dir === 'asc' ? '&#9650;' : '&#9660;';
+
+                    sortTransfers();
+                    renderTransfers();
+                });
+            });
+        }
+
+        // ============================================================
+        // Transfer Modal
+        // ============================================================
+        function openTransferModal() {
+            document.getElementById('transferForm').reset();
+            document.getElementById('transferProductId').value = '';
+            document.getElementById('productSearchInput').value = '';
+            document.getElementById('transferLocationError').style.display = 'none';
+            document.getElementById('sourceStockInfo').classList.remove('visible');
+            document.getElementById('sourceStockInfo').textContent = '';
+            document.getElementById('qtyHelpText').textContent = '';
+            document.getElementById('transferSubmitBtn').disabled = false;
+            document.getElementById('transferModal').classList.add('active');
+        }
+
+        function closeTransferModal() {
+            document.getElementById('transferModal').classList.remove('active');
+            document.getElementById('productDropdown').classList.remove('open');
+        }
+
+        // Product search dropdown
+        function filterProductDropdown() {
+            const input = document.getElementById('productSearchInput');
+            const query = input.value.toLowerCase();
+            const dropdown = document.getElementById('productDropdown');
+
+            // Clear hidden value when user types
+            document.getElementById('transferProductId').value = '';
+            document.getElementById('sourceStockInfo').classList.remove('visible');
+            document.getElementById('qtyHelpText').textContent = '';
+
+            const matches = products.filter(p => {
+                const name = (p.productName || p.name || '').toLowerCase();
+                const pack = (p.packSize || '').toLowerCase();
+                return name.includes(query) || pack.includes(query);
+            });
+
+            if (!matches.length) {
+                dropdown.innerHTML = '<div class="search-select-option" style="color: #999; cursor: default;">No products found</div>';
+            } else {
+                dropdown.innerHTML = matches.map(p =>
+                    `<div class="search-select-option" data-id="${p._id}" data-name="${p.productName || p.name}" onclick="selectProduct('${p._id}', '${escapeAttr(p.productName || p.name)}', '${escapeAttr(p.packSize || '')}')">
+                        ${p.productName || p.name}
+                        ${p.packSize ? `<span class="pack-size">(${p.packSize})</span>` : ''}
+                    </div>`
+                ).join('');
+            }
+
+            dropdown.classList.add('open');
+        }
+
+        function openProductDropdown() {
+            const dropdown = document.getElementById('productDropdown');
+            if (!dropdown.classList.contains('open')) {
+                filterProductDropdown();
+            }
+        }
+
+        function selectProduct(id, name, packSize) {
+            document.getElementById('transferProductId').value = id;
+            document.getElementById('productSearchInput').value = name + (packSize ? ' (' + packSize + ')' : '');
+            document.getElementById('productDropdown').classList.remove('open');
+            updateSourceStockInfo();
+        }
+
+        // Close dropdown when clicking outside
+        document.addEventListener('click', (e) => {
+            const wrapper = document.getElementById('productSearchWrapper');
+            if (wrapper && !wrapper.contains(e.target)) {
+                document.getElementById('productDropdown').classList.remove('open');
+            }
+        });
+
+        function onLocationChange() {
+            validateTransferLocations();
+            updateSourceStockInfo();
+        }
+
+        function updateSourceStockInfo() {
+            const chemId = document.getElementById('transferProductId').value;
+            const fromLoc = document.getElementById('transferFrom').value;
+            const infoEl = document.getElementById('sourceStockInfo');
+            const helpEl = document.getElementById('qtyHelpText');
+
+            if (!chemId || !fromLoc || !warehouseSummary) {
+                infoEl.classList.remove('visible');
+                helpEl.textContent = '';
+                return;
+            }
+
+            const locations = warehouseSummary.locations || [];
+            const loc = locations.find(l => l.location === fromLoc);
+            if (!loc) {
+                infoEl.textContent = 'No inventory data for ' + formatLocationName(fromLoc);
+                infoEl.style.background = '#fff3cd';
+                infoEl.style.borderColor = '#ffc107';
+                infoEl.style.color = '#856404';
+                infoEl.classList.add('visible');
+                helpEl.textContent = '';
+                return;
+            }
+
+            const product = loc.products.find(p =>
+                p.chemicalId && p.chemicalId.toString() === chemId
+            );
+
+            if (!product) {
+                infoEl.textContent = 'Product not found at ' + formatLocationName(fromLoc) + ' (0 on hand)';
+                infoEl.style.background = '#f8d7da';
+                infoEl.style.borderColor = '#f5c6cb';
+                infoEl.style.color = '#721c24';
+                infoEl.classList.add('visible');
+                helpEl.textContent = '';
+                return;
+            }
+
+            const avail = product.quantityAvailable || product.quantityOnHand || 0;
+            const unit = product.unit || '';
+            infoEl.textContent = `Stock at ${formatLocationName(fromLoc)}: ${avail.toLocaleString()}${unit ? ' ' + unit : ''} available`;
+            infoEl.style.background = '#f0f7ef';
+            infoEl.style.borderColor = '#c3ddbf';
+            infoEl.style.color = '#2d5a27';
+            infoEl.classList.add('visible');
+            helpEl.textContent = `Max: ${avail.toLocaleString()}${unit ? ' ' + unit : ''}`;
+        }
+
+        function validateTransferLocations() {
+            const from = document.getElementById('transferFrom').value;
+            const to = document.getElementById('transferTo').value;
+            const errorEl = document.getElementById('transferLocationError');
+            const submitBtn = document.getElementById('transferSubmitBtn');
+
+            if (from && to && from === to) {
+                errorEl.style.display = 'block';
+                submitBtn.disabled = true;
+                return false;
+            } else {
+                errorEl.style.display = 'none';
+                submitBtn.disabled = false;
+                return true;
+            }
+        }
+
+        async function submitTransfer(e) {
+            e.preventDefault();
+
+            if (!validateTransferLocations()) {
+                showMessage('From and To locations must be different.', 'error');
+                return;
+            }
+
+            const chemicalId = document.getElementById('transferProductId').value;
+            if (!chemicalId) {
+                showMessage('Please select a product from the dropdown.', 'error');
+                return;
+            }
+
+            const productInput = document.getElementById('productSearchInput').value;
+            const productName = productInput.split('(')[0].trim();
+
+            const payload = {
+                chemicalId,
+                productName,
+                fromLocation: document.getElementById('transferFrom').value,
+                toLocation: document.getElementById('transferTo').value,
+                quantity: parseFloat(document.getElementById('transferQty').value),
+                notes: document.getElementById('transferNotes').value
+            };
+
+            const submitBtn = document.getElementById('transferSubmitBtn');
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Transferring...';
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/warehouse/transfer`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || result.message || 'Transfer failed');
+
+                showMessage('Transfer completed successfully!', 'success');
+                closeTransferModal();
+
+                // Reload data
+                await Promise.all([loadTransfers(), loadWarehouseSummary()]);
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Create Transfer';
+            }
+        }
+
+        // ============================================================
+        // Utilities
+        // ============================================================
+        function getTransferredBy(t) {
+            if (t.createdBy) {
+                if (typeof t.createdBy === 'object') {
+                    return t.createdBy.name || t.createdBy.email || '--';
+                }
+                return t.createdBy;
+            }
+            return t.transferredBy || t.by || t.userName || '--';
+        }
+
+        function formatDate(d) {
+            if (!d || isNaN(d.getTime())) return '--';
+            const mm = String(d.getMonth() + 1).padStart(2, '0');
+            const dd = String(d.getDate()).padStart(2, '0');
+            const yyyy = d.getFullYear();
+            return `${mm}/${dd}/${yyyy}`;
+        }
+
+        function formatLocationName(loc) {
+            if (!loc) return 'Unknown';
+            const lower = loc.toLowerCase();
+            // Known friendly names
+            const nameMap = {
+                "kyle's": "Kyle's",
+                "kyles": "Kyle's",
+                "kyle": "Kyle's",
+                "ty's": "Ty's",
+                "tys": "Ty's",
+                "ty": "Ty's",
+                "seth's": "Seth's",
+                "seths": "Seth's",
+                "seth": "Seth's",
+                "main": "Main Warehouse",
+                "haxtun": "Haxtun",
+                "otis": "Otis"
+            };
+            return nameMap[lower] || loc.charAt(0).toUpperCase() + loc.slice(1);
+        }
+
+        function getLocClass(loc) {
+            if (!loc) return 'loc-default';
+            const lower = loc.toLowerCase();
+            if (lower.includes('kyle') || lower === 'main') return 'loc-kyle';
+            if (lower.includes('ty') || lower === 'haxtun') return 'loc-ty';
+            if (lower.includes('seth') || lower === 'otis') return 'loc-seth';
+            return 'loc-default';
+        }
+
+        function escapeAttr(str) {
+            return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+            // Scroll to top to see message
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        });
+    </script>
+</body>
+</html>
