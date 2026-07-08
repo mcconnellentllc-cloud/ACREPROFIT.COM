@@ -87,6 +87,44 @@
         .warehouse-section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem; }
         .warehouse-section-header h3 { margin: 0; color: #1a1a2e; font-size: 1.1rem; text-transform: capitalize; }
 
+        /* Chemical Cards */
+        .chem-card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1.5rem; overflow: hidden; }
+        .chem-card-header { padding: 1rem 1.25rem; background: #1a1a2e; color: white; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; }
+        .chem-card-header h3 { margin: 0; font-size: 1.1rem; }
+        .chem-purchased-badge { background: #2d5a27; color: white; padding: 0.35rem 0.75rem; border-radius: 4px; font-weight: 700; font-size: 1rem; }
+        .chem-tier { padding: 0 1.25rem; }
+        .chem-tier-section { padding: 0.85rem 0 0.85rem 1.25rem; border-bottom: 1px solid #eee; position: relative; }
+        .chem-tier-section:last-child { border-bottom: none; }
+        .chem-tier-section::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 2px; background: #ddd; }
+        .chem-tier-section:last-child::before { bottom: 50%; }
+        .chem-tier-section::after { content: ''; position: absolute; left: 0; top: 50%; width: 0.75rem; height: 2px; background: #ddd; }
+        .chem-tier-label { font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; font-weight: 700; color: #666; margin-bottom: 0.4rem; }
+        .chem-wh-grid { display: flex; gap: 0.75rem; flex-wrap: wrap; }
+        .chem-wh-item { background: #f8f9fa; border: 1px solid #eee; border-radius: 5px; padding: 0.4rem 0.75rem; display: flex; gap: 0.5rem; align-items: center; }
+        .chem-wh-name { font-size: 0.8rem; color: #666; font-weight: 600; }
+        .chem-wh-qty { font-size: 1rem; font-weight: 700; }
+        .chem-wh-qty.has-stock { color: #2d5a27; }
+        .chem-wh-qty.no-stock { color: #999; }
+        .chem-sold-table { width: 100%; border-collapse: collapse; font-size: 0.85rem; }
+        .chem-sold-table th { text-align: left; padding: 0.35rem 0.5rem; font-size: 0.68rem; letter-spacing: 0.06em; text-transform: uppercase; color: #666; font-weight: 700; border-bottom: 1px solid #eee; }
+        .chem-sold-table th.r { text-align: right; }
+        .chem-sold-table td { padding: 0.35rem 0.5rem; border-bottom: 1px solid #f0f0f0; }
+        .chem-sold-table td.r { text-align: right; font-weight: 600; }
+        .chem-sold-table tr:last-child td { border-bottom: none; }
+        .chem-sold-total td { font-weight: 700; border-top: 2px solid #ddd; }
+        .chem-balance { padding: 0.85rem 1.25rem; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 0.5rem; border-top: 2px solid #eee; background: #f8f9fa; }
+        .chem-balance-item { text-align: center; min-width: 80px; }
+        .chem-balance-label { font-size: 0.62rem; letter-spacing: 0.06em; text-transform: uppercase; color: #666; font-weight: 700; }
+        .chem-balance-num { font-size: 1.15rem; font-weight: 800; }
+        .chem-balance-op { font-size: 1.2rem; color: #999; }
+        .chem-status { padding: 0.6rem 1.25rem; font-weight: 700; font-size: 0.9rem; display: flex; justify-content: space-between; align-items: center; }
+        .chem-balanced { background: #d4edda; color: #155724; }
+        .chem-farmuse { background: #fff3cd; color: #856404; }
+        .chem-over { background: #f8d7da; color: #721c24; }
+        .pill-paid { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: #d4edda; color: #155724; }
+        .pill-unpaid { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: #f8d7da; color: #721c24; }
+        .pill-draft { display: inline-block; font-size: 0.68rem; font-weight: 700; padding: 0.1rem 0.4rem; border-radius: 3px; background: #fff3cd; color: #856404; }
+
         .location-filters { display: flex; gap: 0.5rem; flex-wrap: wrap; margin-bottom: 1.5rem; }
         .location-chip { padding: 0.5rem 1rem; border: 2px solid #ddd; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 0.9rem; background: white; transition: all 0.2s; }
         .location-chip.active { border-color: #2d5a27; background: #2d5a27; color: white; }
@@ -454,10 +492,9 @@
             const purchaseOrders = poData.purchaseOrders || poData.locations || poData || [];
             const customers = custData.customers || custData || [];
 
-            // Build a map of all chemicals with their data
             const chemMap = {};
 
-            // 1. Gather purchases from POs
+            // 1. Gather purchases from POs (with PO details)
             const allPOs = Array.isArray(purchaseOrders) ? purchaseOrders : Object.values(purchaseOrders).flat();
             allPOs.forEach(po => {
                 const poItems = po.items || [];
@@ -465,8 +502,15 @@
                     const name = item.productName || item.product || '';
                     if (!name) return;
                     const key = name.toLowerCase().replace(/\s+/g, '_');
-                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, warehouses: {}, sold: 0, soldDetails: [] };
-                    chemMap[key].purchased += (item.quantityOrdered || item.qty || 0);
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                    const qty = item.quantityOrdered || item.qty || 0;
+                    chemMap[key].purchased += qty;
+                    chemMap[key].poDetails.push({
+                        poNumber: po.poNumber,
+                        supplier: po.supplier?.name || po.supplier || '',
+                        qty,
+                        cost: item.pricePerUnit || 0
+                    });
                 });
             });
 
@@ -478,48 +522,62 @@
                     const name = p.productName || p.name || '';
                     if (!name) return;
                     const key = name.toLowerCase().replace(/\s+/g, '_');
-                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, warehouses: {}, sold: 0, soldDetails: [] };
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
                     const onHand = p.onHand || p.quantityOnHand || 0;
                     chemMap[key].warehouses[loc] = (chemMap[key].warehouses[loc] || 0) + onHand;
                 });
             });
 
-            // 3. Gather sales from customer accounting
+            // 3. Gather sales from customer accounting (with invoice details)
             customers.forEach(cust => {
                 const custName = cust.customerName || cust.name || 'Unknown';
-                const products = cust.products || [];
-                products.forEach(p => {
-                    const name = p.productName || p.name || '';
-                    if (!name) return;
-                    const key = name.toLowerCase().replace(/\s+/g, '_');
-                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, warehouses: {}, sold: 0, soldDetails: [] };
-                    const qty = p.totalQuantity || p.quantity || 0;
-                    chemMap[key].sold += qty;
-                    chemMap[key].soldDetails.push({ customer: custName, qty });
+                const invoices = cust.invoices || [];
+                invoices.forEach(inv => {
+                    const items = inv.items || [];
+                    const invStatus = inv.status || 'draft';
+                    const invPaid = inv.paymentStatus || 'unpaid';
+                    items.forEach(item => {
+                        const name = item.productName || item.name || '';
+                        if (!name) return;
+                        const key = name.toLowerCase().replace(/\s+/g, '_');
+                        if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                        const qty = item.quantity || 0;
+                        chemMap[key].sold += qty;
+                        chemMap[key].soldDetails.push({
+                            customer: custName,
+                            qty,
+                            invoice: inv.invoiceNumber || '',
+                            status: invStatus,
+                            paid: invPaid
+                        });
+                    });
                 });
+                // Fallback: if no invoices array, use products
+                if (!invoices.length) {
+                    const products = cust.products || [];
+                    products.forEach(p => {
+                        const name = p.productName || p.name || '';
+                        if (!name) return;
+                        const key = name.toLowerCase().replace(/\s+/g, '_');
+                        if (!chemMap[key]) chemMap[key] = { name, purchased: 0, poDetails: [], warehouses: {}, sold: 0, soldDetails: [] };
+                        const qty = p.totalQuantity || p.quantity || 0;
+                        chemMap[key].sold += qty;
+                        chemMap[key].soldDetails.push({ customer: custName, qty, invoice: '', status: '', paid: '' });
+                    });
+                }
             });
-
-            // All known warehouse locations
-            const allLocations = new Set();
-            Object.values(chemMap).forEach(c => {
-                Object.keys(c.warehouses).forEach(loc => allLocations.add(loc));
-            });
-            const locations = Array.from(allLocations).sort();
-            if (!locations.length) locations.push('main');
 
             // Calculate totals
-            let grandPurchased = 0, grandSold = 0, grandOnHand = 0, grandAvailable = 0;
-
+            let grandPurchased = 0, grandSold = 0, grandOnHand = 0;
             const chemicals = Object.values(chemMap).sort((a, b) => a.name.localeCompare(b.name));
 
             chemicals.forEach(c => {
                 c.totalOnHand = Object.values(c.warehouses).reduce((s, v) => s + v, 0);
-                c.available = c.purchased - c.sold - c.totalOnHand;
+                c.unaccounted = c.purchased - c.sold - c.totalOnHand;
                 grandPurchased += c.purchased;
                 grandSold += c.sold;
                 grandOnHand += c.totalOnHand;
             });
-            grandAvailable = grandPurchased - grandSold;
 
             // Update stat cards
             document.getElementById('totalInventoryValue').textContent = chemicals.length + ' chemicals';
@@ -527,76 +585,87 @@
             document.getElementById('totalOnHand').textContent = grandOnHand.toLocaleString();
             document.getElementById('overviewLowStock').textContent = grandSold.toLocaleString();
 
-            // Build the unified table
-            const locationHeaders = locations.map(loc => `<th class="text-right" style="min-width:90px;">${capitalize(loc)}</th>`).join('');
-
-            let rows = '';
+            // Build chemical cards
+            let cardsHtml = '';
             chemicals.forEach(c => {
-                const warehouseCells = locations.map(loc => {
-                    const qty = c.warehouses[loc] || 0;
-                    const cls = qty > 0 ? 'stock-healthy' : 'stock-zero';
-                    return `<td class="text-right ${cls}">${qty > 0 ? qty.toLocaleString() : '0'}</td>`;
-                }).join('');
+                // Warehouse chips
+                const whHtml = Object.entries(c.warehouses).map(([loc, qty]) =>
+                    `<div class="chem-wh-item">
+                        <span class="chem-wh-name">${capitalize(loc)}</span>
+                        <span class="chem-wh-qty ${qty > 0 ? 'has-stock' : 'no-stock'}">${qty.toLocaleString()}</span>
+                    </div>`
+                ).join('');
 
-                const totalInv = c.totalOnHand;
-                const unaccounted = c.purchased - c.sold - totalInv;
-                const unaccountedClass = Math.abs(unaccounted) < 1 ? 'stock-healthy' : (unaccounted > 0 ? 'stock-low' : 'stock-zero');
+                // If no warehouses, show empty
+                const whDisplay = whHtml || '<div class="chem-wh-item"><span class="chem-wh-name">None</span><span class="chem-wh-qty no-stock">0</span></div>';
 
-                // Sold details tooltip
-                const soldTip = c.soldDetails.map(d => `${d.customer}: ${d.qty}`).join(', ');
+                // Sold table rows
+                let soldRows = '';
+                if (c.soldDetails.length) {
+                    c.soldDetails.forEach(d => {
+                        const pillClass = d.paid === 'paid' ? 'pill-paid' : (d.status === 'draft' ? 'pill-draft' : 'pill-unpaid');
+                        const pillText = d.paid === 'paid' ? 'Paid' : (d.status === 'draft' ? 'Draft' : 'Sent');
+                        soldRows += `<tr>
+                            <td>${d.customer}</td>
+                            <td>${d.invoice}</td>
+                            <td><span class="${pillClass}">${pillText}</span></td>
+                            <td class="r">${d.qty.toLocaleString()}</td>
+                        </tr>`;
+                    });
+                    soldRows += `<tr class="chem-sold-total"><td colspan="3">Total Sold</td><td class="r">${c.sold.toLocaleString()}</td></tr>`;
+                } else {
+                    soldRows = '<tr><td colspan="4" style="color:#999; font-style:italic;">No sales recorded</td></tr>';
+                }
 
-                rows += `<tr>
-                    <td><strong>${c.name}</strong></td>
-                    <td class="text-right">${c.purchased.toLocaleString()}</td>
-                    ${warehouseCells}
-                    <td class="text-right" style="font-weight:700;">${totalInv.toLocaleString()}</td>
-                    <td class="text-right" title="${soldTip}" style="cursor:help;">${c.sold.toLocaleString()}</td>
-                    <td class="text-right ${unaccountedClass}" style="font-weight:700;">${unaccounted > 0 ? unaccounted.toLocaleString() : unaccounted === 0 ? '0' : unaccounted.toLocaleString()}</td>
-                </tr>`;
+                // Status bar
+                let statusClass, statusText;
+                if (Math.abs(c.unaccounted) < 1) {
+                    statusClass = 'chem-balanced';
+                    statusText = 'Balanced';
+                } else if (c.unaccounted > 0) {
+                    statusClass = 'chem-farmuse';
+                    statusText = `${c.unaccounted.toLocaleString()} unaccounted (farm use)`;
+                } else {
+                    statusClass = 'chem-over';
+                    statusText = `${Math.abs(c.unaccounted).toLocaleString()} over — missing PO?`;
+                }
+
+                cardsHtml += `
+                <div class="chem-card">
+                    <div class="chem-card-header">
+                        <h3>${c.name}</h3>
+                        <div class="chem-purchased-badge">Purchased: ${c.purchased.toLocaleString()}</div>
+                    </div>
+                    <div class="chem-tier">
+                        <div class="chem-tier-section">
+                            <div class="chem-tier-label">Warehouse Locations</div>
+                            <div class="chem-wh-grid">${whDisplay}</div>
+                        </div>
+                        <div class="chem-tier-section">
+                            <div class="chem-tier-label">Sold To Customers</div>
+                            <table class="chem-sold-table">
+                                <thead><tr><th>Customer</th><th>Invoice</th><th>Status</th><th class="r">Qty</th></tr></thead>
+                                <tbody>${soldRows}</tbody>
+                            </table>
+                        </div>
+                    </div>
+                    <div class="chem-balance">
+                        <div class="chem-balance-item"><div class="chem-balance-label">Purchased</div><div class="chem-balance-num">${c.purchased.toLocaleString()}</div></div>
+                        <div class="chem-balance-op">&minus;</div>
+                        <div class="chem-balance-item"><div class="chem-balance-label">Sold</div><div class="chem-balance-num">${c.sold.toLocaleString()}</div></div>
+                        <div class="chem-balance-op">&minus;</div>
+                        <div class="chem-balance-item"><div class="chem-balance-label">On Hand</div><div class="chem-balance-num" style="color:#2d5a27;">${c.totalOnHand.toLocaleString()}</div></div>
+                        <div class="chem-balance-op">=</div>
+                        <div class="chem-balance-item"><div class="chem-balance-label">Unaccounted</div><div class="chem-balance-num" style="color:${Math.abs(c.unaccounted) < 1 ? '#2d5a27' : c.unaccounted > 0 ? '#856404' : '#dc3545'};">${c.unaccounted.toLocaleString()}</div></div>
+                    </div>
+                    <div class="chem-status ${statusClass}">
+                        <span>${statusText}</span>
+                    </div>
+                </div>`;
             });
 
-            // Totals row
-            const locationTotals = locations.map(loc => {
-                const total = chemicals.reduce((s, c) => s + (c.warehouses[loc] || 0), 0);
-                return `<td class="text-right">${total.toLocaleString()}</td>`;
-            }).join('');
-
             const container = document.getElementById('overviewContent');
-            container.innerHTML = `
-                <div class="card">
-                    <div class="card-header">
-                        <h2>Chemical Inventory Summary</h2>
-                        <span style="font-size:0.9rem;">${chemicals.length} products across ${locations.length} warehouse(s)</span>
-                    </div>
-                    <div class="card-body">
-                        <table class="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Chemical</th>
-                                    <th class="text-right">Total Purchased</th>
-                                    ${locationHeaders}
-                                    <th class="text-right" style="background:#e6efe5;">Total Inventory</th>
-                                    <th class="text-right" style="background:#fceeec;">Total Sold</th>
-                                    <th class="text-right" style="background:#fef7ea;">Unaccounted</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                ${rows}
-                            </tbody>
-                            <tfoot>
-                                <tr>
-                                    <td><strong>TOTALS</strong></td>
-                                    <td class="text-right">${grandPurchased.toLocaleString()}</td>
-                                    ${locationTotals}
-                                    <td class="text-right">${grandOnHand.toLocaleString()}</td>
-                                    <td class="text-right">${grandSold.toLocaleString()}</td>
-                                    <td class="text-right">${(grandPurchased - grandSold - grandOnHand).toLocaleString()}</td>
-                                </tr>
-                            </tfoot>
-                        </table>
-                    </div>
-                </div>
-            `;
+            container.innerHTML = cardsHtml || '<div class="empty-state"><h3>No chemical data</h3><p>No purchase orders or inventory found.</p></div>';
         }
 
         // ========================================
