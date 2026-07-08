@@ -590,7 +590,7 @@
                     </div>
                     <div class="item-qty">
                         <button class="qty-btn" onclick="adjustQty(${index}, -1)">-</button>
-                        <input type="number" value="${item.quantity}" min="1" onchange="setQty(${index}, this.value)">
+                        <input type="number" value="${item.quantity}" min="0.1" step="0.1" onchange="setQty(${index}, this.value)">
                         <button class="qty-btn" onclick="adjustQty(${index}, 1)">+</button>
                     </div>
                     <div class="item-price">
@@ -612,7 +612,7 @@
         }
 
         function setQty(index, value) {
-            invoiceItems[index].quantity = Math.max(1, parseInt(value) || 1);
+            invoiceItems[index].quantity = Math.max(0.1, parseFloat(value) || 1);
             invoiceItems[index].total = invoiceItems[index].quantity * invoiceItems[index].unitPrice;
             renderInvoiceItems();
             updateTotals();
