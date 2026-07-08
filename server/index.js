@@ -37,6 +37,7 @@ const adminRatingsRouter = require('./routes/admin/ratings');
 const supplierInvoicesRouter = require('./routes/admin/supplier-invoices');
 const inventoryLifecycleRouter = require('./routes/admin/inventory-lifecycle');
 const warehouseTrackingRouter = require('./routes/admin/warehouse-tracking');
+const loansRouter = require('./routes/admin/loans');
 const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
 
 // File upload handling
@@ -1979,6 +1980,48 @@ const DISTRIBUTOR_SETTLEMENT_MONEY_PATHS = { 'amount': 2 };
 distributorSettlementSchema.set('toJSON', { transform: decimalToJSONTransform });
 distributorSettlementSchema.pre('validate', function (next) { coerceMoneyFields(this, DISTRIBUTOR_SETTLEMENT_MONEY_PATHS); next(); });
 const DistributorSettlement = mongoose.model('DistributorSettlement', distributorSettlementSchema);
+
+// ============ DISTRIBUTOR LOAN MODEL ============
+// Tracks loans / product credits from distributors (Kyle, Ty) to Acre Profit LLC,
+// and repayments back. Each entry is directional: a loan increases what the
+// business owes, a repayment decreases it. Running balance is computed per lender.
+const distributorLoanSchema = new mongoose.Schema({
+    loanId: { type: String, unique: true }, // auto-generated friendly id
+    lenderId: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
+    lenderName: { type: String, required: true },
+    borrower: { type: String, default: 'Acre Profit LLC' },
+    amount: { type: Number, required: true }, // always positive
+    description: { type: String, required: true },
+    category: {
+        type: String,
+        enum: ['loan', 'repayment', 'product_credit', 'adjustment'],
+        required: true
+    },
+    date: { type: Date, default: Date.now },
+    referenceNumber: String,
+    notes: String,
+    runningBalance: { type: Number, default: 0 }, // positive = business owes lender
+    createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    createdAt: { type: Date, default: Date.now }
+});
+distributorLoanSchema.index({ lenderId: 1, date: -1 });
+distributorLoanSchema.index({ loanId: 1 });
+
+const DISTRIBUTOR_LOAN_MONEY_PATHS = { 'amount': 2, 'runningBalance': 2 };
+distributorLoanSchema.set('toJSON', { transform: decimalToJSONTransform });
+distributorLoanSchema.pre('validate', function (next) { coerceMoneyFields(this, DISTRIBUTOR_LOAN_MONEY_PATHS); next(); });
+
+// Auto-generate loanId before save if not set
+distributorLoanSchema.pre('save', async function (next) {
+    if (!this.loanId) {
+        const prefix = this.category === 'repayment' ? 'PAY' : 'LOAN';
+        const count = await mongoose.model('DistributorLoan').countDocuments();
+        this.loanId = `${prefix}-${String(count + 1).padStart(4, '0')}`;
+    }
+    next();
+});
+
+const DistributorLoan = mongoose.model('DistributorLoan', distributorLoanSchema);
 
 // ============ INVENTORY MODEL ============
 // Tracks actual stock levels by product and location
@@ -4512,6 +4555,9 @@ app.use('/api/admin/inventory-lifecycle', authMiddleware, inventoryAccessMiddlew
 
 // Warehouse tracking - warehouse views, transfers, customer accounting
 app.use('/api/admin/warehouse', authMiddleware, inventoryAccessMiddleware, warehouseTrackingRouter);
+
+// Distributor loans - track loans/repayments from distributors to the business
+app.use('/api/admin/loans', authMiddleware, inventoryAccessMiddleware, loansRouter);
 
 // Superadmin moderation queue for ratings. Scope-specific prefix keeps the
 // strict superAdminMiddleware gate narrow.

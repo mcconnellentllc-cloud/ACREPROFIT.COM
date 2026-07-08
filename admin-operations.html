@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Operations | Acre Profit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .admin-page { padding: 2rem 0; background: #f5f5f5; min-height: 100vh; }
+        .admin-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem; }
+        .admin-header h1 { margin: 0; }
+
+        /* Summary Cards */
+        .ar-summary-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem; margin-bottom: 2rem; }
+        .ar-card { background: white; padding: 1.5rem; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); text-align: center; }
+        .ar-card h3 { margin: 0 0 0.5rem; color: #666; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .ar-card .ar-value { font-size: 2rem; font-weight: 800; }
+        .ar-card .ar-value.ar-danger { color: #dc3545; }
+        .ar-card .ar-value.ar-warning { color: #e67e22; }
+        .ar-card .ar-value.ar-success { color: #2d5a27; }
+        .ar-card .ar-value.ar-neutral { color: #1a1a2e; }
+
+        /* Toolbar */
+        .toolbar { display: flex; gap: 1rem; margin-bottom: 1.5rem; flex-wrap: wrap; align-items: center; }
+        .toolbar input, .toolbar select { padding: 0.6rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; }
+        .toolbar input { flex: 1; min-width: 200px; max-width: 400px; }
+
+        /* Filter chips */
+        .filter-chips { display: flex; gap: 0.5rem; flex-wrap: wrap; }
+        .filter-chip { padding: 0.5rem 1.25rem; border: 2px solid #ddd; border-radius: 20px; cursor: pointer; font-weight: 600; font-size: 0.9rem; background: white; transition: all 0.2s; }
+        .filter-chip.active { border-color: #2d5a27; background: #2d5a27; color: white; }
+        .filter-chip:hover:not(.active) { border-color: #2d5a27; color: #2d5a27; }
+        .filter-chip .chip-count { display: inline-block; margin-left: 0.35rem; padding: 0.1rem 0.45rem; border-radius: 10px; font-size: 0.75rem; background: rgba(255,255,255,0.3); }
+        .filter-chip.active .chip-count { background: rgba(255,255,255,0.3); }
+        .filter-chip:not(.active) .chip-count { background: #eee; }
+
+        /* Customer Operations Card */
+        .ops-card { background: white; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); margin-bottom: 1rem; overflow: hidden; transition: box-shadow 0.2s; }
+        .ops-card.expanded { box-shadow: 0 4px 12px rgba(0,0,0,0.15); }
+
+        .ops-header { padding: 1rem 1.5rem; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.2s; flex-wrap: wrap; gap: 0.75rem; }
+        .ops-header:hover { background: #f9f9f9; }
+
+        .ops-customer-info { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; flex: 1; min-width: 0; }
+        .ops-avatar { width: 42px; height: 42px; border-radius: 50%; background: #2d5a27; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1rem; flex-shrink: 0; }
+        .ops-name-block { min-width: 0; }
+        .ops-name { font-weight: 700; font-size: 1.1rem; color: #1a1a2e; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .ops-contact-line { font-size: 0.82rem; color: #666; margin-top: 0.15rem; display: flex; gap: 1rem; flex-wrap: wrap; }
+        .ops-contact-line span { white-space: nowrap; }
+
+        .ops-financials { display: flex; gap: 1.5rem; align-items: center; flex-wrap: wrap; flex-shrink: 0; }
+        .ops-fin-item { text-align: right; min-width: 90px; }
+        .ops-fin-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        .ops-fin-amount { font-size: 1rem; font-weight: 700; }
+        .ops-fin-amount.text-green { color: #2d5a27; }
+        .ops-fin-amount.text-red { color: #dc3545; }
+        .ops-fin-amount.text-neutral { color: #333; }
+
+        .ops-balance-block { text-align: right; min-width: 110px; }
+        .ops-balance-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; }
+        .ops-balance-amount { font-size: 1.5rem; font-weight: 800; }
+        .ops-balance-amount.due { color: #dc3545; }
+        .ops-balance-amount.clear { color: #2d5a27; }
+
+        .ops-status-badge { display: inline-block; padding: 0.25rem 0.75rem; border-radius: 4px; font-size: 0.8rem; font-weight: 600; }
+        .ops-badge-paid { background: #d4edda; color: #155724; }
+        .ops-badge-partial { background: #fff3cd; color: #856404; }
+        .ops-badge-unpaid { background: #f8d7da; color: #721c24; }
+
+        .expand-icon { font-size: 1.2rem; color: #999; transition: transform 0.3s; margin-left: 0.5rem; flex-shrink: 0; }
+        .expand-icon.open { transform: rotate(180deg); }
+
+        /* Expanded Detail Panel */
+        .ops-details { max-height: 0; overflow: hidden; transition: max-height 0.4s ease; }
+        .ops-details.open { max-height: 5000px; }
+        .ops-details-inner { padding: 0 1.5rem 1.5rem; }
+
+        /* Customer Stats Bar */
+        .ops-stats-bar { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 0.75rem; margin-bottom: 1.5rem; padding: 1rem; background: #f8f9fa; border-radius: 8px; border: 1px solid #eee; }
+        .ops-stat { text-align: center; }
+        .ops-stat-value { font-size: 1.25rem; font-weight: 800; color: #1a1a2e; }
+        .ops-stat-value.green { color: #2d5a27; }
+        .ops-stat-value.red { color: #dc3545; }
+        .ops-stat-label { font-size: 0.7rem; color: #888; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-top: 0.2rem; }
+
+        /* Section Headers */
+        .ops-section-header { font-size: 0.95rem; font-weight: 700; color: #1a1a2e; margin: 1.25rem 0 0.75rem; padding-bottom: 0.5rem; border-bottom: 2px solid #eee; display: flex; align-items: center; gap: 0.5rem; }
+        .ops-section-header .section-icon { font-size: 1rem; }
+
+        /* Data Tables */
+        .data-table { width: 100%; border-collapse: collapse; }
+        .data-table th, .data-table td { padding: 0.65rem 0.85rem; text-align: left; border-bottom: 1px solid #eee; white-space: nowrap; font-size: 0.9rem; }
+        .data-table th { background: #f8f9fa; font-weight: 600; color: #333; font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.03em; position: sticky; top: 0; z-index: 1; }
+        .data-table tr:hover { background: #f9f9f9; }
+        .data-table .text-right { text-align: right; }
+        .data-table .text-center { text-align: center; }
+        .data-table tfoot td { font-weight: 700; background: #f8f9fa; border-top: 2px solid #ddd; }
+        .table-scroll { overflow-x: auto; margin-bottom: 1rem; border-radius: 6px; border: 1px solid #eee; }
+
+        /* Status Badges */
+        .status-badge { display: inline-block; padding: 0.2rem 0.65rem; border-radius: 4px; font-size: 0.78rem; font-weight: 600; }
+        .status-paid { background: #d4edda; color: #155724; }
+        .status-partial { background: #fff3cd; color: #856404; }
+        .status-unpaid { background: #f8d7da; color: #721c24; }
+        .status-sent { background: #cce5ff; color: #004085; }
+        .status-draft { background: #e2e3e5; color: #383d41; }
+        .status-delivered { background: #2d5a27; color: white; }
+        .status-pending { background: #fff3cd; color: #856404; }
+
+        /* Buttons */
+        .btn { padding: 0.5rem 1rem; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; transition: all 0.2s; font-size: 0.9rem; }
+        .btn-primary { background: #2d5a27; color: white; }
+        .btn-primary:hover { background: #1e3d1a; }
+        .btn-secondary { background: #6c757d; color: white; }
+        .btn-secondary:hover { background: #545b62; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #1e7e34; }
+        .btn-warning { background: #ffc107; color: #333; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-sm { padding: 0.3rem 0.65rem; font-size: 0.82rem; }
+        .btn-outline { background: transparent; border: 2px solid currentColor; }
+        .btn-icon { padding: 0.3rem 0.5rem; font-size: 0.85rem; background: #f0f0f0; border: 1px solid #ddd; border-radius: 4px; cursor: pointer; transition: all 0.2s; }
+        .btn-icon:hover { background: #e0e0e0; }
+
+        .action-btns { display: flex; gap: 0.35rem; }
+
+        /* Modal */
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.active { display: flex; }
+        .modal-content { background: white; padding: 2rem; border-radius: 12px; max-width: 600px; width: 95%; max-height: 90vh; overflow-y: auto; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem; padding-bottom: 1rem; border-bottom: 1px solid #eee; }
+        .modal-header h2 { margin: 0; }
+        .close-btn { background: none; border: none; font-size: 1.5rem; cursor: pointer; color: #666; }
+
+        .form-group { margin-bottom: 1rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333; }
+        .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 0.6rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; box-sizing: border-box; }
+
+        /* Misc */
+        .loading { text-align: center; padding: 3rem; color: #666; }
+        .error-msg { background: #f8d7da; color: #721c24; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .success-msg { background: #d4edda; color: #155724; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; }
+        .empty-state { text-align: center; padding: 3rem; color: #666; }
+        .empty-state h3 { margin: 0 0 0.5rem; color: #333; }
+
+        .results-count { font-size: 0.85rem; color: #888; padding: 0.5rem 0; }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .ar-summary-row { grid-template-columns: 1fr 1fr; }
+            .ops-header { padding: 0.85rem 1rem; }
+            .ops-financials { gap: 0.75rem; }
+            .ops-balance-amount { font-size: 1.2rem; }
+            .ops-stats-bar { grid-template-columns: repeat(2, 1fr); }
+            .ops-details-inner { padding: 0 1rem 1rem; }
+            .data-table { display: block; overflow-x: auto; }
+            .ops-customer-info { gap: 0.5rem; }
+            .ops-avatar { width: 36px; height: 36px; font-size: 0.9rem; }
+        }
+
+        @media (max-width: 480px) {
+            .ar-summary-row { grid-template-columns: 1fr; }
+            .ops-financials { width: 100%; justify-content: space-between; }
+        }
+    </style>
+    <script src="https://cdn.jsdelivr.net/npm/decimal.js-light@2.5.1/decimal.min.js"></script>
+    <script src="money.js"></script>
+</head>
+<body>
+    <nav class="navbar dashboard-navbar">
+        <div class="container">
+            <a href="/dashboard.html" class="logo"><img src="logo.svg" alt="Acre Profit"></a>
+            <div class="nav-links">
+                <a href="/dashboard.html" class="nav-link">Dashboard</a>
+                <a href="/admin-inventory.html" class="nav-link">Products</a>
+                <a href="/admin-inventory-lifecycle.html" class="nav-link">Inventory</a>
+                <a href="/admin-warehouse.html" class="nav-link">Warehouse</a>
+                <a href="/admin-operations.html" class="nav-link active">Operations</a>
+                <a href="/admin.html" class="nav-link">Orders</a>
+            </div>
+            <div class="nav-right">
+                <span class="user-name" id="userName">Admin</span>
+                <a href="#" id="logoutBtn" class="btn btn-outline btn-sm">Logout</a>
+            </div>
+        </div>
+    </nav>
+
+    <main class="admin-page">
+        <div class="container">
+            <div class="admin-header">
+                <h1>Operations</h1>
+                <div style="display: flex; gap: 0.75rem; align-items: center;">
+                    <select id="yearSelector" onchange="handleYearChange()" style="padding: 0.5rem 1rem; border: 1px solid #ddd; border-radius: 6px; font-size: 0.95rem; font-weight: 600;">
+                        <option value="2026" selected>2026</option>
+                        <option value="2025">2025</option>
+                        <option value="2024">2024</option>
+                    </select>
+                </div>
+            </div>
+
+            <div id="message"></div>
+
+            <!-- Summary Stats -->
+            <div class="ar-summary-row" id="summaryStats">
+                <div class="ar-card">
+                    <h3>Total Accounts Receivable</h3>
+                    <div class="ar-value ar-danger" id="totalAR">--</div>
+                </div>
+                <div class="ar-card">
+                    <h3>Total Invoiced</h3>
+                    <div class="ar-value ar-neutral" id="totalInvoiced">--</div>
+                </div>
+                <div class="ar-card">
+                    <h3>Total Collected</h3>
+                    <div class="ar-value ar-success" id="totalCollected">--</div>
+                </div>
+                <div class="ar-card">
+                    <h3>Total Customers</h3>
+                    <div class="ar-value ar-neutral" id="totalCustomers">--</div>
+                </div>
+                <div class="ar-card">
+                    <h3>Customers with Balance</h3>
+                    <div class="ar-value ar-warning" id="customersWithBalance">--</div>
+                </div>
+            </div>
+
+            <!-- Toolbar: Search + Filters -->
+            <div class="toolbar">
+                <input type="text" id="searchInput" placeholder="Search by name, contact, farm, phone..." oninput="applyFilters()">
+                <div class="filter-chips">
+                    <button class="filter-chip active" data-filter="all" onclick="setFilter('all')">All <span class="chip-count" id="countAll">0</span></button>
+                    <button class="filter-chip" data-filter="unpaid" onclick="setFilter('unpaid')">Unpaid <span class="chip-count" id="countUnpaid">0</span></button>
+                    <button class="filter-chip" data-filter="paid" onclick="setFilter('paid')">Paid <span class="chip-count" id="countPaid">0</span></button>
+                </div>
+            </div>
+
+            <div class="results-count" id="resultsCount"></div>
+
+            <!-- Customer Operations List -->
+            <div id="operationsContent">
+                <div class="loading">Loading customer operations...</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Mark Paid Modal -->
+    <div class="modal" id="markPaidModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2>Record Payment</h2>
+                <button class="close-btn" onclick="closeMarkPaidModal()">&times;</button>
+            </div>
+            <form id="markPaidForm" onsubmit="submitMarkPaid(event)">
+                <input type="hidden" id="markPaidOrderId">
+                <div class="form-group">
+                    <label>Invoice</label>
+                    <p id="markPaidInvoiceInfo" style="margin: 0; padding: 0.5rem; background: #f8f9fa; border-radius: 4px; font-weight: 600;"></p>
+                </div>
+                <div class="form-group">
+                    <label>Payment Status</label>
+                    <select id="markPaidStatus">
+                        <option value="paid">Paid in Full</option>
+                        <option value="partial">Partial Payment</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Payment Method</label>
+                    <select id="markPaidMethod">
+                        <option value="check">Check</option>
+                        <option value="ach">ACH</option>
+                        <option value="wire">Wire Transfer</option>
+                        <option value="cash">Cash</option>
+                        <option value="card">Card</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Reference / Check #</label>
+                    <input type="text" id="markPaidReference" placeholder="e.g., Check #1234">
+                </div>
+                <div class="form-group">
+                    <label>Notes</label>
+                    <textarea id="markPaidNotes" rows="2" placeholder="Optional notes..." style="resize: vertical;"></textarea>
+                </div>
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeMarkPaidModal()">Cancel</button>
+                    <button type="submit" class="btn btn-success">Confirm Payment</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = '/api';
+        let token = localStorage.getItem('token');
+        let allCustomers = [];
+        let activeFilter = 'all';
+        let selectedYear = 2026;
+
+        // Auth guard
+        if (!token) {
+            window.location.href = '/login.html';
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await checkAuth();
+            loadOperations();
+        });
+
+        async function checkAuth() {
+            try {
+                const res = await fetch(`${API_BASE}/auth/me`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error('Not authenticated');
+                const user = await res.json();
+
+                if (user.role !== 'distributor' && user.role !== 'superadmin') {
+                    showMessage('Access denied. Distributor or Super Admin access required.', 'error');
+                    setTimeout(() => window.location.href = '/dashboard.html', 2000);
+                    return;
+                }
+
+                document.getElementById('userName').textContent = user.name || user.email;
+            } catch (err) {
+                window.location.href = '/login.html';
+            }
+        }
+
+        // ========================================
+        // Data Loading
+        // ========================================
+        async function loadOperations() {
+            const container = document.getElementById('operationsContent');
+            container.innerHTML = '<div class="loading">Loading customer operations...</div>';
+
+            try {
+                const [custRes, ordersRes] = await Promise.all([
+                    fetch(`${API_BASE}/admin/warehouse/customer-accounting`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_BASE}/admin/orders`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    })
+                ]);
+
+                if (!custRes.ok) throw new Error('Failed to load customer data');
+
+                const custData = await custRes.json();
+                const ordersData = await ordersRes.ok ? await ordersRes.json() : [];
+
+                const customers = custData.customers || custData || [];
+
+                // Enrich customer data with order history
+                allCustomers = customers.map(c => enrichCustomer(c, ordersData));
+
+                renderSummary(allCustomers);
+                updateFilterCounts(allCustomers);
+                applyFilters();
+            } catch (err) {
+                container.innerHTML = `<div class="error-msg">Error loading operations data: ${err.message}</div>`;
+            }
+        }
+
+        function enrichCustomer(customer, allOrders) {
+            const name = customer.customerName || customer.name || 'Unknown';
+            const invoices = customer.invoices || [];
+            const products = customer.products || [];
+            const payments = customer.payments || [];
+
+            // Match orders by customer name
+            const customerOrders = allOrders.filter(o => {
+                const orderName = o.contactInfo?.name || o.customerName || '';
+                return orderName.toLowerCase() === name.toLowerCase();
+            });
+
+            // Compute financials
+            const totalInvoiced = customer.totalInvoiced || 0;
+            const totalPaid = customer.totalPaid || 0;
+            const balanceDue = customer.balanceDue != null ? customer.balanceDue : (totalInvoiced - totalPaid);
+
+            // Contact info from orders or customer object
+            let contact = customer.contact || customer.contactName || '';
+            let phone = customer.phone || '';
+            let email = customer.email || '';
+            let farmName = customer.farmName || customer.farm || '';
+
+            if (customerOrders.length && (!contact || !phone)) {
+                const latest = customerOrders[customerOrders.length - 1];
+                if (latest.contactInfo) {
+                    contact = contact || latest.contactInfo.name || '';
+                    phone = phone || latest.contactInfo.phone || '';
+                    email = email || latest.contactInfo.email || '';
+                    farmName = farmName || latest.contactInfo.farmName || latest.contactInfo.farm || '';
+                }
+            }
+
+            // Aggregate product quantities across invoices
+            const productMap = {};
+            invoices.forEach(inv => {
+                (inv.items || []).forEach(item => {
+                    const pName = item.productName || item.name || '';
+                    if (!pName) return;
+                    const key = pName.toLowerCase();
+                    if (!productMap[key]) {
+                        productMap[key] = {
+                            name: pName,
+                            qtyInvoiced: 0,
+                            qtyDelivered: 0,
+                            unitPrice: item.unitPrice || item.price || 0,
+                            total: 0
+                        };
+                    }
+                    productMap[key].qtyInvoiced += item.quantity || 0;
+                    productMap[key].qtyDelivered += item.quantityDelivered || item.quantity || 0;
+                    productMap[key].total += item.lineTotal || item.total || ((item.quantity || 0) * (item.unitPrice || item.price || 0));
+                    // Use latest unit price
+                    if (item.unitPrice || item.price) {
+                        productMap[key].unitPrice = item.unitPrice || item.price;
+                    }
+                });
+            });
+
+            // Fallback: if no invoices, use products array directly
+            if (!invoices.length && products.length) {
+                products.forEach(p => {
+                    const pName = p.productName || p.name || '';
+                    if (!pName) return;
+                    const key = pName.toLowerCase();
+                    if (!productMap[key]) {
+                        productMap[key] = {
+                            name: pName,
+                            qtyInvoiced: 0,
+                            qtyDelivered: 0,
+                            unitPrice: p.unitPrice || p.price || 0,
+                            total: 0
+                        };
+                    }
+                    productMap[key].qtyInvoiced += p.totalQuantity || p.quantity || 0;
+                    productMap[key].qtyDelivered += p.totalQuantity || p.quantity || 0;
+                    productMap[key].total += p.total || p.lineTotal || 0;
+                });
+            }
+
+            // Last order date
+            let lastOrderDate = null;
+            if (customerOrders.length) {
+                const dates = customerOrders.map(o => new Date(o.createdAt || o.date)).filter(d => !isNaN(d));
+                if (dates.length) lastOrderDate = new Date(Math.max(...dates));
+            }
+            if (!lastOrderDate && invoices.length) {
+                const dates = invoices.map(inv => new Date(inv.date || inv.createdAt || inv.invoiceDate)).filter(d => !isNaN(d));
+                if (dates.length) lastOrderDate = new Date(Math.max(...dates));
+            }
+
+            return {
+                ...customer,
+                displayName: name,
+                contact,
+                phone,
+                email,
+                farmName,
+                totalInvoiced,
+                totalPaid,
+                balanceDue,
+                invoices,
+                payments,
+                orders: customerOrders,
+                aggregatedProducts: Object.values(productMap),
+                orderCount: customerOrders.length || invoices.length,
+                lastOrderDate
+            };
+        }
+
+        // ========================================
+        // Summary Stats
+        // ========================================
+        function renderSummary(customers) {
+            let totalAR = 0, totalInvoiced = 0, totalCollected = 0, withBalance = 0;
+
+            customers.forEach(c => {
+                totalInvoiced += c.totalInvoiced || 0;
+                totalCollected += c.totalPaid || 0;
+                const bal = c.balanceDue != null ? c.balanceDue : ((c.totalInvoiced || 0) - (c.totalPaid || 0));
+                totalAR += Math.max(0, bal);
+                if (bal > 0.01) withBalance++;
+            });
+
+            document.getElementById('totalAR').textContent = formatMoney(totalAR);
+            document.getElementById('totalInvoiced').textContent = formatMoney(totalInvoiced);
+            document.getElementById('totalCollected').textContent = formatMoney(totalCollected);
+            document.getElementById('totalCustomers').textContent = customers.length;
+            document.getElementById('customersWithBalance').textContent = withBalance;
+        }
+
+        // ========================================
+        // Filters
+        // ========================================
+        function updateFilterCounts(customers) {
+            let paid = 0, unpaid = 0;
+            customers.forEach(c => {
+                if (c.balanceDue > 0.01) unpaid++;
+                else paid++;
+            });
+            document.getElementById('countAll').textContent = customers.length;
+            document.getElementById('countUnpaid').textContent = unpaid;
+            document.getElementById('countPaid').textContent = paid;
+        }
+
+        function setFilter(filter) {
+            activeFilter = filter;
+            document.querySelectorAll('.filter-chip').forEach(chip => {
+                chip.classList.toggle('active', chip.dataset.filter === filter);
+            });
+            applyFilters();
+        }
+
+        function applyFilters() {
+            const search = (document.getElementById('searchInput').value || '').toLowerCase().trim();
+            let filtered = allCustomers;
+
+            // Text search
+            if (search) {
+                filtered = filtered.filter(c => {
+                    const haystack = [
+                        c.displayName, c.contact, c.phone, c.email, c.farmName
+                    ].join(' ').toLowerCase();
+                    return haystack.includes(search);
+                });
+            }
+
+            // Status filter
+            if (activeFilter === 'unpaid') {
+                filtered = filtered.filter(c => c.balanceDue > 0.01);
+            } else if (activeFilter === 'paid') {
+                filtered = filtered.filter(c => c.balanceDue <= 0.01);
+            }
+
+            // Sort by balance due descending
+            filtered.sort((a, b) => (b.balanceDue || 0) - (a.balanceDue || 0));
+
+            document.getElementById('resultsCount').textContent =
+                `Showing ${filtered.length} of ${allCustomers.length} customer${allCustomers.length !== 1 ? 's' : ''}`;
+
+            renderCustomerCards(filtered);
+        }
+
+        // ========================================
+        // Render Customer Cards
+        // ========================================
+        function renderCustomerCards(customers) {
+            const container = document.getElementById('operationsContent');
+
+            if (!customers.length) {
+                container.innerHTML = '<div class="empty-state"><h3>No customers found</h3><p>Try adjusting your search or filters.</p></div>';
+                return;
+            }
+
+            let html = '';
+            customers.forEach((c, idx) => {
+                const initials = getInitials(c.displayName);
+                const balanceClass = c.balanceDue > 0.01 ? 'due' : 'clear';
+                const badgeClass = c.balanceDue <= 0.01 ? 'ops-badge-paid' : (c.totalPaid > 0.01 ? 'ops-badge-partial' : 'ops-badge-unpaid');
+                const badgeText = c.balanceDue <= 0.01 ? 'Paid' : (c.totalPaid > 0.01 ? 'Partial' : 'Unpaid');
+
+                // Contact line
+                let contactParts = [];
+                if (c.contact && c.contact !== c.displayName) contactParts.push(c.contact);
+                if (c.farmName) contactParts.push(c.farmName);
+                if (c.phone) contactParts.push(c.phone);
+                if (c.email) contactParts.push(c.email);
+
+                html += `
+                <div class="ops-card" id="opsCard${idx}">
+                    <div class="ops-header" onclick="toggleOpsDetails(${idx})">
+                        <div class="ops-customer-info">
+                            <div class="ops-avatar">${initials}</div>
+                            <div class="ops-name-block">
+                                <div class="ops-name">${escHtml(c.displayName)}</div>
+                                <div class="ops-contact-line">
+                                    ${contactParts.map(p => `<span>${escHtml(p)}</span>`).join('')}
+                                </div>
+                            </div>
+                            <span class="ops-status-badge ${badgeClass}">${badgeText}</span>
+                        </div>
+                        <div class="ops-financials">
+                            <div class="ops-fin-item">
+                                <div class="ops-fin-label">Invoiced</div>
+                                <div class="ops-fin-amount text-neutral">${formatMoney(c.totalInvoiced)}</div>
+                            </div>
+                            <div class="ops-fin-item">
+                                <div class="ops-fin-label">Paid</div>
+                                <div class="ops-fin-amount text-green">${formatMoney(c.totalPaid)}</div>
+                            </div>
+                            <div class="ops-balance-block">
+                                <div class="ops-balance-label">Balance Due</div>
+                                <div class="ops-balance-amount ${balanceClass}">${formatMoney(c.balanceDue)}</div>
+                            </div>
+                            <span class="expand-icon" id="expandIcon${idx}">&#9660;</span>
+                        </div>
+                    </div>
+                    <div class="ops-details" id="opsDetails${idx}">
+                        <div class="ops-details-inner">
+                            ${renderCustomerDetail(c, idx)}
+                        </div>
+                    </div>
+                </div>`;
+            });
+
+            container.innerHTML = html;
+        }
+
+        function renderCustomerDetail(c, idx) {
+            let html = '';
+
+            // --- Customer Stats Bar ---
+            html += `<div class="ops-stats-bar">
+                <div class="ops-stat">
+                    <div class="ops-stat-value">${formatMoney(c.totalInvoiced)}</div>
+                    <div class="ops-stat-label">Total Invoiced</div>
+                </div>
+                <div class="ops-stat">
+                    <div class="ops-stat-value green">${formatMoney(c.totalPaid)}</div>
+                    <div class="ops-stat-label">Total Paid</div>
+                </div>
+                <div class="ops-stat">
+                    <div class="ops-stat-value ${c.balanceDue > 0.01 ? 'red' : 'green'}">${formatMoney(c.balanceDue)}</div>
+                    <div class="ops-stat-label">Balance Due</div>
+                </div>
+                <div class="ops-stat">
+                    <div class="ops-stat-value">${c.orderCount}</div>
+                    <div class="ops-stat-label"># of Orders</div>
+                </div>
+                <div class="ops-stat">
+                    <div class="ops-stat-value" style="font-size: 1rem;">${c.lastOrderDate ? c.lastOrderDate.toLocaleDateString() : '--'}</div>
+                    <div class="ops-stat-label">Last Order Date</div>
+                </div>
+            </div>`;
+
+            // --- Products Summary ---
+            if (c.aggregatedProducts.length) {
+                html += `<div class="ops-section-header"><span class="section-icon">&#9632;</span> Products Summary</div>`;
+                html += `<div class="table-scroll"><table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Product</th>
+                            <th class="text-right">Qty Invoiced</th>
+                            <th class="text-right">Qty Delivered</th>
+                            <th class="text-right">Unit Price</th>
+                            <th class="text-right">Total $</th>
+                            <th class="text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                let prodTotal = 0;
+                c.aggregatedProducts.forEach(p => {
+                    const delivered = p.qtyDelivered || 0;
+                    const invoiced = p.qtyInvoiced || 0;
+                    let statusHtml, statusClass;
+                    if (delivered >= invoiced && invoiced > 0) {
+                        statusClass = 'status-delivered';
+                        statusHtml = 'Delivered';
+                    } else if (delivered > 0) {
+                        statusClass = 'status-partial';
+                        statusHtml = 'Partial';
+                    } else {
+                        statusClass = 'status-pending';
+                        statusHtml = 'Pending';
+                    }
+                    prodTotal += p.total || 0;
+
+                    html += `<tr>
+                        <td><strong>${escHtml(p.name)}</strong></td>
+                        <td class="text-right">${invoiced.toLocaleString()}</td>
+                        <td class="text-right">${delivered.toLocaleString()}</td>
+                        <td class="text-right">${formatMoney(p.unitPrice)}</td>
+                        <td class="text-right"><strong>${formatMoney(p.total)}</strong></td>
+                        <td class="text-center"><span class="status-badge ${statusClass}">${statusHtml}</span></td>
+                    </tr>`;
+                });
+
+                html += `</tbody>
+                    <tfoot>
+                        <tr>
+                            <td colspan="4" class="text-right">Total</td>
+                            <td class="text-right">${formatMoney(prodTotal)}</td>
+                            <td></td>
+                        </tr>
+                    </tfoot>
+                </table></div>`;
+            }
+
+            // --- Invoice History ---
+            if (c.invoices.length) {
+                html += `<div class="ops-section-header"><span class="section-icon">&#9632;</span> Invoice History</div>`;
+                html += `<div class="table-scroll"><table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Invoice #</th>
+                            <th>Date</th>
+                            <th>Products</th>
+                            <th class="text-right">Amount</th>
+                            <th class="text-right">Paid</th>
+                            <th class="text-right">Balance</th>
+                            <th class="text-center">Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                c.invoices.forEach(inv => {
+                    const invAmount = inv.total || inv.amount || 0;
+                    const invPaid = inv.amountPaid || inv.paid || 0;
+                    const invBalance = inv.balance != null ? inv.balance : (invAmount - invPaid);
+                    const invNum = inv.invoiceNumber || inv.orderNumber || '--';
+                    const invDate = inv.date || inv.createdAt || inv.invoiceDate;
+
+                    // Products list
+                    const invItems = inv.items || [];
+                    const productsList = invItems.map(i => i.productName || i.name || '').filter(Boolean).join(', ') || '--';
+
+                    let statusClass, statusText;
+                    if (inv.status === 'draft') {
+                        statusClass = 'status-draft';
+                        statusText = 'Draft';
+                    } else if (invBalance <= 0.01) {
+                        statusClass = 'status-paid';
+                        statusText = 'Paid';
+                    } else if (invPaid > 0.01) {
+                        statusClass = 'status-partial';
+                        statusText = 'Partial';
+                    } else {
+                        statusClass = 'status-unpaid';
+                        statusText = 'Unpaid';
+                    }
+
+                    const orderId = inv.orderId || inv._id || '';
+                    const canMarkPaid = invBalance > 0.01 && inv.status !== 'draft';
+
+                    html += `<tr>
+                        <td><strong>${escHtml(invNum)}</strong></td>
+                        <td>${invDate ? new Date(invDate).toLocaleDateString() : '--'}</td>
+                        <td style="max-width: 200px; white-space: normal; font-size: 0.85rem;">${escHtml(productsList)}</td>
+                        <td class="text-right">${formatMoney(invAmount)}</td>
+                        <td class="text-right" style="color: #2d5a27;">${formatMoney(invPaid)}</td>
+                        <td class="text-right" style="${invBalance > 0.01 ? 'color: #dc3545; font-weight: 700;' : ''}">${formatMoney(invBalance)}</td>
+                        <td class="text-center"><span class="status-badge ${statusClass}">${statusText}</span></td>
+                        <td>
+                            <div class="action-btns">
+                                ${canMarkPaid ? `<button class="btn btn-sm btn-success" onclick="openMarkPaidModal('${orderId}', '${escAttr(invNum)}', ${invAmount}, ${invPaid}); event.stopPropagation();">Mark Paid</button>` : ''}
+                            </div>
+                        </td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div>`;
+            }
+
+            // --- Payment History ---
+            const allPayments = collectPayments(c);
+            if (allPayments.length) {
+                html += `<div class="ops-section-header"><span class="section-icon">&#9632;</span> Payment History</div>`;
+                html += `<div class="table-scroll"><table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>Date</th>
+                            <th class="text-right">Amount</th>
+                            <th>Method</th>
+                            <th>Reference</th>
+                        </tr>
+                    </thead>
+                    <tbody>`;
+
+                allPayments.forEach(p => {
+                    html += `<tr>
+                        <td>${p.date ? new Date(p.date).toLocaleDateString() : '--'}</td>
+                        <td class="text-right" style="color: #2d5a27; font-weight: 700;">${formatMoney(p.amount)}</td>
+                        <td>${capitalize(p.method || '--')}</td>
+                        <td>${escHtml(p.reference || '--')}</td>
+                    </tr>`;
+                });
+
+                html += `</tbody></table></div>`;
+            }
+
+            // If nothing at all
+            if (!c.aggregatedProducts.length && !c.invoices.length && !allPayments.length) {
+                html += '<div class="empty-state" style="padding: 1.5rem;"><h3>No detailed data available</h3><p>Invoice and payment data will appear here once transactions are recorded.</p></div>';
+            }
+
+            return html;
+        }
+
+        function collectPayments(customer) {
+            const payments = [];
+
+            // From explicit payments array
+            if (customer.payments && customer.payments.length) {
+                customer.payments.forEach(p => {
+                    payments.push({
+                        date: p.date || p.paymentDate || p.createdAt,
+                        amount: p.amount || 0,
+                        method: p.method || p.paymentMethod || '',
+                        reference: p.reference || p.checkNumber || p.referenceNumber || ''
+                    });
+                });
+            }
+
+            // From invoices that have payment info
+            if (customer.invoices) {
+                customer.invoices.forEach(inv => {
+                    if (inv.payments && inv.payments.length) {
+                        inv.payments.forEach(p => {
+                            payments.push({
+                                date: p.date || p.paymentDate || p.createdAt,
+                                amount: p.amount || 0,
+                                method: p.method || p.paymentMethod || '',
+                                reference: p.reference || p.checkNumber || ''
+                            });
+                        });
+                    } else if ((inv.amountPaid || inv.paid || 0) > 0 && inv.paymentDate) {
+                        payments.push({
+                            date: inv.paymentDate,
+                            amount: inv.amountPaid || inv.paid || 0,
+                            method: inv.paymentMethod || '',
+                            reference: inv.paymentReference || ''
+                        });
+                    }
+                });
+            }
+
+            // Deduplicate by amount+date
+            const seen = new Set();
+            return payments.filter(p => {
+                const key = `${p.amount}-${p.date}-${p.reference}`;
+                if (seen.has(key)) return false;
+                seen.add(key);
+                return true;
+            }).sort((a, b) => {
+                const da = a.date ? new Date(a.date) : new Date(0);
+                const db = b.date ? new Date(b.date) : new Date(0);
+                return db - da;
+            });
+        }
+
+        // ========================================
+        // Expand / Collapse
+        // ========================================
+        function toggleOpsDetails(idx) {
+            const details = document.getElementById(`opsDetails${idx}`);
+            const icon = document.getElementById(`expandIcon${idx}`);
+            const card = document.getElementById(`opsCard${idx}`);
+
+            if (details.classList.contains('open')) {
+                details.classList.remove('open');
+                icon.classList.remove('open');
+                card.classList.remove('expanded');
+            } else {
+                details.classList.add('open');
+                icon.classList.add('open');
+                card.classList.add('expanded');
+            }
+        }
+
+        // ========================================
+        // Mark Paid Modal
+        // ========================================
+        function openMarkPaidModal(orderId, invoiceNum, total, paid) {
+            document.getElementById('markPaidOrderId').value = orderId;
+            document.getElementById('markPaidInvoiceInfo').textContent =
+                `${invoiceNum} -- Total: ${formatMoney(total)}, Paid: ${formatMoney(paid)}, Due: ${formatMoney(total - paid)}`;
+            document.getElementById('markPaidForm').reset();
+            document.getElementById('markPaidOrderId').value = orderId;
+            document.getElementById('markPaidModal').classList.add('active');
+        }
+
+        function closeMarkPaidModal() {
+            document.getElementById('markPaidModal').classList.remove('active');
+        }
+
+        async function submitMarkPaid(e) {
+            e.preventDefault();
+            const orderId = document.getElementById('markPaidOrderId').value;
+            if (!orderId) {
+                showMessage('No order ID found.', 'error');
+                return;
+            }
+
+            try {
+                const res = await fetch(`${API_BASE}/admin/inventory-lifecycle/verify-payment/${orderId}`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        paymentStatus: document.getElementById('markPaidStatus').value,
+                        method: document.getElementById('markPaidMethod').value,
+                        reference: document.getElementById('markPaidReference').value,
+                        notes: document.getElementById('markPaidNotes').value
+                    })
+                });
+
+                const result = await res.json();
+                if (!res.ok) throw new Error(result.error || result.message || 'Payment verification failed');
+
+                showMessage('Payment recorded successfully!', 'success');
+                closeMarkPaidModal();
+                loadOperations();
+            } catch (err) {
+                showMessage('Error: ' + err.message, 'error');
+            }
+        }
+
+        // ========================================
+        // Year Selector
+        // ========================================
+        function handleYearChange() {
+            selectedYear = parseInt(document.getElementById('yearSelector').value);
+            loadOperations();
+        }
+
+        // ========================================
+        // Utilities
+        // ========================================
+        function formatMoney(amount) {
+            if (typeof Decimal !== 'undefined' && typeof formatUSD === 'function') {
+                return formatUSD(amount);
+            }
+            return '$' + (Number(amount) || 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function capitalize(str) {
+            if (!str) return '';
+            return str.charAt(0).toUpperCase() + str.slice(1);
+        }
+
+        function getInitials(name) {
+            if (!name) return '?';
+            const parts = name.trim().split(/\s+/);
+            if (parts.length >= 2) return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+            return name.substring(0, 2).toUpperCase();
+        }
+
+        function escHtml(str) {
+            if (!str) return '';
+            const div = document.createElement('div');
+            div.textContent = str;
+            return div.innerHTML;
+        }
+
+        function escAttr(str) {
+            return (str || '').replace(/'/g, "\\'").replace(/"/g, '&quot;');
+        }
+
+        function showMessage(text, type) {
+            const msg = document.getElementById('message');
+            msg.innerHTML = `<div class="${type === 'error' ? 'error-msg' : 'success-msg'}">${text}</div>`;
+            setTimeout(() => msg.innerHTML = '', 5000);
+        }
+
+        // Logout
+        document.getElementById('logoutBtn').addEventListener('click', (e) => {
+            e.preventDefault();
+            localStorage.removeItem('token');
+            window.location.href = '/login.html';
+        });
+    </script>
+</body>
+</html>
