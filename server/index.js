@@ -36,6 +36,7 @@ const ratingsRouter = require('./routes/ratings');
 const adminRatingsRouter = require('./routes/admin/ratings');
 const supplierInvoicesRouter = require('./routes/admin/supplier-invoices');
 const inventoryLifecycleRouter = require('./routes/admin/inventory-lifecycle');
+const warehouseTrackingRouter = require('./routes/admin/warehouse-tracking');
 const rejectPendingChemicalOrders = require('./middleware/rejectPendingChemicalOrders');
 
 // File upload handling
@@ -4508,6 +4509,9 @@ app.use('/api/admin/supplier-invoices', authMiddleware, inventoryAccessMiddlewar
 
 // Inventory lifecycle - allocation, fulfillment, payment verification
 app.use('/api/admin/inventory-lifecycle', authMiddleware, inventoryAccessMiddleware, inventoryLifecycleRouter);
+
+// Warehouse tracking - warehouse views, transfers, customer accounting
+app.use('/api/admin/warehouse', authMiddleware, inventoryAccessMiddleware, warehouseTrackingRouter);
 
 // Superadmin moderation queue for ratings. Scope-specific prefix keeps the
 // strict superAdminMiddleware gate narrow.
