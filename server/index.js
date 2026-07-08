@@ -2403,6 +2403,19 @@ const invoiceSchema = new mongoose.Schema({
     paymentMethod: String,
     paymentDate: Date,
     paidAt: Date,
+    // Individual payment records - audit trail for every payment received
+    payments: [{
+        amount: Number,
+        method: String,
+        checkNumber: String,
+        reference: String,
+        notes: String,
+        date: { type: Date, default: Date.now },
+        recordedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        recordedByName: String
+    }],
+    // Inventory deduction guard - prevents double-deduction on repeated delivery
+    inventoryDeducted: { type: Boolean, default: false },
     stripePaymentIntentId: String,
     // Stripe Checkout Session for the Pay Now email button. Created on invoice
     // send (and regenerated if the hosted URL expires before customer clicks).
@@ -16265,9 +16278,23 @@ app.post('/api/admin/invoices/:id/payment', authMiddleware, adminMiddleware, asy
         invoice.paymentMethod = method;
         invoice.paymentDate = new Date();
 
+        // Record individual payment in audit trail
+        if (!invoice.payments) invoice.payments = [];
+        invoice.payments.push({
+            amount,
+            method: method || 'check',
+            checkNumber: req.body.checkNumber,
+            reference: req.body.reference,
+            notes: notes || '',
+            date: new Date(),
+            recordedBy: req.user._id,
+            recordedByName: req.user.name || req.user.email
+        });
+
         if (newAmountPaid >= invoice.total) {
             invoice.paymentStatus = 'paid';
             invoice.status = 'paid';
+            invoice.paidAt = new Date();
         } else {
             invoice.paymentStatus = 'partial';
         }
@@ -16277,16 +16304,46 @@ app.post('/api/admin/invoices/:id/payment', authMiddleware, adminMiddleware, asy
         }
 
         invoice.updatedAt = new Date();
-        await invoice.save();
 
-        // Deduct inventory if order exists and status allows
-        if (invoice.orderId) {
-            const order = await ChemicalOrder.findById(invoice.orderId);
-            if (order && order.status !== 'delivered') {
-                // Optionally deduct inventory here when payment is received
-                // This depends on business logic - might want to deduct on delivery instead
+        // Deduct inventory when invoice is fully paid (if not already deducted)
+        if (invoice.paymentStatus === 'paid' && !invoice.inventoryDeducted) {
+            try {
+                const items = invoice.items || [];
+                for (const item of items) {
+                    if (!item.chemicalId) continue;
+                    const inv = await Inventory.findOne({ chemicalId: item.chemicalId, location: 'main' });
+                    if (inv) {
+                        const prevQty = inv.quantityOnHand;
+                        inv.quantityOnHand = Math.max(0, inv.quantityOnHand - (item.quantity || 0));
+                        inv.quantityAvailable = inv.quantityOnHand - inv.quantityReserved;
+                        inv.lastSoldDate = new Date();
+                        inv.updatedAt = new Date();
+                        await inv.save();
+
+                        await new InventoryTransaction({
+                            inventoryId: inv._id,
+                            chemicalId: item.chemicalId,
+                            productName: item.productName,
+                            type: 'sale',
+                            quantityChange: -(item.quantity || 0),
+                            previousQuantity: prevQty,
+                            newQuantity: inv.quantityOnHand,
+                            referenceType: 'ChemicalOrder',
+                            referenceId: invoice.orderId || invoice._id,
+                            referenceNumber: invoice.invoiceNumber,
+                            location: 'main',
+                            notes: `Sold to ${invoice.customerName} - ${invoice.invoiceNumber}`,
+                            createdBy: req.user._id
+                        }).save();
+                    }
+                }
+                invoice.inventoryDeducted = true;
+            } catch (invErr) {
+                console.error('Inventory deduction error on payment:', invErr.message);
             }
         }
+
+        await invoice.save();
 
         res.json({ message: 'Payment recorded', invoice });
     } catch (error) {
@@ -16319,32 +16376,59 @@ app.post('/api/admin/invoices/:id/delivery', authMiddleware, adminMiddleware, as
         invoice.updatedAt = new Date();
         await invoice.save();
 
-        // If delivered and signed, deduct inventory
-        if (deliveryStatus === 'signed' && invoice.orderId) {
+        // If delivered and signed, deduct inventory (with idempotency guard)
+        if (deliveryStatus === 'signed' && !invoice.inventoryDeducted) {
             try {
-                const order = await ChemicalOrder.findById(invoice.orderId);
-                if (order) {
-                    for (const item of order.items) {
+                if (invoice.orderId) {
+                    // Order-based invoice: deduct from order items
+                    const order = await ChemicalOrder.findById(invoice.orderId);
+                    if (order) {
+                        for (const item of order.items) {
+                            if (item.chemicalId) {
+                                await deductInventory({
+                                    chemicalId: item.chemicalId,
+                                    quantity: item.quantity,
+                                    location: 'main',
+                                    orderId: order._id,
+                                    orderNumber: order.orderNumber,
+                                    userId: req.user._id,
+                                    notes: `Delivered - Invoice ${invoice.invoiceNumber}`
+                                });
+                            }
+                        }
+                        order.status = 'delivered';
+                        order.deliveredAt = new Date();
+                        await order.save();
+                    }
+                } else {
+                    // Standalone invoice: deduct from invoice items directly
+                    for (const item of (invoice.items || [])) {
                         if (item.chemicalId) {
-                            await deductInventory({
-                                chemicalId: item.chemicalId,
-                                quantity: item.quantity,
-                                location: 'main',
-                                orderId: order._id,
-                                orderNumber: order.orderNumber,
-                                userId: req.user._id,
-                                notes: `Delivered - Invoice ${invoice.invoiceNumber}`
-                            });
+                            const inv = await Inventory.findOne({ chemicalId: item.chemicalId, location: 'main' });
+                            if (inv) {
+                                const prevQty = inv.quantityOnHand;
+                                inv.quantityOnHand = Math.max(0, inv.quantityOnHand - (item.quantity || 0));
+                                inv.quantityAvailable = inv.quantityOnHand - inv.quantityReserved;
+                                inv.lastSoldDate = new Date();
+                                inv.updatedAt = new Date();
+                                await inv.save();
+                                await new InventoryTransaction({
+                                    inventoryId: inv._id, chemicalId: item.chemicalId,
+                                    productName: item.productName, type: 'sale',
+                                    quantityChange: -(item.quantity || 0),
+                                    previousQuantity: prevQty, newQuantity: inv.quantityOnHand,
+                                    referenceType: 'ChemicalOrder', referenceId: invoice._id,
+                                    referenceNumber: invoice.invoiceNumber, location: 'main',
+                                    notes: `Delivered to ${invoice.customerName} - ${invoice.invoiceNumber}`,
+                                    createdBy: req.user._id
+                                }).save();
+                            }
                         }
                     }
-
-                    // Update order status
-                    order.status = 'delivered';
-                    order.deliveredAt = new Date();
-                    await order.save();
                 }
+                invoice.inventoryDeducted = true;
+                await invoice.save();
             } catch (invError) {
-                // Log but don't fail the delivery confirmation
                 console.error('Inventory deduction error:', invError.message);
             }
         }
@@ -16370,6 +16454,60 @@ app.post('/api/orders/:id/confirm-delivery', authMiddleware, async (req, res) =>
         invoice.deliverySignedBy = signedBy || req.user.name;
         invoice.deliverySignedAt = new Date();
         invoice.updatedAt = new Date();
+
+        // Deduct inventory on customer delivery confirmation (with idempotency guard)
+        if (!invoice.inventoryDeducted) {
+            try {
+                if (invoice.orderId) {
+                    const order = await ChemicalOrder.findById(invoice.orderId);
+                    if (order) {
+                        for (const item of order.items) {
+                            if (item.chemicalId) {
+                                await deductInventory({
+                                    chemicalId: item.chemicalId,
+                                    quantity: item.quantity,
+                                    location: 'main',
+                                    orderId: order._id,
+                                    orderNumber: order.orderNumber,
+                                    userId: req.user._id,
+                                    notes: `Customer confirmed delivery - ${invoice.invoiceNumber}`
+                                });
+                            }
+                        }
+                        order.status = 'delivered';
+                        order.deliveredAt = new Date();
+                        await order.save();
+                    }
+                } else {
+                    for (const item of (invoice.items || [])) {
+                        if (item.chemicalId) {
+                            const inv = await Inventory.findOne({ chemicalId: item.chemicalId, location: 'main' });
+                            if (inv) {
+                                const prevQty = inv.quantityOnHand;
+                                inv.quantityOnHand = Math.max(0, inv.quantityOnHand - (item.quantity || 0));
+                                inv.quantityAvailable = inv.quantityOnHand - inv.quantityReserved;
+                                inv.lastSoldDate = new Date();
+                                inv.updatedAt = new Date();
+                                await inv.save();
+                                await new InventoryTransaction({
+                                    inventoryId: inv._id, chemicalId: item.chemicalId,
+                                    productName: item.productName, type: 'sale',
+                                    quantityChange: -(item.quantity || 0),
+                                    previousQuantity: prevQty, newQuantity: inv.quantityOnHand,
+                                    referenceType: 'ChemicalOrder', referenceId: invoice._id,
+                                    referenceNumber: invoice.invoiceNumber, location: 'main',
+                                    notes: `Customer delivery confirmed - ${invoice.invoiceNumber}`,
+                                    createdBy: req.user._id
+                                }).save();
+                            }
+                        }
+                    }
+                }
+                invoice.inventoryDeducted = true;
+            } catch (invError) {
+                console.error('Inventory deduction error on customer delivery:', invError.message);
+            }
+        }
 
         await invoice.save();
 
