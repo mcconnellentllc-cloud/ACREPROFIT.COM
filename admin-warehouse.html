@@ -179,32 +179,25 @@
             <div class="tab-content active" id="overviewTab">
                 <div class="stats-row" id="overviewStats">
                     <div class="stat-card">
-                        <h3>Total Inventory Value</h3>
+                        <h3>Chemicals Tracked</h3>
                         <div class="value" id="totalInventoryValue">--</div>
                     </div>
                     <div class="stat-card">
-                        <h3>Total Products</h3>
+                        <h3>Total Purchased</h3>
                         <div class="value" id="totalProductCount">--</div>
                     </div>
                     <div class="stat-card">
                         <h3>Total On Hand</h3>
                         <div class="value" id="totalOnHand">--</div>
                     </div>
-                    <div class="stat-card warning">
-                        <h3>Low Stock Items</h3>
+                    <div class="stat-card danger">
+                        <h3>Total Sold</h3>
                         <div class="value" id="overviewLowStock">--</div>
                     </div>
                 </div>
 
-                <div class="location-filters" id="overviewLocationFilters">
-                    <button class="location-chip active" data-location="all" onclick="filterOverviewLocation('all')">All Locations</button>
-                    <button class="location-chip" data-location="main" onclick="filterOverviewLocation('main')">Main</button>
-                    <button class="location-chip" data-location="haxtun" onclick="filterOverviewLocation('haxtun')">Haxtun</button>
-                    <button class="location-chip" data-location="otis" onclick="filterOverviewLocation('otis')">Otis</button>
-                </div>
-
                 <div id="overviewContent">
-                    <div class="loading">Loading warehouse data...</div>
+                    <div class="loading">Loading inventory data...</div>
                 </div>
             </div>
 
@@ -437,128 +430,173 @@
         // ========================================
         async function loadOverview() {
             const container = document.getElementById('overviewContent');
-            container.innerHTML = '<div class="loading">Loading warehouse data...</div>';
+            container.innerHTML = '<div class="loading">Loading inventory data...</div>';
 
             try {
-                const res = await fetch(`${API_BASE}/admin/warehouse/warehouse-summary`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error('Failed to load warehouse summary');
-                warehouseData = await res.json();
-                renderOverview();
+                const [whRes, poRes, invRes] = await Promise.all([
+                    fetch(`${API_BASE}/admin/warehouse/warehouse-summary`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/admin/warehouse/purchases-by-warehouse`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_BASE}/admin/warehouse/customer-accounting`, { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+
+                warehouseData = await whRes.json();
+                const poData = await poRes.json();
+                const custData = await invRes.json();
+
+                renderUnifiedOverview(warehouseData, poData, custData);
             } catch (err) {
-                container.innerHTML = `<div class="error-msg">Error loading warehouse data: ${err.message}</div>`;
+                container.innerHTML = `<div class="error-msg">Error loading data: ${err.message}</div>`;
             }
         }
 
-        function renderOverview() {
-            if (!warehouseData) return;
+        function renderUnifiedOverview(whData, poData, custData) {
+            const warehouses = whData.warehouses || whData.locations || [];
+            const purchaseOrders = poData.purchaseOrders || poData.locations || poData || [];
+            const customers = custData.customers || custData || [];
 
-            const data = warehouseData;
-            const warehouses = data.warehouses || data.locations || [];
-            const locationFilter = selectedOverviewLocation;
+            // Build a map of all chemicals with their data
+            const chemMap = {};
 
-            // Compute totals
-            let totalValue = 0;
-            let totalProducts = 0;
-            let totalOnHand = 0;
-            let lowStockCount = 0;
-
-            const filteredWarehouses = warehouses.filter(w => {
-                const loc = (w.location || w.name || '').toLowerCase();
-                return locationFilter === 'all' || loc === locationFilter;
-            });
-
-            filteredWarehouses.forEach(w => {
-                const wValue = w.totalValue || 0;
-                totalValue += wValue;
-                const prods = w.products || w.items || [];
-                totalProducts += prods.length;
-                prods.forEach(p => {
-                    const onHand = p.onHand || p.quantityOnHand || 0;
-                    totalOnHand += onHand;
-                    if (onHand <= 0) lowStockCount++;
+            // 1. Gather purchases from POs
+            const allPOs = Array.isArray(purchaseOrders) ? purchaseOrders : Object.values(purchaseOrders).flat();
+            allPOs.forEach(po => {
+                const poItems = po.items || [];
+                poItems.forEach(item => {
+                    const name = item.productName || item.product || '';
+                    if (!name) return;
+                    const key = name.toLowerCase().replace(/\s+/g, '_');
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, warehouses: {}, sold: 0, soldDetails: [] };
+                    chemMap[key].purchased += (item.quantityOrdered || item.qty || 0);
                 });
             });
 
-            document.getElementById('totalInventoryValue').textContent = formatMoney(totalValue);
-            document.getElementById('totalProductCount').textContent = totalProducts;
-            document.getElementById('totalOnHand').textContent = totalOnHand;
-            document.getElementById('overviewLowStock').textContent = lowStockCount;
-
-            // Render each warehouse as a card
-            const container = document.getElementById('overviewContent');
-            if (!filteredWarehouses.length) {
-                container.innerHTML = '<div class="empty-state"><h3>No warehouse data</h3><p>No inventory found for the selected location.</p></div>';
-                return;
-            }
-
-            let html = '';
-            filteredWarehouses.forEach(w => {
-                const loc = w.location || w.name || 'Unknown';
+            // 2. Gather warehouse inventory
+            warehouses.forEach(w => {
+                const loc = w.location || w.name || 'unknown';
                 const prods = w.products || w.items || [];
-                const wValue = w.totalValue || 0;
+                prods.forEach(p => {
+                    const name = p.productName || p.name || '';
+                    if (!name) return;
+                    const key = name.toLowerCase().replace(/\s+/g, '_');
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, warehouses: {}, sold: 0, soldDetails: [] };
+                    const onHand = p.onHand || p.quantityOnHand || 0;
+                    chemMap[key].warehouses[loc] = (chemMap[key].warehouses[loc] || 0) + onHand;
+                });
+            });
 
-                html += `
-                <div class="card warehouse-section">
+            // 3. Gather sales from customer accounting
+            customers.forEach(cust => {
+                const custName = cust.customerName || cust.name || 'Unknown';
+                const products = cust.products || [];
+                products.forEach(p => {
+                    const name = p.productName || p.name || '';
+                    if (!name) return;
+                    const key = name.toLowerCase().replace(/\s+/g, '_');
+                    if (!chemMap[key]) chemMap[key] = { name, purchased: 0, warehouses: {}, sold: 0, soldDetails: [] };
+                    const qty = p.totalQuantity || p.quantity || 0;
+                    chemMap[key].sold += qty;
+                    chemMap[key].soldDetails.push({ customer: custName, qty });
+                });
+            });
+
+            // All known warehouse locations
+            const allLocations = new Set();
+            Object.values(chemMap).forEach(c => {
+                Object.keys(c.warehouses).forEach(loc => allLocations.add(loc));
+            });
+            const locations = Array.from(allLocations).sort();
+            if (!locations.length) locations.push('main');
+
+            // Calculate totals
+            let grandPurchased = 0, grandSold = 0, grandOnHand = 0, grandAvailable = 0;
+
+            const chemicals = Object.values(chemMap).sort((a, b) => a.name.localeCompare(b.name));
+
+            chemicals.forEach(c => {
+                c.totalOnHand = Object.values(c.warehouses).reduce((s, v) => s + v, 0);
+                c.available = c.purchased - c.sold - c.totalOnHand;
+                grandPurchased += c.purchased;
+                grandSold += c.sold;
+                grandOnHand += c.totalOnHand;
+            });
+            grandAvailable = grandPurchased - grandSold;
+
+            // Update stat cards
+            document.getElementById('totalInventoryValue').textContent = chemicals.length + ' chemicals';
+            document.getElementById('totalProductCount').textContent = grandPurchased.toLocaleString();
+            document.getElementById('totalOnHand').textContent = grandOnHand.toLocaleString();
+            document.getElementById('overviewLowStock').textContent = grandSold.toLocaleString();
+
+            // Build the unified table
+            const locationHeaders = locations.map(loc => `<th class="text-right" style="min-width:90px;">${capitalize(loc)}</th>`).join('');
+
+            let rows = '';
+            chemicals.forEach(c => {
+                const warehouseCells = locations.map(loc => {
+                    const qty = c.warehouses[loc] || 0;
+                    const cls = qty > 0 ? 'stock-healthy' : 'stock-zero';
+                    return `<td class="text-right ${cls}">${qty > 0 ? qty.toLocaleString() : '0'}</td>`;
+                }).join('');
+
+                const totalInv = c.totalOnHand;
+                const unaccounted = c.purchased - c.sold - totalInv;
+                const unaccountedClass = Math.abs(unaccounted) < 1 ? 'stock-healthy' : (unaccounted > 0 ? 'stock-low' : 'stock-zero');
+
+                // Sold details tooltip
+                const soldTip = c.soldDetails.map(d => `${d.customer}: ${d.qty}`).join(', ');
+
+                rows += `<tr>
+                    <td><strong>${c.name}</strong></td>
+                    <td class="text-right">${c.purchased.toLocaleString()}</td>
+                    ${warehouseCells}
+                    <td class="text-right" style="font-weight:700;">${totalInv.toLocaleString()}</td>
+                    <td class="text-right" title="${soldTip}" style="cursor:help;">${c.sold.toLocaleString()}</td>
+                    <td class="text-right ${unaccountedClass}" style="font-weight:700;">${unaccounted > 0 ? unaccounted.toLocaleString() : unaccounted === 0 ? '0' : unaccounted.toLocaleString()}</td>
+                </tr>`;
+            });
+
+            // Totals row
+            const locationTotals = locations.map(loc => {
+                const total = chemicals.reduce((s, c) => s + (c.warehouses[loc] || 0), 0);
+                return `<td class="text-right">${total.toLocaleString()}</td>`;
+            }).join('');
+
+            const container = document.getElementById('overviewContent');
+            container.innerHTML = `
+                <div class="card">
                     <div class="card-header">
-                        <h2>${capitalize(loc)} Warehouse</h2>
-                        <span style="font-size: 0.9rem;">Value: ${formatMoney(wValue)} | ${prods.length} product${prods.length !== 1 ? 's' : ''}</span>
+                        <h2>Chemical Inventory Summary</h2>
+                        <span style="font-size:0.9rem;">${chemicals.length} products across ${locations.length} warehouse(s)</span>
                     </div>
-                    <div class="card-body">`;
-
-                if (!prods.length) {
-                    html += '<div class="empty-state">No products at this location</div>';
-                } else {
-                    html += `<table class="data-table">
-                        <thead>
-                            <tr>
-                                <th>Product Name</th>
-                                <th class="text-right">On Hand</th>
-                                <th class="text-right">Reserved</th>
-                                <th class="text-right">Available</th>
-                                <th class="text-right">Avg Cost</th>
-                                <th class="text-right">Value</th>
-                            </tr>
-                        </thead>
-                        <tbody>`;
-
-                    prods.forEach(p => {
-                        const onHand = p.onHand || p.quantityOnHand || 0;
-                        const reserved = p.reserved || p.quantityReserved || 0;
-                        const available = p.available || p.quantityAvailable || (onHand - reserved);
-                        const avgCost = p.avgCost || p.averageCost || 0;
-                        const value = p.value || p.totalValue || (onHand * avgCost);
-
-                        let stockClass = 'stock-healthy';
-                        if (onHand <= 0) stockClass = 'stock-zero';
-                        else if (onHand < 10) stockClass = 'stock-low';
-
-                        html += `<tr>
-                            <td><strong>${p.productName || p.name || 'Unknown'}</strong></td>
-                            <td class="text-right ${stockClass}">${onHand}</td>
-                            <td class="text-right">${reserved}</td>
-                            <td class="text-right">${available}</td>
-                            <td class="text-right">${formatMoney(avgCost)}</td>
-                            <td class="text-right"><strong>${formatMoney(value)}</strong></td>
-                        </tr>`;
-                    });
-
-                    html += `</tbody></table>`;
-                }
-
-                html += `</div></div>`;
-            });
-
-            container.innerHTML = html;
-        }
-
-        function filterOverviewLocation(location) {
-            selectedOverviewLocation = location;
-            document.querySelectorAll('#overviewLocationFilters .location-chip').forEach(chip => {
-                chip.classList.toggle('active', chip.dataset.location === location);
-            });
-            renderOverview();
+                    <div class="card-body">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Chemical</th>
+                                    <th class="text-right">Total Purchased</th>
+                                    ${locationHeaders}
+                                    <th class="text-right" style="background:#e6efe5;">Total Inventory</th>
+                                    <th class="text-right" style="background:#fceeec;">Total Sold</th>
+                                    <th class="text-right" style="background:#fef7ea;">Unaccounted</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${rows}
+                            </tbody>
+                            <tfoot>
+                                <tr>
+                                    <td><strong>TOTALS</strong></td>
+                                    <td class="text-right">${grandPurchased.toLocaleString()}</td>
+                                    ${locationTotals}
+                                    <td class="text-right">${grandOnHand.toLocaleString()}</td>
+                                    <td class="text-right">${grandSold.toLocaleString()}</td>
+                                    <td class="text-right">${(grandPurchased - grandSold - grandOnHand).toLocaleString()}</td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                    </div>
+                </div>
+            `;
         }
 
         // ========================================
