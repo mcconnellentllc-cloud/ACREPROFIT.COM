@@ -1422,8 +1422,12 @@
                                 <th>Admin Margin $</th>
                                 <th>Margin $</th>
                                 <th>Sell Price</th>
-                                <th>Inventory</th>
-                                <th>Units Sold</th>
+                                <th>Ordered</th>
+                                <th>Kyle's</th>
+                                <th>Ty's</th>
+                                <th>Total Inv</th>
+                                <th>Sold</th>
+                                <th>Off</th>
                                 <th>Revenue</th>
                                 <th>Actions</th>
                             </tr>
@@ -6286,16 +6290,92 @@
 
         async function loadProducts() {
             try {
-                // Use the endpoint that includes inventory data
                 const statusFilter = document.getElementById('productStatusFilter')?.value || 'active';
-                const res = await fetch(`${API_URL}/api/admin/products-with-inventory?status=${statusFilter}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                const [productsRes, warehouseRes, poRes, custRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/products-with-inventory?status=${statusFilter}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_URL}/api/admin/warehouse/warehouse-summary`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).catch(() => null),
+                    fetch(`${API_URL}/api/admin/warehouse/purchases-by-warehouse`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).catch(() => null),
+                    fetch(`${API_URL}/api/admin/warehouse/customer-accounting`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).catch(() => null)
+                ]);
+                allProducts = await productsRes.json();
+
+                // Build PO totals by product name
+                const poMap = {};
+                if (poRes && poRes.ok) {
+                    const poData = await poRes.json();
+                    const allPOs = Array.isArray(poData) ? poData : (poData.purchaseOrders || Object.values(poData).flat() || []);
+                    allPOs.forEach(po => {
+                        (po.items || []).forEach(item => {
+                            const name = (item.productName || '').toLowerCase().trim();
+                            if (!name) return;
+                            poMap[name] = (poMap[name] || 0) + (item.quantityOrdered || item.qty || 0);
+                        });
+                    });
+                }
+
+                // Build sold totals by product name from invoices
+                const soldMap = {};
+                if (custRes && custRes.ok) {
+                    const custData = await custRes.json();
+                    const customers = custData.customers || custData || [];
+                    customers.forEach(cust => {
+                        const invoices = cust.invoices || [];
+                        invoices.forEach(inv => {
+                            (inv.items || []).forEach(item => {
+                                const name = (item.productName || '').toLowerCase().trim();
+                                if (!name) return;
+                                soldMap[name] = (soldMap[name] || 0) + (item.quantity || 0);
+                            });
+                        });
+                        if (!invoices.length) {
+                            (cust.products || []).forEach(p => {
+                                const name = (p.productName || p.name || '').toLowerCase().trim();
+                                if (!name) return;
+                                soldMap[name] = (soldMap[name] || 0) + (p.totalQuantity || p.quantity || 0);
+                            });
+                        }
+                    });
+                }
+
+                // Enrich products with per-warehouse inventory
+                const whMap = {};
+                if (warehouseRes && warehouseRes.ok) {
+                    const whData = await warehouseRes.json();
+                    const warehouses = whData.warehouses || whData.locations || [];
+                    warehouses.forEach(w => {
+                        const loc = (w.location || w.name || '').toLowerCase();
+                        const prods = w.products || w.items || [];
+                        prods.forEach(p => {
+                            const id = (p.chemicalId || p._id || '').toString();
+                            if (!whMap[id]) whMap[id] = {};
+                            whMap[id][loc] = p.onHand || p.quantityOnHand || 0;
+                        });
+                    });
+                }
+
+                allProducts.forEach(p => {
+                    const id = (p._id || '').toString();
+                    const wh = whMap[id] || {};
+                    p._kyleInv = wh['main'] || wh['kyle'] || wh['kyles'] || 0;
+                    p._tyInv = wh['ty'] || wh['tys'] || wh['haxtun'] || 0;
+                    p._totalAvail = p._kyleInv + p._tyInv;
+                    const name = (p.productName || '').toLowerCase().trim();
+                    p._ordered = poMap[name] || 0;
+                    p._sold = soldMap[name] || p.unitsSold || 0;
+                    p._off = p._ordered - p._sold - p._totalAvail;
                 });
-                allProducts = await res.json();
+
                 filterProducts();
             } catch (error) {
                 console.error('Error loading products:', error);
-                // Fallback to regular products endpoint
                 try {
                     const res = await fetch(`${API_URL}/api/admin/products`, {
                         headers: { 'Authorization': `Bearer ${token}` }
@@ -6349,7 +6429,7 @@
             const tbody = document.getElementById('productsTableBody');
 
             if (!products.length) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="14" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
                 return;
             }
 
@@ -6409,11 +6489,23 @@
                         <br><small style="color: var(--text-muted);">/unit</small>
                     </td>
                     <td>${fmtMoney(sellPrice)}</td>
+                    <td style="font-weight:700;">${(p._ordered || 0).toLocaleString()}</td>
                     <td>
-                        <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
-                        ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
+                        <span style="color: ${(p._kyleInv || 0) > 0 ? '#059669' : '#999'}; font-weight: 700;">${(p._kyleInv || 0).toLocaleString()}</span>
                     </td>
-                    <td>${p.unitsSold || 0}</td>
+                    <td>
+                        <span style="color: ${(p._tyInv || 0) > 0 ? '#7c3aed' : '#999'}; font-weight: 700;">${(p._tyInv || 0).toLocaleString()}</span>
+                    </td>
+                    <td>
+                        <span style="color: ${inventoryColor}; font-weight: 700;">${(p._totalAvail || inventory).toLocaleString()}</span>
+                    </td>
+                    <td>${(p._sold || 0).toLocaleString()}</td>
+                    <td>
+                        <span style="color: ${Math.abs(p._off || 0) < 1 ? '#059669' : (p._off || 0) > 0 ? '#d97706' : '#dc2626'}; font-weight: 700;">
+                            ${(p._off || 0) === 0 ? '0' : (p._off > 0 ? '+' : '') + (p._off || 0).toLocaleString()}
+                        </span>
+                        ${Math.abs(p._off || 0) > 0 ? `<br><small style="color:#999;">${(p._off || 0) > 0 ? 'needs billed' : 'missing PO?'}</small>` : ''}
+                    </td>
                     <td>${fmtMoneyLocale((p.totalRevenue || 0))}</td>
                     <td>
                         <button class="btn btn-sm ${needsPricing && inventory > 0 ? 'btn-primary' : 'btn-outline'}" onclick='openEditProductModal(${JSON.stringify(p).replace(/'/g, "&#39;")})' title="Edit margins" ${needsPricing && inventory > 0 ? 'style="background:#dc2626; border-color:#dc2626; animation: pulse 2s infinite;"' : ''}>
