@@ -4813,6 +4813,19 @@ const createRawTransporter = () => {
         }
         const t = nodemailer.createTransport(config);
         t._transport = 'smtp';
+        // Override sendMail to force the from address with envelope sender
+        // This ensures M365 uses the alias display name, not the account name
+        const originalSendMail = t.sendMail.bind(t);
+        t.sendMail = async (opts) => {
+            const fromAddr = process.env.EMAIL_FROM || '"Acre Profit" <contact@acreprofit.com>';
+            opts.from = fromAddr;
+            opts.sender = fromAddr;
+            opts.envelope = {
+                from: 'contact@acreprofit.com',
+                to: opts.to
+            };
+            return originalSendMail(opts);
+        };
         return t;
     }
     if (process.env.GMAIL_USER && process.env.GMAIL_APP_PASSWORD) {
