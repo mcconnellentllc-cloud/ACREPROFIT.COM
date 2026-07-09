@@ -1422,7 +1422,9 @@
                                 <th>Admin Margin $</th>
                                 <th>Margin $</th>
                                 <th>Sell Price</th>
-                                <th>Inventory</th>
+                                <th>Kyle's</th>
+                                <th>Ty's</th>
+                                <th>Total Avail</th>
                                 <th>Units Sold</th>
                                 <th>Revenue</th>
                                 <th>Actions</th>
@@ -6286,16 +6288,43 @@
 
         async function loadProducts() {
             try {
-                // Use the endpoint that includes inventory data
                 const statusFilter = document.getElementById('productStatusFilter')?.value || 'active';
-                const res = await fetch(`${API_URL}/api/admin/products-with-inventory?status=${statusFilter}`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                allProducts = await res.json();
+                const [productsRes, warehouseRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/products-with-inventory?status=${statusFilter}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_URL}/api/admin/warehouse/warehouse-summary`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).catch(() => null)
+                ]);
+                allProducts = await productsRes.json();
+
+                // Enrich products with per-warehouse inventory
+                if (warehouseRes && warehouseRes.ok) {
+                    const whData = await warehouseRes.json();
+                    const warehouses = whData.warehouses || whData.locations || [];
+                    const whMap = {};
+                    warehouses.forEach(w => {
+                        const loc = (w.location || w.name || '').toLowerCase();
+                        const prods = w.products || w.items || [];
+                        prods.forEach(p => {
+                            const id = (p.chemicalId || p._id || '').toString();
+                            if (!whMap[id]) whMap[id] = {};
+                            whMap[id][loc] = p.onHand || p.quantityOnHand || 0;
+                        });
+                    });
+                    allProducts.forEach(p => {
+                        const id = (p._id || '').toString();
+                        const wh = whMap[id] || {};
+                        p._kyleInv = wh['main'] || wh['kyle'] || wh['kyles'] || 0;
+                        p._tyInv = wh['ty'] || wh['tys'] || wh['haxtun'] || 0;
+                        p._totalAvail = p._kyleInv + p._tyInv;
+                    });
+                }
+
                 filterProducts();
             } catch (error) {
                 console.error('Error loading products:', error);
-                // Fallback to regular products endpoint
                 try {
                     const res = await fetch(`${API_URL}/api/admin/products`, {
                         headers: { 'Authorization': `Bearer ${token}` }
@@ -6349,7 +6378,7 @@
             const tbody = document.getElementById('productsTableBody');
 
             if (!products.length) {
-                tbody.innerHTML = '<tr><td colspan="10" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="12" class="empty">No products found. Click "+ Add Product" to add your first product.</td></tr>';
                 return;
             }
 
@@ -6410,8 +6439,14 @@
                     </td>
                     <td>${fmtMoney(sellPrice)}</td>
                     <td>
-                        <span style="color: ${inventoryColor}; font-weight: 700;">${inventory}</span>
-                        ${inventory === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
+                        <span style="color: ${(p._kyleInv || 0) > 0 ? '#059669' : '#999'}; font-weight: 700;">${p._kyleInv || 0}</span>
+                    </td>
+                    <td>
+                        <span style="color: ${(p._tyInv || 0) > 0 ? '#7c3aed' : '#999'}; font-weight: 700;">${p._tyInv || 0}</span>
+                    </td>
+                    <td>
+                        <span style="color: ${inventoryColor}; font-weight: 700;">${p._totalAvail || inventory}</span>
+                        ${(p._totalAvail || inventory) === 0 ? '<br><small style="color: #dc2626;">Out of stock</small>' : ''}
                     </td>
                     <td>${p.unitsSold || 0}</td>
                     <td>${fmtMoneyLocale((p.totalRevenue || 0))}</td>
