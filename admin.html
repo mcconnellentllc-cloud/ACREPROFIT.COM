@@ -6504,7 +6504,7 @@
                         <span style="color: ${Math.abs(p._off || 0) < 1 ? '#059669' : (p._off || 0) > 0 ? '#d97706' : '#dc2626'}; font-weight: 700;">
                             ${(p._off || 0) === 0 ? '0' : (p._off > 0 ? '+' : '') + (p._off || 0).toLocaleString()}
                         </span>
-                        ${Math.abs(p._off || 0) > 0 ? `<br><small style="color:#999;">${(p._off || 0) > 0 ? 'farm use?' : 'missing PO?'}</small>` : ''}
+                        ${Math.abs(p._off || 0) > 0 ? `<br><small style="color:#999;">${(p._off || 0) > 0 ? 'needs billed' : 'missing PO?'}</small>` : ''}
                     </td>
                     <td>${fmtMoneyLocale((p.totalRevenue || 0))}</td>
                     <td>
