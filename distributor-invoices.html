@@ -214,18 +214,27 @@
             <!-- Existing Invoices -->
             <div class="card" style="margin-top: 32px;">
                 <div class="card-header">
-                    <h2>Recent Invoices</h2>
-                    <div class="header-actions">
-                        <select id="invoiceStatusFilter" class="form-control-sm" onchange="loadInvoices()">
-                            <option value="">All Statuses</option>
-                            <option value="draft">Draft</option>
-                            <option value="sent">Sent</option>
-                            <option value="paid">Paid</option>
-                            <option value="overdue">Overdue</option>
-                            <option value="voided">Voided</option>
-                        </select>
-                    </div>
+                    <h2>Invoices</h2>
                 </div>
+                <div style="display:flex; gap:0; border-bottom:2px solid #eee; background:#f8f9fa; padding:0 1rem;">
+                    <button class="inv-tab active" data-status="" onclick="filterInvoiceTab(this, '')">All <span class="inv-tab-count" id="countAll">0</span></button>
+                    <button class="inv-tab" data-status="draft" onclick="filterInvoiceTab(this, 'draft')">Drafts <span class="inv-tab-count" id="countDraft">0</span></button>
+                    <button class="inv-tab" data-status="sent" onclick="filterInvoiceTab(this, 'sent')">Sent <span class="inv-tab-count" id="countSent">0</span></button>
+                    <button class="inv-tab" data-status="viewed" onclick="filterInvoiceTab(this, 'viewed')">Read <span class="inv-tab-count" id="countViewed">0</span></button>
+                    <button class="inv-tab" data-status="paid" onclick="filterInvoiceTab(this, 'paid')">Paid <span class="inv-tab-count" id="countPaid">0</span></button>
+                    <button class="inv-tab" data-status="overdue" onclick="filterInvoiceTab(this, 'overdue')">Overdue <span class="inv-tab-count inv-tab-count-red" id="countOverdue">0</span></button>
+                    <button class="inv-tab" data-status="voided" onclick="filterInvoiceTab(this, 'voided')">Voided <span class="inv-tab-count" id="countVoided">0</span></button>
+                </div>
+                <!-- Hidden select for backward compat -->
+                <select id="invoiceStatusFilter" style="display:none;">
+                    <option value="">All</option>
+                    <option value="draft">Draft</option>
+                    <option value="sent">Sent</option>
+                    <option value="viewed">Read</option>
+                    <option value="paid">Paid</option>
+                    <option value="overdue">Overdue</option>
+                    <option value="voided">Voided</option>
+                </select>
                 <div class="table-container">
                     <table class="admin-table">
                         <thead>
@@ -937,24 +946,51 @@
             updateTotals();
         }
 
+        let allInvoicesCache = [];
+
+        function filterInvoiceTab(btn, status) {
+            document.querySelectorAll('.inv-tab').forEach(t => t.classList.remove('active'));
+            btn.classList.add('active');
+            document.getElementById('invoiceStatusFilter').value = status;
+            if (allInvoicesCache.length) {
+                const filtered = status ? allInvoicesCache.filter(i => i.status === status) : allInvoicesCache;
+                renderInvoicesTable(filtered);
+            } else {
+                loadInvoices();
+            }
+        }
+
         async function loadInvoices() {
             try {
-                const status = document.getElementById('invoiceStatusFilter').value;
-                let url = `${API_URL}/api/admin/invoices`;
-                if (status) url += `?status=${status}`;
-
-                const response = await fetch(url, {
+                const response = await fetch(`${API_URL}/api/admin/invoices`, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
 
                 if (!response.ok) throw new Error('Failed to load invoices');
 
-                const invoices = await response.json();
-                renderInvoicesTable(invoices);
+                allInvoicesCache = await response.json();
+
+                // Update tab counts
+                const counts = { draft: 0, sent: 0, viewed: 0, paid: 0, overdue: 0, voided: 0 };
+                allInvoicesCache.forEach(inv => {
+                    if (counts[inv.status] !== undefined) counts[inv.status]++;
+                });
+                document.getElementById('countAll').textContent = allInvoicesCache.length;
+                document.getElementById('countDraft').textContent = counts.draft;
+                document.getElementById('countSent').textContent = counts.sent;
+                document.getElementById('countViewed').textContent = counts.viewed;
+                document.getElementById('countPaid').textContent = counts.paid;
+                document.getElementById('countOverdue').textContent = counts.overdue;
+                document.getElementById('countVoided').textContent = counts.voided;
+
+                // Apply current filter
+                const status = document.getElementById('invoiceStatusFilter').value;
+                const filtered = status ? allInvoicesCache.filter(i => i.status === status) : allInvoicesCache;
+                renderInvoicesTable(filtered);
             } catch (error) {
                 console.error('Error loading invoices:', error);
                 document.getElementById('invoicesTableBody').innerHTML =
-                    '<tr><td colspan="6" class="error">Failed to load invoices</td></tr>';
+                    '<tr><td colspan="6" class="error">Failed to load invoices. Check connection.</td></tr>';
             }
         }
 
@@ -1939,6 +1975,32 @@
             font-weight: 500;
             margin-right: 16px;
         }
+
+        .inv-tab {
+            padding: 0.75rem 1.25rem;
+            border: none;
+            background: transparent;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 0.9rem;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        .inv-tab:hover { color: #333; background: rgba(0,0,0,0.03); }
+        .inv-tab.active { color: #2d5a27; border-bottom-color: #2d5a27; }
+        .inv-tab-count {
+            display: inline-block;
+            background: #e5e7eb;
+            color: #555;
+            font-size: 0.72rem;
+            padding: 0.1rem 0.45rem;
+            border-radius: 10px;
+            margin-left: 0.25rem;
+            font-weight: 700;
+        }
+        .inv-tab.active .inv-tab-count { background: #2d5a27; color: white; }
+        .inv-tab-count-red { background: #fecaca !important; color: #dc2626 !important; }
     </style>
 </body>
 </html>
