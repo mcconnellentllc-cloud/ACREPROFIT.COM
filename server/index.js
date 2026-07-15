@@ -5939,6 +5939,31 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
         customer.updatedAt = new Date();
         await customer.save();
 
+        // Cascade update: sync customer name/email/phone to all their invoices and orders
+        const updateFields = {};
+        if (name !== undefined) updateFields.customerName = name;
+        if (email !== undefined) updateFields.customerEmail = email.toLowerCase();
+        if (phone !== undefined) updateFields.customerPhone = phone;
+
+        if (Object.keys(updateFields).length > 0) {
+            updateFields.updatedAt = new Date();
+            await Invoice.updateMany(
+                { customerId: customer._id },
+                { $set: updateFields }
+            );
+            const orderUpdateFields = {};
+            if (name !== undefined) orderUpdateFields['contactInfo.name'] = name;
+            if (email !== undefined) orderUpdateFields['contactInfo.email'] = email.toLowerCase();
+            if (phone !== undefined) orderUpdateFields['contactInfo.phone'] = phone;
+            if (Object.keys(orderUpdateFields).length > 0) {
+                orderUpdateFields.updatedAt = new Date();
+                await ChemicalOrder.updateMany(
+                    { userId: customer._id },
+                    { $set: orderUpdateFields }
+                );
+            }
+        }
+
         res.json(customer);
     } catch (error) {
         res.status(400).json({ error: error.message });
