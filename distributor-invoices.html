@@ -480,12 +480,35 @@
 
         async function loadProducts() {
             try {
-                const response = await fetch(`${API_URL}/api/distributor/products`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!response.ok) throw new Error('Failed to load products');
+                const [productsRes, whRes] = await Promise.all([
+                    fetch(`${API_URL}/api/distributor/products`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }),
+                    fetch(`${API_URL}/api/admin/warehouse/warehouse-summary`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    }).catch(() => null)
+                ]);
+                if (!productsRes.ok) throw new Error('Failed to load products');
+                products = await productsRes.json();
 
-                products = await response.json();
+                if (whRes && whRes.ok) {
+                    const whData = await whRes.json();
+                    const warehouses = whData.warehouses || whData.locations || [];
+                    const whMap = {};
+                    warehouses.forEach(w => {
+                        const loc = (w.location || w.name || '').toLowerCase();
+                        (w.products || w.items || []).forEach(p => {
+                            const id = (p.chemicalId || p._id || '').toString();
+                            if (!whMap[id]) whMap[id] = {};
+                            whMap[id][loc] = p.onHand || p.quantityOnHand || 0;
+                        });
+                    });
+                    products.forEach(p => {
+                        const wh = whMap[(p._id || '').toString()] || {};
+                        p._kyleInv = wh['main'] || wh['kyle'] || wh['kyles'] || 0;
+                        p._tyInv = wh['ty'] || wh['tys'] || wh['haxtun'] || 0;
+                    });
+                }
             } catch (error) {
                 console.error('Error loading products:', error);
             }
@@ -532,12 +555,24 @@
             if (filtered.length === 0) {
                 dropdown.innerHTML = '<div class="dropdown-empty">No products found</div>';
             } else {
-                dropdown.innerHTML = filtered.map(p => `
-                    <div class="dropdown-item" onclick="addProduct('${p._id}')">
-                        <span class="product-name">${p.productName}</span>
-                        <span class="product-details">${p.packSize} - ${fmtMoney(p.effectivePrice || p.baseRetailPrice || p.sellPrice || p.price || 0)}/${p.unit}</span>
-                    </div>
-                `).join('');
+                dropdown.innerHTML = filtered.map(p => {
+                    const inv = p.quantityOnHand || 0;
+                    const kyle = p._kyleInv || 0;
+                    const ty = p._tyInv || 0;
+                    const total = kyle + ty || inv;
+                    const stockColor = total > 0 ? '#059669' : '#dc2626';
+                    const stockText = total > 0
+                        ? `In Stock: ${total} (Kyle: ${kyle}, Ty: ${ty})`
+                        : 'Out of Stock';
+                    return `
+                    <div class="dropdown-item" onclick="addProduct('${p._id}')" style="display:flex; justify-content:space-between; align-items:center;">
+                        <div>
+                            <span class="product-name">${p.productName}</span>
+                            <span class="product-details">${p.packSize} - ${fmtMoney(p.effectivePrice || p.baseRetailPrice || p.sellPrice || p.price || 0)}/${p.unit}</span>
+                        </div>
+                        <span style="font-size:0.75rem; font-weight:600; color:${stockColor}; white-space:nowrap; margin-left:8px;">${stockText}</span>
+                    </div>`;
+                }).join('');
             }
 
             dropdown.style.display = 'block';
