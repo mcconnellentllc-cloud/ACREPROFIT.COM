@@ -5909,9 +5909,11 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
 
         const { name, email, phone, farm, state, acres, crops, privateApplicatorLicense } = req.body;
 
-        // Update fields if provided
+        // Update fields if provided (skip email if unchanged to avoid unique index conflict)
         if (name !== undefined) customer.name = name;
-        if (email !== undefined) customer.email = email.toLowerCase();
+        if (email !== undefined && email.toLowerCase() !== customer.email) {
+            customer.email = email.toLowerCase();
+        }
         if (phone !== undefined) customer.phone = phone;
 
         // Update farm as an object
@@ -5938,6 +5940,31 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
 
         customer.updatedAt = new Date();
         await customer.save();
+
+        // Cascade update: sync customer name/email/phone to all their invoices and orders
+        const updateFields = {};
+        if (name !== undefined) updateFields.customerName = name;
+        if (email !== undefined) updateFields.customerEmail = email.toLowerCase();
+        if (phone !== undefined) updateFields.customerPhone = phone;
+
+        if (Object.keys(updateFields).length > 0) {
+            updateFields.updatedAt = new Date();
+            await Invoice.updateMany(
+                { customerId: customer._id },
+                { $set: updateFields }
+            );
+            const orderUpdateFields = {};
+            if (name !== undefined) orderUpdateFields['contactInfo.name'] = name;
+            if (email !== undefined) orderUpdateFields['contactInfo.email'] = email.toLowerCase();
+            if (phone !== undefined) orderUpdateFields['contactInfo.phone'] = phone;
+            if (Object.keys(orderUpdateFields).length > 0) {
+                orderUpdateFields.updatedAt = new Date();
+                await ChemicalOrder.updateMany(
+                    { userId: customer._id },
+                    { $set: orderUpdateFields }
+                );
+            }
+        }
 
         res.json(customer);
     } catch (error) {
