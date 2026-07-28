@@ -5909,10 +5909,17 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
 
         const { name, email, phone, farm, state, acres, crops, privateApplicatorLicense } = req.body;
 
-        // Update fields if provided (skip email if unchanged to avoid unique index conflict)
+        // Update fields if provided
         if (name !== undefined) customer.name = name;
-        if (email !== undefined && email.toLowerCase() !== customer.email) {
-            customer.email = email.toLowerCase();
+        if (email !== undefined) {
+            const newEmail = email.toLowerCase();
+            if (newEmail !== customer.email) {
+                const existing = await User.findOne({ email: newEmail, _id: { $ne: customer._id } });
+                if (existing) {
+                    return res.status(400).json({ error: `Email ${newEmail} is already in use by ${existing.name}` });
+                }
+                customer.email = newEmail;
+            }
         }
         if (phone !== undefined) customer.phone = phone;
 
