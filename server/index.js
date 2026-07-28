@@ -5909,9 +5909,11 @@ app.put('/api/admin/customers/:customerId', authMiddleware, adminMiddleware, asy
 
         const { name, email, phone, farm, state, acres, crops, privateApplicatorLicense } = req.body;
 
-        // Update fields if provided
+        // Update fields if provided (skip email if unchanged to avoid unique index conflict)
         if (name !== undefined) customer.name = name;
-        if (email !== undefined) customer.email = email.toLowerCase();
+        if (email !== undefined && email.toLowerCase() !== customer.email) {
+            customer.email = email.toLowerCase();
+        }
         if (phone !== undefined) customer.phone = phone;
 
         // Update farm as an object
