@@ -259,7 +259,10 @@
     <!-- View Invoice Modal -->
     <div id="viewInvoiceModal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.5); z-index:1000; align-items:center; justify-content:center;">
         <div style="background:#fff; max-width:720px; width:92%; max-height:90vh; overflow:auto; border-radius:8px; padding:24px; position:relative;">
-            <button onclick="closeViewInvoice()" style="position:absolute; top:12px; right:12px; background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+            <div style="position:absolute; top:12px; right:12px; display:flex; gap:8px; align-items:center;">
+                <button onclick="printInvoice()" style="background:#2d5a27; color:white; border:none; padding:6px 14px; border-radius:4px; cursor:pointer; font-weight:600; font-size:0.85rem;">Print</button>
+                <button onclick="closeViewInvoice()" style="background:none; border:none; font-size:24px; cursor:pointer; color:#666;">&times;</button>
+            </div>
             <div id="viewInvoiceContent">Loading...</div>
         </div>
     </div>
@@ -1249,6 +1252,24 @@
                 // Non-fatal — just skip the credit notes block
                 console.warn('Failed to load credit notes:', err.message);
             }
+        }
+
+        function printInvoice() {
+            const content = document.getElementById('viewInvoiceContent').innerHTML;
+            const printWin = window.open('', '_blank');
+            printWin.document.write(`
+                <html><head><title>Invoice</title>
+                <style>
+                    body { font-family: 'Segoe UI', system-ui, sans-serif; padding: 40px; max-width: 720px; margin: 0 auto; color: #1a1a1a; }
+                    table { width: 100%; border-collapse: collapse; }
+                    th, td { padding: 8px; }
+                    th { text-align: left; }
+                    @media print { body { padding: 0; } button { display: none !important; } }
+                </style>
+                </head><body>${content}</body></html>
+            `);
+            printWin.document.close();
+            printWin.print();
         }
 
         function closeViewInvoice() {
