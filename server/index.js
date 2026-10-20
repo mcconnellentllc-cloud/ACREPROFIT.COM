@@ -642,7 +642,10 @@ const auditLogSchema = new mongoose.Schema({
             'credit_note_issued',
             'credit_note_refund_completed',
             'credit_note_refund_failed',
-            'bid_sheet_sent'
+            'bid_sheet_sent',
+            'llc_info_change',
+            'llc_document_upload',
+            'llc_document_change'
         ]
     },
     performedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -1084,6 +1087,57 @@ const companySettingsSchema = new mongoose.Schema({
         createdAt: { type: Date, default: Date.now },
         completedAt: Date,
         completedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+    }],
+
+    // LLC entity record (superadmin only). Read/written ONLY through
+    // /api/admin/llc-info*, never through the generic company-settings PUT.
+    // No values are hardcoded in source - this repo is public.
+    llcInfo: {
+        legalName: String,
+        entityType: String,
+        stateOfFormation: String,
+        sosId: String,
+        formationDate: Date,
+        sosStatus: String,              // e.g. "Good Standing"
+        periodicReportMonth: String,    // CO SOS periodic report due month
+        ein: String,                    // confidential
+        principalOffice: { street: String, city: String, state: String, zip: String },
+        mailingAddress: { street: String, city: String, state: String, zip: String },
+        registeredAgent: { name: String, street: String, city: String, state: String, zip: String },
+        managementStructure: { type: String, enum: ['', 'member-managed', 'manager-managed'], default: '' },
+        taxClassification: { type: String, enum: ['', 'disregarded-entity', 'partnership', 's-corp', 'c-corp'], default: '' },
+        fiscalYearEnd: String,
+        members: [{
+            name: { type: String, required: true },
+            ownershipPercent: { type: Number, min: 0, max: 100 },
+            role: String,
+            address: String,
+            admittedDate: Date,
+            status: { type: String, enum: ['active', 'pending', 'former'], default: 'active' }
+        }],
+        notes: String
+    },
+
+    // LLC formation/governance documents (superadmin only). Files live on
+    // disk in llcDocumentsPath; never hard-deleted - archive instead.
+    llcDocuments: [{
+        title: { type: String, required: true },
+        docType: {
+            type: String,
+            enum: ['articles_of_organization', 'operating_agreement', 'amendment', 'statement_of_change',
+                   'periodic_report', 'ein_letter', 'certificate_of_good_standing', 'membership_assignment', 'other'],
+            default: 'other'
+        },
+        status: { type: String, enum: ['draft', 'executed', 'filed'], default: 'filed' },
+        effectiveDate: Date,
+        fileName: String,
+        storedName: String,
+        fileType: String,
+        fileSize: Number,
+        notes: String,
+        archived: { type: Boolean, default: false },
+        uploadedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+        uploadedAt: { type: Date, default: Date.now }
     }],
 
     updatedAt: { type: Date, default: Date.now },
@@ -17111,6 +17165,349 @@ app.get('/api/admin/purchase-order-documents', authMiddleware, adminMiddleware, 
 
 // Serve static files from purchase-orders folder (authenticated)
 app.use('/purchase-orders', authMiddleware, adminMiddleware, express.static(poDocumentsPath));
+
+// ============ LLC INFORMATION + DOCUMENTS (superadmin only) ============
+// Shown under AcreProfit Business > Company Settings. Stored on the single
+// CompanySettings document (llcInfo + llcDocuments). Files are written to a
+// sibling of the PO upload dir, so on Render they land on the same disk
+// (e.g. /var/data/llc-documents) when UPLOAD_DIR points at it.
+
+const llcDocumentsPath = process.env.LLC_DOCS_UPLOAD_DIR || path.join(path.dirname(poDocumentsPath), 'llc-documents');
+try {
+    if (!fs.existsSync(llcDocumentsPath)) fs.mkdirSync(llcDocumentsPath, { recursive: true });
+} catch (e) {
+    console.error(`Failed to create upload dir ${llcDocumentsPath}: ${e.message}`);
+}
+// True only when an upload dir is explicitly configured (persistent disk).
+// Without it, files land in the build directory and are lost on redeploy.
+const llcStoragePersistent = !!(process.env.LLC_DOCS_UPLOAD_DIR || process.env.UPLOAD_DIR);
+
+const LLC_DOC_TYPES = ['articles_of_organization', 'operating_agreement', 'amendment', 'statement_of_change',
+    'periodic_report', 'ein_letter', 'certificate_of_good_standing', 'membership_assignment', 'other'];
+const LLC_DOC_STATUSES = ['draft', 'executed', 'filed'];
+
+// Public-record starting values (Colorado SOS) used only until the first save.
+// EIN and anything not on the public record is intentionally left blank.
+function defaultLlcInfo() {
+    return {
+        legalName: 'AcreProfit LLC',
+        entityType: 'Limited Liability Company',
+        stateOfFormation: 'Colorado',
+        sosId: '20261301277',
+        principalOffice: { street: '34549 HWY 59', city: 'Haxtun', state: 'CO', zip: '80731' },
+        members: [{ name: 'Kyle McConnell', ownershipPercent: 100, role: 'Member', status: 'active' }]
+    };
+}
+
+function maskEin(ein) {
+    if (!ein) return ein;
+    const digits = String(ein).replace(/\D/g, '');
+    return digits.length >= 4 ? `**-***${digits.slice(-4)}` : '****';
+}
+
+function llcInfoForAudit(info) {
+    if (!info) return info;
+    const copy = JSON.parse(JSON.stringify(info));
+    if (copy.ein) copy.ein = maskEin(copy.ein);
+    return copy;
+}
+
+function cleanAddress(a, withName) {
+    if (!a || typeof a !== 'object') return undefined;
+    const out = {
+        street: String(a.street || '').trim(),
+        city: String(a.city || '').trim(),
+        state: String(a.state || '').trim(),
+        zip: String(a.zip || '').trim()
+    };
+    if (withName) out.name = String(a.name || '').trim();
+    return out;
+}
+
+function parseOptionalDate(v, field) {
+    if (v === undefined || v === null || v === '') return null;
+    const d = new Date(v);
+    if (isNaN(d.getTime())) throw new Error(`${field} is not a valid date`);
+    return d;
+}
+
+// Validates and normalizes a PUT body into an llcInfo object. Throws on bad input.
+function buildLlcInfo(body) {
+    const str = (v) => (v === undefined || v === null) ? '' : String(v).trim();
+    const info = {
+        legalName: str(body.legalName),
+        entityType: str(body.entityType),
+        stateOfFormation: str(body.stateOfFormation),
+        sosId: str(body.sosId),
+        formationDate: parseOptionalDate(body.formationDate, 'Formation date'),
+        sosStatus: str(body.sosStatus),
+        periodicReportMonth: str(body.periodicReportMonth),
+        ein: str(body.ein),
+        principalOffice: cleanAddress(body.principalOffice),
+        mailingAddress: cleanAddress(body.mailingAddress),
+        registeredAgent: cleanAddress(body.registeredAgent, true),
+        managementStructure: str(body.managementStructure),
+        taxClassification: str(body.taxClassification),
+        fiscalYearEnd: str(body.fiscalYearEnd),
+        notes: str(body.notes)
+    };
+
+    if (!info.legalName) throw new Error('Legal name is required');
+    if (info.ein && !/^\d{2}-\d{7}$/.test(info.ein)) throw new Error('EIN must be in the format 12-3456789');
+    if (!['', 'member-managed', 'manager-managed'].includes(info.managementStructure)) throw new Error('Invalid management structure');
+    if (!['', 'disregarded-entity', 'partnership', 's-corp', 'c-corp'].includes(info.taxClassification)) throw new Error('Invalid tax classification');
+
+    const members = Array.isArray(body.members) ? body.members : [];
+    info.members = members.map((m, i) => {
+        const name = str(m && m.name);
+        if (!name) throw new Error(`Member ${i + 1}: name is required`);
+        const pct = Number(m.ownershipPercent);
+        if (!Number.isFinite(pct) || pct < 0 || pct > 100) throw new Error(`Member ${name}: ownership % must be 0-100`);
+        const status = str(m.status) || 'active';
+        if (!['active', 'pending', 'former'].includes(status)) throw new Error(`Member ${name}: invalid status`);
+        return {
+            name,
+            ownershipPercent: Math.round(pct * 100) / 100,
+            role: str(m.role),
+            address: str(m.address),
+            admittedDate: parseOptionalDate(m.admittedDate, `Member ${name} admitted date`),
+            status
+        };
+    });
+
+    const seen = new Set();
+    for (const m of info.members) {
+        const key = m.name.toLowerCase();
+        if (seen.has(key)) throw new Error(`Member ${m.name} is listed more than once`);
+        seen.add(key);
+    }
+
+    // Active ownership must total exactly 100%. Pending members (e.g. an
+    // unsigned operating agreement) are recorded but not counted.
+    const active = info.members.filter(m => m.status === 'active');
+    if (active.length === 0) throw new Error('At least one active member is required');
+    const total = active.reduce((s, m) => s + m.ownershipPercent, 0);
+    if (Math.abs(total - 100) > 0.01) throw new Error(`Active member ownership totals ${total}% - it must equal 100%`);
+
+    return info;
+}
+
+function serializeLlcDoc(d) {
+    return {
+        _id: d._id,
+        title: d.title,
+        docType: d.docType,
+        status: d.status,
+        effectiveDate: d.effectiveDate,
+        fileName: d.fileName,
+        fileType: d.fileType,
+        fileSize: d.fileSize,
+        notes: d.notes,
+        archived: !!d.archived,
+        uploadedAt: d.uploadedAt
+    };
+}
+
+let uploadLlcDoc;
+if (multer) {
+    uploadLlcDoc = multer({
+        storage: multer.diskStorage({
+            destination: (req, file, cb) => cb(null, llcDocumentsPath),
+            filename: (req, file, cb) => {
+                const ext = path.extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '');
+                cb(null, `llc-${Date.now()}-${crypto.randomBytes(6).toString('hex')}${ext}`);
+            }
+        }),
+        limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+        fileFilter: (req, file, cb) => {
+            if (['application/pdf', 'image/jpeg', 'image/png'].includes(file.mimetype)) cb(null, true);
+            else cb(new Error('Invalid file type. Allowed: PDF, JPEG, PNG'));
+        }
+    });
+}
+
+// Get LLC info + documents
+app.get('/api/admin/llc-info', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const settings = await CompanySettings.findOne();
+        const stored = settings && settings.llcInfo && settings.llcInfo.legalName ? settings.toObject().llcInfo : null;
+        const includeArchived = req.query.includeArchived === 'true';
+        const documents = ((settings && settings.llcDocuments) || [])
+            .filter(d => includeArchived || !d.archived)
+            .map(serializeLlcDoc)
+            .sort((a, b) => new Date(b.uploadedAt) - new Date(a.uploadedAt));
+
+        res.json({
+            llcInfo: stored || defaultLlcInfo(),
+            isDefault: !stored,
+            documents,
+            storagePersistent: llcStoragePersistent
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Save LLC info (full replace of llcInfo, validated)
+app.put('/api/admin/llc-info', authMiddleware, superAdminMiddleware, async (req, res) => {
+    let info;
+    try {
+        info = buildLlcInfo(req.body || {});
+    } catch (e) {
+        return res.status(400).json({ error: e.message });
+    }
+    try {
+        let settings = await CompanySettings.findOne();
+        if (!settings) settings = new CompanySettings();
+
+        const before = settings.llcInfo && settings.llcInfo.legalName ? llcInfoForAudit(settings.toObject().llcInfo) : null;
+        settings.llcInfo = info;
+        settings.updatedAt = new Date();
+        settings.updatedBy = req.user._id;
+        await settings.save();
+
+        await logAudit({
+            action: 'llc_info_change',
+            req,
+            entityType: 'CompanySettings',
+            entityId: settings._id,
+            entityRef: 'llcInfo',
+            before,
+            after: llcInfoForAudit(settings.toObject().llcInfo)
+        });
+
+        res.json({ message: 'LLC information saved', llcInfo: settings.llcInfo });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
+// Upload an LLC document (multipart: document, title, docType, status, effectiveDate, notes)
+app.post('/api/admin/llc-info/documents', authMiddleware, superAdminMiddleware, (req, res) => {
+    if (!uploadLlcDoc) return res.status(500).json({ error: 'File upload not configured' });
+
+    uploadLlcDoc.single('document')(req, res, async (err) => {
+        const discard = () => { if (req.file) fs.unlink(req.file.path, () => {}); };
+        if (err) return res.status(400).json({ error: err.message });
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+
+        try {
+            const title = String(req.body.title || '').trim();
+            const docType = String(req.body.docType || 'other');
+            const status = String(req.body.status || 'filed');
+            if (!title) { discard(); return res.status(400).json({ error: 'Title is required' }); }
+            if (!LLC_DOC_TYPES.includes(docType)) { discard(); return res.status(400).json({ error: 'Invalid document type' }); }
+            if (!LLC_DOC_STATUSES.includes(status)) { discard(); return res.status(400).json({ error: 'Invalid status' }); }
+            let effectiveDate;
+            try { effectiveDate = parseOptionalDate(req.body.effectiveDate, 'Effective date'); }
+            catch (e) { discard(); return res.status(400).json({ error: e.message }); }
+
+            let settings = await CompanySettings.findOne();
+            if (!settings) settings = new CompanySettings();
+
+            settings.llcDocuments.push({
+                title,
+                docType,
+                status,
+                effectiveDate,
+                fileName: req.file.originalname,
+                storedName: req.file.filename,
+                fileType: req.file.mimetype,
+                fileSize: req.file.size,
+                notes: String(req.body.notes || '').trim(),
+                uploadedBy: req.user._id,
+                uploadedAt: new Date()
+            });
+            settings.updatedAt = new Date();
+            settings.updatedBy = req.user._id;
+            await settings.save();
+
+            const doc = settings.llcDocuments[settings.llcDocuments.length - 1];
+            await logAudit({
+                action: 'llc_document_upload',
+                req,
+                entityType: 'CompanySettings',
+                entityId: settings._id,
+                entityRef: `llcDocuments/${doc._id}`,
+                after: serializeLlcDoc(doc)
+            });
+
+            res.json({ message: 'Document uploaded', document: serializeLlcDoc(doc) });
+        } catch (error) {
+            discard();
+            res.status(500).json({ error: error.message });
+        }
+    });
+});
+
+// View an LLC document (inline). Fetched with the Bearer token, not a bare link.
+app.get('/api/admin/llc-info/documents/:docId/file', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const settings = await CompanySettings.findOne();
+        const doc = settings && settings.llcDocuments.id(req.params.docId);
+        if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+        const filePath = path.join(llcDocumentsPath, path.basename(doc.storedName));
+        if (!fs.existsSync(filePath)) return res.status(404).json({ error: 'File not found on server' });
+
+        const safeName = String(doc.fileName || 'document').replace(/["\r\n]/g, '');
+        res.setHeader('Content-Type', doc.fileType);
+        res.setHeader('Content-Disposition', `inline; filename="${safeName}"`);
+        res.setHeader('Cache-Control', 'no-store');
+        res.sendFile(filePath);
+    } catch (error) {
+        res.status(400).json({ error: error.message });
+    }
+});
+
+// Update LLC document metadata / archive. No hard delete for legal records.
+app.patch('/api/admin/llc-info/documents/:docId', authMiddleware, superAdminMiddleware, async (req, res) => {
+    try {
+        const settings = await CompanySettings.findOne();
+        const doc = settings && settings.llcDocuments.id(req.params.docId);
+        if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+        const before = serializeLlcDoc(doc);
+        const b = req.body || {};
+        if (b.title !== undefined) {
+            const t = String(b.title).trim();
+            if (!t) return res.status(400).json({ error: 'Title is required' });
+            doc.title = t;
+        }
+        if (b.docType !== undefined) {
+            if (!LLC_DOC_TYPES.includes(b.docType)) return res.status(400).json({ error: 'Invalid document type' });
+            doc.docType = b.docType;
+        }
+        if (b.status !== undefined) {
+            if (!LLC_DOC_STATUSES.includes(b.status)) return res.status(400).json({ error: 'Invalid status' });
+            doc.status = b.status;
+        }
+        if (b.effectiveDate !== undefined) {
+            try { doc.effectiveDate = parseOptionalDate(b.effectiveDate, 'Effective date'); }
+            catch (e) { return res.status(400).json({ error: e.message }); }
+        }
+        if (b.notes !== undefined) doc.notes = String(b.notes).trim();
+        if (b.archived !== undefined) doc.archived = !!b.archived;
+
+        settings.updatedAt = new Date();
+        settings.updatedBy = req.user._id;
+        await settings.save();
+
+        await logAudit({
+            action: 'llc_document_change',
+            req,
+            entityType: 'CompanySettings',
+            entityId: settings._id,
+            entityRef: `llcDocuments/${doc._id}`,
+            before,
+            after: serializeLlcDoc(doc)
+        });
+
+        res.json({ message: 'Document updated', document: serializeLlcDoc(doc) });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
 
 // ============ DISTRIBUTOR PRICING ENDPOINTS ============
 
