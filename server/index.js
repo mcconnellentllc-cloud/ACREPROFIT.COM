@@ -215,7 +215,7 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['customer', 'admin', 'superadmin', 'supplier', 'distributor'],
+        enum: ['customer', 'admin', 'superadmin', 'supplier', 'distributor', 'partner'],
         default: 'customer'
     },
     isActive: { type: Boolean, default: true },
@@ -3552,7 +3552,7 @@ async function initializeAdmins() {
     const admins = [
         { name: 'Acre Profit Admin', email: 'contact@acreprofit.com', phone: '970-571-1015', role: 'superadmin' },
         { name: 'Kyle McConnell',    email: 'office@togoag.com',       phone: '970-571-1015', role: 'distributor', slug: 'kyle' },
-        { name: 'Ty Mollohan',       email: 'tymollohan77@gmail.com',  phone: '970-520-2340', role: 'distributor', slug: 'ty' },
+        { name: 'Ty Mollohan',       email: 'tymollohan77@gmail.com',  phone: '970-520-2340', role: 'partner',     slug: 'ty' },
         { name: 'Chad Bamford',      email: 'ckbamford@yahoo.com',     phone: '970-520-3716', role: 'distributor', slug: 'chad' },
         { name: 'Seth Rolfs',        email: 'seth@acreprofit.com',     phone: '785-531-0680', role: 'distributor', slug: 'seth' },
         { name: 'Tyson',             email: 'fyeagllc@gmail.com',                             role: 'distributor', slug: 'tyson' }
@@ -4506,9 +4506,13 @@ const authMiddleware = async (req, res, next) => {
     next();
 };
 
+// Role hierarchy (top → bottom): superadmin > admin > partner > distributor > customer
+// Partner is a new tier (added 2026-10-20) between admin and distributor. Partners
+// see everything a distributor sees PLUS the Business tab (articles, bylaws, licenses,
+// EIN, state filings, insurance). Partners cannot do superadmin-only destructive
+// actions (user role changes, financial resets, catalog nukes).
 const adminMiddleware = async (req, res, next) => {
-    // Allow admin, distributor, and superadmin roles
-    if (req.user.role !== 'admin' && req.user.role !== 'distributor' && req.user.role !== 'superadmin') {
+    if (!['admin', 'distributor', 'superadmin', 'partner'].includes(req.user.role)) {
         return res.status(403).json({ error: 'Admin access required' });
     }
     next();
@@ -4516,12 +4520,24 @@ const adminMiddleware = async (req, res, next) => {
 
 // Helper function to check if user has admin-level access
 const isAdminLevel = (user) => {
-    return user.role === 'admin' || user.role === 'distributor' || user.role === 'superadmin';
+    return ['admin', 'distributor', 'superadmin', 'partner'].includes(user.role);
 };
 
-// Helper function to check if user is a non-superadmin staff member (distributor/admin)
+// Helper function to check if user is a non-superadmin staff member (distributor/admin/partner)
 const isDistributor = (user) => {
-    return user.role === 'admin' || user.role === 'distributor';
+    return ['admin', 'distributor', 'partner'].includes(user.role);
+};
+
+// Partner-or-higher gate — business tab, financial summaries, member-level data
+const isPartnerLevel = (user) => {
+    return ['superadmin', 'admin', 'partner'].includes(user.role);
+};
+
+const partnerMiddleware = async (req, res, next) => {
+    if (!isPartnerLevel(req.user)) {
+        return res.status(403).json({ error: 'Partner access required' });
+    }
+    next();
 };
 
 const superAdminMiddleware = async (req, res, next) => {
@@ -5642,6 +5658,43 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 });
 
 // ---- ADMIN ROUTES ----
+
+// ========================================================================
+// BUSINESS TAB — AcreProfit LLC filings, licenses, ID numbers, insurance.
+// Partner-tier gate (superadmin + admin + partner). Distributors don't see
+// member-level business data; customers never do. Backing store is a static
+// JSON file (server/business.json) — partners can PUT to update it. Not in
+// MongoDB because this data lives at the entity level, not per-user; the
+// file is tiny and version-controlled with the server deploy.
+// ========================================================================
+const BUSINESS_JSON_PATH = require('path').join(__dirname, 'business.json');
+
+app.get('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const raw = require('fs').readFileSync(BUSINESS_JSON_PATH, 'utf8');
+        res.json(JSON.parse(raw));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not read business profile: ' + err.message });
+    }
+});
+
+app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const incoming = req.body;
+        if (!incoming || typeof incoming !== 'object') {
+            return res.status(400).json({ error: 'Request body must be a JSON object' });
+        }
+        // Stamp lastUpdated + preserve the editor's name for the audit field.
+        if (incoming._meta) {
+            incoming._meta.lastUpdated = new Date().toISOString().slice(0, 10);
+            incoming._meta.editedBy = req.user.name || req.user.email;
+        }
+        require('fs').writeFileSync(BUSINESS_JSON_PATH, JSON.stringify(incoming, null, 2));
+        res.json({ ok: true, business: incoming });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not save business profile: ' + err.message });
+    }
+});
 
 // Get all customers (admin only) - with search support
 // Create a new customer (admin only)
