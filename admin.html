@@ -1255,6 +1255,127 @@
                     <p style="color: var(--text-light); margin-top: 4px;">Manage business licenses, credentials, and reminders</p>
                 </div>
 
+                <!-- LLC Information Card (superadmin only; data from /api/admin/llc-info) -->
+                <div class="card" style="margin-bottom: 24px;" id="llcInfoCard">
+                    <div class="card-header">
+                        <h3>LLC Information</h3>
+                        <div style="display: flex; gap: 8px; align-items: center;">
+                            <span id="llcDefaultBadge" class="status-badge status-pending" style="display: none;">Not saved yet</span>
+                            <button class="btn btn-primary btn-sm" id="llcEditBtn" onclick="openLlcEdit()">Edit</button>
+                        </div>
+                    </div>
+                    <div style="padding: 24px;">
+                        <div id="llcView"><p style="color: var(--text-muted);">Loading LLC information&hellip;</p></div>
+
+                        <form id="llcEditForm" style="display: none;" onsubmit="saveLlcInfo(event)">
+                            <div class="llc-form-grid">
+                                <div class="form-group"><label>Legal Name *</label><input type="text" id="llcLegalName" class="form-control" required></div>
+                                <div class="form-group"><label>Entity Type</label><input type="text" id="llcEntityType" class="form-control"></div>
+                                <div class="form-group"><label>State of Formation</label><input type="text" id="llcStateOfFormation" class="form-control"></div>
+                                <div class="form-group"><label>Colorado SOS ID</label><input type="text" id="llcSosId" class="form-control"></div>
+                                <div class="form-group"><label>Formation Date</label><input type="date" id="llcFormationDate" class="form-control"></div>
+                                <div class="form-group"><label>SOS Status</label><input type="text" id="llcSosStatus" class="form-control" placeholder="e.g. Good Standing"></div>
+                                <div class="form-group"><label>Periodic Report Due Month</label><input type="text" id="llcPeriodicReportMonth" class="form-control" placeholder="e.g. March"></div>
+                                <div class="form-group"><label>EIN (confidential)</label><input type="text" id="llcEin" class="form-control" placeholder="12-3456789" pattern="\d{2}-\d{7}" autocomplete="off"></div>
+                                <div class="form-group">
+                                    <label>Management Structure</label>
+                                    <select id="llcManagementStructure" class="form-control">
+                                        <option value="">— Not set —</option>
+                                        <option value="member-managed">Member-managed</option>
+                                        <option value="manager-managed">Manager-managed</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Federal Tax Classification</label>
+                                    <select id="llcTaxClassification" class="form-control">
+                                        <option value="">— Not set —</option>
+                                        <option value="disregarded-entity">Single-member (disregarded entity)</option>
+                                        <option value="partnership">Partnership</option>
+                                        <option value="s-corp">S corporation</option>
+                                        <option value="c-corp">C corporation</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label>Fiscal Year End</label><input type="text" id="llcFiscalYearEnd" class="form-control" placeholder="e.g. December 31"></div>
+                            </div>
+
+                            <h4 class="llc-subhead">Principal Office</h4>
+                            <div class="llc-form-grid" id="llcPrincipalOfficeFields"></div>
+                            <h4 class="llc-subhead">Mailing Address <span style="font-weight: 400; color: var(--text-light);">(if different)</span></h4>
+                            <div class="llc-form-grid" id="llcMailingAddressFields"></div>
+                            <h4 class="llc-subhead">Registered Agent</h4>
+                            <div class="llc-form-grid" id="llcRegisteredAgentFields"></div>
+
+                            <h4 class="llc-subhead">Members</h4>
+                            <p style="color: var(--text-light); font-size: 0.85rem; margin-bottom: 8px;">Active members must total 100%. Use "Pending" for an owner whose operating agreement is not yet signed &mdash; pending members are not counted.</p>
+                            <div style="overflow-x: auto;">
+                                <table class="data-table" style="min-width: 640px;">
+                                    <thead><tr><th>Name *</th><th>Ownership %</th><th>Role</th><th>Status</th><th>Admitted</th><th>Address</th><th></th></tr></thead>
+                                    <tbody id="llcMembersBody"></tbody>
+                                </table>
+                            </div>
+                            <button type="button" class="btn btn-outline btn-sm" style="margin-top: 8px;" onclick="addLlcMemberRow()">+ Add Member</button>
+                            <div id="llcMembersTotal" style="margin-top: 8px; font-weight: 600;"></div>
+
+                            <div class="form-group" style="margin-top: 16px;"><label>Notes</label><textarea id="llcNotes" class="form-control" rows="3"></textarea></div>
+
+                            <div style="display: flex; gap: 8px; margin-top: 16px;">
+                                <button type="submit" class="btn btn-primary" id="llcSaveBtn">Save LLC Information</button>
+                                <button type="button" class="btn btn-outline" onclick="cancelLlcEdit()">Cancel</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- LLC Documents Card (superadmin only) -->
+                <div class="card" style="margin-bottom: 24px;">
+                    <div class="card-header">
+                        <h3>LLC Documents</h3>
+                        <label class="checkbox-label" style="font-size: 0.85rem;">
+                            <input type="checkbox" id="llcShowArchived" onchange="loadLlcInfo()">
+                            <span>Show archived</span>
+                        </label>
+                    </div>
+                    <div style="padding: 24px;">
+                        <div id="llcStorageWarning" style="display: none; background: #fff3cd; color: #856404; padding: 12px; border-radius: 8px; margin-bottom: 16px;">
+                            Upload storage is not on a persistent disk (UPLOAD_DIR is not set on the server). Uploaded files would be lost on the next deploy &mdash; uploads are disabled until it is configured.
+                        </div>
+                        <div id="llcDocumentsList"><p style="color: var(--text-muted);">Loading documents&hellip;</p></div>
+
+                        <form id="llcUploadForm" onsubmit="uploadLlcDocument(event)" style="margin-top: 20px; padding-top: 20px; border-top: 1px solid var(--border);">
+                            <h4 class="llc-subhead" style="margin-top: 0;">Upload Document</h4>
+                            <div class="llc-form-grid">
+                                <div class="form-group"><label>Title *</label><input type="text" id="llcDocTitle" class="form-control" required placeholder="e.g. Articles of Organization"></div>
+                                <div class="form-group">
+                                    <label>Type</label>
+                                    <select id="llcDocType" class="form-control">
+                                        <option value="articles_of_organization">Articles of Organization</option>
+                                        <option value="operating_agreement">Operating Agreement</option>
+                                        <option value="amendment">Amendment</option>
+                                        <option value="membership_assignment">Assignment of Membership Interest</option>
+                                        <option value="statement_of_change">Statement of Change</option>
+                                        <option value="periodic_report">Periodic Report</option>
+                                        <option value="ein_letter">EIN Letter (IRS CP 575)</option>
+                                        <option value="certificate_of_good_standing">Certificate of Good Standing</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label>Status</label>
+                                    <select id="llcDocStatus" class="form-control">
+                                        <option value="filed">Filed</option>
+                                        <option value="executed">Executed (signed)</option>
+                                        <option value="draft">Draft</option>
+                                    </select>
+                                </div>
+                                <div class="form-group"><label>Effective Date</label><input type="date" id="llcDocEffectiveDate" class="form-control"></div>
+                            </div>
+                            <div class="form-group"><label>File * (PDF, JPEG, PNG &mdash; 15 MB max)</label><input type="file" id="llcDocFile" class="form-control" accept="application/pdf,image/jpeg,image/png" required></div>
+                            <div class="form-group"><label>Notes</label><input type="text" id="llcDocNotes" class="form-control"></div>
+                            <button type="submit" class="btn btn-primary" id="llcUploadBtn">Upload</button>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- License Info Card -->
                 <div class="card" style="margin-bottom: 24px;">
                     <div class="card-header">
@@ -10020,6 +10141,348 @@
             } catch (error) {
                 console.error('Error loading company settings:', error);
             }
+            // LLC info has its own endpoint; load independently so a failure in
+            // one card never blanks the other.
+            loadLlcInfo();
+        }
+
+        // ============ LLC INFORMATION + DOCUMENTS ============
+        let llcData = null;
+
+        function llcEsc(s) {
+            if (s == null) return '';
+            return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        }
+
+        // Dates are stored as UTC midnight; format in UTC so they never shift a day.
+        function llcDateText(d) {
+            if (!d) return '';
+            const dt = new Date(d);
+            if (isNaN(dt)) return '';
+            return dt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+        }
+        function llcDateInput(d) {
+            if (!d) return '';
+            const dt = new Date(d);
+            return isNaN(dt) ? '' : dt.toISOString().slice(0, 10);
+        }
+        function llcAddressText(a) {
+            if (!a) return '';
+            const line2 = [a.city, [a.state, a.zip].filter(Boolean).join(' ')].filter(Boolean).join(', ');
+            return [a.name, a.street, line2].filter(Boolean).join(', ');
+        }
+
+        const LLC_DOC_TYPE_LABELS = {
+            articles_of_organization: 'Articles of Organization',
+            operating_agreement: 'Operating Agreement',
+            amendment: 'Amendment',
+            membership_assignment: 'Assignment of Membership Interest',
+            statement_of_change: 'Statement of Change',
+            periodic_report: 'Periodic Report',
+            ein_letter: 'EIN Letter',
+            certificate_of_good_standing: 'Certificate of Good Standing',
+            other: 'Other'
+        };
+        const LLC_MGMT_LABELS = { 'member-managed': 'Member-managed', 'manager-managed': 'Manager-managed' };
+        const LLC_TAX_LABELS = {
+            'disregarded-entity': 'Single-member (disregarded entity)',
+            'partnership': 'Partnership', 's-corp': 'S corporation', 'c-corp': 'C corporation'
+        };
+
+        async function loadLlcInfo() {
+            try {
+                const showArchived = document.getElementById('llcShowArchived')?.checked;
+                const res = await fetch(`${API_URL}/api/admin/llc-info${showArchived ? '?includeArchived=true' : ''}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Failed to load LLC information');
+                llcData = data;
+                renderLlcView();
+                renderLlcDocuments();
+            } catch (error) {
+                console.error('Error loading LLC info:', error);
+                document.getElementById('llcView').innerHTML = `<p style="color: #dc3545;">${llcEsc(error.message)}</p>`;
+                document.getElementById('llcDocumentsList').innerHTML = '';
+            }
+        }
+
+        function renderLlcView() {
+            const i = llcData.llcInfo || {};
+            document.getElementById('llcDefaultBadge').style.display = llcData.isDefault ? 'inline-block' : 'none';
+
+            const field = (label, value) => `
+                <div class="license-field"><label>${llcEsc(label)}</label>
+                <div class="license-value">${value ? llcEsc(value) : '<span style="color: var(--text-muted); font-weight: 400;">Not set</span>'}</div></div>`;
+
+            const members = (i.members || []);
+            const statusLabel = { active: 'Active', pending: 'Pending', former: 'Former' };
+            const membersHtml = members.length ? `
+                <div style="overflow-x: auto; margin-top: 16px;">
+                <table class="data-table">
+                    <thead><tr><th>Member</th><th>Ownership</th><th>Role</th><th>Status</th><th>Admitted</th></tr></thead>
+                    <tbody>${members.map(m => `<tr>
+                        <td>${llcEsc(m.name)}</td>
+                        <td>${llcEsc(m.ownershipPercent)}%</td>
+                        <td>${llcEsc(m.role)}</td>
+                        <td>${llcEsc(statusLabel[m.status] || m.status)}</td>
+                        <td>${llcEsc(llcDateText(m.admittedDate))}</td>
+                    </tr>`).join('')}</tbody>
+                </table></div>` : '<p style="color: var(--text-muted); margin-top: 16px;">No members recorded.</p>';
+
+            document.getElementById('llcView').innerHTML = `
+                <div class="llc-view-grid">
+                    ${field('Legal Name', i.legalName)}
+                    ${field('Entity Type', i.entityType)}
+                    ${field('State of Formation', i.stateOfFormation)}
+                    ${field('Colorado SOS ID', i.sosId)}
+                    ${field('Formation Date', llcDateText(i.formationDate))}
+                    ${field('SOS Status', i.sosStatus)}
+                    ${field('Periodic Report Due', i.periodicReportMonth)}
+                    ${field('EIN', i.ein)}
+                    ${field('Management', LLC_MGMT_LABELS[i.managementStructure] || '')}
+                    ${field('Tax Classification', LLC_TAX_LABELS[i.taxClassification] || '')}
+                    ${field('Fiscal Year End', i.fiscalYearEnd)}
+                    ${field('Principal Office', llcAddressText(i.principalOffice))}
+                    ${field('Mailing Address', llcAddressText(i.mailingAddress))}
+                    ${field('Registered Agent', llcAddressText(i.registeredAgent))}
+                </div>
+                <h4 class="llc-subhead">Members</h4>
+                ${membersHtml}
+                ${i.notes ? `<p style="margin-top: 16px; white-space: pre-wrap;">${llcEsc(i.notes)}</p>` : ''}
+                ${llcData.isDefault ? '<p style="color: var(--text-light); font-size: 0.85rem; margin-top: 12px;">Showing public-record starting values. Click Edit, complete the missing fields, and save.</p>' : ''}`;
+        }
+
+        function llcAddressFieldsHtml(prefix, a, withName) {
+            a = a || {};
+            const f = (key, label) => `<div class="form-group"><label>${label}</label><input type="text" class="form-control" id="${prefix}_${key}" value="${llcEsc(a[key] || '')}"></div>`;
+            return (withName ? f('name', 'Name') : '') + f('street', 'Street') + f('city', 'City') + f('state', 'State') + f('zip', 'ZIP');
+        }
+        function llcReadAddress(prefix, withName) {
+            const v = (key) => (document.getElementById(`${prefix}_${key}`)?.value || '').trim();
+            const out = { street: v('street'), city: v('city'), state: v('state'), zip: v('zip') };
+            if (withName) out.name = v('name');
+            return out;
+        }
+
+        function addLlcMemberRow(m) {
+            m = m || { status: 'active' };
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+                <td><input type="text" class="form-control llc-m-name" value="${llcEsc(m.name || '')}"></td>
+                <td><input type="number" class="form-control llc-m-pct" min="0" max="100" step="0.01" value="${m.ownershipPercent ?? ''}"></td>
+                <td><input type="text" class="form-control llc-m-role" value="${llcEsc(m.role || '')}"></td>
+                <td><select class="form-control llc-m-status">
+                    <option value="active"${m.status === 'active' ? ' selected' : ''}>Active</option>
+                    <option value="pending"${m.status === 'pending' ? ' selected' : ''}>Pending</option>
+                    <option value="former"${m.status === 'former' ? ' selected' : ''}>Former</option>
+                </select></td>
+                <td><input type="date" class="form-control llc-m-date" value="${llcDateInput(m.admittedDate)}"></td>
+                <td><input type="text" class="form-control llc-m-addr" value="${llcEsc(m.address || '')}"></td>
+                <td><button type="button" class="btn btn-sm btn-outline" title="Remove member">&times;</button></td>`;
+            tr.querySelector('button').addEventListener('click', () => { tr.remove(); updateLlcMembersTotal(); });
+            tr.querySelectorAll('input, select').forEach(el => el.addEventListener('input', updateLlcMembersTotal));
+            document.getElementById('llcMembersBody').appendChild(tr);
+            updateLlcMembersTotal();
+        }
+
+        function readLlcMembers() {
+            return [...document.querySelectorAll('#llcMembersBody tr')].map(tr => ({
+                name: tr.querySelector('.llc-m-name').value.trim(),
+                ownershipPercent: tr.querySelector('.llc-m-pct').value === '' ? NaN : Number(tr.querySelector('.llc-m-pct').value),
+                role: tr.querySelector('.llc-m-role').value.trim(),
+                status: tr.querySelector('.llc-m-status').value,
+                admittedDate: tr.querySelector('.llc-m-date').value || null,
+                address: tr.querySelector('.llc-m-addr').value.trim()
+            }));
+        }
+
+        function updateLlcMembersTotal() {
+            const total = readLlcMembers().filter(m => m.status === 'active')
+                .reduce((s, m) => s + (Number.isFinite(m.ownershipPercent) ? m.ownershipPercent : 0), 0);
+            const el = document.getElementById('llcMembersTotal');
+            const good = Math.abs(total - 100) <= 0.01;
+            el.textContent = `Active ownership total: ${Math.round(total * 100) / 100}%${good ? '' : ' — must equal 100%'}`;
+            el.style.color = good ? 'var(--primary)' : '#dc3545';
+        }
+
+        function openLlcEdit() {
+            if (!llcData) return;
+            const i = llcData.llcInfo || {};
+            const set = (id, v) => { document.getElementById(id).value = v || ''; };
+            set('llcLegalName', i.legalName);
+            set('llcEntityType', i.entityType);
+            set('llcStateOfFormation', i.stateOfFormation);
+            set('llcSosId', i.sosId);
+            set('llcFormationDate', llcDateInput(i.formationDate));
+            set('llcSosStatus', i.sosStatus);
+            set('llcPeriodicReportMonth', i.periodicReportMonth);
+            set('llcEin', i.ein);
+            set('llcManagementStructure', i.managementStructure);
+            set('llcTaxClassification', i.taxClassification);
+            set('llcFiscalYearEnd', i.fiscalYearEnd);
+            set('llcNotes', i.notes);
+            document.getElementById('llcPrincipalOfficeFields').innerHTML = llcAddressFieldsHtml('llcPO', i.principalOffice);
+            document.getElementById('llcMailingAddressFields').innerHTML = llcAddressFieldsHtml('llcMA', i.mailingAddress);
+            document.getElementById('llcRegisteredAgentFields').innerHTML = llcAddressFieldsHtml('llcRA', i.registeredAgent, true);
+            document.getElementById('llcMembersBody').innerHTML = '';
+            (i.members || []).forEach(m => addLlcMemberRow(m));
+            if (!(i.members || []).length) addLlcMemberRow();
+            updateLlcMembersTotal();
+
+            document.getElementById('llcView').style.display = 'none';
+            document.getElementById('llcEditForm').style.display = 'block';
+            document.getElementById('llcEditBtn').style.display = 'none';
+        }
+
+        function cancelLlcEdit() {
+            document.getElementById('llcEditForm').style.display = 'none';
+            document.getElementById('llcView').style.display = 'block';
+            document.getElementById('llcEditBtn').style.display = '';
+        }
+
+        async function saveLlcInfo(event) {
+            event.preventDefault();
+            const btn = document.getElementById('llcSaveBtn');
+            const v = (id) => document.getElementById(id).value.trim();
+            const body = {
+                legalName: v('llcLegalName'),
+                entityType: v('llcEntityType'),
+                stateOfFormation: v('llcStateOfFormation'),
+                sosId: v('llcSosId'),
+                formationDate: v('llcFormationDate') || null,
+                sosStatus: v('llcSosStatus'),
+                periodicReportMonth: v('llcPeriodicReportMonth'),
+                ein: v('llcEin'),
+                managementStructure: v('llcManagementStructure'),
+                taxClassification: v('llcTaxClassification'),
+                fiscalYearEnd: v('llcFiscalYearEnd'),
+                notes: v('llcNotes'),
+                principalOffice: llcReadAddress('llcPO'),
+                mailingAddress: llcReadAddress('llcMA'),
+                registeredAgent: llcReadAddress('llcRA', true),
+                members: readLlcMembers()
+            };
+            btn.disabled = true;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/llc-info`, {
+                    method: 'PUT',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify(body)
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Failed to save');
+                toast('LLC information saved', 'success');
+                cancelLlcEdit();
+                await loadLlcInfo();
+            } catch (error) {
+                toast('Error saving LLC information: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function renderLlcDocuments() {
+            const persistent = !!llcData.storagePersistent;
+            document.getElementById('llcStorageWarning').style.display = persistent ? 'none' : 'block';
+            document.getElementById('llcUploadBtn').disabled = !persistent;
+
+            const docs = llcData.documents || [];
+            const list = document.getElementById('llcDocumentsList');
+            if (!docs.length) {
+                list.innerHTML = '<p style="color: var(--text-muted);">No documents uploaded yet.</p>';
+                return;
+            }
+            const statusLabel = { draft: 'Draft', executed: 'Executed', filed: 'Filed' };
+            list.innerHTML = `
+                <div style="overflow-x: auto;">
+                <table class="data-table">
+                    <thead><tr><th>Title</th><th>Type</th><th>Status</th><th>Effective</th><th>Uploaded</th><th></th></tr></thead>
+                    <tbody>${docs.map(d => `<tr${d.archived ? ' style="opacity: 0.55;"' : ''}>
+                        <td>${llcEsc(d.title)}${d.notes ? `<div style="font-size: 0.8rem; color: var(--text-light);">${llcEsc(d.notes)}</div>` : ''}</td>
+                        <td>${llcEsc(LLC_DOC_TYPE_LABELS[d.docType] || d.docType)}</td>
+                        <td>${llcEsc(statusLabel[d.status] || d.status)}${d.archived ? ' (archived)' : ''}</td>
+                        <td>${llcEsc(llcDateText(d.effectiveDate))}</td>
+                        <td>${llcEsc(new Date(d.uploadedAt).toLocaleDateString('en-US'))}</td>
+                        <td style="white-space: nowrap;">
+                            <button class="btn btn-sm btn-primary" onclick="viewLlcDocument('${llcEsc(d._id)}')">View</button>
+                            <button class="btn btn-sm btn-outline" onclick="setLlcDocumentArchived('${llcEsc(d._id)}', ${!d.archived})">${d.archived ? 'Restore' : 'Archive'}</button>
+                        </td>
+                    </tr>`).join('')}</tbody>
+                </table></div>`;
+        }
+
+        // Fetch with the Bearer token and open as a blob URL - no unauthenticated links.
+        async function viewLlcDocument(docId) {
+            const win = window.open('', '_blank'); // open synchronously to avoid popup blockers
+            try {
+                const res = await fetch(`${API_URL}/api/admin/llc-info/documents/${encodeURIComponent(docId)}/file`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || 'Failed to open document');
+                }
+                const url = URL.createObjectURL(await res.blob());
+                if (win) win.location.href = url; else window.location.href = url;
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (error) {
+                if (win) win.close();
+                toast(error.message, 'error');
+            }
+        }
+
+        async function setLlcDocumentArchived(docId, archived) {
+            if (archived && !(await confirmDialog('Archive this document? It stays on file and can be restored with "Show archived".'))) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/llc-info/documents/${encodeURIComponent(docId)}`, {
+                    method: 'PATCH',
+                    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+                    body: JSON.stringify({ archived })
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Failed to update document');
+                toast(archived ? 'Document archived' : 'Document restored', 'success');
+                await loadLlcInfo();
+            } catch (error) {
+                toast(error.message, 'error');
+            }
+        }
+
+        async function uploadLlcDocument(event) {
+            event.preventDefault();
+            const fileInput = document.getElementById('llcDocFile');
+            const file = fileInput.files[0];
+            if (!file) return toast('Choose a file to upload', 'error');
+            if (file.size > 15 * 1024 * 1024) return toast('File is larger than 15 MB', 'error');
+
+            const fd = new FormData();
+            fd.append('title', document.getElementById('llcDocTitle').value.trim());
+            fd.append('docType', document.getElementById('llcDocType').value);
+            fd.append('status', document.getElementById('llcDocStatus').value);
+            fd.append('effectiveDate', document.getElementById('llcDocEffectiveDate').value);
+            fd.append('notes', document.getElementById('llcDocNotes').value.trim());
+            fd.append('document', file); // file last so text fields are parsed first
+
+            const btn = document.getElementById('llcUploadBtn');
+            btn.disabled = true;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/llc-info/documents`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: fd
+                });
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) throw new Error(data.error || 'Upload failed');
+                toast('Document uploaded', 'success');
+                document.getElementById('llcUploadForm').reset();
+                await loadLlcInfo();
+            } catch (error) {
+                toast('Upload failed: ' + error.message, 'error');
+            } finally {
+                btn.disabled = !llcData?.storagePersistent;
+            }
         }
 
         function renderReminders(reminders) {
@@ -13818,6 +14281,36 @@
 
         .btn-reorder:hover {
             background: #047857;
+        }
+
+        /* LLC Information (Company Settings) */
+        .llc-form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 0 16px;
+        }
+        .llc-subhead {
+            margin: 20px 0 8px;
+            font-size: 1rem;
+        }
+        .llc-view-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+        }
+        .llc-view-grid .license-value {
+            font-size: 1rem;
+            word-break: break-word;
+        }
+        #llcInfoCard .data-table th, #llcInfoCard .data-table td,
+        #llcDocumentsList .data-table th, #llcDocumentsList .data-table td {
+            padding: 8px 10px;
+            text-align: left;
+            vertical-align: middle;
+        }
+        #llcMembersBody input, #llcMembersBody select {
+            width: 100%;
+            min-width: 80px;
         }
 
         /* Company Settings Styles */
