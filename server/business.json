@@ -28,8 +28,8 @@
       "address": null
     },
     "members": [
-      { "name": "Kyle McConnell",  "role": "Member/Manager", "ownershipPct": null },
-      { "name": "Ty Mollohan",     "role": "Member",          "ownershipPct": null }
+      { "name": "Kyle McConnell",  "role": "Member/Manager", "ownershipPct": 50 },
+      { "name": "Ty Mollohan",     "role": "Member",         "ownershipPct": 50, "effectiveDate": "2026-03-11", "amendmentRef": "Operating Agreement Amendment No. 1" }
     ]
   },
   "identifiers": {

@@ -5706,6 +5706,7 @@ const PARTNER_DOC_SLOTS = {
     'pesticideDealerLicense':   { label: 'CO Pesticide Dealer License (reselling)' },
     'salesTaxLicense':          { label: 'CO Sales Tax License (reselling)' },
     'operatingAgreement':       { label: 'Operating Agreement' },
+    'operatingAgreementAmendment': { label: 'Operating Agreement — Amendments' },
     'bylaws':                   { label: 'Bylaws' },
     'einLetter':                { label: 'EIN Confirmation Letter (CP 575)' },
     'commercialApplicatorLicense': { label: 'CO Commercial Applicator License' },
@@ -17103,6 +17104,79 @@ for (const dir of [poDocumentsPath, licensesPath, businessDocsPath]) {
     } catch (e) {
         console.error(`Failed to create upload dir ${dir}: ${e.message}`);
     }
+}
+
+// ---- SEED PARTNER DOCUMENTS ON FIRST BOOT ----
+// Articles, Operating Agreement, EIN letter, Dealer License etc. ship in the
+// repo at server/business-docs-seed/. On first boot (or whenever a slot is
+// empty), copy the seed file onto the persistent disk and record it in
+// business.json so Ty sees it immediately without manual upload. Idempotent:
+// if a slot already has a file (seeded or user-uploaded), skip it. A seed
+// file that is missing on disk is silently skipped — not every slot needs
+// one.
+function seedPartnerDocuments() {
+    const seedDir = path.join(__dirname, 'business-docs-seed');
+    if (!fs.existsSync(seedDir)) return; // no seed set bundled
+
+    // slot → filename in seedDir. Keep in sync with PARTNER_DOC_SLOTS above.
+    const SEED_MAP = {
+        'articles':                     'articles-of-organization.pdf',
+        'operatingAgreement':           'operating-agreement.pdf',
+        'operatingAgreementAmendment':  'operating-agreement-amendment-1.pdf',
+        'einLetter':                    'ein-letter-cp575.pdf',
+        'pesticideDealerLicense':       'pesticide-dealer-license.pdf'
+    };
+
+    let b;
+    try {
+        b = JSON.parse(fs.readFileSync(BUSINESS_JSON_PATH, 'utf8'));
+    } catch (err) {
+        console.error('[seedPartnerDocuments] cannot read business.json:', err.message);
+        return;
+    }
+    if (!b.partnerDocuments) b.partnerDocuments = {};
+
+    let changed = false;
+    for (const [slot, seedFile] of Object.entries(SEED_MAP)) {
+        if (b.partnerDocuments[slot] && b.partnerDocuments[slot].storedName) continue; // already filled
+        const src = path.join(seedDir, seedFile);
+        if (!fs.existsSync(src)) continue;
+        try {
+            const ts = Date.now();
+            const storedName = `${slot}-seed-${ts}.pdf`;
+            const dest = path.join(businessDocsPath, storedName);
+            fs.copyFileSync(src, dest);
+            const stat = fs.statSync(dest);
+            b.partnerDocuments[slot] = {
+                originalName: seedFile,
+                storedName: storedName,
+                mimeType: 'application/pdf',
+                size: stat.size,
+                uploadedBy: 'system (seeded from repo)',
+                uploadedAt: new Date().toISOString()
+            };
+            changed = true;
+            console.log(`[seedPartnerDocuments] seeded ${slot} from ${seedFile}`);
+        } catch (err) {
+            console.error(`[seedPartnerDocuments] failed to seed ${slot}: ${err.message}`);
+        }
+    }
+
+    if (changed) {
+        try {
+            if (b._meta) {
+                b._meta.lastUpdated = new Date().toISOString().slice(0, 10);
+                b._meta.editedBy = 'system (seeded from repo)';
+            }
+            fs.writeFileSync(BUSINESS_JSON_PATH, JSON.stringify(b, null, 2));
+        } catch (err) {
+            console.error('[seedPartnerDocuments] cannot write business.json:', err.message);
+        }
+    }
+}
+
+try { seedPartnerDocuments(); } catch (err) {
+    console.error('[seedPartnerDocuments] crashed:', err.message);
 }
 
 let uploadPO;
