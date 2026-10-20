@@ -1260,7 +1260,7 @@
                 </div>
             </div>
 
-            <!-- Company Settings Tab (Superadmin only) -->
+            <!-- Company Settings Tab (Partner tier: superadmin + admin + partner) -->
             <div id="company-settingsTab" class="tab-content">
                 <div class="tab-header">
                     <h2>Company Settings</h2>
@@ -1308,14 +1308,14 @@
                     </div>
                 </div>
 
-                <!-- Confidential Info Card (Superadmin Only) -->
-                <div class="card confidential-card" style="margin-bottom: 24px; border: 2px solid #dc3545;">
-                    <div class="card-header" style="background: #fff5f5;">
-                        <h3 style="color: #dc3545;">Confidential License Credentials</h3>
-                        <span class="badge" style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">SUPER ADMIN ONLY</span>
+                <!-- Confidential Info Card (Partner tier: superadmin + admin + partner) -->
+                <div class="card confidential-card" style="margin-bottom: 24px; border: 2px solid #b8860b;">
+                    <div class="card-header" style="background: #fdf6e3;">
+                        <h3 style="color: #b8860b;">Confidential License Credentials</h3>
+                        <span class="badge" style="background: #b8860b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">PARTNER TIER</span>
                     </div>
                     <div style="padding: 24px;">
-                        <p style="color: #dc3545; margin-bottom: 16px; font-size: 0.9rem;">This information is only visible to super admins. Do not share these credentials.</p>
+                        <p style="color: #8b6508; margin-bottom: 16px; font-size: 0.9rem;">Visible to partners (members of the LLC) and above. Do not share these credentials outside the partnership.</p>
 
                         <div class="form-row">
                             <div class="form-group">
@@ -9776,7 +9776,134 @@
             </div>`;
         }
 
-        function renderBusinessProfile(b) {
+        // Priority document slots partners (Ty) need to pull up on demand.
+        // Keep in lock-step with PARTNER_DOC_SLOTS on the server.
+        const PARTNER_PRIORITY_DOC_ORDER = [
+            'articles',
+            'pesticideDealerLicense',
+            'salesTaxLicense',
+            'operatingAgreement',
+            'bylaws',
+            'einLetter',
+            'commercialApplicatorLicense',
+            'generalLiabilityCoi'
+        ];
+
+        function renderPriorityDocsSection(slots) {
+            if (!Array.isArray(slots) || slots.length === 0) return '';
+            // Order: priority items first (articles, reseller licenses), then the rest.
+            const ordered = PARTNER_PRIORITY_DOC_ORDER
+                .map(k => slots.find(s => s.slot === k))
+                .filter(Boolean)
+                .concat(slots.filter(s => !PARTNER_PRIORITY_DOC_ORDER.includes(s.slot)));
+
+            let rows = '';
+            ordered.forEach(s => {
+                const hasFile = !!(s.file && s.file.storedName);
+                const statusHtml = hasFile
+                    ? `<span style="color: #2e7d32; font-weight: 600;">On file</span>`
+                    : `<span style="color: var(--text-light); font-style: italic;">Not uploaded</span>`;
+                const meta = hasFile
+                    ? `<div style="font-size: 12px; color: var(--text-light); margin-top: 2px;">
+                           ${escapeHtml(s.file.originalName || '')} · ${escapeHtml((s.file.uploadedAt || '').slice(0, 10))} · ${escapeHtml(s.file.uploadedBy || '')}
+                       </div>`
+                    : '';
+                const viewBtn = hasFile
+                    ? `<button class="btn btn-sm btn-outline" onclick="viewBusinessDoc('${escapeHtml(s.slot)}')">View</button>
+                       <button class="btn btn-sm btn-outline" onclick="deleteBusinessDoc('${escapeHtml(s.slot)}', '${escapeHtml(s.label)}')" style="color: #b00020;">Remove</button>`
+                    : '';
+                rows += `<tr>
+                    <td style="padding: 10px 12px; vertical-align: top;">
+                        <strong>${escapeHtml(s.label)}</strong>
+                        ${meta}
+                    </td>
+                    <td style="padding: 10px 12px; vertical-align: top; white-space: nowrap;">
+                        ${statusHtml}
+                    </td>
+                    <td style="padding: 10px 12px; vertical-align: top; text-align: right; white-space: nowrap;">
+                        ${viewBtn}
+                        <label class="btn btn-sm btn-primary" style="cursor: pointer;">
+                            ${hasFile ? 'Replace' : 'Upload'}
+                            <input type="file" accept="application/pdf,image/jpeg,image/png,image/gif"
+                                   style="display: none;"
+                                   onchange="uploadBusinessDoc(this, '${escapeHtml(s.slot)}', '${escapeHtml(s.label)}')">
+                        </label>
+                    </td>
+                </tr>`;
+            });
+
+            return `<div style="margin-bottom: 24px; border: 2px solid #b8860b; border-radius: 8px; background: #fdf6e3;">
+                <h3 style="padding: 12px 16px; margin: 0; border-bottom: 1px solid #e9d08a; font-size: 16px; color: #8b6508; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Partner Documents</span>
+                    <span class="badge" style="background: #b8860b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">PARTNER TIER</span>
+                </h3>
+                <div style="padding: 8px 4px; background: white;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        ${rows}
+                    </table>
+                </div>
+                <p style="padding: 8px 16px; margin: 0; font-size: 12px; color: #8b6508; background: #fdf6e3; border-top: 1px solid #e9d08a;">
+                    Articles of Incorporation and the reselling licenses (Pesticide Dealer + Sales Tax) are the top three — partners need these pulled up on demand.
+                </p>
+            </div>`;
+        }
+
+        async function uploadBusinessDoc(input, slot, label) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const fd = new FormData();
+            fd.append('document', file);
+            try {
+                const res = await fetch(`${API_URL}/api/admin/business/documents/${encodeURIComponent(slot)}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: fd
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                loadBusinessProfile();
+            } catch (err) {
+                alert(`Could not upload ${label}: ${err.message}`);
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function viewBusinessDoc(slot) {
+            // Fetch the file with the Bearer token, then open the blob in a new tab.
+            try {
+                const res = await fetch(`${API_URL}/api/admin/business/documents/${encodeURIComponent(slot)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank', 'noopener');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (err) {
+                alert(`Could not open document: ${err.message}`);
+            }
+        }
+
+        async function deleteBusinessDoc(slot, label) {
+            if (!confirm(`Remove the uploaded ${label}? This cannot be undone.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/business/documents/${encodeURIComponent(slot)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                loadBusinessProfile();
+            } catch (err) {
+                alert(`Could not remove document: ${err.message}`);
+            }
+        }
+
+        function renderBusinessProfile(b, slots) {
             const container = document.getElementById('businessProfileContent');
             if (!b || typeof b !== 'object') {
                 container.innerHTML = '<div class="error">Business profile is empty.</div>';
@@ -9796,6 +9923,9 @@
             const lic = b.licenses || {};
 
             let html = '';
+
+            // Priority docs first — this is what partners (Ty) came here for.
+            html += renderPriorityDocsSection(slots);
 
             if (b._meta && b._meta.lastUpdated) {
                 html += `<p style="color: var(--text-light); margin-bottom: 16px;">Last updated: ${escapeHtml(b._meta.lastUpdated)}</p>`;
@@ -9983,16 +10113,19 @@
             const container = document.getElementById('businessProfileContent');
             container.innerHTML = '<div class="loading">Loading business profile…</div>';
             try {
-                const res = await fetch(`${API_URL}/api/admin/business`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) {
-                    const errText = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                const headers = { 'Authorization': `Bearer ${token}` };
+                const [bRes, sRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/business`, { headers }),
+                    fetch(`${API_URL}/api/admin/business/document-slots`, { headers })
+                ]);
+                if (!bRes.ok) {
+                    const errText = bRes.status === 403 ? 'Partner-level access required.' : `HTTP ${bRes.status}`;
                     container.innerHTML = `<div class="error">Could not load business profile: ${escapeHtml(errText)}</div>`;
                     return;
                 }
-                const data = await res.json();
-                renderBusinessProfile(data);
+                const data = await bRes.json();
+                const slotData = sRes.ok ? await sRes.json() : { slots: [] };
+                renderBusinessProfile(data, slotData.slots || []);
             } catch (err) {
                 container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
             }

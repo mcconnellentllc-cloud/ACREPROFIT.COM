@@ -5696,6 +5696,155 @@ app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, re
     }
 });
 
+// ---- BUSINESS DOCUMENT UPLOADS (partner tier) ----
+// Fixed-slot uploader: each slot name maps to exactly one file at a time.
+// Priority slots Ty asked for: articles, pesticideDealerLicense, salesTaxLicense.
+// Upload replaces the slot's file; download streams whatever's current. All
+// state lives in business.json → partnerDocuments.<slot>.
+const PARTNER_DOC_SLOTS = {
+    'articles':                 { label: 'Articles of Incorporation / Organization' },
+    'pesticideDealerLicense':   { label: 'CO Pesticide Dealer License (reselling)' },
+    'salesTaxLicense':          { label: 'CO Sales Tax License (reselling)' },
+    'operatingAgreement':       { label: 'Operating Agreement' },
+    'bylaws':                   { label: 'Bylaws' },
+    'einLetter':                { label: 'EIN Confirmation Letter (CP 575)' },
+    'commercialApplicatorLicense': { label: 'CO Commercial Applicator License' },
+    'generalLiabilityCoi':      { label: 'General Liability Insurance COI' }
+};
+
+app.get('/api/admin/business/document-slots', authMiddleware, partnerMiddleware, (req, res) => {
+    try {
+        const b = JSON.parse(require('fs').readFileSync(BUSINESS_JSON_PATH, 'utf8'));
+        const partnerDocs = b.partnerDocuments || {};
+        const slots = Object.entries(PARTNER_DOC_SLOTS).map(([key, meta]) => ({
+            slot: key,
+            label: meta.label,
+            file: partnerDocs[key] || null
+        }));
+        res.json({ slots });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not read document slots: ' + err.message });
+    }
+});
+
+let uploadBusinessDoc;
+if (multer) {
+    uploadBusinessDoc = multer({
+        storage: multer.diskStorage({
+            destination: (req, file, cb) => cb(null, businessDocsPath),
+            filename: (req, file, cb) => {
+                const ext = require('path').extname(file.originalname).toLowerCase();
+                const slot = req.params.slot;
+                const ts = Date.now();
+                cb(null, `${slot}-${ts}${ext}`);
+            }
+        }),
+        limits: { fileSize: 15 * 1024 * 1024 }, // 15MB
+        fileFilter: (req, file, cb) => {
+            const allowed = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif'];
+            if (allowed.includes(file.mimetype)) cb(null, true);
+            else cb(new Error('Invalid file type. Allowed: PDF, JPEG, PNG, GIF'));
+        }
+    });
+}
+
+app.post('/api/admin/business/documents/:slot', authMiddleware, partnerMiddleware, (req, res) => {
+    const { slot } = req.params;
+    if (!PARTNER_DOC_SLOTS[slot]) {
+        return res.status(400).json({ error: 'Unknown document slot: ' + slot });
+    }
+    if (!uploadBusinessDoc) {
+        return res.status(500).json({ error: 'File upload not configured on this server' });
+    }
+    uploadBusinessDoc.single('document')(req, res, (err) => {
+        if (err) return res.status(400).json({ error: err.message });
+        if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
+        try {
+            const b = JSON.parse(require('fs').readFileSync(BUSINESS_JSON_PATH, 'utf8'));
+            if (!b.partnerDocuments) b.partnerDocuments = {};
+            // Delete the previous file for this slot, if any, before replacing.
+            const prev = b.partnerDocuments[slot];
+            if (prev && prev.storedName) {
+                try {
+                    const prevPath = require('path').join(businessDocsPath, prev.storedName);
+                    if (require('fs').existsSync(prevPath)) require('fs').unlinkSync(prevPath);
+                } catch (_) { /* best effort */ }
+            }
+            b.partnerDocuments[slot] = {
+                originalName: req.file.originalname,
+                storedName: req.file.filename,
+                mimeType: req.file.mimetype,
+                size: req.file.size,
+                uploadedBy: req.user.name || req.user.email,
+                uploadedAt: new Date().toISOString()
+            };
+            if (b._meta) {
+                b._meta.lastUpdated = new Date().toISOString().slice(0, 10);
+                b._meta.editedBy = req.user.name || req.user.email;
+            }
+            require('fs').writeFileSync(BUSINESS_JSON_PATH, JSON.stringify(b, null, 2));
+            res.json({ ok: true, slot, file: b.partnerDocuments[slot] });
+        } catch (writeErr) {
+            res.status(500).json({ error: 'Saved file but could not record it: ' + writeErr.message });
+        }
+    });
+});
+
+app.get('/api/admin/business/documents/:slot', authMiddleware, partnerMiddleware, (req, res) => {
+    const { slot } = req.params;
+    if (!PARTNER_DOC_SLOTS[slot]) {
+        return res.status(400).json({ error: 'Unknown document slot: ' + slot });
+    }
+    try {
+        const b = JSON.parse(require('fs').readFileSync(BUSINESS_JSON_PATH, 'utf8'));
+        const entry = b.partnerDocuments && b.partnerDocuments[slot];
+        if (!entry || !entry.storedName) {
+            return res.status(404).json({ error: 'No document uploaded for ' + PARTNER_DOC_SLOTS[slot].label });
+        }
+        // Resolve + verify the file is still inside businessDocsPath.
+        const fp = require('path').join(businessDocsPath, entry.storedName);
+        const resolved = require('path').resolve(fp);
+        if (!resolved.startsWith(require('path').resolve(businessDocsPath))) {
+            return res.status(400).json({ error: 'Invalid stored path' });
+        }
+        if (!require('fs').existsSync(resolved)) {
+            return res.status(404).json({ error: 'File missing from disk — re-upload required' });
+        }
+        res.setHeader('Content-Type', entry.mimeType || 'application/octet-stream');
+        res.setHeader('Content-Disposition', `inline; filename="${entry.originalName.replace(/"/g, '')}"`);
+        require('fs').createReadStream(resolved).pipe(res);
+    } catch (err) {
+        res.status(500).json({ error: 'Could not stream document: ' + err.message });
+    }
+});
+
+app.delete('/api/admin/business/documents/:slot', authMiddleware, partnerMiddleware, (req, res) => {
+    const { slot } = req.params;
+    if (!PARTNER_DOC_SLOTS[slot]) {
+        return res.status(400).json({ error: 'Unknown document slot: ' + slot });
+    }
+    try {
+        const b = JSON.parse(require('fs').readFileSync(BUSINESS_JSON_PATH, 'utf8'));
+        const entry = b.partnerDocuments && b.partnerDocuments[slot];
+        if (!entry || !entry.storedName) {
+            return res.status(404).json({ error: 'Nothing to delete for this slot' });
+        }
+        try {
+            const fp = require('path').join(businessDocsPath, entry.storedName);
+            if (require('fs').existsSync(fp)) require('fs').unlinkSync(fp);
+        } catch (_) { /* best effort */ }
+        delete b.partnerDocuments[slot];
+        if (b._meta) {
+            b._meta.lastUpdated = new Date().toISOString().slice(0, 10);
+            b._meta.editedBy = req.user.name || req.user.email;
+        }
+        require('fs').writeFileSync(BUSINESS_JSON_PATH, JSON.stringify(b, null, 2));
+        res.json({ ok: true });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not delete document: ' + err.message });
+    }
+});
+
 // Get all customers (admin only) - with search support
 // Create a new customer (admin only)
 app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
@@ -9885,8 +10034,11 @@ app.get('/api/company/license', async (req, res) => {
     }
 });
 
-// Get full company settings (superadmin only)
-app.get('/api/admin/company-settings', authMiddleware, superAdminMiddleware, async (req, res) => {
+// Get full company settings (partner tier — superadmin + admin + partner).
+// Includes confidential license credentials (AgLicense ID/PIN/portal URL) which
+// are member-level info: partners (members of the LLC) can see them, same as
+// Articles and the reseller licenses themselves.
+app.get('/api/admin/company-settings', authMiddleware, partnerMiddleware, async (req, res) => {
     try {
         let settings = await CompanySettings.findOne();
 
@@ -9924,8 +10076,8 @@ app.get('/api/admin/company-settings', authMiddleware, superAdminMiddleware, asy
     }
 });
 
-// Update company settings (superadmin only)
-app.put('/api/admin/company-settings', authMiddleware, superAdminMiddleware, async (req, res) => {
+// Update company settings (partner tier — see GET above for rationale).
+app.put('/api/admin/company-settings', authMiddleware, partnerMiddleware, async (req, res) => {
     try {
         const updates = req.body;
 
@@ -16940,9 +17092,12 @@ app.get('/api/admin/sync-prices/status', authMiddleware, adminMiddleware, async 
 // but the directory is pre-created so the future upload endpoint just drops in.
 const poDocumentsPath = process.env.UPLOAD_DIR || path.join(__dirname, '..', 'purchase-orders');
 const licensesPath = process.env.LICENSES_UPLOAD_DIR || path.join(path.dirname(poDocumentsPath), 'licenses');
+// Business docs (Articles of Incorporation, reseller licenses, bylaws, insurance COIs,
+// EIN letter, etc.) — partner-tier only. Uses the same persistent-disk root as POs.
+const businessDocsPath = process.env.BUSINESS_DOCS_DIR || path.join(path.dirname(poDocumentsPath), 'business-docs');
 
 // Ensure upload directories exist
-for (const dir of [poDocumentsPath, licensesPath]) {
+for (const dir of [poDocumentsPath, licensesPath, businessDocsPath]) {
     try {
         if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     } catch (e) {
