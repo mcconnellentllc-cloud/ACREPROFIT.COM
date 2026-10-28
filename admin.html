@@ -1519,8 +1519,8 @@
                             <option value="other">Other</option>
                         </select>
                         <select id="productStockFilter" onchange="filterProducts()" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
-                            <option value="">All Stock</option>
-                            <option value="in_stock" selected>In Stock</option>
+                            <option value="" selected>All Stock</option>
+                            <option value="in_stock">In Stock</option>
                             <option value="out_of_stock">Out of Stock</option>
                             <option value="needs_pricing">Needs Pricing</option>
                             <option value="ready_to_sell">Ready to Sell</option>
@@ -6516,11 +6516,16 @@
 
             let filtered = allProducts;
             if (search) {
+                // Null-safe field reads: a single product with missing
+                // productName or sourceSupplier would otherwise throw and
+                // freeze the UI on whatever was rendered last.
                 filtered = filtered.filter(p => {
-                    const nameMatch = p.productName.toLowerCase().includes(search);
-                    const supplierMatch = p.sourceSupplier.toLowerCase().includes(search);
-                    const aiMatch = p.activeIngredients && p.activeIngredients.some(
-                        ai => ai.name && ai.name.toLowerCase().includes(search)
+                    const name = (p.productName || '').toLowerCase();
+                    const supplier = (p.sourceSupplier || '').toLowerCase();
+                    const nameMatch = name.includes(search);
+                    const supplierMatch = supplier.includes(search);
+                    const aiMatch = Array.isArray(p.activeIngredients) && p.activeIngredients.some(
+                        ai => ai && ai.name && ai.name.toLowerCase().includes(search)
                     );
                     return nameMatch || supplierMatch || aiMatch;
                 });
