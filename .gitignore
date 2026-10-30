@@ -9,4 +9,8 @@ licenses/
 AcreProfit_Price_List_April_2026.pdf
 node_modules/
 *.pdf
+# Allow the business-docs seed set (Articles, Operating Agreement, EIN
+# letter, Pesticide Dealer License). Loaded into the Partner Documents
+# slots on first boot via seedPartnerDocuments() in server/index.js.
+!server/business-docs-seed/*.pdf
 package-lock.json

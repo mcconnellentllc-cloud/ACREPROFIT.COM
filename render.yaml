@@ -68,12 +68,39 @@ services:
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
 
-  # Static Site (optional - if not using GitHub Pages)
-  # - type: web
-  #   name: acreprofit-web
-  #   env: static
-  #   staticPublishPath: ./
-  #   headers:
-  #     - path: /*
-  #       name: Cache-Control
-  #       value: public, max-age=31536000
+  # Static Site — serves the frontend (acreprofit.com). Moved off GitHub
+  # Pages 2026-10-20 because Pages doesn't serve private repos on the free
+  # GitHub plan. Render static sites are free (100GB bandwidth/mo) and
+  # repo-visibility independent, as long as Render's GitHub App has access
+  # to the repo.
+  #
+  # Parity note: same behavior as GitHub Pages (publishes everything at the
+  # repo root, including server/). Nothing in-repo is secret (all secrets
+  # live in Render env vars), but if you ever want to lock down server/
+  # at the CDN layer, add a build step that stages only frontend files.
+  - type: web
+    name: acreprofit-web
+    env: static
+    pullRequestPreviewsEnabled: false
+    buildCommand: echo "no build needed"
+    staticPublishPath: ./
+    headers:
+      # HTML files should re-check with the server on each request so a
+      # deploy actually goes live immediately instead of being pinned by
+      # the CDN. CSS/JS/SVG/image assets are safe to cache long because
+      # frontend code is deployed together with any content changes.
+      - path: /*.html
+        name: Cache-Control
+        value: no-cache, must-revalidate
+      - path: /*.css
+        name: Cache-Control
+        value: public, max-age=3600
+      - path: /*.js
+        name: Cache-Control
+        value: public, max-age=3600
+      - path: /*.svg
+        name: Cache-Control
+        value: public, max-age=86400
+      - path: /*.png
+        name: Cache-Control
+        value: public, max-age=86400

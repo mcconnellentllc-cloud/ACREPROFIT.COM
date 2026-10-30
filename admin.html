@@ -82,6 +82,7 @@
                             <span id="complianceNav"><a href="#compliance" class="dropdown-item tab-warning-item" data-tab="compliance">Compliance</a></span>
                             <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
+                            <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
                         </div>
                     </div>
 
@@ -1248,7 +1249,18 @@
                 </div>
             </div>
 
-            <!-- Company Settings Tab (Superadmin only) -->
+            <!-- Business Profile Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="businessTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>AcreProfit Business Profile</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">Articles of Organization, bylaws, EIN, state registrations, licenses, insurance. Partner-level access only.</p>
+                </div>
+                <div id="businessProfileContent" style="padding: 20px;">
+                    <div class="loading">Loading business profile…</div>
+                </div>
+            </div>
+
+            <!-- Company Settings Tab (Partner tier: superadmin + admin + partner) -->
             <div id="company-settingsTab" class="tab-content">
                 <div class="tab-header">
                     <h2>Company Settings</h2>
@@ -1417,14 +1429,14 @@
                     </div>
                 </div>
 
-                <!-- Confidential Info Card (Superadmin Only) -->
-                <div class="card confidential-card" style="margin-bottom: 24px; border: 2px solid #dc3545;">
-                    <div class="card-header" style="background: #fff5f5;">
-                        <h3 style="color: #dc3545;">Confidential License Credentials</h3>
-                        <span class="badge" style="background: #dc3545; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">SUPER ADMIN ONLY</span>
+                <!-- Confidential Info Card (Partner tier: superadmin + admin + partner) -->
+                <div class="card confidential-card" style="margin-bottom: 24px; border: 2px solid #b8860b;">
+                    <div class="card-header" style="background: #fdf6e3;">
+                        <h3 style="color: #b8860b;">Confidential License Credentials</h3>
+                        <span class="badge" style="background: #b8860b; color: white; padding: 4px 8px; border-radius: 4px; font-size: 0.75rem;">PARTNER TIER</span>
                     </div>
                     <div style="padding: 24px;">
-                        <p style="color: #dc3545; margin-bottom: 16px; font-size: 0.9rem;">This information is only visible to super admins. Do not share these credentials.</p>
+                        <p style="color: #8b6508; margin-bottom: 16px; font-size: 0.9rem;">Visible to partners (members of the LLC) and above. Do not share these credentials outside the partnership.</p>
 
                         <div class="form-row">
                             <div class="form-group">
@@ -3716,12 +3728,28 @@
             setDisplay('complianceNav', 'block');
             setDisplay('programsNav', 'inline');
             setDisplay('ratingsNav', 'inline');
+            setDisplay('businessProfileNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
                 el.style.display = 'flex';
             });
             loadPricingData();
+            loadCommissionData();
+            loadCompanySettings();
+            loadDashboardReminders();
+        } else if (userData.role === 'partner') {
+            document.getElementById('adminRole').textContent = 'Partner';
+            setDisplay('inventoryNav', 'block');
+            setDisplay('commissionsNav', 'block');
+            setDisplay('distributorsNav', 'block');
+            setDisplay('suppliersNavTop', 'block');
+            setDisplay('complianceNav', 'block');
+            setDisplay('companySettingsNav', 'block');
+            setDisplay('businessProfileNav', 'block');
+            // Partners don't see rep applications or audit log (superadmin only)
+            setDisplay('repAppsNav', 'none');
+            setDisplay('auditLogNav', 'none');
             loadCommissionData();
             loadCompanySettings();
             loadDashboardReminders();
@@ -3736,6 +3764,8 @@
             setDisplay('suppliersNavTop', 'block');
             setDisplay('companySettingsNav', 'none');
             setDisplay('complianceNav', 'none');
+            // Distributors do NOT see the Business Profile (partner+ only)
+            setDisplay('businessProfileNav', 'none');
         } else {
             // Regular admin/representative
             document.getElementById('adminRole').textContent = 'Representative';
@@ -4092,6 +4122,7 @@
             if (tabName === 'suppliers') loadSuppliers();
             if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
+            if (tabName === 'business') loadBusinessProfile();
         }
 
         // Tab navigation - regular tabs (only for tabs with data-tab attribute)
@@ -9847,6 +9878,385 @@
         document.getElementById('receiveShipmentModal').addEventListener('click', function(e) {
             if (e.target === this) closeReceiveShipmentModal();
         });
+
+        // ============ BUSINESS PROFILE (partner+ only) ============
+
+        function bpVal(v) {
+            if (v === null || v === undefined || v === '') {
+                return '<span style="color: var(--text-light); font-style: italic;">— not set —</span>';
+            }
+            return escapeHtml(v);
+        }
+
+        function bpRow(label, value) {
+            return `<tr>
+                <td style="padding: 6px 12px; color: var(--text-light); width: 240px; vertical-align: top;">${escapeHtml(label)}</td>
+                <td style="padding: 6px 12px;">${bpVal(value)}</td>
+            </tr>`;
+        }
+
+        function bpSection(title, bodyHtml) {
+            return `<div style="margin-bottom: 24px; border: 1px solid var(--border); border-radius: 8px; background: var(--card-bg);">
+                <h3 style="padding: 12px 16px; margin: 0; border-bottom: 1px solid var(--border); font-size: 16px;">${escapeHtml(title)}</h3>
+                <div style="padding: 8px 4px;">${bodyHtml}</div>
+            </div>`;
+        }
+
+        // Priority document slots partners (Ty) need to pull up on demand.
+        // Keep in lock-step with PARTNER_DOC_SLOTS on the server.
+        const PARTNER_PRIORITY_DOC_ORDER = [
+            'articles',
+            'pesticideDealerLicense',
+            'salesTaxLicense',
+            'operatingAgreement',
+            'operatingAgreementAmendment',
+            'bylaws',
+            'einLetter',
+            'commercialApplicatorLicense',
+            'generalLiabilityCoi'
+        ];
+
+        function renderPriorityDocsSection(slots) {
+            if (!Array.isArray(slots) || slots.length === 0) return '';
+            // Order: priority items first (articles, reseller licenses), then the rest.
+            const ordered = PARTNER_PRIORITY_DOC_ORDER
+                .map(k => slots.find(s => s.slot === k))
+                .filter(Boolean)
+                .concat(slots.filter(s => !PARTNER_PRIORITY_DOC_ORDER.includes(s.slot)));
+
+            let rows = '';
+            ordered.forEach(s => {
+                const hasFile = !!(s.file && s.file.storedName);
+                const statusHtml = hasFile
+                    ? `<span style="color: #2e7d32; font-weight: 600;">On file</span>`
+                    : `<span style="color: var(--text-light); font-style: italic;">Not uploaded</span>`;
+                const meta = hasFile
+                    ? `<div style="font-size: 12px; color: var(--text-light); margin-top: 2px;">
+                           ${escapeHtml(s.file.originalName || '')} · ${escapeHtml((s.file.uploadedAt || '').slice(0, 10))} · ${escapeHtml(s.file.uploadedBy || '')}
+                       </div>`
+                    : '';
+                const viewBtn = hasFile
+                    ? `<button class="btn btn-sm btn-outline" onclick="viewBusinessDoc('${escapeHtml(s.slot)}')">View</button>
+                       <button class="btn btn-sm btn-outline" onclick="deleteBusinessDoc('${escapeHtml(s.slot)}', '${escapeHtml(s.label)}')" style="color: #b00020;">Remove</button>`
+                    : '';
+                rows += `<tr>
+                    <td style="padding: 10px 12px; vertical-align: top;">
+                        <strong>${escapeHtml(s.label)}</strong>
+                        ${meta}
+                    </td>
+                    <td style="padding: 10px 12px; vertical-align: top; white-space: nowrap;">
+                        ${statusHtml}
+                    </td>
+                    <td style="padding: 10px 12px; vertical-align: top; text-align: right; white-space: nowrap;">
+                        ${viewBtn}
+                        <label class="btn btn-sm btn-primary" style="cursor: pointer;">
+                            ${hasFile ? 'Replace' : 'Upload'}
+                            <input type="file" accept="application/pdf,image/jpeg,image/png,image/gif"
+                                   style="display: none;"
+                                   onchange="uploadBusinessDoc(this, '${escapeHtml(s.slot)}', '${escapeHtml(s.label)}')">
+                        </label>
+                    </td>
+                </tr>`;
+            });
+
+            return `<div style="margin-bottom: 24px; border: 2px solid #b8860b; border-radius: 8px; background: #fdf6e3;">
+                <h3 style="padding: 12px 16px; margin: 0; border-bottom: 1px solid #e9d08a; font-size: 16px; color: #8b6508; display: flex; justify-content: space-between; align-items: center;">
+                    <span>Partner Documents</span>
+                    <span class="badge" style="background: #b8860b; color: white; padding: 2px 8px; border-radius: 4px; font-size: 11px;">PARTNER TIER</span>
+                </h3>
+                <div style="padding: 8px 4px; background: white;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        ${rows}
+                    </table>
+                </div>
+                <p style="padding: 8px 16px; margin: 0; font-size: 12px; color: #8b6508; background: #fdf6e3; border-top: 1px solid #e9d08a;">
+                    Articles of Incorporation and the reselling licenses (Pesticide Dealer + Sales Tax) are the top three — partners need these pulled up on demand.
+                </p>
+            </div>`;
+        }
+
+        async function uploadBusinessDoc(input, slot, label) {
+            if (!input.files || input.files.length === 0) return;
+            const file = input.files[0];
+            const fd = new FormData();
+            fd.append('document', file);
+            try {
+                const res = await fetch(`${API_URL}/api/admin/business/documents/${encodeURIComponent(slot)}`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: fd
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                loadBusinessProfile();
+            } catch (err) {
+                alert(`Could not upload ${label}: ${err.message}`);
+            } finally {
+                input.value = '';
+            }
+        }
+
+        async function viewBusinessDoc(slot) {
+            // Fetch the file with the Bearer token, then open the blob in a new tab.
+            try {
+                const res = await fetch(`${API_URL}/api/admin/business/documents/${encodeURIComponent(slot)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const data = await res.json().catch(() => ({}));
+                    throw new Error(data.error || `HTTP ${res.status}`);
+                }
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+                window.open(url, '_blank', 'noopener');
+                setTimeout(() => URL.revokeObjectURL(url), 60000);
+            } catch (err) {
+                alert(`Could not open document: ${err.message}`);
+            }
+        }
+
+        async function deleteBusinessDoc(slot, label) {
+            if (!confirm(`Remove the uploaded ${label}? This cannot be undone.`)) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/business/documents/${encodeURIComponent(slot)}`, {
+                    method: 'DELETE',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                loadBusinessProfile();
+            } catch (err) {
+                alert(`Could not remove document: ${err.message}`);
+            }
+        }
+
+        function renderBusinessProfile(b, slots) {
+            const container = document.getElementById('businessProfileContent');
+            if (!b || typeof b !== 'object') {
+                container.innerHTML = '<div class="error">Business profile is empty.</div>';
+                return;
+            }
+
+            const e = b.entity || {};
+            const pa = e.principalAddress || {};
+            const ma = e.mailingAddress || {};
+            const ra = e.registeredAgent || {};
+            const ids = b.identifiers || {};
+            const gov = b.governance || {};
+            const contacts = b.contacts || {};
+            const docs = Array.isArray(b.documents) ? b.documents : [];
+            const regs = Array.isArray(b.stateRegistrations) ? b.stateRegistrations : [];
+            const ins = Array.isArray(b.insurance) ? b.insurance : [];
+            const lic = b.licenses || {};
+
+            let html = '';
+
+            // Priority docs first — this is what partners (Ty) came here for.
+            html += renderPriorityDocsSection(slots);
+
+            if (b._meta && b._meta.lastUpdated) {
+                html += `<p style="color: var(--text-light); margin-bottom: 16px;">Last updated: ${escapeHtml(b._meta.lastUpdated)}</p>`;
+            }
+
+            // Entity
+            let entityRows = '';
+            entityRows += bpRow('Legal name', e.legalName);
+            entityRows += bpRow('DBA', e.dba);
+            entityRows += bpRow('Entity type', e.entityType);
+            entityRows += bpRow('Formation state', e.formationState);
+            entityRows += bpRow('Formation date', e.formationDate);
+            const princAddr = [pa.street, pa.city, pa.state, pa.zip].filter(Boolean).join(', ');
+            entityRows += bpRow('Principal address', princAddr || null);
+            const mailAddr = ma.sameAsPrincipal
+                ? 'Same as principal'
+                : [ma.street, ma.city, ma.state, ma.zip].filter(Boolean).join(', ');
+            entityRows += bpRow('Mailing address', mailAddr || null);
+            entityRows += bpRow('Registered agent', ra.name);
+            entityRows += bpRow('Registered agent address', ra.address);
+            if (Array.isArray(e.members) && e.members.length > 0) {
+                const members = e.members.map(m => {
+                    const pct = m.ownershipPct !== null && m.ownershipPct !== undefined ? ` — ${m.ownershipPct}%` : '';
+                    return `${escapeHtml(m.name || '')} <span style="color: var(--text-light);">(${escapeHtml(m.role || '')}${pct})</span>`;
+                }).join('<br>');
+                entityRows += `<tr><td style="padding: 6px 12px; color: var(--text-light); vertical-align: top;">Members</td><td style="padding: 6px 12px;">${members}</td></tr>`;
+            }
+            html += bpSection('Entity', `<table style="width: 100%;">${entityRows}</table>`);
+
+            // Identifiers
+            let idRows = '';
+            idRows += bpRow('EIN', ids.ein);
+            idRows += bpRow('CO Secretary of State ID', ids.coSecretaryOfStateId);
+            idRows += bpRow('CO Sales Tax License', ids.coSalesTaxLicense);
+            idRows += bpRow('CO Withholding account', ids.coWithholdingAccount);
+            idRows += bpRow('DUNS', ids.duns);
+            idRows += bpRow('NAICS code', ids.naicsCode);
+            html += bpSection('Identifiers', `<table style="width: 100%;">${idRows}</table>`);
+
+            // State Registrations
+            if (regs.length > 0) {
+                const regHtml = regs.map(r => {
+                    let rows = '';
+                    rows += bpRow('State', r.state);
+                    rows += bpRow('Status', r.status);
+                    rows += bpRow('Domestic/Foreign', r.foreignOrDomestic);
+                    rows += bpRow('SOS file number', r.secretaryOfStateFileNumber);
+                    rows += bpRow('Good standing through', r.goodStandingThrough);
+                    rows += bpRow('Annual report due', r.annualReportDueDate);
+                    rows += bpRow('Sales tax ID', r.salesTaxId);
+                    rows += bpRow('Withholding ID', r.withholdingId);
+                    rows += bpRow('Notes', r.notes);
+                    return `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+                }).join('<hr style="border: none; border-top: 1px solid var(--border); margin: 4px 0;">');
+                html += bpSection('State Registrations', regHtml);
+            }
+
+            // Licenses
+            let licHtml = '';
+            if (Array.isArray(lic.commercialPesticideApplicator) && lic.commercialPesticideApplicator.length > 0) {
+                licHtml += '<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">Commercial Pesticide Applicator</h4>';
+                lic.commercialPesticideApplicator.forEach(l => {
+                    let rows = '';
+                    rows += bpRow('State', l.state);
+                    rows += bpRow('Licensee', l.licensee);
+                    rows += bpRow('License number', l.licenseNumber);
+                    rows += bpRow('Categories', Array.isArray(l.categories) && l.categories.length ? l.categories.join(', ') : null);
+                    rows += bpRow('Issued', l.issuedDate);
+                    rows += bpRow('Expires', l.expirationDate);
+                    rows += bpRow('Notes', l.notes);
+                    licHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+                });
+            }
+            if (Array.isArray(lic.pesticideDealer) && lic.pesticideDealer.length > 0) {
+                licHtml += '<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">Pesticide Dealer</h4>';
+                lic.pesticideDealer.forEach(l => {
+                    let rows = '';
+                    rows += bpRow('State', l.state);
+                    rows += bpRow('License number', l.licenseNumber);
+                    rows += bpRow('Issued', l.issuedDate);
+                    rows += bpRow('Expires', l.expirationDate);
+                    rows += bpRow('Notes', l.notes);
+                    licHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+                });
+            }
+            licHtml += `<table style="width: 100%;">${bpRow('EPA establishment number', lic.epaEstablishmentNumber)}</table>`;
+            html += bpSection('Licenses', licHtml);
+
+            // Insurance
+            if (ins.length > 0) {
+                const insHtml = ins.map(p => {
+                    let rows = '';
+                    rows += bpRow('Type', p.type);
+                    rows += bpRow('Carrier', p.carrier);
+                    rows += bpRow('Policy number', p.policyNumber);
+                    rows += bpRow('Coverage limit', p.coverageLimit);
+                    rows += bpRow('Effective', p.effectiveDate);
+                    rows += bpRow('Expires', p.expirationDate);
+                    rows += bpRow('Certificate holder notes', p.certificateHolderNotes);
+                    return `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+                }).join('<hr style="border: none; border-top: 1px solid var(--border); margin: 4px 0;">');
+                html += bpSection('Insurance', insHtml);
+            }
+
+            // Governance
+            let govHtml = '';
+            if (gov.articlesOfOrganization) {
+                let rows = '';
+                rows += bpRow('Filed date', gov.articlesOfOrganization.filedDate);
+                rows += bpRow('File number', gov.articlesOfOrganization.fileNumber);
+                rows += bpRow('Document ref', gov.articlesOfOrganization.documentRef);
+                govHtml += '<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">Articles of Organization</h4>';
+                govHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+            }
+            if (gov.operatingAgreement) {
+                let rows = '';
+                rows += bpRow('Adopted', gov.operatingAgreement.adopted);
+                rows += bpRow('Last amended', gov.operatingAgreement.lastAmended);
+                rows += bpRow('Document ref', gov.operatingAgreement.documentRef);
+                govHtml += '<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">Operating Agreement</h4>';
+                govHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+            }
+            if (gov.bylaws) {
+                let rows = '';
+                rows += bpRow('Adopted', gov.bylaws.adopted);
+                rows += bpRow('Last amended', gov.bylaws.lastAmended);
+                rows += bpRow('Document ref', gov.bylaws.documentRef);
+                govHtml += '<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">Bylaws</h4>';
+                govHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+            }
+            html += bpSection('Governance', govHtml);
+
+            // Contacts
+            let contactsHtml = '';
+            if (contacts.primary) {
+                const p = contacts.primary;
+                let rows = '';
+                rows += bpRow('Name', p.name);
+                rows += bpRow('Title', p.title);
+                rows += bpRow('Email', p.email);
+                rows += bpRow('Phone', p.phone);
+                contactsHtml += '<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">Primary</h4>';
+                contactsHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+            }
+            ['accounting', 'legal', 'insurance'].forEach(k => {
+                if (contacts[k]) {
+                    const c = contacts[k];
+                    let rows = '';
+                    rows += bpRow('Name', c.name);
+                    rows += bpRow('Email', c.email);
+                    rows += bpRow('Phone', c.phone);
+                    contactsHtml += `<h4 style="padding: 6px 12px; margin: 8px 0 4px 0; font-size: 14px;">${k.charAt(0).toUpperCase() + k.slice(1)}</h4>`;
+                    contactsHtml += `<table style="width: 100%; margin-bottom: 8px;">${rows}</table>`;
+                }
+            });
+            html += bpSection('Contacts', contactsHtml);
+
+            // Documents
+            if (docs.length > 0) {
+                let docsHtml = '<table style="width: 100%;">';
+                docsHtml += '<tr style="color: var(--text-light); font-size: 12px; text-transform: uppercase;">';
+                docsHtml += '<th style="padding: 6px 12px; text-align: left;">Label</th>';
+                docsHtml += '<th style="padding: 6px 12px; text-align: left;">Type</th>';
+                docsHtml += '<th style="padding: 6px 12px; text-align: left;">Path</th>';
+                docsHtml += '<th style="padding: 6px 12px; text-align: left;">Added</th>';
+                docsHtml += '</tr>';
+                docs.forEach(d => {
+                    docsHtml += `<tr>
+                        <td style="padding: 6px 12px;">${bpVal(d.label)}</td>
+                        <td style="padding: 6px 12px;">${bpVal(d.type)}</td>
+                        <td style="padding: 6px 12px; font-family: monospace; font-size: 12px;">${bpVal(d.path)}</td>
+                        <td style="padding: 6px 12px;">${bpVal(d.dateAdded)}</td>
+                    </tr>`;
+                });
+                docsHtml += '</table>';
+                html += bpSection('Documents', docsHtml);
+            }
+
+            html += '<p style="color: var(--text-light); font-size: 12px; margin-top: 16px;">Edit this profile by updating <code>server/business.json</code> in the repo. A write-through UI is on the roadmap.</p>';
+
+            container.innerHTML = html;
+        }
+
+        async function loadBusinessProfile() {
+            const container = document.getElementById('businessProfileContent');
+            container.innerHTML = '<div class="loading">Loading business profile…</div>';
+            try {
+                const headers = { 'Authorization': `Bearer ${token}` };
+                const [bRes, sRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/business`, { headers }),
+                    fetch(`${API_URL}/api/admin/business/document-slots`, { headers })
+                ]);
+                if (!bRes.ok) {
+                    const errText = bRes.status === 403 ? 'Partner-level access required.' : `HTTP ${bRes.status}`;
+                    container.innerHTML = `<div class="error">Could not load business profile: ${escapeHtml(errText)}</div>`;
+                    return;
+                }
+                const data = await bRes.json();
+                const slotData = sRes.ok ? await sRes.json() : { slots: [] };
+                renderBusinessProfile(data, slotData.slots || []);
+            } catch (err) {
+                container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
+            }
+        }
 
         // ============ COMPLIANCE DASHBOARD FUNCTIONS ============
 

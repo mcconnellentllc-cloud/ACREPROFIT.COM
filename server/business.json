@@ -1,0 +1,174 @@
+{
+  "_meta": {
+    "description": "AcreProfit LLC business filings, licenses, and ID numbers. One place for everything that goes on invoices, contracts, state submissions, and tax filings.",
+    "lastUpdated": "2026-10-20",
+    "notes": "Null = not yet entered. documents[] holds a reference to the PDF/scan location on disk or in the file system — paths relative to this file or absolute. Add new states/licenses as needed."
+  },
+  "entity": {
+    "legalName": "AcreProfit LLC",
+    "dba": null,
+    "entityType": "LLC",
+    "formationState": "Colorado",
+    "formationDate": null,
+    "principalAddress": {
+      "street": null,
+      "city": null,
+      "state": null,
+      "zip": null
+    },
+    "mailingAddress": {
+      "sameAsPrincipal": true,
+      "street": null,
+      "city": null,
+      "state": null,
+      "zip": null
+    },
+    "registeredAgent": {
+      "name": null,
+      "address": null
+    },
+    "members": [
+      { "name": "Kyle McConnell",  "role": "Member/Manager", "ownershipPct": 50 },
+      { "name": "Ty Mollohan",     "role": "Member",         "ownershipPct": 50, "effectiveDate": "2026-03-11", "amendmentRef": "Operating Agreement Amendment No. 1" }
+    ]
+  },
+  "identifiers": {
+    "ein": null,
+    "coSecretaryOfStateId": null,
+    "coSalesTaxLicense": null,
+    "coWithholdingAccount": null,
+    "duns": null,
+    "naicsCode": null,
+    "bankingRoutingNumber": null,
+    "bankingAccountNumber": null
+  },
+  "stateRegistrations": [
+    {
+      "state": "CO",
+      "status": null,
+      "foreignOrDomestic": "domestic",
+      "secretaryOfStateFileNumber": null,
+      "goodStandingThrough": null,
+      "annualReportDueDate": null,
+      "salesTaxId": null,
+      "withholdingId": null,
+      "notes": null
+    }
+  ],
+  "licenses": {
+    "commercialPesticideApplicator": [
+      {
+        "state": "CO",
+        "licensee": null,
+        "licenseNumber": null,
+        "categories": [],
+        "issuedDate": null,
+        "expirationDate": null,
+        "notes": null
+      }
+    ],
+    "pesticideDealer": [
+      {
+        "state": "CO",
+        "licenseNumber": null,
+        "issuedDate": null,
+        "expirationDate": null,
+        "notes": null
+      }
+    ],
+    "privateApplicator": [],
+    "epaEstablishmentNumber": null,
+    "paraquatTraining": [],
+    "dicambaTraining": []
+  },
+  "insurance": [
+    {
+      "type": "General Liability",
+      "carrier": null,
+      "policyNumber": null,
+      "coverageLimit": null,
+      "effectiveDate": null,
+      "expirationDate": null,
+      "certificateHolderNotes": null
+    }
+  ],
+  "governance": {
+    "operatingAgreement": {
+      "adopted": null,
+      "lastAmended": null,
+      "documentRef": null
+    },
+    "bylaws": {
+      "adopted": null,
+      "lastAmended": null,
+      "documentRef": null
+    },
+    "articlesOfOrganization": {
+      "filedDate": null,
+      "fileNumber": null,
+      "documentRef": null
+    }
+  },
+  "contacts": {
+    "primary": {
+      "name": "Kyle McConnell",
+      "email": "kyle@acreprofit.com",
+      "phone": "970-571-1015",
+      "title": "Managing Member"
+    },
+    "accounting": null,
+    "legal": null,
+    "insurance": null
+  },
+  "documents": [
+    {
+      "label": "Articles of Organization",
+      "type": "formation",
+      "path": null,
+      "dateAdded": null,
+      "notes": "Scan or PDF — drop file path here once scanned"
+    },
+    {
+      "label": "Operating Agreement",
+      "type": "governance",
+      "path": null,
+      "dateAdded": null
+    },
+    {
+      "label": "Bylaws",
+      "type": "governance",
+      "path": null,
+      "dateAdded": null
+    },
+    {
+      "label": "EIN Confirmation Letter (CP 575)",
+      "type": "tax",
+      "path": null,
+      "dateAdded": null
+    },
+    {
+      "label": "CO Sales Tax License",
+      "type": "license",
+      "path": null,
+      "dateAdded": null
+    },
+    {
+      "label": "CO Commercial Applicator License",
+      "type": "license",
+      "path": null,
+      "dateAdded": null
+    },
+    {
+      "label": "CO Pesticide Dealer License",
+      "type": "license",
+      "path": null,
+      "dateAdded": null
+    },
+    {
+      "label": "General Liability Insurance COI",
+      "type": "insurance",
+      "path": null,
+      "dateAdded": null
+    }
+  ]
+}
