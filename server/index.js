@@ -5343,7 +5343,7 @@ app.put('/api/auth/me', authMiddleware, async (req, res) => {
 
 app.get('/api/representatives', async (req, res) => {
     try {
-        const reps = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin'] } })
+        const reps = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin', 'partner'] } })
             .select('name email phone');
         res.json(reps);
     } catch (error) {
@@ -5419,7 +5419,7 @@ app.get('/api/price-mining/quotes', async (req, res) => {
 
 app.get('/api/distributors', async (req, res) => {
     try {
-        const distributors = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin'] } })
+        const distributors = await User.find({ role: { $in: ['admin', 'distributor', 'superadmin', 'partner'] } })
             .select('name email phone')
             .sort({ name: 1 });
 
@@ -5923,7 +5923,7 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
         // back to the creating admin only if the slug can't be resolved, so
         // customer creation never fails.
         const repSlug = representativeId || 'kyle';
-        const distributor = await User.findOne({ role: 'distributor', representativeId: repSlug }).select('_id');
+        const distributor = await User.findOne({ role: { $in: ['distributor', 'partner'] }, representativeId: repSlug }).select('_id');
 
         const user = new User({
             name,
@@ -6246,9 +6246,9 @@ app.put('/api/admin/customers/:customerId/assign', authMiddleware, superAdminMid
             return res.status(404).json({ error: 'Customer not found' });
         }
 
-        // Find the distributor
+        // Find the distributor (includes partner tier — they can also be assigned as a rep)
         const distributor = await User.findById(distributorId);
-        if (!distributor || !['admin', 'distributor'].includes(distributor.role)) {
+        if (!distributor || !['admin', 'distributor', 'partner'].includes(distributor.role)) {
             return res.status(404).json({ error: 'Distributor not found' });
         }
 
@@ -10815,8 +10815,8 @@ app.post('/api/chemical-orders', authMiddleware, rejectPendingChemicalOrders, as
             const customer = await User.findById(actingAsCustomerId);
             if (customer && customer.role === 'customer') {
                 orderUserId = customer._id;
-                // Rep is the acting user (if they are a distributor) or the customer's assigned rep
-                orderRepId = req.user.role === 'distributor' ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
+                // Rep is the acting user (if they are a distributor or partner) or the customer's assigned rep
+                orderRepId = (req.user.role === 'distributor' || req.user.role === 'partner') ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
             }
         }
 
@@ -11053,7 +11053,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
             const customer = await User.findById(actingAsId);
             if (customer && customer.role === 'customer') {
                 orderUserId = customer._id;
-                orderRepId = req.user.role === 'distributor' ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
+                orderRepId = (req.user.role === 'distributor' || req.user.role === 'partner') ? req.user._id : (customer.representative || customer.representativeId || req.user._id);
             }
         }
 
@@ -11085,7 +11085,7 @@ app.post('/api/chemical-orders/checkout', authMiddleware, async (req, res) => {
                     { representativeId: repCode },
                     { email: { $regex: new RegExp(repCode, 'i') } }
                 ],
-                role: { $in: ['admin', 'distributor', 'superadmin'] }
+                role: { $in: ['admin', 'distributor', 'superadmin', 'partner'] }
             });
             if (repUser) {
                 representativeId = repUser._id;
@@ -12120,7 +12120,7 @@ app.get('/api/admin/ledger/summary', authMiddleware, adminMiddleware, async (req
         if (isDistributor(req.user)) {
             repFilter = { _id: req.user._id };
         } else {
-            repFilter = { role: { $in: ['admin', 'distributor', 'superadmin'] } };
+            repFilter = { role: { $in: ['admin', 'distributor', 'superadmin', 'partner'] } };
         }
 
         const reps = await User.find(repFilter).select('name email role');
@@ -12599,7 +12599,7 @@ app.delete('/api/admin/purchase-orders/:id/items/:itemIndex', authMiddleware, ad
 app.get('/api/admin/distributors', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const distributors = await User.find({
-            role: { $in: ['admin', 'distributor'] }
+            role: { $in: ['admin', 'distributor', 'partner'] }
         }).select('name email role').sort({ name: 1 });
 
         // Enrich with inventory value, order count, customer count
@@ -18177,8 +18177,8 @@ app.post('/api/quote-requests', authMiddleware, async (req, res) => {
         let customerEmail = req.user.email;
         let customerPhone = req.user.phone;
 
-        // Admin can submit on behalf of a customer
-        if (customerId && (req.user.role === 'admin' || req.user.role === 'superadmin' || req.user.role === 'distributor')) {
+        // Admin / distributor / partner can submit on behalf of a customer
+        if (customerId && (req.user.role === 'admin' || req.user.role === 'superadmin' || req.user.role === 'distributor' || req.user.role === 'partner')) {
             const customer = await User.findById(customerId);
             if (customer) {
                 targetCustomerId = customer._id;

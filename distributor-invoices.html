@@ -370,7 +370,7 @@
         let editingInvoiceId = null;   // when set, the builder is editing this draft (PUT) instead of creating (POST)
 
         // Check authentication
-        if (!token || !['admin', 'distributor', 'superadmin'].includes(user.role)) {
+        if (!token || !['admin', 'distributor', 'superadmin', 'partner'].includes(user.role)) {
             window.location.href = '/login.html';
         }
 

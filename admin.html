@@ -3846,8 +3846,8 @@
 
         const userData = JSON.parse(user);
 
-        // Check if admin/distributor
-        if (userData.role !== 'superadmin' && userData.role !== 'admin' && userData.role !== 'distributor') {
+        // Check if admin/distributor/partner — partners inherit distributor access
+        if (!['superadmin', 'admin', 'distributor', 'partner'].includes(userData.role)) {
             window.location.href = '/dashboard.html';
         }
 
@@ -4941,7 +4941,7 @@
                 }
                 if (distRes.ok) {
                     const dists = await distRes.json();
-                    const count = Array.isArray(dists) ? dists.filter(d => d.role === 'distributor').length : 0;
+                    const count = Array.isArray(dists) ? dists.filter(d => d.role === 'distributor' || d.role === 'partner').length : 0;
                     document.getElementById('totalDistributorsCount').textContent = count;
                 }
             } catch (e) {
@@ -5019,7 +5019,7 @@
             try {
                 const res = await fetch(`${API_URL}/api/admin/distributors`, { headers: { 'Authorization': `Bearer ${token}` } });
                 if (!res.ok) return;
-                const dists = (await res.json()).filter(d => d.role === 'distributor');
+                const dists = (await res.json()).filter(d => d.role === 'distributor' || d.role === 'partner');
                 const opts = '<option value="">Select&hellip;</option>' + dists.map(d => `<option value="${d._id}">${escapeHtml(d.name)}</option>`).join('');
                 const from = document.getElementById('setFrom'), to = document.getElementById('setTo');
                 if (from && !from.dataset.filled) { from.innerHTML = opts; from.dataset.filled = '1'; }
@@ -5712,7 +5712,7 @@
             const resetBtn = document.getElementById('resetPasswordBtn');
             if (resetBtn) {
                 const viewerUser = JSON.parse(localStorage.getItem('user') || '{}');
-                resetBtn.style.display = ['admin', 'superadmin', 'distributor'].includes(viewerUser.role) ? 'inline-block' : 'none';
+                resetBtn.style.display = ['admin', 'superadmin', 'distributor', 'partner'].includes(viewerUser.role) ? 'inline-block' : 'none';
             }
 
             // Archive/Reactivate button — superadmin only, lives on editActions bar.
