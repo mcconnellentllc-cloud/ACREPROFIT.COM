@@ -12941,6 +12941,75 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
     }
 });
 
+// ---- BULK PRICE ADJUSTMENT ----
+// Multiply every product's sellPrice by (1 + percentage/100). Two-step
+// flow: client calls with preview=true first to get the changeset, then
+// again with preview=false to commit. Both steps return the full list of
+// {productId, name, oldPrice, newPrice}. Rounds to 2 decimals. Skips
+// products with sellPrice <= 0 (nothing to adjust).
+app.post('/api/admin/products/bulk-adjust-prices', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { percentage, preview = true } = req.body || {};
+        const pct = Number(percentage);
+        if (!isFinite(pct)) {
+            return res.status(400).json({ error: 'percentage must be a number (e.g. 7 for +7%)' });
+        }
+        if (pct <= -100) {
+            return res.status(400).json({ error: 'percentage must be greater than -100' });
+        }
+        const factor = 1 + (pct / 100);
+
+        const chemicals = await Chemical.find({ sellPrice: { $gt: 0 } }).select('_id productName sellPrice costPrice unit packSize');
+        const changes = chemicals.map(c => {
+            const oldPrice = Number(c.sellPrice) || 0;
+            const newPrice = Math.round(oldPrice * factor * 100) / 100;
+            return {
+                productId: c._id,
+                productName: c.productName,
+                unit: c.unit || null,
+                packSize: c.packSize || null,
+                oldPrice,
+                newPrice,
+                delta: Math.round((newPrice - oldPrice) * 100) / 100
+            };
+        });
+
+        if (preview) {
+            return res.json({
+                preview: true,
+                percentage: pct,
+                factor,
+                count: changes.length,
+                changes
+            });
+        }
+
+        // Apply: one bulk write for atomicity and speed.
+        if (changes.length > 0) {
+            const ops = changes.map(c => ({
+                updateOne: {
+                    filter: { _id: c.productId },
+                    update: { $set: { sellPrice: c.newPrice } }
+                }
+            }));
+            await Chemical.bulkWrite(ops, { ordered: false });
+        }
+
+        res.json({
+            preview: false,
+            percentage: pct,
+            factor,
+            count: changes.length,
+            appliedBy: req.user.name || req.user.email,
+            appliedAt: new Date().toISOString(),
+            changes
+        });
+    } catch (error) {
+        console.error('[bulk-adjust-prices] error:', error);
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // ---- SPRAY PROGRAM CALCULATOR ROUTES ----
 
 // Helper: Convert hardcoded sprayPrograms to program format
