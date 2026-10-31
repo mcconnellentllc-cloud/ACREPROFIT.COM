@@ -83,6 +83,7 @@
                             <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                             <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
+                            <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
                         </div>
                     </div>
 
@@ -1257,6 +1258,56 @@
                 </div>
                 <div id="businessProfileContent" style="padding: 20px;">
                     <div class="loading">Loading business profile…</div>
+                </div>
+            </div>
+
+            <!-- Webhook Events Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="webhook-eventsTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Webhook Events</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        Every Stripe (and SendGrid) webhook our server has received, newest first. Useful for payment diagnostics and anti-fraud checks. Rows auto-delete after 30 days.
+                    </p>
+                </div>
+                <div style="padding: 20px;">
+                    <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap;">
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 12px; color: var(--text-light);">Provider</label>
+                            <select id="webhookEventsProvider" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                                <option value="">All</option>
+                                <option value="stripe" selected>Stripe</option>
+                                <option value="sendgrid">SendGrid</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 12px; color: var(--text-light);">Status</label>
+                            <select id="webhookEventsStatus" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                                <option value="">All</option>
+                                <option value="processed">Processed</option>
+                                <option value="received">Received (in-flight)</option>
+                                <option value="failed">Failed</option>
+                            </select>
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 12px; color: var(--text-light);">Since</label>
+                            <input type="date" id="webhookEventsSince"
+                                style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                        </div>
+                        <div class="form-group" style="margin: 0;">
+                            <label style="font-size: 12px; color: var(--text-light);">Limit</label>
+                            <select id="webhookEventsLimit" style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius);">
+                                <option value="50" selected>50</option>
+                                <option value="100">100</option>
+                                <option value="250">250</option>
+                                <option value="500">500</option>
+                            </select>
+                        </div>
+                        <button class="btn btn-primary" onclick="loadWebhookEvents()">Refresh</button>
+                        <span id="webhookEventsSummary" style="margin-left: auto; color: var(--text-light); font-size: 0.9rem;"></span>
+                    </div>
+                    <div id="webhookEventsContent" style="border: 1px solid var(--border); border-radius: 6px;">
+                        <div class="loading" style="padding: 40px; text-align: center;">Load the tab to fetch events…</div>
+                    </div>
                 </div>
             </div>
 
@@ -3820,6 +3871,7 @@
             setDisplay('programsNav', 'inline');
             setDisplay('ratingsNav', 'inline');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('webhookEventsNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
             document.querySelectorAll('.superadmin-only').forEach(el => {
@@ -3838,6 +3890,7 @@
             setDisplay('complianceNav', 'block');
             setDisplay('companySettingsNav', 'block');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('webhookEventsNav', 'block');
             // Partners don't see rep applications or audit log (superadmin only)
             setDisplay('repAppsNav', 'none');
             setDisplay('auditLogNav', 'none');
@@ -3857,6 +3910,7 @@
             setDisplay('complianceNav', 'none');
             // Distributors do NOT see the Business Profile (partner+ only)
             setDisplay('businessProfileNav', 'none');
+            setDisplay('webhookEventsNav', 'none');
         } else {
             // Regular admin/representative
             document.getElementById('adminRole').textContent = 'Representative';
@@ -4214,6 +4268,7 @@
             if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
             if (tabName === 'business') loadBusinessProfile();
+            if (tabName === 'webhook-events') loadWebhookEvents();
         }
 
         // Tab navigation - regular tabs (only for tabs with data-tab attribute)
@@ -10703,6 +10758,118 @@
                 renderBusinessProfile(data, slotData.slots || []);
             } catch (err) {
                 container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        // ============ WEBHOOK EVENTS PANEL (partner+ only) ============
+        // Diagnostic feed over WebhookEvent collection. Read-only.
+
+        function webhookStatusBadge(status) {
+            const styles = {
+                processed: 'background: #d4edda; color: #155724;',
+                received:  'background: #fff3cd; color: #856404;',
+                failed:    'background: #f8d7da; color: #721c24;'
+            };
+            const style = styles[status] || 'background: #e2e3e5; color: #383d41;';
+            return `<span style="display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; ${style}">${escapeHtml(status || '—')}</span>`;
+        }
+
+        function webhookEventIdLink(provider, eventId) {
+            if (!eventId) return '<span style="color: var(--text-light);">—</span>';
+            const esc = escapeHtml(eventId);
+            if (provider === 'stripe' && eventId.startsWith('evt_')) {
+                return `<a href="https://dashboard.stripe.com/events/${esc}" target="_blank" rel="noopener"
+                    style="font-family: monospace; font-size: 11px;">${esc}</a>`;
+            }
+            return `<span style="font-family: monospace; font-size: 11px;">${esc}</span>`;
+        }
+
+        function formatWebhookTimestamp(iso) {
+            if (!iso) return '—';
+            const d = new Date(iso);
+            if (isNaN(d.getTime())) return '—';
+            return d.toLocaleString();
+        }
+
+        function renderWebhookEvents(data) {
+            const container = document.getElementById('webhookEventsContent');
+            const events = Array.isArray(data.events) ? data.events : [];
+
+            if (events.length === 0) {
+                container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">No webhook events match these filters.</div>';
+                return;
+            }
+
+            let rows = '';
+            events.forEach(e => {
+                const dur = (e.processedAt && e.receivedAt)
+                    ? Math.round((new Date(e.processedAt) - new Date(e.receivedAt)))
+                    : null;
+                const durLabel = dur !== null ? `${dur} ms` : '—';
+                rows += `<tr>
+                    <td style="padding: 8px 12px; font-size: 12px; white-space: nowrap;">${formatWebhookTimestamp(e.receivedAt)}</td>
+                    <td style="padding: 8px 12px; font-size: 12px;"><span style="padding: 2px 6px; border-radius: 4px; background: #eef2ff; color: #3730a3; font-size: 11px; font-weight: 600;">${escapeHtml(e.provider || '—')}</span></td>
+                    <td style="padding: 8px 12px; font-size: 12px; font-family: monospace;">${escapeHtml(e.eventType || '—')}</td>
+                    <td style="padding: 8px 12px;">${webhookStatusBadge(e.status)}</td>
+                    <td style="padding: 8px 12px;">${webhookEventIdLink(e.provider, e.eventId)}</td>
+                    <td style="padding: 8px 12px; font-size: 12px; color: var(--text-light); text-align: right;">${durLabel}</td>
+                </tr>`;
+            });
+
+            container.innerHTML = `
+                <div style="max-height: 600px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; background: var(--card-bg); border-bottom: 2px solid var(--border); z-index: 1;">
+                            <tr>
+                                <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Received</th>
+                                <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Provider</th>
+                                <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Event Type</th>
+                                <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Status</th>
+                                <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Event ID</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Handler</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>`;
+
+            // Summary line: count by status over the window.
+            const summary = Array.isArray(data.summary) ? data.summary : [];
+            const counts = {};
+            summary.forEach(s => {
+                const key = s._id && s._id.status ? s._id.status : 'unknown';
+                counts[key] = (counts[key] || 0) + (s.count || 0);
+            });
+            const parts = Object.keys(counts).map(k => `${k}: ${counts[k]}`);
+            const summaryEl = document.getElementById('webhookEventsSummary');
+            summaryEl.textContent = `${data.count} shown${data.count >= data.cap ? ' (capped)' : ''} · ${parts.join(' · ')}`;
+        }
+
+        async function loadWebhookEvents() {
+            const container = document.getElementById('webhookEventsContent');
+            container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading webhook events…</div>';
+            document.getElementById('webhookEventsSummary').textContent = '';
+            try {
+                const params = new URLSearchParams();
+                const provider = document.getElementById('webhookEventsProvider').value;
+                const status = document.getElementById('webhookEventsStatus').value;
+                const since = document.getElementById('webhookEventsSince').value;
+                const limit = document.getElementById('webhookEventsLimit').value;
+                if (provider) params.set('provider', provider);
+                if (status) params.set('status', status);
+                if (since) params.set('since', new Date(since).toISOString());
+                if (limit) params.set('limit', limit);
+                const url = `${API_URL}/api/admin/webhooks/recent${params.toString() ? '?' + params : ''}`;
+                const res = await fetch(url, { headers: { 'Authorization': `Bearer ${token}` } });
+                if (!res.ok) {
+                    const err = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                    container.innerHTML = `<div class="error" style="padding: 20px;">Could not load webhook events: ${escapeHtml(err)}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                renderWebhookEvents(data);
+            } catch (err) {
+                container.innerHTML = `<div class="error" style="padding: 20px;">Error: ${escapeHtml(err.message)}</div>`;
             }
         }
 
