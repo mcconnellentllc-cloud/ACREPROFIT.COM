@@ -16109,6 +16109,39 @@ app.post('/api/admin/invoices/:id/checkout-session', authMiddleware, adminMiddle
     }
 });
 
+// Public retail price list. No auth — this is what the acreprofit.com
+// /retail-prices.html page renders and is intended to be visible to the
+// world (same posture as the hand-maintained /price-list.html already
+// publishes). Only products with sellPrice > 0 are returned, so items
+// that still need pricing stay out of the public view.
+app.get('/api/public/retail-prices', async (req, res) => {
+    try {
+        const chemicals = await Chemical.find({ sellPrice: { $gt: 0 } })
+            .select('productName category unit packSize sellPrice sourceSupplier activeIngredients')
+            .sort({ category: 1, productName: 1 })
+            .lean();
+
+        const products = chemicals.map(c => ({
+            productName: c.productName,
+            category: c.category || 'other',
+            unit: c.unit || null,
+            packSize: c.packSize || null,
+            sellPrice: Number(c.sellPrice) || 0,
+            activeIngredients: (c.activeIngredients || [])
+                .map(ai => ai && ai.name).filter(Boolean)
+        }));
+
+        res.set('Cache-Control', 'public, max-age=60');
+        res.json({
+            generatedAt: new Date().toISOString(),
+            count: products.length,
+            products
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+});
+
 // Public invoice fetch for the Pay Now chooser page. Returns only the
 // fields needed to display the choice and price. Invoice _id is a 24-char
 // Mongo ObjectId, same threat model as the email's Pay Now link.
