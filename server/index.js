@@ -12942,51 +12942,111 @@ app.get('/api/admin/products', authMiddleware, adminMiddleware, async (req, res)
 });
 
 // ---- BULK PRICE ADJUSTMENT ----
-// Multiply every product's sellPrice by (1 + percentage/100). Two-step
-// flow: client calls with preview=true first to get the changeset, then
-// again with preview=false to commit. Both steps return the full list of
-// {productId, name, oldPrice, newPrice}. Rounds to 2 decimals. Skips
-// products with sellPrice <= 0 (nothing to adjust).
+// Two operations:
+//   - 'percent':    newPrice = oldPrice * (1 + pct/100)        (e.g. +7% across the board)
+//   - 'margin_cut': newPrice = costPrice + (1 - pct/100) * (oldPrice - costPrice)
+//                   e.g. "25% off the margin" discounts the sell by 25% of (sell - cost),
+//                   keeping cost coverage intact.
+//
+// Two-step flow: preview=true first to get the changeset, then preview=false to commit.
+// Both responses return the full list of {productId, name, oldPrice, newPrice, delta,
+// skipped?, skipReason?}. Products with sellPrice <= 0 are skipped silently (no retail
+// set). For 'margin_cut', products with costPrice <= 0 or sell <= cost are skipped with
+// a reason so the UI can show why.
+//
+// `exclude` is an array of case-insensitive substrings matched against productName —
+// any match keeps that product out of the operation. Used for "all except Hydrovant" etc.
 app.post('/api/admin/products/bulk-adjust-prices', authMiddleware, adminMiddleware, async (req, res) => {
     try {
-        const { percentage, preview = true } = req.body || {};
+        const { percentage, preview = true, operation = 'percent', exclude = [] } = req.body || {};
         const pct = Number(percentage);
         if (!isFinite(pct)) {
             return res.status(400).json({ error: 'percentage must be a number (e.g. 7 for +7%)' });
         }
-        if (pct <= -100) {
-            return res.status(400).json({ error: 'percentage must be greater than -100' });
+        if (operation !== 'percent' && operation !== 'margin_cut') {
+            return res.status(400).json({ error: `operation must be 'percent' or 'margin_cut'` });
         }
-        const factor = 1 + (pct / 100);
+        if (operation === 'percent' && pct <= -100) {
+            return res.status(400).json({ error: 'percent operation requires percentage > -100' });
+        }
+        if (operation === 'margin_cut' && (pct < 0 || pct > 100)) {
+            return res.status(400).json({ error: 'margin_cut operation requires percentage between 0 and 100' });
+        }
 
-        const chemicals = await Chemical.find({ sellPrice: { $gt: 0 } }).select('_id productName sellPrice costPrice unit packSize');
-        const changes = chemicals.map(c => {
+        // Normalize exclude list to lowercase substrings for case-insensitive match.
+        const excludeTerms = (Array.isArray(exclude) ? exclude : [])
+            .map(s => String(s || '').trim().toLowerCase())
+            .filter(Boolean);
+
+        const chemicals = await Chemical.find({ sellPrice: { $gt: 0 } })
+            .select('_id productName sellPrice costPrice unit packSize');
+
+        const changes = [];
+        chemicals.forEach(c => {
             const oldPrice = Number(c.sellPrice) || 0;
-            const newPrice = Math.round(oldPrice * factor * 100) / 100;
-            return {
-                productId: c._id,
-                productName: c.productName,
-                unit: c.unit || null,
-                packSize: c.packSize || null,
-                oldPrice,
-                newPrice,
+            const name = c.productName || '';
+            const lower = name.toLowerCase();
+            const matched = excludeTerms.find(t => lower.includes(t));
+            if (matched) {
+                changes.push({
+                    productId: c._id, productName: name,
+                    unit: c.unit || null, packSize: c.packSize || null,
+                    oldPrice, newPrice: oldPrice, delta: 0,
+                    skipped: true, skipReason: `excluded (matched "${matched}")`
+                });
+                return;
+            }
+
+            let newPrice;
+            if (operation === 'percent') {
+                newPrice = oldPrice * (1 + pct / 100);
+            } else { // margin_cut
+                const cost = Number(c.costPrice) || 0;
+                if (cost <= 0) {
+                    changes.push({
+                        productId: c._id, productName: name,
+                        unit: c.unit || null, packSize: c.packSize || null,
+                        oldPrice, newPrice: oldPrice, delta: 0,
+                        skipped: true, skipReason: 'no cost on file — margin undefined'
+                    });
+                    return;
+                }
+                if (oldPrice <= cost) {
+                    changes.push({
+                        productId: c._id, productName: name,
+                        unit: c.unit || null, packSize: c.packSize || null,
+                        oldPrice, newPrice: oldPrice, delta: 0,
+                        skipped: true, skipReason: 'sell <= cost — no margin to cut'
+                    });
+                    return;
+                }
+                newPrice = cost + (1 - pct / 100) * (oldPrice - cost);
+            }
+
+            newPrice = Math.round(newPrice * 100) / 100;
+            changes.push({
+                productId: c._id, productName: name,
+                unit: c.unit || null, packSize: c.packSize || null,
+                oldPrice, newPrice,
                 delta: Math.round((newPrice - oldPrice) * 100) / 100
-            };
+            });
         });
+
+        const applicable = changes.filter(c => !c.skipped);
+        const skipped = changes.length - applicable.length;
 
         if (preview) {
             return res.json({
                 preview: true,
-                percentage: pct,
-                factor,
-                count: changes.length,
+                operation, percentage: pct,
+                count: applicable.length,
+                skippedCount: skipped,
                 changes
             });
         }
 
-        // Apply: one bulk write for atomicity and speed.
-        if (changes.length > 0) {
-            const ops = changes.map(c => ({
+        if (applicable.length > 0) {
+            const ops = applicable.map(c => ({
                 updateOne: {
                     filter: { _id: c.productId },
                     update: { $set: { sellPrice: c.newPrice } }
@@ -12997,9 +13057,9 @@ app.post('/api/admin/products/bulk-adjust-prices', authMiddleware, adminMiddlewa
 
         res.json({
             preview: false,
-            percentage: pct,
-            factor,
-            count: changes.length,
+            operation, percentage: pct,
+            count: applicable.length,
+            skippedCount: skipped,
             appliedBy: req.user.name || req.user.email,
             appliedAt: new Date().toISOString(),
             changes

@@ -1576,34 +1576,53 @@
 
             <!-- Bulk Price Adjustment Modal -->
             <div class="modal-overlay" id="bulkPriceAdjustModal" style="display: none;">
-                <div class="modal-content customer-modal-content" style="max-width: 820px;">
+                <div class="modal-content customer-modal-content" style="max-width: 860px;">
                     <button class="modal-close" onclick="closeBulkPriceAdjust()">&times;</button>
                     <div class="customer-modal-header">
                         <div class="customer-modal-avatar" style="background: #b45309;">%</div>
                         <div class="customer-modal-title">
-                            <h2>Bulk Adjust Retail Prices</h2>
-                            <p>Multiply every product's retail by (1 + %). Preview before you apply.</p>
+                            <h2>Bulk Price Change</h2>
+                            <p>Percentage change across the board, OR cut a % of the margin (fall cleanout). Preview before you apply.</p>
                         </div>
                     </div>
                     <div class="customer-modal-body">
-                        <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 16px; flex-wrap: wrap;">
+                        <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
+                            <button class="btn btn-outline" onclick="setBulkPricePreset('seven')" style="font-size: 13px;">+7% across the board</button>
+                            <button class="btn btn-outline" onclick="setBulkPricePreset('fall_cleanout')" style="font-size: 13px; background: #fef3c7; border-color: #d97706; color: #92400e;">Fall Cleanout — cut 25% of margin (exclude Hydrovant)</button>
+                        </div>
+                        <div style="display: flex; gap: 12px; align-items: flex-end; margin-bottom: 12px; flex-wrap: wrap;">
                             <div class="form-group" style="margin: 0;">
-                                <label>Percentage change</label>
+                                <label>Operation</label>
+                                <select id="bulkPriceOperation" onchange="updateBulkPriceLabels()"
+                                    style="padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); font-size: 14px;">
+                                    <option value="percent">Change price by %</option>
+                                    <option value="margin_cut">Cut % of margin</option>
+                                </select>
+                            </div>
+                            <div class="form-group" style="margin: 0;">
+                                <label id="bulkPricePercentageLabel">Percentage change</label>
                                 <div style="display: flex; align-items: center; gap: 4px;">
                                     <input type="number" id="bulkPricePercentage" step="0.1" value="7"
                                         style="width: 100px; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); font-size: 16px;">
                                     <span style="font-size: 16px;">%</span>
                                 </div>
                             </div>
+                            <div class="form-group" style="margin: 0; flex: 1; min-width: 240px;">
+                                <label>Exclude products whose name contains (comma-separated)</label>
+                                <input type="text" id="bulkPriceExclude" placeholder="e.g. hydrovant"
+                                    style="width: 100%; padding: 8px 12px; border: 2px solid var(--border); border-radius: var(--radius); font-size: 14px;">
+                            </div>
+                        </div>
+                        <div style="display: flex; gap: 8px; align-items: center; margin-bottom: 12px;">
                             <button class="btn btn-outline" onclick="runBulkPricePreview()" id="bulkPricePreviewBtn">Preview</button>
-                            <button class="btn btn-primary" onclick="applyBulkPriceAdjust()" id="bulkPriceApplyBtn" disabled style="background: #b45309; border-color: #b45309;">Apply to all products</button>
+                            <button class="btn btn-primary" onclick="applyBulkPriceAdjust()" id="bulkPriceApplyBtn" disabled style="background: #b45309; border-color: #b45309;">Apply</button>
                             <span id="bulkPriceStatus" style="margin-left: auto; color: var(--text-light); font-size: 0.9rem;"></span>
                         </div>
                         <div id="bulkPricePreviewContainer" style="max-height: 420px; overflow-y: auto; border: 1px solid var(--border); border-radius: 6px;">
-                            <p style="padding: 20px; color: var(--text-light); text-align: center;">Enter a percentage and click Preview to see the changes.</p>
+                            <p style="padding: 20px; color: var(--text-light); text-align: center;">Pick a preset or enter values, then click Preview to see the changes.</p>
                         </div>
                         <p style="font-size: 12px; color: var(--text-light); margin-top: 12px;">
-                            Preview is read-only; Apply updates the catalog and takes effect immediately for new quotes and invoices. Open invoices keep their locked prices.
+                            Preview is read-only; Apply updates the catalog and takes effect immediately for new quotes and invoices. Open invoices keep their locked prices. Margin cut needs a cost on file for each product — those without are skipped and shown in the preview.
                         </p>
                     </div>
                 </div>
@@ -6997,11 +7016,43 @@
 
         let _bulkPricePreviewed = null;
 
+        function updateBulkPriceLabels() {
+            const op = document.getElementById('bulkPriceOperation').value;
+            const label = document.getElementById('bulkPricePercentageLabel');
+            if (op === 'margin_cut') {
+                label.textContent = '% of margin to cut';
+            } else {
+                label.textContent = 'Percentage change';
+            }
+        }
+
+        function setBulkPricePreset(name) {
+            if (name === 'seven') {
+                document.getElementById('bulkPriceOperation').value = 'percent';
+                document.getElementById('bulkPricePercentage').value = 7;
+                document.getElementById('bulkPriceExclude').value = '';
+            } else if (name === 'fall_cleanout') {
+                document.getElementById('bulkPriceOperation').value = 'margin_cut';
+                document.getElementById('bulkPricePercentage').value = 25;
+                document.getElementById('bulkPriceExclude').value = 'hydrovant';
+            }
+            updateBulkPriceLabels();
+            // Reset preview state so Apply can't fire on stale data.
+            _bulkPricePreviewed = null;
+            document.getElementById('bulkPriceApplyBtn').disabled = true;
+            document.getElementById('bulkPriceStatus').textContent = 'Preset loaded — click Preview to see the changes';
+            document.getElementById('bulkPricePreviewContainer').innerHTML =
+                '<p style="padding: 20px; color: var(--text-light); text-align: center;">Pick a preset or enter values, then click Preview to see the changes.</p>';
+        }
+
         function openBulkPriceAdjust() {
             _bulkPricePreviewed = null;
+            document.getElementById('bulkPriceOperation').value = 'percent';
             document.getElementById('bulkPricePercentage').value = 7;
+            document.getElementById('bulkPriceExclude').value = '';
+            updateBulkPriceLabels();
             document.getElementById('bulkPricePreviewContainer').innerHTML =
-                '<p style="padding: 20px; color: var(--text-light); text-align: center;">Enter a percentage and click Preview to see the changes.</p>';
+                '<p style="padding: 20px; color: var(--text-light); text-align: center;">Pick a preset or enter values, then click Preview to see the changes.</p>';
             document.getElementById('bulkPriceApplyBtn').disabled = true;
             document.getElementById('bulkPriceStatus').textContent = '';
             document.getElementById('bulkPriceAdjustModal').style.display = 'flex';
@@ -7013,26 +7064,41 @@
 
         function renderBulkPriceChangeset(data) {
             const container = document.getElementById('bulkPricePreviewContainer');
-            const changes = Array.isArray(data.changes) ? data.changes : [];
-            if (changes.length === 0) {
+            const allChanges = Array.isArray(data.changes) ? data.changes.slice() : [];
+            if (allChanges.length === 0) {
                 container.innerHTML = '<p style="padding: 20px; color: var(--text-light); text-align: center;">No products have a retail price set yet. Nothing to adjust.</p>';
                 return;
             }
-            changes.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
-            const totalOld = changes.reduce((s, c) => s + (Number(c.oldPrice) || 0), 0);
-            const totalNew = changes.reduce((s, c) => s + (Number(c.newPrice) || 0), 0);
+            allChanges.sort((a, b) => (a.productName || '').localeCompare(b.productName || ''));
+            const applicable = allChanges.filter(c => !c.skipped);
+            const skipped = allChanges.filter(c => c.skipped);
+            const totalOld = applicable.reduce((s, c) => s + (Number(c.oldPrice) || 0), 0);
+            const totalNew = applicable.reduce((s, c) => s + (Number(c.newPrice) || 0), 0);
             const totalDelta = totalNew - totalOld;
 
+            const esc = s => String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
             let rows = '';
-            changes.forEach(c => {
+            applicable.forEach(c => {
                 const unit = c.unit ? '/' + c.unit : '';
                 rows += `<tr>
-                    <td style="padding: 6px 10px;">${(c.productName || '').replace(/</g, '&lt;')}</td>
+                    <td style="padding: 6px 10px;">${esc(c.productName)}</td>
                     <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">$${Number(c.oldPrice).toFixed(2)}${unit}</td>
                     <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: #2e7d32;">$${Number(c.newPrice).toFixed(2)}${unit}</td>
                     <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; color: ${c.delta >= 0 ? '#b45309' : '#b00020'};">${c.delta >= 0 ? '+' : ''}$${Number(c.delta).toFixed(2)}</td>
                 </tr>`;
             });
+            skipped.forEach(c => {
+                const unit = c.unit ? '/' + c.unit : '';
+                rows += `<tr style="color: var(--text-light);">
+                    <td style="padding: 6px 10px;">${esc(c.productName)} <span style="font-size: 11px; color: #b45309;">— skipped: ${esc(c.skipReason)}</span></td>
+                    <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">$${Number(c.oldPrice).toFixed(2)}${unit}</td>
+                    <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">—</td>
+                    <td style="padding: 6px 10px; text-align: right;">—</td>
+                </tr>`;
+            });
+
+            const footerLabel = `Totals (${applicable.length} to change${skipped.length ? `, ${skipped.length} skipped` : ''})`;
 
             container.innerHTML = `
                 <table style="width: 100%; border-collapse: collapse;">
@@ -7047,7 +7113,7 @@
                     <tbody>${rows}</tbody>
                     <tfoot style="border-top: 2px solid var(--border); background: #fafafa;">
                         <tr>
-                            <td style="padding: 8px 10px; font-weight: 600;">Totals (${changes.length} products)</td>
+                            <td style="padding: 8px 10px; font-weight: 600;">${footerLabel}</td>
                             <td style="padding: 8px 10px; text-align: right; font-variant-numeric: tabular-nums;">$${totalOld.toFixed(2)}</td>
                             <td style="padding: 8px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">$${totalNew.toFixed(2)}</td>
                             <td style="padding: 8px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: ${totalDelta >= 0 ? '#b45309' : '#b00020'};">${totalDelta >= 0 ? '+' : ''}$${totalDelta.toFixed(2)}</td>
@@ -7056,10 +7122,23 @@
                 </table>`;
         }
 
-        async function runBulkPricePreview() {
+        function _readBulkPriceInputs() {
+            const operation = document.getElementById('bulkPriceOperation').value;
             const pct = Number(document.getElementById('bulkPricePercentage').value);
+            const excludeRaw = document.getElementById('bulkPriceExclude').value || '';
+            const exclude = excludeRaw.split(',').map(s => s.trim()).filter(Boolean);
+            return { operation, pct, exclude };
+        }
+
+        function _describeOperation(operation, pct) {
+            if (operation === 'margin_cut') return `cut ${pct}% of margin`;
+            return `${pct >= 0 ? '+' : ''}${pct}%`;
+        }
+
+        async function runBulkPricePreview() {
+            const { operation, pct, exclude } = _readBulkPriceInputs();
             if (!isFinite(pct)) {
-                alert('Enter a valid percentage (e.g. 7 for +7%).');
+                alert('Enter a valid percentage.');
                 return;
             }
             const btn = document.getElementById('bulkPricePreviewBtn');
@@ -7073,15 +7152,17 @@
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ percentage: pct, preview: true })
+                    body: JSON.stringify({ operation, percentage: pct, exclude, preview: true })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-                _bulkPricePreviewed = { pct, data };
+                _bulkPricePreviewed = { operation, pct, exclude, data };
                 renderBulkPriceChangeset(data);
                 document.getElementById('bulkPriceApplyBtn').disabled = false;
                 document.getElementById('bulkPriceStatus').textContent =
-                    `Preview: ${data.count} products · click Apply to commit`;
+                    `Preview: ${_describeOperation(operation, pct)} → ${data.count} products` +
+                    (data.skippedCount ? `, ${data.skippedCount} skipped` : '') +
+                    ` · click Apply to commit`;
             } catch (err) {
                 document.getElementById('bulkPriceStatus').textContent = 'Preview failed: ' + err.message;
             } finally {
@@ -7095,9 +7176,10 @@
                 alert('Run Preview first so you can see what will change.');
                 return;
             }
-            const pct = _bulkPricePreviewed.pct;
+            const { operation, pct, exclude } = _bulkPricePreviewed;
             const prevCount = _bulkPricePreviewed.data.count;
-            if (!confirm(`Apply ${pct >= 0 ? '+' : ''}${pct}% to all ${prevCount} products' retail prices? This cannot be undone (except by applying the inverse %).`)) {
+            const desc = _describeOperation(operation, pct);
+            if (!confirm(`Apply "${desc}" to ${prevCount} products' retail prices? This cannot be undone (except by applying the inverse).`)) {
                 return;
             }
             const btn = document.getElementById('bulkPriceApplyBtn');
@@ -7111,20 +7193,19 @@
                         'Authorization': `Bearer ${token}`,
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({ percentage: pct, preview: false })
+                    body: JSON.stringify({ operation, percentage: pct, exclude, preview: false })
                 });
                 const data = await res.json();
                 if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
                 renderBulkPriceChangeset(data);
                 document.getElementById('bulkPriceStatus').textContent =
-                    `✓ Applied ${pct >= 0 ? '+' : ''}${pct}% to ${data.count} products at ${new Date().toLocaleTimeString()}`;
+                    `✓ Applied ${desc} to ${data.count} products at ${new Date().toLocaleTimeString()}`;
                 btn.textContent = '✓ Applied';
-                // Refresh the catalog in the background so the Products table reflects new prices.
                 if (typeof loadProducts === 'function') loadProducts();
             } catch (err) {
                 document.getElementById('bulkPriceStatus').textContent = 'Apply failed: ' + err.message;
                 btn.disabled = false;
-                btn.textContent = 'Apply to all products';
+                btn.textContent = 'Apply';
             }
         }
 
