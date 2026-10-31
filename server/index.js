@@ -16474,15 +16474,17 @@ app.post('/api/admin/invoices/:id/send', authMiddleware, adminMiddleware, async 
                 </div>
             </div>
             ${showPayNow ? `
-            <!-- First-time payer help + anti-phishing note. Shown whenever Pay Now is
-                 offered; harmless to show to repeat payers since it's quick to skim. -->
+            <!-- First-time payer help + anti-phishing + rep contact note. Shown
+                 whenever Pay Now is offered; harmless to show to repeat payers
+                 since it's quick to skim. -->
             <div style="background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 10px; padding: 16px 18px; margin: 24px 0; font-size: 13.5px; line-height: 1.55; color: #333;">
                 <p style="margin: 0 0 8px 0; font-weight: 600; color: #2d5a27;">First time paying us through Stripe?</p>
                 <p style="margin: 0 0 8px 0;">Card = seconds, 3.5% fee. ACH = free, 1–2 business days. For ACH, most banks support instant verification — you log in through Stripe's secure window on the pay page.</p>
                 <p style="margin: 0 0 8px 0;">If your bank doesn't support instant verification, Stripe falls back to a one-time micro-deposit flow: a $0.01 lands in your account the next business day, you find a 6-digit code starting with <strong>SM</strong> in the transaction description on your statement, enter it on Stripe's verification page. Future payments to AcreProfit skip this step.</p>
                 <div style="margin-top: 10px; padding: 8px 10px; background: #fff8e1; border-left: 3px solid #f59e0b; border-radius: 3px;">
-                    <p style="margin: 0; font-size: 12.5px; color: #78350f;"><strong>⚠️ About phishing:</strong> Stripe only emails you about verifying a bank account <em>after you've started a payment yourself</em>. An unexpected "Verify your bank account for AcreProfit" email you didn't initiate is almost certainly a scam — don't click, forward to contact@acreprofit.com instead.</p>
+                    <p style="margin: 0; font-size: 12.5px; color: #78350f;"><strong>⚠️ Phishing &amp; fraud:</strong> Stripe only emails you about verifying a bank account <em>after you've started a payment yourself</em>. If you get a "Verify your bank account for AcreProfit" email you didn't initiate, don't click — <strong>contact your AcreProfit sales rep right away</strong> or forward the email to contact@acreprofit.com.</p>
                 </div>
+                <p style="margin: 10px 0 0 0; font-size: 12.5px; color: #555;"><strong>Any questions about this invoice or the payment process — contact your AcreProfit sales rep first.</strong> They'll get you a straight answer or loop in Kyle direct at 970-571-1015.</p>
             </div>
             ` : ''}
             `}
