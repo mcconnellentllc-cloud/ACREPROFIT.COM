@@ -241,6 +241,20 @@
                 convenience fee to cover payment processing costs. You'll
                 be redirected to Stripe's secure checkout to complete payment.
             </div>
+
+            <details style="margin-top: 20px; padding: 14px 16px; background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 8px; cursor: pointer;">
+                <summary style="font-weight: 600; color: #2d5a27; cursor: pointer; outline: none;">First time paying us through Stripe? Here's what to expect.</summary>
+                <div style="margin-top: 14px; color: #333; font-size: 13.5px; line-height: 1.6; cursor: default;">
+                    <p style="margin: 0 0 10px 0;">After you click a payment option above, you'll be sent to Stripe's secure checkout.</p>
+                    <p style="margin: 0 0 10px 0;"><strong>Pay by Card</strong> — fastest. Payment goes through in seconds. Includes a 3.5% convenience fee.</p>
+                    <p style="margin: 0 0 10px 0;"><strong>Pay by ACH (bank transfer)</strong> — free, and preferred for larger invoices. Most banks support "instant verification" — you'll log in through Stripe's secure window and the payment is on its way in a day or two.</p>
+                    <p style="margin: 0 0 10px 0;">If your bank doesn't support instant verification, Stripe falls back to <strong>micro-deposit verification</strong>: they'll deposit $0.01 into your account (shows up the next business day), you'll find a 6-digit code starting with "SM" in that transaction's description on your bank statement, come back to the Stripe email you got, and enter it to confirm the account. One-time step — future payments to AcreProfit won't need it again.</p>
+                    <div style="margin-top: 14px; padding: 10px 12px; background: #fff8e1; border-left: 3px solid #f59e0b; border-radius: 4px;">
+                        <p style="margin: 0; font-size: 13px; color: #78350f;"><strong>⚠️ About phishing &amp; fraud:</strong> Stripe will only email you about verifying a bank account <em>after you've started a payment yourself</em>. If you get a "Verify your bank account for AcreProfit" email out of the blue — one you didn't initiate — <strong>don't click any links</strong>. <strong>Contact your AcreProfit sales rep right away</strong>, or forward the email to <a href="mailto:contact@acreprofit.com" style="color: #2d5a27;">contact@acreprofit.com</a>. We'd rather confirm with you than let you get scammed.</p>
+                    </div>
+                    <p style="margin: 14px 0 0 0; color: #666;"><strong>Any questions about this invoice or the payment process — contact your AcreProfit sales rep first.</strong> They'll get you a straight answer or loop in Kyle direct — <a href="tel:+19705711015" style="color: #2d5a27;">970-571-1015</a>.</p>
+                </div>
+            </details>
         </div>
 
         <div id="stripeDisabled" class="status error" style="display: none;">
