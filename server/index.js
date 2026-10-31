@@ -7900,6 +7900,55 @@ webhookEventSchema.index({ provider: 1, eventId: 1 }, { unique: true });
 webhookEventSchema.index({ receivedAt: 1 }, { expireAfterSeconds: 30 * 24 * 60 * 60 });
 const WebhookEvent = mongoose.model('WebhookEvent', webhookEventSchema);
 
+// ---- ADMIN: recent webhook events panel ----
+// Read-only diagnostic feed over the WebhookEvent collection. Partner-tier
+// gated — this is used both for debugging real payment issues and for anti-
+// fraud ("did Stripe actually call me for this?" questions like the Robert
+// Kuntz incident on 2026-10-30). TTL on WebhookEvent is 30 days so this
+// window is always what you'll see.
+app.get('/api/admin/webhooks/recent', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const { provider, status, since, limit } = req.query;
+        const cap = Math.min(parseInt(limit, 10) || 50, 500);
+
+        const query = {};
+        if (provider) query.provider = provider;
+        if (status) query.status = status;
+        if (since) {
+            const sinceDate = new Date(since);
+            if (!isNaN(sinceDate.getTime())) query.receivedAt = { $gte: sinceDate };
+        }
+
+        const events = await WebhookEvent.find(query)
+            .sort({ receivedAt: -1 })
+            .limit(cap)
+            .lean();
+
+        // Summary counts over the same query window (status breakdown).
+        const summary = await WebhookEvent.aggregate([
+            { $match: query },
+            { $group: { _id: { provider: '$provider', status: '$status' }, count: { $sum: 1 } } }
+        ]);
+
+        res.json({
+            count: events.length,
+            cap,
+            events: events.map(e => ({
+                _id: e._id,
+                provider: e.provider,
+                eventId: e.eventId,
+                eventType: e.eventType,
+                status: e.status,
+                receivedAt: e.receivedAt,
+                processedAt: e.processedAt
+            })),
+            summary
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
 // Claim an event for processing. Returns true if we should process, false if
 // the event has already been seen (handled or in-flight on another worker).
 // Race-safe via the unique (provider, eventId) index.
