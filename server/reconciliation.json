@@ -1,0 +1,92 @@
+{
+  "_meta": {
+    "description": "AcreProfit chemical reconciliation ledger. Not a GL — a plain-English who-owes-who snapshot so partners can see the full 2026 chemical money picture at a glance. Updated by hand from supplier statements as they come in.",
+    "lastUpdated": "2026-11-10",
+    "editedBy": "Kyle McConnell",
+    "sources": {
+      "simsKyle": "Sims Fertilizer Volume Report for Kyle McConnell / Acre Profit (Haxtun), YTD 11/6/26",
+      "simsM5": "Sims Fertilizer Volume Report for Ty Mollohan / M5 Ag, LLC (Otis), YTD 11/6/26",
+      "corbetKyle": "Partial — matches Hydrovant on hand at both locations; waiting on full statement",
+      "jabcoKyle": "Pending — waiting on 2026 statement from Jabco (Xingfa USA)"
+    }
+  },
+  "fiscalYear": 2026,
+  "supplierPurchases": [
+    {
+      "key": "sims-kyle",
+      "supplier": "Sims Fertilizer & Chemical",
+      "account": "Kyle McConnell / Acre Profit",
+      "paidBy": "Kyle McConnell",
+      "total": 245463.34,
+      "statementDate": "2026-11-06",
+      "status": "confirmed",
+      "notes": "Address on file: 34549 Hwy 59, Haxtun, CO 80731. Products: Amine, Anthem NXT, Atrazine 4L (bulk + tote), Clethodim, Dicamba DMA Tigris, Flagstaff, Flumioxazin, Flurox Sharda, Glypex 5 Extra, Longbow EC, Me-Try-Buzin, Parapex, Peak, Status, Sulfen 4SC."
+    },
+    {
+      "key": "sims-m5",
+      "supplier": "Sims Fertilizer & Chemical",
+      "account": "Ty Mollohan / M5 Ag, LLC",
+      "paidBy": "M5 Ag, LLC",
+      "total": 461143.25,
+      "statementDate": "2026-11-06",
+      "status": "confirmed",
+      "notes": "Address on file: 52480 Co. Rd. TT, Otis, CO 80743. Products: AMS NeuAG, Anthem NXT, Atrazine 4L tote, Dicamba DMA Tigris (both sizes), Flumioxazin, Glypex 5 Extra, LV6 variants, Mivum, Moccasin II Plus (net of returns), Parapex. Returns: -520 gal Moccasin logged July 2026."
+    },
+    {
+      "key": "corbet-kyle",
+      "supplier": "Corbet Scientific, LLC",
+      "account": "Kyle McConnell",
+      "paidBy": "Kyle McConnell",
+      "total": null,
+      "statementDate": null,
+      "status": "pending",
+      "notes": "Primary product: Hydrovant fA ($75/gal cost basis). At least 452.5 gal on hand across locations (315 Kyle + 137.5 Ty) = ~$33,937 just in standing stock. Need full 2026 statement to close the number."
+    },
+    {
+      "key": "jabco-kyle",
+      "supplier": "Jabco (Xingfa USA)",
+      "account": "Kyle McConnell",
+      "paidBy": "Kyle McConnell",
+      "total": null,
+      "statementDate": null,
+      "status": "pending",
+      "notes": "Primary products: Xsate glyphosate ($13.25/gal cost per our catalog), possibly Meso 4SC and other non-Sims lines. Need 2026 statement."
+    }
+  ],
+  "inventoryOnHand": [
+    {
+      "location": "Ty's warehouse (Otis, CO)",
+      "asOf": "2026-11-06",
+      "value": 208601.40,
+      "source": "PDF submitted 2026-11-10 (Acre_Profit_Inventory_-_TY.pdf)"
+    },
+    {
+      "location": "Kyle's warehouse (Haxtun, CO)",
+      "asOf": "2026-11-10",
+      "value": 51957.36,
+      "source": "Photo inventory submitted 2026-11-10. Cost basis: Flumi $12.50/lb, Dicamba $25.25/gal, Hydrovant $75/gal (Corbet), Meso 4SC $48/gal (per Ty's basis), Anthem NXT $476/gal, Longbow EC $3.49/oz."
+    }
+  ],
+  "partyBalances": [
+    {
+      "party": "Kyle McConnell",
+      "role": "Partner / personally absorbs Kyle-side Sims + Corbet + Jabco invoices",
+      "notes": "AcreProfit LLC owes Kyle the cost of any chemical he paid for personally that ends up applied to an outside customer's acres or sold through AcreProfit invoices."
+    },
+    {
+      "party": "M5 Ag, LLC (Ty)",
+      "role": "Partner / personally absorbs Ty-side Sims invoices",
+      "notes": "AcreProfit LLC owes M5 Ag the cost of any chemical M5 Ag paid Sims for that ends up on an AcreProfit invoice to an outside customer."
+    },
+    {
+      "party": "AcreProfit LLC",
+      "role": "The joint entity. 50/50 Kyle + Ty (effective Amendment No. 1, 2026-03-11).",
+      "notes": "Receives revenue from outside-customer invoices. Owes Kyle and M5 Ag for their respective chemical cost contributions. Owes outside suppliers (Corbet, Jabco direct, if any)."
+    },
+    {
+      "party": "Outside customers",
+      "role": "Owe AcreProfit LLC for chemicals and custom application services.",
+      "notes": "Current A/R shown in admin dashboard: $102,499.50 across 15 open invoices (all past due as of 2026-11-10)."
+    }
+  ]
+}

@@ -5722,6 +5722,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // file is tiny and version-controlled with the server deploy.
 // ========================================================================
 const BUSINESS_JSON_PATH = require('path').join(__dirname, 'business.json');
+const RECONCILIATION_JSON_PATH = require('path').join(__dirname, 'reconciliation.json');
 
 app.get('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
     try {
@@ -5747,6 +5748,122 @@ app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, re
         res.json({ ok: true, business: incoming });
     } catch (err) {
         res.status(500).json({ error: 'Could not save business profile: ' + err.message });
+    }
+});
+
+// ---- RECONCILIATION CENTER (partner tier) ----
+// One-screen "who owes who" view of the chemical money. Reads static
+// supplier/inventory snapshot from server/reconciliation.json, then
+// enriches with LIVE numbers from the DB (open A/R from Invoice,
+// on-hand value from Inventory) so the dashboard stays current without
+// a manual refresh of the JSON.
+app.get('/api/admin/reconciliation/summary', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        let snapshot;
+        try {
+            snapshot = JSON.parse(require('fs').readFileSync(RECONCILIATION_JSON_PATH, 'utf8'));
+        } catch (err) {
+            return res.status(500).json({ error: 'Could not read reconciliation snapshot: ' + err.message });
+        }
+
+        // LIVE: open Accounts Receivable from Invoice collection.
+        let liveAR = { openCount: 0, outstanding: 0, pastDueCount: 0, pastDueAmount: 0 };
+        try {
+            const openInvoices = await Invoice.find({
+                paymentStatus: { $in: ['unpaid', 'partial', 'overdue'] },
+                status: { $ne: 'void' }
+            }).select('total amountPaid paymentStatus dueDate').lean();
+            const now = new Date();
+            openInvoices.forEach(inv => {
+                const total = Number(inv.total) || 0;
+                const paid = Number(inv.amountPaid) || 0;
+                const outstanding = Math.max(0, total - paid);
+                liveAR.openCount += 1;
+                liveAR.outstanding += outstanding;
+                if (inv.dueDate && new Date(inv.dueDate) < now) {
+                    liveAR.pastDueCount += 1;
+                    liveAR.pastDueAmount += outstanding;
+                }
+            });
+            liveAR.outstanding = Math.round(liveAR.outstanding * 100) / 100;
+            liveAR.pastDueAmount = Math.round(liveAR.pastDueAmount * 100) / 100;
+        } catch (err) {
+            // If the Invoice model isn't available for some reason, continue
+            // with zeros rather than failing the whole dashboard.
+            console.warn('[reconciliation] live A/R read failed:', err.message);
+        }
+
+        // LIVE: inventory value from Inventory collection.
+        let liveInventorySystemValue = 0;
+        try {
+            const items = await Inventory.find({}).select('quantityOnHand averageCost lastCost').lean();
+            items.forEach(i => {
+                const qty = Number(i.quantityOnHand) || 0;
+                const cost = Number(i.averageCost) || Number(i.lastCost) || 0;
+                liveInventorySystemValue += qty * cost;
+            });
+            liveInventorySystemValue = Math.round(liveInventorySystemValue * 100) / 100;
+        } catch (err) {
+            console.warn('[reconciliation] live inventory read failed:', err.message);
+        }
+
+        // Derived totals from the snapshot.
+        const purchases = Array.isArray(snapshot.supplierPurchases) ? snapshot.supplierPurchases : [];
+        const confirmedPurchases = purchases
+            .filter(p => p.total !== null && p.total !== undefined)
+            .reduce((s, p) => s + (Number(p.total) || 0), 0);
+        const pendingSuppliers = purchases.filter(p => p.total === null || p.total === undefined);
+
+        const inventoryList = Array.isArray(snapshot.inventoryOnHand) ? snapshot.inventoryOnHand : [];
+        const inventorySnapshotValue = inventoryList.reduce((s, i) => s + (Number(i.value) || 0), 0);
+
+        // The headline gap:
+        // confirmed purchases − what's standing in inventory = chemical
+        // that's been applied / sold / is in transit. We'll show both
+        // the snapshot-based number and the system-inventory-based number
+        // so partners can see where the DB and reality disagree.
+        const gapVsSnapshotInventory = Math.round((confirmedPurchases - inventorySnapshotValue) * 100) / 100;
+        const gapVsSystemInventory = Math.round((confirmedPurchases - liveInventorySystemValue) * 100) / 100;
+
+        res.json({
+            generatedAt: new Date().toISOString(),
+            snapshot,
+            live: {
+                accountsReceivable: liveAR,
+                inventorySystemValue: liveInventorySystemValue
+            },
+            derived: {
+                confirmedPurchasesTotal: Math.round(confirmedPurchases * 100) / 100,
+                pendingSupplierCount: pendingSuppliers.length,
+                inventorySnapshotTotal: Math.round(inventorySnapshotValue * 100) / 100,
+                inventorySystemVsSnapshotDelta: Math.round((liveInventorySystemValue - inventorySnapshotValue) * 100) / 100,
+                gapVsSnapshotInventory,
+                gapVsSystemInventory
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.put('/api/admin/reconciliation/supplier/:key', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const { key } = req.params;
+        const { total, statementDate, status, notes } = req.body || {};
+        const snapshot = JSON.parse(require('fs').readFileSync(RECONCILIATION_JSON_PATH, 'utf8'));
+        const row = (snapshot.supplierPurchases || []).find(p => p.key === key);
+        if (!row) return res.status(404).json({ error: 'No supplier row with that key' });
+        if (total !== undefined) row.total = total === null ? null : Number(total);
+        if (statementDate !== undefined) row.statementDate = statementDate;
+        if (status !== undefined) row.status = status;
+        if (notes !== undefined) row.notes = notes;
+        snapshot._meta = snapshot._meta || {};
+        snapshot._meta.lastUpdated = new Date().toISOString().slice(0, 10);
+        snapshot._meta.editedBy = req.user.name || req.user.email;
+        require('fs').writeFileSync(RECONCILIATION_JSON_PATH, JSON.stringify(snapshot, null, 2));
+        res.json({ ok: true, supplier: row });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

@@ -83,6 +83,7 @@
                             <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                             <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
+                            <span id="reconciliationNav" style="display: none;"><a href="#reconciliation" class="dropdown-item" data-tab="reconciliation">Reconciliation Center</a></span>
                             <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
                         </div>
                     </div>
@@ -1258,6 +1259,19 @@
                 </div>
                 <div id="businessProfileContent" style="padding: 20px;">
                     <div class="loading">Loading business profile…</div>
+                </div>
+            </div>
+
+            <!-- Reconciliation Center Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="reconciliationTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Reconciliation Center</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        The chemical money picture across Kyle, M5 Ag (Ty), AcreProfit LLC, and outside customers. Click Refresh any time to pick up the latest live numbers.
+                    </p>
+                </div>
+                <div id="reconciliationContent" style="padding: 20px;">
+                    <div class="loading">Loading reconciliation…</div>
                 </div>
             </div>
 
@@ -3871,6 +3885,7 @@
             setDisplay('programsNav', 'inline');
             setDisplay('ratingsNav', 'inline');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('reconciliationNav', 'block');
             setDisplay('webhookEventsNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
@@ -3890,6 +3905,7 @@
             setDisplay('complianceNav', 'block');
             setDisplay('companySettingsNav', 'block');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('reconciliationNav', 'block');
             setDisplay('webhookEventsNav', 'block');
             // Partners don't see rep applications or audit log (superadmin only)
             setDisplay('repAppsNav', 'none');
@@ -3910,6 +3926,7 @@
             setDisplay('complianceNav', 'none');
             // Distributors do NOT see the Business Profile (partner+ only)
             setDisplay('businessProfileNav', 'none');
+            setDisplay('reconciliationNav', 'none');
             setDisplay('webhookEventsNav', 'none');
         } else {
             // Regular admin/representative
@@ -4268,6 +4285,7 @@
             if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
             if (tabName === 'business') loadBusinessProfile();
+            if (tabName === 'reconciliation') loadReconciliation();
             if (tabName === 'webhook-events') loadWebhookEvents();
         }
 
@@ -10758,6 +10776,213 @@
                 renderBusinessProfile(data, slotData.slots || []);
             } catch (err) {
                 container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        // ============ RECONCILIATION CENTER (partner+ only) ============
+        // One-screen "who owes who" view. Server pulls live A/R and
+        // inventory values + the static supplier snapshot; this page
+        // just arranges them with the gap math surfaced.
+
+        function money(n, opts) {
+            opts = opts || {};
+            if (n === null || n === undefined || isNaN(n)) {
+                return opts.pendingLabel || '—';
+            }
+            const num = Number(n);
+            const sign = num < 0 ? '-' : '';
+            const abs = Math.abs(num);
+            return sign + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function reconStatCard(title, value, subtitle, color) {
+            const c = color || 'var(--accent)';
+            return `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid ${c}; border-radius: 8px; padding: 16px 20px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); margin-bottom: 6px;">${escapeHtml(title)}</div>
+                <div style="font-size: 28px; font-weight: 700; color: ${c}; font-variant-numeric: tabular-nums;">${value}</div>
+                <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">${subtitle}</div>
+            </div>`;
+        }
+
+        function reconSupplierRow(s) {
+            const total = s.total === null || s.total === undefined
+                ? `<span style="color: #b45309; font-style: italic;">Pending — statement not yet received</span>`
+                : `<span style="font-variant-numeric: tabular-nums; font-weight: 600;">${money(s.total)}</span>`;
+            const statusBadge = s.status === 'confirmed'
+                ? '<span style="padding: 2px 8px; background: #d4edda; color: #155724; border-radius: 10px; font-size: 11px; font-weight: 600;">CONFIRMED</span>'
+                : '<span style="padding: 2px 8px; background: #fff3cd; color: #856404; border-radius: 10px; font-size: 11px; font-weight: 600;">PENDING</span>';
+            return `<tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 10px 12px;">
+                    <strong>${escapeHtml(s.supplier)}</strong>
+                    <div style="font-size: 12px; color: var(--text-light); margin-top: 2px;">${escapeHtml(s.account || '')}</div>
+                </td>
+                <td style="padding: 10px 12px; font-size: 13px;">${escapeHtml(s.paidBy || '')}</td>
+                <td style="padding: 10px 12px; text-align: right;">${total}</td>
+                <td style="padding: 10px 12px;">${statusBadge}</td>
+                <td style="padding: 10px 12px; font-size: 12px; color: var(--text-light);">${escapeHtml(s.statementDate || '—')}</td>
+            </tr>`;
+        }
+
+        function reconInventoryRow(i) {
+            return `<tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 10px 12px;"><strong>${escapeHtml(i.location)}</strong></td>
+                <td style="padding: 10px 12px; font-size: 12px; color: var(--text-light);">${escapeHtml(i.asOf || '—')}</td>
+                <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${money(i.value)}</td>
+                <td style="padding: 10px 12px; font-size: 12px; color: var(--text-light);">${escapeHtml(i.source || '')}</td>
+            </tr>`;
+        }
+
+        function reconPartyRow(p) {
+            return `<tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 10px 12px; font-weight: 600; vertical-align: top; width: 220px;">${escapeHtml(p.party)}</td>
+                <td style="padding: 10px 12px; font-size: 13px; color: var(--text-light); vertical-align: top;">${escapeHtml(p.role || '')}</td>
+                <td style="padding: 10px 12px; font-size: 12px; color: var(--text-light); vertical-align: top;">${escapeHtml(p.notes || '')}</td>
+            </tr>`;
+        }
+
+        function renderReconciliation(data) {
+            const container = document.getElementById('reconciliationContent');
+            if (!data || !data.snapshot) {
+                container.innerHTML = '<div class="error">No reconciliation data returned.</div>';
+                return;
+            }
+            const snap = data.snapshot;
+            const live = data.live || {};
+            const derived = data.derived || {};
+            const suppliers = Array.isArray(snap.supplierPurchases) ? snap.supplierPurchases : [];
+            const inventories = Array.isArray(snap.inventoryOnHand) ? snap.inventoryOnHand : [];
+            const parties = Array.isArray(snap.partyBalances) ? snap.partyBalances : [];
+            const ar = live.accountsReceivable || {};
+
+            const lastUpdated = snap._meta && snap._meta.lastUpdated ? snap._meta.lastUpdated : '—';
+
+            let html = '';
+
+            // Top row: 4 big stat cards
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; margin-bottom: 24px;">`;
+            html += reconStatCard(
+                'Chemical IN (confirmed)',
+                money(derived.confirmedPurchasesTotal),
+                derived.pendingSupplierCount
+                    ? `${derived.pendingSupplierCount} supplier(s) still pending`
+                    : 'All suppliers confirmed',
+                '#0f766e'
+            );
+            html += reconStatCard(
+                'Inventory ON HAND',
+                money(derived.inventorySnapshotTotal),
+                'Snapshot across both locations',
+                '#1e40af'
+            );
+            html += reconStatCard(
+                'Customers OWE us',
+                money(ar.outstanding || 0),
+                `${ar.openCount || 0} open · ${ar.pastDueCount || 0} past due (${money(ar.pastDueAmount || 0)})`,
+                '#b45309'
+            );
+            const gap = derived.gapVsSnapshotInventory || 0;
+            html += reconStatCard(
+                '"Where did it go?" gap',
+                money(gap),
+                'Purchases minus inventory. Should ≈ applied + invoiced + in-transit.',
+                gap > 0 ? '#b00020' : '#2e7d32'
+            );
+            html += `</div>`;
+
+            // Suppliers section
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px;">Supplier purchases — ${snap.fiscalYear || '2026'}</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border);">
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Supplier / Account</th>
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Paid by</th>
+                            <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">2026 total</th>
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Status</th>
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Statement date</th>
+                        </tr>
+                    </thead>
+                    <tbody>${suppliers.map(reconSupplierRow).join('')}</tbody>
+                    <tfoot>
+                        <tr style="background: #fafafa; font-weight: 700;">
+                            <td style="padding: 10px 12px;" colspan="2">Confirmed total</td>
+                            <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums;">${money(derived.confirmedPurchasesTotal)}</td>
+                            <td style="padding: 10px 12px;" colspan="2"></td>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>`;
+
+            // Inventory section
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px;">Inventory on hand</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead>
+                        <tr style="border-bottom: 2px solid var(--border);">
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Location</th>
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">As of</th>
+                            <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Value</th>
+                            <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Source</th>
+                        </tr>
+                    </thead>
+                    <tbody>${inventories.map(reconInventoryRow).join('')}</tbody>
+                    <tfoot>
+                        <tr style="background: #fafafa; font-weight: 700;">
+                            <td style="padding: 10px 12px;" colspan="2">Snapshot total</td>
+                            <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums;">${money(derived.inventorySnapshotTotal)}</td>
+                            <td style="padding: 10px 12px;"></td>
+                        </tr>
+                        <tr style="background: #fafafa;">
+                            <td style="padding: 10px 12px; color: var(--text-light);" colspan="2">System inventory value (from Mongo) — delta vs snapshot</td>
+                            <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums;">${money(live.inventorySystemValue)}</td>
+                            <td style="padding: 10px 12px; color: ${(derived.inventorySystemVsSnapshotDelta || 0) === 0 ? 'var(--text-light)' : '#b45309'}; font-weight: 600;">
+                                Δ ${money(derived.inventorySystemVsSnapshotDelta)}
+                            </td>
+                        </tr>
+                    </tfoot>
+                </table>
+                <p style="font-size: 12px; color: var(--text-light); margin-top: 10px;">
+                    A big delta between snapshot and system means the Inventory tab doesn't match what's physically on the shelves. Fix the system numbers via the Inventory module (or wait for Phase 2: line-by-line chemical matching will reconcile these automatically).
+                </p>
+            </div>`;
+
+            // Parties section
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 16px;">Who owes who — plain English</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tbody>${parties.map(reconPartyRow).join('')}</tbody>
+                </table>
+            </div>`;
+
+            // Footer / next phase
+            html += `<div style="background: #fffbeb; border: 1px solid #fcd34d; border-radius: 8px; padding: 14px 16px; margin-bottom: 20px; color: #78350f; font-size: 13px; line-height: 1.5;">
+                <strong>Next phase (line-by-line matching):</strong> every chemical lot will carry who-paid-for-it and who-it-went-to tags, so the "where did it go" gap resolves automatically. Until that ships, match the gap number against: customer invoices sent out, chemical applied to Mollohan Farms, chemical applied to Kyle's farm, chemical in transit between locations.
+            </div>`;
+
+            html += `<p style="font-size: 12px; color: var(--text-light);">
+                Snapshot last updated: ${escapeHtml(lastUpdated)} · Live A/R and inventory values pulled just now.
+                <button class="btn btn-outline btn-sm" style="margin-left: 12px;" onclick="loadReconciliation()">Refresh</button>
+            </p>`;
+
+            container.innerHTML = html;
+        }
+
+        async function loadReconciliation() {
+            const container = document.getElementById('reconciliationContent');
+            container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading reconciliation…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/reconciliation/summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const err = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                    container.innerHTML = `<div class="error">Could not load reconciliation: ${escapeHtml(err)}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                renderReconciliation(data);
+            } catch (err) {
+                container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
             }
         }
 
