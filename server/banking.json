@@ -56,6 +56,17 @@
     { "date": "2026-07-17", "supplier": "Corbet Scientific", "amount": 18440.41, "method": "ACH SALE" },
     { "date": "2026-08-04", "supplier": "Corbet Scientific", "amount": 18439.40, "method": "ACH SALE" }
   ],
+  "suspectedJabcoWire": {
+    "date": "2026-04-30",
+    "wireOut": 84827.00,
+    "depositSameDay": 84807.00,
+    "jabcoInvoiceMatch": {
+      "so2129": 76617.00,
+      "so2131": 8190.00,
+      "total": 84807.00
+    },
+    "notes": "The 4/30 $84,827 TELEPHONE TRANSFER out is within $20 of the exact Jabco invoice sum ($76,617 SO 2129 + $8,190 SO 2131 = $84,807). The $20 is likely a wire fee. This suggests the 4/30 wire paid Jabco directly (not Kyle loan). RECLASSIFY if confirmed — would reduce Kyle loan repayments by $84,827 and add a supplier payment of same."
+  },
   "stripeTransfersIn": [
     { "date": "2026-08-10", "amount": 1092.67, "ref": "ST-Z4R3N2H6N9M2" },
     { "date": "2026-08-24", "amount": 8069.05, "ref": "ST-B1A4L1D9B5T4" },
