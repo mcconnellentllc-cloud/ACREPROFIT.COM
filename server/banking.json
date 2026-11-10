@@ -32,8 +32,13 @@
     "netChange": 25643.17,
     "throughDate": "2026-10-30"
   },
+  "distributionPolicy": {
+    "rule": "NO PARTNER DRAWS until the M77 Ag loan AND the M5 Ag loan are both fully cleared. Every dollar paid to any partner-related entity (M77 Ag, M5 Ag, Kyle personally, Ty personally) is a loan repayment, not a draw.",
+    "sourceConfirmation": "Kyle McConnell 2026-11-10: 'nothing is a partner draw until we clear the loans to M77 ag and M5 Ag'",
+    "effect": "All partner-related outflows YTD are classified as loan repayments. The paymentsToPartners / 'paid to Kyle' / 'paid to Ty' framing is accounting-correctly treated as loan balance paydown, not P&L distribution. Partner K-1 distributions start at $0 until lender balances hit zero."
+  },
   "loanRepaymentsOut": {
-    "note": "Every payment out to a partner-related name is a loan repayment, NOT a draw. Confirmed by Kyle 2026-11-10: 'M77 Ag loans money to acre profit to buy product' / 'same as M5 Ag loans money to acre profit from Ty and then Acre Profit repays M5 AG'. Kyle and Ty's own entities (M77 Ag, ToGo AG, M5 Ag) fund AcreProfit's chemical purchases; AcreProfit repays them as cash comes in from customers. These are NOT P&L items — they're balance-sheet entries against the loans-payable to each lender.",
+    "note": "Every payment out to a partner-related name is a loan repayment, NOT a draw. Confirmed by Kyle 2026-11-10: 'M77 Ag loans money to acre profit to buy product' / 'same as M5 Ag loans money to acre profit from Ty and then Acre Profit repays M5 AG' / 'nothing is a partner draw until we clear the loans to M77 ag and M5 Ag'. Kyle and Ty's own entities (M77 Ag, ToGo AG, M5 Ag) fund AcreProfit's chemical purchases; AcreProfit repays them as cash comes in from customers. These are NOT P&L items — they're balance-sheet entries against the loans-payable to each lender.",
     "m5AgLoanRepayments": {
       "confirmed": 93419.20,
       "transactions": [
