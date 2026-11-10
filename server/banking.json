@@ -32,24 +32,31 @@
     "netChange": 25643.17,
     "throughDate": "2026-10-30"
   },
-  "paymentsToPartners": {
-    "tyMollohan": {
+  "loanRepaymentsOut": {
+    "note": "Every payment out to a partner-related name is a loan repayment, NOT a draw. Confirmed by Kyle 2026-11-10: 'M77 Ag loans money to acre profit to buy product' / 'same as M5 Ag loans money to acre profit from Ty and then Acre Profit repays M5 AG'. Kyle and Ty's own entities (M77 Ag, ToGo AG, M5 Ag) fund AcreProfit's chemical purchases; AcreProfit repays them as cash comes in from customers. These are NOT P&L items — they're balance-sheet entries against the loans-payable to each lender.",
+    "m5AgLoanRepayments": {
       "confirmed": 93419.20,
       "transactions": [
-        { "date": "2026-10-15", "amount": 57378.80, "method": "Check #2300",                 "payee": "M5 Ag",            "verified": true, "notes": "Matches 9/30 deposit of $57,378.80 held 15 days then paid to M5 Ag." },
-        { "date": "2026-10-19", "amount": 36040.40, "method": "TELEPHONE TRANSFER (wire)",   "description": "Wire to Ty", "verified": true, "notes": "Confirmed by Kyle 2026-11-10 — this telephone transfer went to Ty, not to Kyle." }
+        { "date": "2026-10-15", "amount": 57378.80, "method": "Check #2300",                 "payee": "M5 Ag",  "verified": true, "notes": "Repayment on M5 Ag loan. Matches 9/30 deposit of $57,378.80 held 15 days." },
+        { "date": "2026-10-19", "amount": 36040.40, "method": "TELEPHONE TRANSFER (wire)",   "payee": "Ty",    "verified": true, "notes": "Repayment on M5 Ag loan. Confirmed by Kyle 2026-11-10." }
       ]
     },
-    "kyleMcConnell": {
+    "kyleOrM77AgLoanRepayments": {
       "confirmed": 176345.00,
+      "note": "These are loan repayments to Kyle personally OR to M77 Ag (via account 9047) OR to ToGo AG LLC. Needs Kyle to confirm which entity owns account 9047 and who received each wire. All are loan-related — none are draws.",
       "transactions": [
-        { "date": "2026-04-27", "amount": 12500.00, "method": "Online transfer to acct 9047", "description": "Loan Repayment",    "verified": true },
-        { "date": "2026-05-08", "amount": 15000.00, "method": "Online transfer to acct 9047", "description": "Loan Reimbursement", "verified": true },
-        { "date": "2026-06-11", "amount": 75045.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment",    "verified": true, "notes": "PENDING: same-day $75,000 deposit — could be M77 Ag loan-in pattern like 4/30. Confirm with Kyle." },
-        { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment (memo was 'Payroll')", "verified": true, "notes": "PENDING: no same-day match but $44K is a round number. Confirm with Kyle." },
-        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit",                   "description": "LOAN PAYMENT",      "verified": true }
+        { "date": "2026-04-27", "amount": 12500.00, "method": "Online transfer to acct 9047", "description": "Loan Repayment",    "verified": true, "payeeEntity": "PENDING — is 9047 Kyle personal, M77 Ag, or ToGo AG?" },
+        { "date": "2026-05-08", "amount": 15000.00, "method": "Online transfer to acct 9047", "description": "Loan Reimbursement", "verified": true, "payeeEntity": "PENDING — same as above" },
+        { "date": "2026-06-11", "amount": 75045.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment",    "verified": true, "payeeEntity": "PENDING", "notes": "Same-day $75,000 deposit — may be M77 Ag loan-in like 4/30 pattern; this wire may then be paying a supplier, not repaying Kyle. Confirm." },
+        { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Memo 'Payroll'",    "verified": true, "payeeEntity": "PENDING", "notes": "No same-day deposit match. $44K round number." },
+        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit",                   "description": "LOAN PAYMENT",      "verified": true, "payeeEntity": "PENDING" }
       ]
     }
+  },
+  "paymentsToPartners": {
+    "note": "DEPRECATED — all partner-related outflows are loan repayments, not draws. See loanRepaymentsOut.",
+    "tyMollohan": { "confirmed": 93419.20, "see": "loanRepaymentsOut.m5AgLoanRepayments" },
+    "kyleMcConnell": { "confirmed": 176345.00, "see": "loanRepaymentsOut.kyleOrM77AgLoanRepayments" }
   },
   "supplierPayments": [
     { "date": "2026-04-30", "supplier": "Jabco, LLC",         "amount": 84827.00, "method": "TELEPHONE TRANSFER (wire)", "notes": "Pays SO 2129 ($76,617) + SO 2131 ($8,190) = $84,807. $20 wire fee. Funded by same-day M77 Ag loan-in." },
@@ -57,12 +64,19 @@
     { "date": "2026-08-04", "supplier": "Corbet Scientific", "amount": 18439.40, "method": "ACH SALE" }
   ],
   "loansFromRelatedEntities": {
-    "note": "M77 Ag (Kyle's entity) loans cash into AcreProfit to fund chemical purchases from suppliers (confirmed by Kyle 2026-11-10: 'M77 Ag loans money to acre profit to buy product'). These deposits are NOT revenue; they are loans IN to AcreProfit that AcreProfit then uses to wire suppliers.",
+    "note": "Both M77 Ag (Kyle's entity) AND M5 Ag (Ty's entity) loan cash into AcreProfit to fund chemical purchases from suppliers (confirmed by Kyle 2026-11-10). Pattern: lender deposits into AcreProfit, same day AcreProfit wires supplier, AcreProfit later repays lender from customer cash. Deposits in this list are NOT revenue — they are LOANS payable, balance-sheet liabilities, not P&L items.",
     "loansIn": [
-      { "date": "2026-04-30", "amount": 84807.00, "from": "M77 Ag",  "purpose": "Fund Jabco SO 2129 + 2131 wire-out same day", "verified": true },
-      { "date": "2026-06-11", "amount": 75000.00, "from": "PENDING", "purpose": "Likely M77 Ag loan — same-day $75,045 wire out. Deposit memo was 'Alumax'. Confirm with Kyle whether Alumax is an entity he controls or the customer.", "verified": false },
-      { "date": "2026-07-17", "amount": 18440.41, "from": "PENDING", "purpose": "Same-day as Corbet ACH out — deposit was Ardmore check. Could be customer paying for chemical that AcreProfit then uses to pay Corbet.", "verified": false }
-    ]
+      { "date": "2026-04-30", "amount": 84807.00, "from": "M77 Ag",  "purpose": "Fund Jabco SO 2129 + 2131 wire-out same day ($84,827)", "verified": true },
+      { "date": "2026-06-11", "amount": 75000.00, "from": "PENDING", "purpose": "Likely M77 Ag or M5 Ag loan — same-day $75,045 wire out to supplier. Deposit memo was 'Alumax'. Confirm whether Alumax is an entity Kyle/Ty control.", "verified": false },
+      { "date": "2026-07-17", "amount": 18440.41, "from": "PENDING", "purpose": "Same-day as Corbet ACH out — deposit was Ardmore check. Could be customer paying for chemical that AcreProfit then uses to pay Corbet (revenue), OR could be another entity loan. Confirm.", "verified": false }
+    ],
+    "outstandingLoanBalances": {
+      "note": "Running balance owed by AcreProfit to each lender. Need Kyle to supply ORIGINATIONS (how much loaned total over 2026) and current claim of outstanding balance — then math is Originations - Repayments = Current balance.",
+      "m77Ag": { "originatedYTD": "PENDING", "repaidYTD": "PENDING — depends on 9047 ownership", "balance": "PENDING" },
+      "m5Ag":  { "originatedYTD": "PENDING", "repaidYTD": 93419.20,                               "balance": "PENDING" },
+      "kyleMcConnellPersonal": { "originatedYTD": "PENDING", "repaidYTD": "PENDING — depends on 9047 ownership", "balance": "PENDING" },
+      "togoAgLlc": { "originatedYTD": "PENDING", "repaidYTD": "PENDING",                          "balance": "PENDING" }
+    }
   },
   "stripeTransfersIn": [
     { "date": "2026-08-10", "amount": 1092.67, "ref": "ST-Z4R3N2H6N9M2" },
