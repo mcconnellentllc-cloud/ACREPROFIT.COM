@@ -83,6 +83,7 @@
                             <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                             <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
+                            <span id="bankingNav" style="display: none;"><a href="#banking" class="dropdown-item" data-tab="banking">Banking</a></span>
                             <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
                         </div>
                     </div>
@@ -141,6 +142,25 @@
                             <div class="overview-card-sub">
                                 <span><strong id="arInvoiceCount">0</strong> open invoices</span>
                                 <span><strong id="arPastDue">$0</strong> past due</span>
+                            </div>
+                        </div>
+                        <div class="overview-card-arrow">→</div>
+                    </div>
+
+                    <!-- Banking (partner-tier only) — hidden by default; shown in role setup. -->
+                    <div class="overview-card" id="bankingOverviewCard" onclick="switchTab('banking')" style="cursor: pointer; display: none;">
+                        <div class="overview-card-icon" style="background: #ddd6fe; color: #6d28d9;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="7" width="20" height="13" rx="2"></rect><path d="M2 11h20"></path><path d="M6 15h4"></path></svg>
+                        </div>
+                        <div class="overview-card-content">
+                            <h2>Banking</h2>
+                            <div class="overview-card-stats">
+                                <span class="big-number" id="bankingBalance">$0</span>
+                                <span class="stat-detail">Cash on hand · PWCB *9253</span>
+                            </div>
+                            <div class="overview-card-sub">
+                                <span>To Kyle: <strong id="bankingToKyle">$0</strong></span>
+                                <span>To Ty: <strong id="bankingToTy">$0</strong></span>
                             </div>
                         </div>
                         <div class="overview-card-arrow">→</div>
@@ -1258,6 +1278,19 @@
                 </div>
                 <div id="businessProfileContent" style="padding: 20px;">
                     <div class="loading">Loading business profile…</div>
+                </div>
+            </div>
+
+            <!-- Banking Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="bankingTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Banking</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        AcreProfit LLC operating account at Points West Community Bank. Parsed from monthly statements. Partner-tier access only.
+                    </p>
+                </div>
+                <div id="bankingContent" style="padding: 20px;">
+                    <div class="loading">Loading banking…</div>
                 </div>
             </div>
 
@@ -3871,6 +3904,8 @@
             setDisplay('programsNav', 'inline');
             setDisplay('ratingsNav', 'inline');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('bankingNav', 'block');
+            setDisplay('bankingOverviewCard', 'flex');
             setDisplay('webhookEventsNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
@@ -3890,6 +3925,8 @@
             setDisplay('complianceNav', 'block');
             setDisplay('companySettingsNav', 'block');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('bankingNav', 'block');
+            setDisplay('bankingOverviewCard', 'flex');
             setDisplay('webhookEventsNav', 'block');
             // Partners don't see rep applications or audit log (superadmin only)
             setDisplay('repAppsNav', 'none');
@@ -3910,6 +3947,7 @@
             setDisplay('complianceNav', 'none');
             // Distributors do NOT see the Business Profile (partner+ only)
             setDisplay('businessProfileNav', 'none');
+            setDisplay('bankingNav', 'none');
             setDisplay('webhookEventsNav', 'none');
         } else {
             // Regular admin/representative
@@ -4268,6 +4306,7 @@
             if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
             if (tabName === 'business') loadBusinessProfile();
+            if (tabName === 'banking') loadBanking();
             if (tabName === 'webhook-events') loadWebhookEvents();
         }
 
@@ -4944,9 +4983,31 @@
                     const count = Array.isArray(dists) ? dists.filter(d => d.role === 'distributor' || d.role === 'partner').length : 0;
                     document.getElementById('totalDistributorsCount').textContent = count;
                 }
+                loadBankingOverviewCard();
             } catch (e) {
                 console.error('loadOverviewStats error:', e);
             }
+        }
+
+        // Populates the Banking overview card (current balance + partner payment totals).
+        // Partner-gated endpoint so non-partners just get a quiet 403 and the card stays
+        // hidden by its role-gated display setting.
+        async function loadBankingOverviewCard() {
+            const card = document.getElementById('bankingOverviewCard');
+            if (!card || card.style.display === 'none') return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/banking/summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                const bal = (data.primaryAccount && data.primaryAccount.currentBalance) || 0;
+                const toKyle = (data.paymentsToPartners && data.paymentsToPartners.kyleMcConnell && data.paymentsToPartners.kyleMcConnell.confirmed) || 0;
+                const toTy = (data.paymentsToPartners && data.paymentsToPartners.tyMollohan && data.paymentsToPartners.tyMollohan.confirmed) || 0;
+                document.getElementById('bankingBalance').textContent = '$' + bal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                document.getElementById('bankingToKyle').textContent = '$' + toKyle.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+                document.getElementById('bankingToTy').textContent = '$' + toTy.toLocaleString('en-US', { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+            } catch (_) { /* silent */ }
         }
 
         // Rep application approve/reject (were dead onclick handlers). Both PUT the
@@ -10758,6 +10819,200 @@
                 renderBusinessProfile(data, slotData.slots || []);
             } catch (err) {
                 container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        // ============ BANKING TAB (partner+ only) ============
+        // Parsed-statement view of the Points West operating account 9253.
+
+        function bankMoney(n) {
+            if (n === null || n === undefined || isNaN(n)) return '—';
+            return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function renderBanking(data) {
+            const container = document.getElementById('bankingContent');
+            if (!data || !data.primaryAccount) {
+                container.innerHTML = '<div class="error">Banking data missing.</div>';
+                return;
+            }
+            const acct = data.primaryAccount;
+            const ytd = data.yearToDate || {};
+            const statements = Array.isArray(data.statements) ? data.statements : [];
+            const kyle = (data.paymentsToPartners && data.paymentsToPartners.kyleMcConnell) || {};
+            const ty = (data.paymentsToPartners && data.paymentsToPartners.tyMollohan) || {};
+            const suppliers = Array.isArray(data.supplierPayments) ? data.supplierPayments : [];
+            const stripe = Array.isArray(data.stripeTransfersIn) ? data.stripeTransfersIn : [];
+
+            const kyleTxns = (kyle.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+            const tyTxns = (ty.transactions || []).slice().sort((a, b) => a.date.localeCompare(b.date));
+            const kyleTotal = kyle.confirmed || 0;
+            const tyTotal = ty.confirmed || 0;
+
+            let html = '';
+
+            // Top row: balance + YTD + partner payment totals
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 24px;">`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #6d28d9; border-radius: 8px; padding: 16px 20px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">Current balance</div>
+                <div style="font-size: 28px; font-weight: 700; color: #6d28d9; font-variant-numeric: tabular-nums; margin-top: 6px;">${bankMoney(acct.currentBalance)}</div>
+                <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">As of ${escapeHtml(acct.balanceAsOf || '')}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #0f766e; border-radius: 8px; padding: 16px 20px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">YTD credits in</div>
+                <div style="font-size: 28px; font-weight: 700; color: #0f766e; font-variant-numeric: tabular-nums; margin-top: 6px;">${bankMoney(ytd.totalCredits)}</div>
+                <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">Through ${escapeHtml(ytd.throughDate || '')}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b00020; border-radius: 8px; padding: 16px 20px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">YTD debits out</div>
+                <div style="font-size: 28px; font-weight: 700; color: #b00020; font-variant-numeric: tabular-nums; margin-top: 6px;">${bankMoney(ytd.totalDebits)}</div>
+                <div style="font-size: 12px; color: var(--text-light); margin-top: 4px;">Net ${bankMoney(ytd.netChange)}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b45309; border-radius: 8px; padding: 16px 20px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">To Kyle vs To Ty</div>
+                <div style="font-size: 20px; font-weight: 700; color: #b45309; font-variant-numeric: tabular-nums; margin-top: 6px;">Kyle: ${bankMoney(kyleTotal)}</div>
+                <div style="font-size: 20px; font-weight: 700; color: #1e40af; font-variant-numeric: tabular-nums;">Ty: ${bankMoney(tyTotal)}</div>
+            </div>`;
+            html += `</div>`;
+
+            // Account info
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 15px;">Account</h3>
+                <div style="font-size: 14px; line-height: 1.6;">
+                    <strong>${escapeHtml(acct.bank)}</strong> · ${escapeHtml(acct.accountType)} · *${escapeHtml(acct.accountLast4)}<br>
+                    ${escapeHtml(acct.bankAddress)}<br>
+                    ${escapeHtml(acct.bankPhone)} · <a href="https://${escapeHtml(acct.bankWebsite)}" target="_blank" rel="noopener">${escapeHtml(acct.bankWebsite)}</a><br>
+                    Signers: ${(acct.signers || []).map(escapeHtml).join(', ')}
+                </div>
+            </div>`;
+
+            // Partner payments
+            function txnRow(t) {
+                return `<tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px; font-size: 13px; white-space: nowrap;">${escapeHtml(t.date)}</td>
+                    <td style="padding: 8px 12px; font-size: 13px;">${escapeHtml(t.method)}</td>
+                    <td style="padding: 8px 12px; font-size: 13px; color: var(--text-light);">${escapeHtml(t.description || t.payee || '')}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${bankMoney(t.amount)}</td>
+                </tr>`;
+            }
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-bottom: 20px;">`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b45309; border-radius: 8px; padding: 16px 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 15px;">Paid to Kyle</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Date</th>
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Method</th>
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Note</th>
+                        <th style="padding: 6px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Amount</th>
+                    </tr></thead>
+                    <tbody>${kyleTxns.map(txnRow).join('')}</tbody>
+                    <tfoot><tr style="background: #fafafa; font-weight: 700;">
+                        <td colspan="3" style="padding: 8px 12px;">Total</td>
+                        <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums;">${bankMoney(kyleTotal)}</td>
+                    </tr></tfoot>
+                </table>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #1e40af; border-radius: 8px; padding: 16px 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 15px;">Paid to Ty / M5 Ag</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Date</th>
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Method</th>
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Note</th>
+                        <th style="padding: 6px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Amount</th>
+                    </tr></thead>
+                    <tbody>${tyTxns.map(txnRow).join('')}</tbody>
+                    <tfoot><tr style="background: #fafafa; font-weight: 700;">
+                        <td colspan="3" style="padding: 8px 12px;">Total</td>
+                        <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums;">${bankMoney(tyTotal)}</td>
+                    </tr></tfoot>
+                </table>
+            </div>`;
+            html += `</div>`;
+
+            // Monthly statement table
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 15px;">Monthly statements</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Month</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Begin</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Credits</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Debits</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Ending</th>
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Notes</th>
+                    </tr></thead>
+                    <tbody>`;
+            statements.forEach(s => {
+                html += `<tr style="border-bottom: 1px solid var(--border);">
+                    <td style="padding: 8px 12px; font-size: 13px; white-space: nowrap;">${escapeHtml(s.month)}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px;">${bankMoney(s.begin)}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: #0f766e;">${bankMoney(s.credits)}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; color: #b00020;">${bankMoney(s.debits)}</td>
+                    <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; font-weight: 600;">${bankMoney(s.ending)}</td>
+                    <td style="padding: 8px 12px; font-size: 12px; color: var(--text-light);">${escapeHtml(s.notes || '')}</td>
+                </tr>`;
+            });
+            html += `</tbody></table></div>`;
+
+            // Supplier payments + Stripe credits
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px; margin-bottom: 20px;">`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 15px;">Supplier payments (ACH)</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Date</th>
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Supplier</th>
+                        <th style="padding: 6px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Amount</th>
+                    </tr></thead>
+                    <tbody>${suppliers.map(s => `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 12px; font-size: 13px;">${escapeHtml(s.date)}</td>
+                        <td style="padding: 6px 12px; font-size: 13px;">${escapeHtml(s.supplier)}</td>
+                        <td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${bankMoney(s.amount)}</td>
+                    </tr>`).join('')}</tbody>
+                </table>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px;">
+                <h3 style="margin: 0 0 10px 0; font-size: 15px;">Stripe transfers in</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Date</th>
+                        <th style="padding: 6px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Ref</th>
+                        <th style="padding: 6px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Amount</th>
+                    </tr></thead>
+                    <tbody>${stripe.map(s => `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 12px; font-size: 13px;">${escapeHtml(s.date)}</td>
+                        <td style="padding: 6px 12px; font-size: 12px; font-family: monospace;">${escapeHtml(s.ref)}</td>
+                        <td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: #0f766e;">${bankMoney(s.amount)}</td>
+                    </tr>`).join('')}</tbody>
+                </table>
+            </div>`;
+            html += `</div>`;
+
+            html += `<p style="font-size: 12px; color: var(--text-light);">
+                Snapshot last updated: ${escapeHtml((data._meta && data._meta.lastUpdated) || '—')}
+                <button class="btn btn-outline btn-sm" style="margin-left: 12px;" onclick="loadBanking()">Refresh</button>
+            </p>`;
+
+            container.innerHTML = html;
+        }
+
+        async function loadBanking() {
+            const container = document.getElementById('bankingContent');
+            container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading banking…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/banking/summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const err = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                    container.innerHTML = `<div class="error">Could not load banking: ${escapeHtml(err)}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                renderBanking(data);
+            } catch (err) {
+                container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
             }
         }
 
