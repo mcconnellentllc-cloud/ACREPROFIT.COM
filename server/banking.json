@@ -24,7 +24,7 @@
     { "month": "2026-07", "endingDate": "2026-07-31", "begin": 3593.15,    "credits": 71843.11,  "debits": 18440.41,   "ending": 56995.85,  "notes": "Corbet ACH out $18,440.41. Customer deposits: Seger, Ardmore, Tabric Group, GSV Pharms." },
     { "month": "2026-08", "endingDate": "2026-08-31", "begin": 56995.85,   "credits": 35261.72,  "debits": 62439.40,   "ending": 29818.17,  "notes": "Corbet ACH $18,439.40. $44,000 loan repayment to Kyle (memo=Payroll). 2 Stripe transfers in: $1,092.67 + $8,069.05." },
     { "month": "2026-09", "endingDate": "2026-09-30", "begin": 29818.17,   "credits": 93399.20,  "debits": 29800.00,   "ending": 93417.37,  "notes": "Stripe $36,020.40 in. 3-check deposit $57,378.80. $29,800 LOAN PAYMENT to Kyle." },
-    { "month": "2026-10", "endingDate": "2026-10-30", "begin": 93417.37,   "credits": 25645.00,  "debits": 93419.20,   "ending": 25643.17,  "notes": "Check #2300 $57,378.80 to M5 Ag (Ty). $36,040.40 loan repayment to Kyle. $1,000 reclass from 9047." }
+    { "month": "2026-10", "endingDate": "2026-10-30", "begin": 93417.37,   "credits": 25645.00,  "debits": 93419.20,   "ending": 25643.17,  "notes": "Check #2300 $57,378.80 to M5 Ag + $36,040.40 wire to Ty — both out to Ty this month ($93,419.20 combined). $1,000 reclass from 9047." }
   ],
   "yearToDate": {
     "totalCredits": 417114.18,
@@ -34,21 +34,21 @@
   },
   "paymentsToPartners": {
     "tyMollohan": {
-      "confirmed": 57378.80,
+      "confirmed": 93419.20,
       "transactions": [
-        { "date": "2026-10-15", "amount": 57378.80, "method": "Check #2300", "payee": "M5 Ag", "verified": true, "notes": "Matches 9/30 deposit of $57,378.80 held 15 days then paid to M5 Ag." }
+        { "date": "2026-10-15", "amount": 57378.80, "method": "Check #2300",                 "payee": "M5 Ag",            "verified": true, "notes": "Matches 9/30 deposit of $57,378.80 held 15 days then paid to M5 Ag." },
+        { "date": "2026-10-19", "amount": 36040.40, "method": "TELEPHONE TRANSFER (wire)",   "description": "Wire to Ty", "verified": true, "notes": "Confirmed by Kyle 2026-11-10 — this telephone transfer went to Ty, not to Kyle." }
       ]
     },
     "kyleMcConnell": {
-      "confirmed": 297212.40,
+      "confirmed": 261172.00,
       "transactions": [
         { "date": "2026-04-27", "amount": 12500.00, "method": "Online transfer to acct 9047", "description": "Loan Repayment",    "verified": true },
         { "date": "2026-04-30", "amount": 84827.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment",    "verified": true },
         { "date": "2026-05-08", "amount": 15000.00, "method": "Online transfer to acct 9047", "description": "Loan Reimbursement", "verified": true },
         { "date": "2026-06-11", "amount": 75045.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment",    "verified": true },
         { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment (memo was 'Payroll')", "verified": true },
-        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit",                   "description": "LOAN PAYMENT",      "verified": true },
-        { "date": "2026-10-19", "amount": 36040.40, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment",    "verified": true }
+        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit",                   "description": "LOAN PAYMENT",      "verified": true }
       ]
     }
   },
