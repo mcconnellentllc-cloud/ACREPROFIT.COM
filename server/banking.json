@@ -66,12 +66,11 @@
       ]
     },
     "wiresOutPendingPayeeClassification": {
-      "subtotal": 148845.00,
-      "note": "Three TELEPHONE TRANSFER / Other Debit outflows whose payee entity isn't on the statement. Kyle has confirmed they're all loan repayments (not draws / not supplier payments on AcreProfit's dime). Needs Kyle to tell me which lender each one paid back: M77 Ag, M5 Ag, Kyle personal, ToGo AG, or McConnell Enterprises.",
+      "subtotal": 73800.00,
+      "note": "Two remaining TELEPHONE TRANSFER / Other Debit outflows whose payee entity isn't on the statement. The 6/11 $75,045 wire is now reclassified as a Sims supplier payment (funded by M5 Ag loan-in), removed from this list. Remaining: 8/3 and 9/11 need Kyle to name which lender each one paid back.",
       "transactions": [
-        { "date": "2026-06-11", "amount": 75045.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Loan repayment",     "verified": true, "payeeEntity": "PENDING", "notes": "Same-day $75,000 deposit (memo 'Alumax') — may also be M77 Ag loan-in like 4/30 pattern, with this wire then paying a supplier. Or Alumax was a customer and this wire repaid an existing M77/M5 loan. Confirm." },
-        { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Memo was 'Payroll'", "verified": true, "payeeEntity": "PENDING", "notes": "No same-day deposit match. $44K round number." },
-        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit",                   "description": "LOAN PAYMENT",       "verified": true, "payeeEntity": "PENDING" }
+        { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire)",     "description": "Memo was 'Payroll'", "verified": true, "payeeEntity": "PENDING", "notes": "No same-day deposit match. $44K round number. Could be loan repayment (Kyle/M77 Ag/M5 Ag), OR another supplier payment pattern like 4/30 and 6/11 but without a matched same-day deposit, OR actual payroll. Look for a Sims/Jabco/Corbet invoice around 8/3 for $43,980." },
+        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit",                   "description": "LOAN PAYMENT",       "verified": true, "payeeEntity": "PENDING", "notes": "Could be loan repayment to Kyle/M77 Ag/M5 Ag, OR a supplier payment. Statement explicitly says 'LOAN PAYMENT' though." }
       ]
     }
   },
@@ -81,27 +80,35 @@
     "kyleMcConnell": { "confirmed": 176345.00, "see": "loanRepaymentsOut.m77AgLoanRepayments + .wiresOutPendingPayeeClassification" }
   },
   "supplierPayments": [
-    { "date": "2026-04-30", "supplier": "Jabco, LLC",         "amount": 84827.00, "method": "TELEPHONE TRANSFER (wire)", "notes": "Pays SO 2129 ($76,617) + SO 2131 ($8,190) = $84,807. $20 wire fee. Funded by same-day M77 Ag loan-in." },
+    { "date": "2026-04-30", "supplier": "Jabco, LLC",         "amount": 84827.00, "method": "TELEPHONE TRANSFER (wire)", "notes": "Pays Jabco SO 2129 ($76,617) + SO 2131 ($8,190) = $84,807. $20 wire fee. Funded by same-day M77 Ag loan-in of $84,807." },
+    { "date": "2026-06-11", "supplier": "Sims Fertilizer & Chemical", "amount": 75045.00, "method": "TELEPHONE TRANSFER (wire)", "notes": "Pays Sims Invoice 103475 ($75,025, billed to M5 Ag at Sims — Atrazine + Glypex + Moccasin + Parapex). $20 wire fee. Funded by same-day M5 Ag loan-in of $75,000. Match confirmed by Kyle 2026-11-10." },
     { "date": "2026-07-17", "supplier": "Corbet Scientific", "amount": 18440.41, "method": "ACH SALE" },
     { "date": "2026-08-04", "supplier": "Corbet Scientific", "amount": 18439.40, "method": "ACH SALE" }
   ],
   "loansFromRelatedEntities": {
     "note": "Both M77 Ag (Kyle's entity) AND M5 Ag (Ty's entity) loan cash into AcreProfit to fund chemical purchases from suppliers (confirmed by Kyle 2026-11-10). Pattern: lender deposits into AcreProfit, same day AcreProfit wires supplier, AcreProfit later repays lender from customer cash. Deposits in this list are NOT revenue — they are LOANS payable, balance-sheet liabilities, not P&L items.",
     "loansIn": [
-      { "date": "2026-04-30", "amount": 84807.00, "from": "M77 Ag",  "purpose": "Fund Jabco SO 2129 + 2131 wire-out same day ($84,827)", "verified": true },
-      { "date": "2026-06-11", "amount": 75000.00, "from": "PENDING", "purpose": "Likely M77 Ag or M5 Ag loan — same-day $75,045 wire out to supplier. Deposit memo was 'Alumax'. Confirm whether Alumax is an entity Kyle/Ty control.", "verified": false },
+      { "date": "2026-04-30", "amount": 84807.00, "from": "M77 Ag", "purpose": "Fund Jabco SO 2129 + 2131 wire-out same day ($84,827)", "verified": true },
+      { "date": "2026-06-11", "amount": 75000.00, "from": "M77 Ag", "purpose": "Fund Sims Invoice 103475 wire-out same day ($75,045 — invoice billed to M5 Ag at Sims but paid by AcreProfit using M77 Ag loan money)", "verified": true, "notes": "Match + source confirmed by Kyle 2026-11-10 — deposit is M77 Ag loan, wire pays Sims Invoice 103475 ($75,025 + $20 fee). Side-effect: M77 Ag effectively funded a Sims invoice billed to M5 Ag — creates a potential inter-entity receivable from M5 Ag to M77 Ag that neither side's books are tracking directly." },
       { "date": "2026-07-17", "amount": 18440.41, "from": "PENDING", "purpose": "Same-day as Corbet ACH out — deposit was Ardmore check. Could be customer paying for chemical that AcreProfit then uses to pay Corbet (revenue), OR could be another entity loan. Confirm.", "verified": false }
     ],
     "outstandingLoanBalances": {
       "note": "Running balance owed by AcreProfit to each lender. Originations per lender from Kyle's ledger plus bank-statement detection. Math: Originations YTD - Repayments YTD = Balance.",
       "m77Ag": {
-        "originatedYTD_perKyleLedger": 75232.50,
-        "originatedYTD_detectedOnBankStatements": 84807.00,
-        "originatedYTD_totalPossible": 160039.50,
+        "originatedYTD_confirmed": 235039.50,
+        "originations": [
+          { "date": "2026-03-20", "amount": 56200.00, "route": "Direct wire 9047 → Jabco",   "supplierInvoice": "Jabco SO 2119 $56,180 (Glyphosate)",  "fromKylesLedger": true },
+          { "date": "2026-03-20", "amount": 19032.50, "route": "Direct wire 9047 → Corbet",  "supplierInvoice": "Corbet Invoice 364 $19,012.50 (Hydrovant)", "fromKylesLedger": true },
+          { "date": "2026-04-30", "amount": 84807.00, "route": "Deposit into 9253 → AcreProfit wires Jabco $84,827 same day", "supplierInvoice": "Jabco SO 2129 + 2131 $84,807", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-10 — 'wire in is loan from M77 ag to Acre Profit to pay for JabCO order'" },
+          { "date": "2026-06-11", "amount": 75000.00, "route": "Deposit into 9253 → AcreProfit wires Sims $75,045 same day", "supplierInvoice": "Sims Invoice 103475 $75,025 (billed to M5 Ag at Sims, but AcreProfit paid with M77 Ag's money)", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-10 — '6/11 deposit is a loan from M77 ag to Acre Profit - the 75045.00 is a payment to sims or jabco'" }
+        ],
         "repaidYTD": 27500.00,
-        "balancePerKyleLedger": 47732.50,
-        "balanceIfBoth": 132539.50,
-        "notes": "Kyle's ledger (2026-11-10 screenshot) shows M77 Ag loaned $75,232.50 on 3/20 — paid Jabco directly ($56,200 for Glyphosate SO 2119) and Corbet directly ($19,032.50 for Hydrovant Invoice 364). Repaid $27,500 via 9253→9047 on 4/27 and 5/8. Per Kyle's math: still owed $47,732.50. HOWEVER — the 4/30 $84,807 deposit into AcreProfit (identified by Kyle as M77 Ag loan-in to fund the Jabco SO 2129 + 2131 wire-out) does NOT appear on Kyle's ledger. Either (a) Kyle's ledger is incomplete and the real balance is $132,539.50, or (b) the 4/30 deposit came from a different lender. Needs Kyle confirmation."
+        "repayments": [
+          { "date": "2026-04-27", "amount": 12500.00, "route": "9253 → 9047 online transfer" },
+          { "date": "2026-05-08", "amount": 15000.00, "route": "9253 → 9047 online transfer" }
+        ],
+        "balanceOwed": 207539.50,
+        "notes": "Kyle's March screenshot showed $75,232.50 originated with a $47,732.50 ending balance. Kyle later confirmed 4/30 $84,807 AND 6/11 $75,000 were also M77 Ag loan-ins (fund-and-wire pattern). True originated total YTD: $235,039.50. True balance owed: $207,539.50. Kyle's original screenshot was a partial view."
       },
       "m5Ag":                 { "originatedYTD": "PENDING",                                             "repaidYTD": 93419.20, "balance": "PENDING" },
       "kyleMcConnellPersonal":{ "originatedYTD": "PENDING",                                             "repaidYTD": 0.00,     "balance": "PENDING", "notes": "No confirmed direct Kyle-personal repayments found yet." },
