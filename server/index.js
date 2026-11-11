@@ -4844,6 +4844,53 @@ const emailLogSchema = new mongoose.Schema({
 emailLogSchema.index({ sentAt: -1 });
 const EmailLog = mongoose.model('EmailLog', emailLogSchema);
 
+// ============================================================================
+// EmailCampaign — mass-mail campaigns (flash sale, newsletters, announcements)
+// ============================================================================
+// Unlike EmailLog (one row per transactional send), a campaign is the thing
+// the admin composes ONCE and fans out to many recipients. The per-recipient
+// EmailLog rows are still written (so bounce/open tracking still works), but
+// the campaign row holds the single source of truth: what was sent, to whom
+// it was aimed, by whom, when, and the delivery stats.
+const emailCampaignSchema = new mongoose.Schema({
+    name: { type: String, required: true },            // Admin-facing label, e.g. "End of year flash sale"
+    subject: { type: String, required: true },
+    bodyHtml: { type: String, required: true },         // Full rendered HTML that went out
+    bodyText: { type: String },                         // Plain-text fallback (optional)
+    // Who received it. Resolved at send time from `audience`.
+    audience: {
+        roles: [{ type: String, enum: ['customer', 'distributor', 'partner', 'admin', 'superadmin'] }],
+        includeArchived: { type: Boolean, default: false },
+        userIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // explicit list override
+        extraEmails: [String]                           // one-off addresses not in User table
+    },
+    // Attached sale snapshot — frozen at send time so the campaign is reproducible.
+    // Shape: [{ productName, packSize, unit, retailPrice, salePrice, savings }]
+    saleSnapshot: [mongoose.Schema.Types.Mixed],
+    // Delivery stats — updated during and after send.
+    stats: {
+        totalRecipients: { type: Number, default: 0 },
+        sent: { type: Number, default: 0 },
+        failed: { type: Number, default: 0 },
+        bounced: { type: Number, default: 0 },
+        opened: { type: Number, default: 0 },
+        clicked: { type: Number, default: 0 }
+    },
+    status: {
+        type: String,
+        enum: ['draft', 'sending', 'sent', 'failed'],
+        default: 'draft',
+        index: true
+    },
+    sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    sentByName: String,
+    sentAt: { type: Date, index: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: Date
+});
+emailCampaignSchema.index({ sentAt: -1 });
+const EmailCampaign = mongoose.model('EmailCampaign', emailCampaignSchema);
+
 // Raw transport - returns a nodemailer-compatible transporter (or null).
 // SendGrid path returns a shim matching the nodemailer sendMail signature;
 // SMTP/Gmail paths return actual nodemailer transporters. Never called
@@ -10145,6 +10192,261 @@ app.get('/api/sale/active', async (req, res) => {
             saleNote: i.saleNote
         }));
         res.json({ active: true, count: formatted.length, items: formatted });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============================================================================
+// EMAIL CAMPAIGNS — sale blasts, announcements, newsletter-style sends
+// ============================================================================
+// Admin composes a message, picks an audience (customers / distributors /
+// all / explicit list), optionally auto-appends the current sale inventory
+// table, and fires. Delivery goes through the same createEmailTransporter()
+// used by every other send on the site, so SendGrid is the default transport,
+// test mode is honored, and every per-recipient delivery is written to the
+// EmailLog audit trail. The EmailCampaign row carries the single source of
+// truth for the blast: subject, body, audience, counts, status.
+
+// Helper: resolve an audience spec to a de-duped list of {email, name}
+async function _resolveAudience(audience = {}) {
+    const recipients = new Map(); // email → {email, name}
+
+    // 1) Role-based pull from User collection
+    if (Array.isArray(audience.roles) && audience.roles.length) {
+        const query = { role: { $in: audience.roles }, email: { $exists: true, $ne: null, $ne: '' } };
+        if (!audience.includeArchived) query.isActive = { $ne: false };
+        // Honor opt-out flags if present
+        query.$or = [{ emailOptOut: { $ne: true } }, { emailOptOut: { $exists: false } }];
+        const users = await User.find(query).select('email name firstName lastName').lean();
+        for (const u of users) {
+            const email = (u.email || '').trim().toLowerCase();
+            if (!email) continue;
+            if (!recipients.has(email)) {
+                recipients.set(email, { email, name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || '' });
+            }
+        }
+    }
+
+    // 2) Explicit user IDs
+    if (Array.isArray(audience.userIds) && audience.userIds.length) {
+        const users = await User.find({ _id: { $in: audience.userIds }, email: { $exists: true, $ne: null, $ne: '' } })
+            .select('email name firstName lastName').lean();
+        for (const u of users) {
+            const email = (u.email || '').trim().toLowerCase();
+            if (!email) continue;
+            if (!recipients.has(email)) {
+                recipients.set(email, { email, name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || '' });
+            }
+        }
+    }
+
+    // 3) Extra raw emails — admin-pasted addresses not in the User table
+    if (Array.isArray(audience.extraEmails)) {
+        for (const raw of audience.extraEmails) {
+            const email = String(raw || '').trim().toLowerCase();
+            if (!email || !email.includes('@')) continue;
+            if (!recipients.has(email)) recipients.set(email, { email, name: '' });
+        }
+    }
+
+    return Array.from(recipients.values());
+}
+
+// Helper: build the sale snapshot HTML table that gets appended to blasts
+async function _buildSaleHtmlSnapshot() {
+    const items = await Chemical.find({
+        onSale: true, isActive: true, availableForOrder: true, status: 'approved'
+    }).select('productName packSize unit sellPrice salePrice manufacturer').lean();
+
+    if (!items.length) return { html: '', text: '', items: [] };
+
+    const rows = items.map(i => {
+        const retail = Number(i.sellPrice) || 0;
+        const sale = Number(i.salePrice) || 0;
+        const savings = Math.max(0, retail - sale);
+        return { productName: i.productName, packSize: i.packSize, unit: i.unit, manufacturer: i.manufacturer, retailPrice: retail, salePrice: sale, savings };
+    });
+
+    const htmlRows = rows.map(r => `
+        <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">
+                <strong>${_escapeHtml(r.productName)}</strong>
+                ${r.manufacturer ? `<br><span style="color:#6b7280;font-size:13px;">${_escapeHtml(r.manufacturer)}</span>` : ''}
+                <br><span style="color:#6b7280;font-size:13px;">${_escapeHtml(r.packSize)} ${_escapeHtml(r.unit || '')}</span>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#9ca3af;text-decoration:line-through;">$${r.retailPrice.toFixed(2)}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#059669;font-weight:700;font-size:16px;">$${r.salePrice.toFixed(2)}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#059669;">You save $${r.savings.toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    const html = `
+        <h3 style="margin:24px 0 12px;font-size:18px;color:#111827;">Current Sale Inventory</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+            <thead><tr style="background:#f9fafb;">
+                <th style="padding:10px 12px;text-align:left;font-size:13px;color:#374151;">Product</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#374151;">Retail</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#374151;">Sale</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#374151;">Savings</th>
+            </tr></thead>
+            <tbody>${htmlRows}</tbody>
+        </table>
+    `;
+
+    const text = rows.map(r => `${r.productName} (${r.packSize} ${r.unit || ''}) — Retail $${r.retailPrice.toFixed(2)} → Sale $${r.salePrice.toFixed(2)} (save $${r.savings.toFixed(2)})`).join('\n');
+
+    return { html, text, items: rows };
+}
+
+function _escapeHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// POST /api/admin/campaigns/preview-recipients — how many would we send to?
+app.post('/api/admin/campaigns/preview-recipients', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const recipients = await _resolveAudience(req.body?.audience || {});
+        res.json({ count: recipients.length, sample: recipients.slice(0, 10) });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/campaigns/send — compose and send a blast
+// Body: {
+//   name, subject, bodyHtml, [bodyText], audience: {roles, userIds, extraEmails, includeArchived},
+//   appendSaleInventory: boolean, ctaUrl: string, ctaLabel: string
+// }
+app.post('/api/admin/campaigns/send', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, subject, bodyHtml, bodyText, audience, appendSaleInventory, ctaUrl, ctaLabel } = req.body || {};
+        if (!subject) return res.status(400).json({ error: 'subject is required' });
+        if (!bodyHtml) return res.status(400).json({ error: 'bodyHtml is required' });
+
+        const recipients = await _resolveAudience(audience || {});
+        if (!recipients.length) {
+            return res.status(400).json({ error: 'No recipients matched the audience filter. Refusing to send.' });
+        }
+
+        // Build sale snapshot if requested
+        let saleSnapshot = [];
+        let saleHtml = '';
+        if (appendSaleInventory) {
+            const snap = await _buildSaleHtmlSnapshot();
+            saleSnapshot = snap.items;
+            saleHtml = snap.html;
+        }
+
+        const siteUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        const saleUrl = ctaUrl || `${siteUrl}/sale.html`;
+        const label = ctaLabel || 'Browse Sale Inventory';
+        const ctaButton = `
+            <div style="margin:28px 0;text-align:center;">
+                <a href="${_escapeHtml(saleUrl)}" style="display:inline-block;background:#059669;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;">${_escapeHtml(label)} →</a>
+            </div>
+        `;
+
+        const fullHtml = `
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111827;">
+                ${bodyHtml}
+                ${saleHtml}
+                ${ctaButton}
+                <hr style="margin:32px 0;border:none;border-top:1px solid #e5e7eb;">
+                <p style="font-size:12px;color:#6b7280;line-height:1.5;">
+                    You're receiving this because you're a customer of AcreProfit LLC.
+                    Questions? Reply to this email or call your sales rep.
+                </p>
+            </div>
+        `;
+
+        // Create the campaign record up front so we have an audit trail even if send partially fails
+        const campaign = await EmailCampaign.create({
+            name: name || subject,
+            subject,
+            bodyHtml: fullHtml,
+            bodyText: bodyText || '',
+            audience: audience || {},
+            saleSnapshot,
+            stats: { totalRecipients: recipients.length, sent: 0, failed: 0 },
+            status: 'sending',
+            sentBy: req.user._id,
+            sentByName: req.user.name,
+            sentAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+        });
+
+        const transporter = createEmailTransporter();
+        if (!transporter) {
+            campaign.status = 'failed';
+            await campaign.save();
+            return res.status(500).json({ error: 'No email transport configured (SENDGRID_API_KEY, SMTP, or Gmail).' });
+        }
+
+        const from = process.env.FROM_EMAIL || 'no-reply@acreprofit.com';
+        let sent = 0, failed = 0;
+        // Send one-by-one so SendGrid keeps per-recipient tracking + the EmailLog
+        // transactional audit works (the transporter wraps each sendMail into
+        // its own EmailLog row).
+        for (const r of recipients) {
+            try {
+                await transporter.sendMail({
+                    from,
+                    to: r.email,
+                    subject,
+                    html: fullHtml,
+                    text: bodyText || undefined
+                });
+                sent++;
+            } catch (e) {
+                failed++;
+                console.error(`[Campaign ${campaign._id}] send failed to ${r.email}:`, e.message);
+            }
+        }
+
+        campaign.stats.sent = sent;
+        campaign.stats.failed = failed;
+        campaign.status = failed === recipients.length ? 'failed' : 'sent';
+        campaign.updatedAt = new Date();
+        await campaign.save();
+
+        res.json({
+            ok: true,
+            campaignId: campaign._id,
+            totalRecipients: recipients.length,
+            sent,
+            failed,
+            status: campaign.status
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/campaigns — list past campaigns
+app.get('/api/admin/campaigns', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const limit = Math.min(Number(req.query.limit) || 25, 100);
+        const campaigns = await EmailCampaign.find({})
+            .sort({ sentAt: -1, createdAt: -1 })
+            .limit(limit)
+            .select('-bodyHtml -saleSnapshot')  // keep list payload small
+            .lean();
+        res.json({ campaigns });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/campaigns/:id — full campaign including rendered body + snapshot
+app.get('/api/admin/campaigns/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const campaign = await EmailCampaign.findById(req.params.id).lean();
+        if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+        res.json({ campaign });
     } catch (e) {
         res.status(500).json({ error: e.message });
     }
