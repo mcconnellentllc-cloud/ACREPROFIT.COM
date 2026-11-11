@@ -16,7 +16,7 @@
     { "date": "2026-06-11", "amount": 75000.00,   "kind": "loanIn",       "sourceHint": "M77 Ag",                       "notes": "M77 Ag loan-in (slip memo: 'Alumax' was the check from), funded Sims Invoice 103475 wire-out same day", "skipMatch": true },
     { "date": "2026-07-16", "amount": 4655.00,    "kind": "customer",     "sourceHint": "Lynn Seger (check memo)",     "notes": "Check deposit" },
     { "date": "2026-07-17", "amount": 18440.41,   "kind": "loanIn",       "sourceHint": "M77 Ag",                       "notes": "M77 Ag loan-in (slip memo: 'Advance'), funded Corbet ACH same day", "skipMatch": true },
-    { "date": "2026-07-20", "amount": 35322.00,   "kind": "customer",     "sourceHint": "Tabric Group (check memo)",   "notes": "Check deposit" },
+    { "date": "2026-07-20", "amount": 35322.00,   "kind": "customer",     "sourceHint": "Juston Strand",               "notes": "Check deposit written 7/17/26, cleared 7/20/26. Confirmed by Kyle 2026-11-11 via deposit slip image. Matches INV-00027 Juston Strand $35,322.50 (within $0.50)." },
     { "date": "2026-07-21", "amount": 13425.70,   "kind": "customer",     "sourceHint": "GSV Pharms + Transfer from Savings", "notes": "Combined deposit — check + savings transfer" },
     { "date": "2026-08-03", "amount": 7130.00,    "kind": "customer",     "sourceHint": "Paul Brown Farms (check memo)", "notes": "Check deposit" },
     { "date": "2026-08-10", "amount": 1092.67,    "kind": "customer",     "sourceHint": "STRIPE TRANSFER ST-Z4R3N2H6N9M2", "notes": "Stripe card/ACH deposit (net of fees)" },
