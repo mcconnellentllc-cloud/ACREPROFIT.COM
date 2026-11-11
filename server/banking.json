@@ -27,6 +27,15 @@
       { "name": "ToGo AG LLC",              "last4": "8831", "owner": "Kyle McConnell / ToGo AG" }
     ]
   },
+  "physicalInventoryOnHand": {
+    "note": "Hand-counted chemical inventory at both warehouses, from Kyle's inventory photos and Ty's inventory PDF submitted 2026-11-10. Preferred over Mongo's Chemical.quantityOnHand because the live system catalog hasn't been updated to reflect the actual shelves.",
+    "asOf": "2026-11-10",
+    "totalValue": 260558.76,
+    "locations": [
+      { "location": "Ty's warehouse (Otis, CO)", "value": 208601.40, "source": "Acre_Profit_Inventory_-_TY.pdf" },
+      { "location": "Kyle's warehouse (Haxtun, CO)", "value": 51957.36, "source": "Photo inventory submitted 2026-11-10 (6 line items — Hydrovant, Anthem NXT, Meso 4SC, Longbow EC, Tigris Dicamba, Flumi)" }
+    ]
+  },
   "statements": [
     { "month": "2026-03", "endingDate": "2026-03-31", "begin": 0.00,       "credits": 100.00,    "debits": 0.00,       "ending": 100.00,    "notes": "Account opened 3/17 with $100 deposit." },
     { "month": "2026-04", "endingDate": "2026-04-30", "begin": 100.00,     "credits": 98728.50,  "debits": 97327.00,   "ending": 1501.50,   "notes": "M77 Ag loan-in $84,807 on 4/30 → wired $84,827 to Jabco same day (pays SO 2129 + 2131). Loan paydown: $12,500 to M77 Ag (9253→9047) on 4/27. Customer deposits: Michaelis $12,571.50, Seger $1,350." },
