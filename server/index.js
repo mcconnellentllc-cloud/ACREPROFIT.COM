@@ -5722,6 +5722,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // file is tiny and version-controlled with the server deploy.
 // ========================================================================
 const BUSINESS_JSON_PATH = require('path').join(__dirname, 'business.json');
+const CHEMICAL_PURCHASES_JSON_PATH = require('path').join(__dirname, 'chemical-purchases.json');
 
 app.get('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
     try {
@@ -5747,6 +5748,227 @@ app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, re
         res.json({ ok: true, business: incoming });
     } catch (err) {
         res.status(500).json({ error: 'Could not save business profile: ' + err.message });
+    }
+});
+
+// ---- CHEMICAL LEDGER (partner tier) ----
+// Per-product ledger: purchased (from parsed supplier statements in
+// server/chemical-purchases.json) vs. sold (live aggregate of all
+// Invoice.items) vs. on-hand (live from Chemical.quantityOnHand).
+// The product-name match between suppliers and the AcreProfit catalog
+// is fuzzy — the UI surfaces mismatches so partners can confirm which
+// supplier product maps to which catalog product.
+function _normalizeProductName(name) {
+    return String(name || '').toLowerCase().replace(/\s+/g, ' ').trim();
+}
+
+app.get('/api/admin/chemical-ledger/summary', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        // 1. Purchases from static JSON
+        let purchases;
+        try {
+            purchases = JSON.parse(require('fs').readFileSync(CHEMICAL_PURCHASES_JSON_PATH, 'utf8'));
+        } catch (err) {
+            return res.status(500).json({ error: 'Could not read chemical purchases: ' + err.message });
+        }
+        const purchaseRows = Array.isArray(purchases.purchases) ? purchases.purchases : [];
+
+        // 2. Sold aggregated from Invoice.items (exclude voided invoices)
+        let invoiceAgg = [];
+        try {
+            invoiceAgg = await Invoice.aggregate([
+                { $match: { status: { $ne: 'void' } } },
+                { $unwind: '$items' },
+                { $group: {
+                    _id: { productName: '$items.productName', unit: '$items.unit' },
+                    totalQty: { $sum: '$items.quantity' },
+                    totalRevenue: { $sum: '$items.totalPrice' },
+                    invoiceCount: { $addToSet: '$_id' }
+                }}
+            ]);
+        } catch (err) {
+            console.warn('[chemical-ledger] Invoice aggregation failed:', err.message);
+        }
+
+        // 3. On-hand from Chemical catalog
+        let chemicals = [];
+        try {
+            chemicals = await Chemical.find({}).select('productName unit packSize quantityOnHand averageCost sellPrice').lean();
+        } catch (err) {
+            console.warn('[chemical-ledger] Chemical read failed:', err.message);
+        }
+
+        // Group purchases by normalized product name
+        const purchasedByProduct = {};
+        purchaseRows.forEach(p => {
+            const key = _normalizeProductName(p.product);
+            if (!purchasedByProduct[key]) {
+                purchasedByProduct[key] = {
+                    productName: p.product,
+                    unit: p.unit,
+                    totalQty: 0,
+                    totalCost: 0,
+                    purchaseCount: 0,
+                    suppliers: new Set(),
+                    lastPurchaseDate: null
+                };
+            }
+            const agg = purchasedByProduct[key];
+            agg.totalQty += Number(p.qty) || 0;
+            agg.totalCost += Number(p.totalCost) || 0;
+            agg.purchaseCount += 1;
+            agg.suppliers.add(p.supplier);
+            if (!agg.lastPurchaseDate || (p.date && p.date > agg.lastPurchaseDate)) {
+                agg.lastPurchaseDate = p.date;
+            }
+        });
+
+        // Build sold-by-product map (normalized)
+        const soldByProduct = {};
+        invoiceAgg.forEach(row => {
+            const key = _normalizeProductName(row._id.productName);
+            if (!soldByProduct[key]) {
+                soldByProduct[key] = {
+                    productName: row._id.productName,
+                    unit: row._id.unit || null,
+                    totalQty: 0,
+                    totalRevenue: 0,
+                    invoiceCount: 0
+                };
+            }
+            const agg = soldByProduct[key];
+            agg.totalQty += Number(row.totalQty) || 0;
+            agg.totalRevenue += Number(row.totalRevenue) || 0;
+            agg.invoiceCount += (row.invoiceCount || []).length;
+        });
+
+        // On-hand by product (normalized)
+        const onHandByProduct = {};
+        chemicals.forEach(c => {
+            const key = _normalizeProductName(c.productName);
+            onHandByProduct[key] = {
+                productName: c.productName,
+                unit: c.unit || null,
+                packSize: c.packSize || null,
+                quantityOnHand: Number(c.quantityOnHand) || 0,
+                averageCost: Number(c.averageCost) || 0,
+                sellPrice: Number(c.sellPrice) || 0
+            };
+        });
+
+        // Union of all products across the three sources
+        const allKeys = new Set([
+            ...Object.keys(purchasedByProduct),
+            ...Object.keys(soldByProduct),
+            ...Object.keys(onHandByProduct)
+        ]);
+
+        const products = Array.from(allKeys).map(key => {
+            const p = purchasedByProduct[key] || { productName: null, unit: null, totalQty: 0, totalCost: 0, purchaseCount: 0, suppliers: new Set(), lastPurchaseDate: null };
+            const s = soldByProduct[key]        || { productName: null, unit: null, totalQty: 0, totalRevenue: 0, invoiceCount: 0 };
+            const h = onHandByProduct[key]      || { productName: null, unit: null, packSize: null, quantityOnHand: 0, averageCost: 0, sellPrice: 0 };
+            const displayName = p.productName || s.productName || h.productName || key;
+            const expectedOnHand = (p.totalQty || 0) - (s.totalQty || 0);
+            const actualOnHand = h.quantityOnHand || 0;
+            const delta = actualOnHand - expectedOnHand;
+            return {
+                key,
+                productName: displayName,
+                unit: p.unit || s.unit || h.unit,
+                purchased: {
+                    qty: Math.round((p.totalQty || 0) * 100) / 100,
+                    cost: Math.round((p.totalCost || 0) * 100) / 100,
+                    count: p.purchaseCount,
+                    suppliers: Array.from(p.suppliers || []),
+                    lastDate: p.lastPurchaseDate
+                },
+                sold: {
+                    qty: Math.round((s.totalQty || 0) * 100) / 100,
+                    revenue: Math.round((s.totalRevenue || 0) * 100) / 100,
+                    invoiceCount: s.invoiceCount
+                },
+                onHand: {
+                    actual: Math.round(actualOnHand * 100) / 100,
+                    expected: Math.round(expectedOnHand * 100) / 100,
+                    delta: Math.round(delta * 100) / 100,
+                    averageCost: h.averageCost,
+                    sellPrice: h.sellPrice
+                },
+                inSources: {
+                    purchases: !!purchasedByProduct[key],
+                    invoices: !!soldByProduct[key],
+                    catalog: !!onHandByProduct[key]
+                }
+            };
+        });
+
+        products.sort((a, b) => (b.purchased.cost || 0) - (a.purchased.cost || 0));
+
+        res.json({
+            generatedAt: new Date().toISOString(),
+            productsCount: products.length,
+            totals: {
+                totalPurchased: Math.round(products.reduce((s, p) => s + (p.purchased.cost || 0), 0) * 100) / 100,
+                totalSoldRevenue: Math.round(products.reduce((s, p) => s + (p.sold.revenue || 0), 0) * 100) / 100,
+                totalOnHandValue: Math.round(products.reduce((s, p) => s + (p.onHand.actual || 0) * (p.onHand.averageCost || 0), 0) * 100) / 100
+            },
+            products
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.get('/api/admin/chemical-ledger/product-customers', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const { product } = req.query;
+        if (!product) return res.status(400).json({ error: 'product query param required' });
+        const key = _normalizeProductName(product);
+
+        // Find all invoices containing this product (name match is normalized)
+        const invoices = await Invoice.find({ status: { $ne: 'void' } })
+            .select('invoiceNumber customerId customerName items paymentStatus totalAmount createdAt date')
+            .lean();
+
+        const rows = [];
+        invoices.forEach(inv => {
+            (inv.items || []).forEach(item => {
+                if (_normalizeProductName(item.productName) === key) {
+                    rows.push({
+                        invoiceId: inv._id,
+                        invoiceNumber: inv.invoiceNumber,
+                        customerName: inv.customerName || '(unknown)',
+                        date: inv.date || inv.createdAt,
+                        paymentStatus: inv.paymentStatus || 'unknown',
+                        qty: Number(item.quantity) || 0,
+                        unit: item.unit,
+                        unitPrice: Number(item.unitPrice) || 0,
+                        totalPrice: Number(item.totalPrice) || 0
+                    });
+                }
+            });
+        });
+
+        // Aggregate by customer too
+        const byCustomer = {};
+        rows.forEach(r => {
+            if (!byCustomer[r.customerName]) {
+                byCustomer[r.customerName] = { customerName: r.customerName, totalQty: 0, totalRevenue: 0, invoiceCount: 0 };
+            }
+            byCustomer[r.customerName].totalQty += r.qty;
+            byCustomer[r.customerName].totalRevenue += r.totalPrice;
+            byCustomer[r.customerName].invoiceCount += 1;
+        });
+
+        rows.sort((a, b) => new Date(b.date || 0) - new Date(a.date || 0));
+
+        res.json({
+            product,
+            lines: rows,
+            byCustomer: Object.values(byCustomer).sort((a, b) => b.totalQty - a.totalQty)
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

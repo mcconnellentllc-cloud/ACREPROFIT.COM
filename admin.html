@@ -83,6 +83,7 @@
                             <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                             <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
+                            <span id="chemicalLedgerNav" style="display: none;"><a href="#chemical-ledger" class="dropdown-item" data-tab="chemical-ledger">Chemical Ledger</a></span>
                             <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
                         </div>
                     </div>
@@ -1258,6 +1259,35 @@
                 </div>
                 <div id="businessProfileContent" style="padding: 20px;">
                     <div class="loading">Loading business profile…</div>
+                </div>
+            </div>
+
+            <!-- Chemical Ledger Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="chemical-ledgerTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Chemical Ledger</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        Per-product: what was purchased from suppliers, what was sold to customers, what's on hand, and the delta. Click any product for the customer-level drill-down.
+                    </p>
+                </div>
+                <div id="chemicalLedgerContent" style="padding: 20px;">
+                    <div class="loading">Loading chemical ledger…</div>
+                </div>
+                <!-- Drill-down modal for a single product -->
+                <div class="modal-overlay" id="chemicalLedgerProductModal" style="display: none;">
+                    <div class="modal-content customer-modal-content" style="max-width: 860px;">
+                        <button class="modal-close" onclick="closeChemicalLedgerProduct()">&times;</button>
+                        <div class="customer-modal-header">
+                            <div class="customer-modal-avatar" style="background: #0f766e;">C</div>
+                            <div class="customer-modal-title">
+                                <h2 id="chemLedgerProductTitle">—</h2>
+                                <p id="chemLedgerProductSub">—</p>
+                            </div>
+                        </div>
+                        <div class="customer-modal-body" id="chemLedgerProductBody">
+                            <div class="loading">Loading…</div>
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -3871,6 +3901,7 @@
             setDisplay('programsNav', 'inline');
             setDisplay('ratingsNav', 'inline');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('chemicalLedgerNav', 'block');
             setDisplay('webhookEventsNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
@@ -3890,6 +3921,7 @@
             setDisplay('complianceNav', 'block');
             setDisplay('companySettingsNav', 'block');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('chemicalLedgerNav', 'block');
             setDisplay('webhookEventsNav', 'block');
             // Partners don't see rep applications or audit log (superadmin only)
             setDisplay('repAppsNav', 'none');
@@ -3910,6 +3942,7 @@
             setDisplay('complianceNav', 'none');
             // Distributors do NOT see the Business Profile (partner+ only)
             setDisplay('businessProfileNav', 'none');
+            setDisplay('chemicalLedgerNav', 'none');
             setDisplay('webhookEventsNav', 'none');
         } else {
             // Regular admin/representative
@@ -4268,6 +4301,7 @@
             if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
             if (tabName === 'business') loadBusinessProfile();
+            if (tabName === 'chemical-ledger') loadChemicalLedger();
             if (tabName === 'webhook-events') loadWebhookEvents();
         }
 
@@ -10759,6 +10793,198 @@
             } catch (err) {
                 container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
             }
+        }
+
+        // ============ CHEMICAL LEDGER (partner+ only) ============
+
+        function chemMoney(n) {
+            if (n === null || n === undefined || isNaN(n)) return '—';
+            return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function chemQty(n, unit) {
+            if (n === null || n === undefined || isNaN(n)) return '—';
+            const num = Number(n);
+            return num.toLocaleString('en-US', { maximumFractionDigits: 2 }) + (unit ? ' ' + unit : '');
+        }
+
+        function renderChemicalLedger(data) {
+            const container = document.getElementById('chemicalLedgerContent');
+            const products = Array.isArray(data.products) ? data.products : [];
+            const totals = data.totals || {};
+
+            let html = '';
+            // Summary cards
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 20px;">`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b00020; border-radius: 8px; padding: 14px 18px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">Chemical purchased (YTD)</div>
+                <div style="font-size: 24px; font-weight: 700; color: #b00020; font-variant-numeric: tabular-nums; margin-top: 6px;">${chemMoney(totals.totalPurchased)}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #0f766e; border-radius: 8px; padding: 14px 18px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">Customer revenue (YTD)</div>
+                <div style="font-size: 24px; font-weight: 700; color: #0f766e; font-variant-numeric: tabular-nums; margin-top: 6px;">${chemMoney(totals.totalSoldRevenue)}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #1e40af; border-radius: 8px; padding: 14px 18px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">On-hand value (catalog)</div>
+                <div style="font-size: 24px; font-weight: 700; color: #1e40af; font-variant-numeric: tabular-nums; margin-top: 6px;">${chemMoney(totals.totalOnHandValue)}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #6d28d9; border-radius: 8px; padding: 14px 18px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light);">Products tracked</div>
+                <div style="font-size: 24px; font-weight: 700; color: #6d28d9; font-variant-numeric: tabular-nums; margin-top: 6px;">${data.productsCount || 0}</div>
+            </div>`;
+            html += `</div>`;
+
+            // Table
+            let rows = '';
+            products.forEach(p => {
+                const unit = p.unit || '';
+                const srcFlags = [];
+                if (p.inSources.purchases) srcFlags.push('<span style="padding: 1px 6px; background: #fee2e2; color: #b91c1c; border-radius: 10px; font-size: 10px;">PUR</span>');
+                if (p.inSources.invoices)  srcFlags.push('<span style="padding: 1px 6px; background: #dcfce7; color: #15803d; border-radius: 10px; font-size: 10px;">SOLD</span>');
+                if (p.inSources.catalog)   srcFlags.push('<span style="padding: 1px 6px; background: #dbeafe; color: #1e40af; border-radius: 10px; font-size: 10px;">CAT</span>');
+                const deltaColor = Math.abs(p.onHand.delta) < 0.01 ? 'var(--text-light)' : (p.onHand.delta < 0 ? '#b00020' : '#b45309');
+                rows += `<tr style="border-bottom: 1px solid var(--border); cursor: pointer;" onclick="openChemicalLedgerProduct(${JSON.stringify(p.productName).replace(/"/g, '&quot;')})">
+                    <td style="padding: 10px 12px;"><strong>${escapeHtml(p.productName)}</strong><div style="font-size: 11px; color: var(--text-light);">${srcFlags.join(' ')}</div></td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums;">${chemQty(p.purchased.qty, unit)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-light); font-size: 12px;">${chemMoney(p.purchased.cost)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; color: #0f766e;">${chemQty(p.sold.qty, unit)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-light); font-size: 12px;">${chemMoney(p.sold.revenue)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums;">${chemQty(p.onHand.actual, unit)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums;">${chemQty(p.onHand.expected, unit)}</td>
+                    <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; color: ${deltaColor};">${p.onHand.delta >= 0 ? '+' : ''}${chemQty(p.onHand.delta, unit)}</td>
+                </tr>`;
+            });
+
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 0; overflow: hidden;">
+                <div style="max-height: 640px; overflow-y: auto;">
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead style="position: sticky; top: 0; background: var(--card-bg); border-bottom: 2px solid var(--border); z-index: 1;">
+                            <tr>
+                                <th style="padding: 10px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Product</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Purchased</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Cost</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Sold</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Revenue</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">On-hand</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Expected</th>
+                                <th style="padding: 10px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Delta</th>
+                            </tr>
+                        </thead>
+                        <tbody>${rows}</tbody>
+                    </table>
+                </div>
+            </div>`;
+            html += `<p style="font-size: 12px; color: var(--text-light); margin-top: 12px;">
+                <strong>Legend:</strong>
+                <span style="padding: 1px 6px; background: #fee2e2; color: #b91c1c; border-radius: 10px; font-size: 10px;">PUR</span> appears on supplier statements,
+                <span style="padding: 1px 6px; background: #dcfce7; color: #15803d; border-radius: 10px; font-size: 10px;">SOLD</span> appears on customer invoices,
+                <span style="padding: 1px 6px; background: #dbeafe; color: #1e40af; border-radius: 10px; font-size: 10px;">CAT</span> in the live product catalog.
+                A product only in SOLD or CAT means supplier-side product-name mapping may differ (e.g. "XSATE Glyphosate" in catalog vs "Glypex 5 Extra" on Sims).
+                Click a row for the customer-level drill-down.
+                <button class="btn btn-outline btn-sm" style="margin-left: 12px;" onclick="loadChemicalLedger()">Refresh</button>
+            </p>`;
+            container.innerHTML = html;
+        }
+
+        async function loadChemicalLedger() {
+            const container = document.getElementById('chemicalLedgerContent');
+            container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading chemical ledger…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemical-ledger/summary`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const errText = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                    container.innerHTML = `<div class="error">Could not load chemical ledger: ${escapeHtml(errText)}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                renderChemicalLedger(data);
+            } catch (err) {
+                container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function closeChemicalLedgerProduct() {
+            document.getElementById('chemicalLedgerProductModal').style.display = 'none';
+        }
+
+        async function openChemicalLedgerProduct(productName) {
+            const modal = document.getElementById('chemicalLedgerProductModal');
+            modal.style.display = 'flex';
+            document.getElementById('chemLedgerProductTitle').textContent = productName;
+            document.getElementById('chemLedgerProductSub').textContent = 'Loading customer breakdown…';
+            document.getElementById('chemLedgerProductBody').innerHTML = '<div class="loading">Loading…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemical-ledger/product-customers?product=${encodeURIComponent(productName)}`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                renderChemicalLedgerProductDetail(data);
+            } catch (err) {
+                document.getElementById('chemLedgerProductBody').innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        function renderChemicalLedgerProductDetail(data) {
+            const sub = document.getElementById('chemLedgerProductSub');
+            const body = document.getElementById('chemLedgerProductBody');
+            const lines = Array.isArray(data.lines) ? data.lines : [];
+            const byCustomer = Array.isArray(data.byCustomer) ? data.byCustomer : [];
+            sub.textContent = `${lines.length} invoice line${lines.length === 1 ? '' : 's'} across ${byCustomer.length} customer${byCustomer.length === 1 ? '' : 's'}`;
+
+            let html = '';
+            if (byCustomer.length) {
+                html += `<h3 style="font-size: 14px; margin: 0 0 8px 0;">By customer</h3>`;
+                html += `<table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Customer</th>
+                        <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Qty</th>
+                        <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Revenue</th>
+                        <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Invoices</th>
+                    </tr></thead><tbody>`;
+                byCustomer.forEach(c => {
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 10px;">${escapeHtml(c.customerName)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">${chemQty(c.totalQty)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${chemMoney(c.totalRevenue)}</td>
+                        <td style="padding: 6px 10px; text-align: right;">${c.invoiceCount}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            }
+
+            if (lines.length) {
+                html += `<h3 style="font-size: 14px; margin: 0 0 8px 0;">Line items</h3>`;
+                html += `<table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Invoice</th>
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Date</th>
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Customer</th>
+                        <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Status</th>
+                        <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Qty</th>
+                        <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">$/unit</th>
+                        <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Total</th>
+                    </tr></thead><tbody>`;
+                lines.forEach(l => {
+                    const date = l.date ? new Date(l.date).toLocaleDateString() : '—';
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 10px; font-family: monospace; font-size: 12px;">${escapeHtml(l.invoiceNumber || '—')}</td>
+                        <td style="padding: 6px 10px; font-size: 12px;">${escapeHtml(date)}</td>
+                        <td style="padding: 6px 10px;">${escapeHtml(l.customerName)}</td>
+                        <td style="padding: 6px 10px; font-size: 11px; text-transform: uppercase; color: var(--text-light);">${escapeHtml(l.paymentStatus)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">${chemQty(l.qty, l.unit)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; color: var(--text-light);">${chemMoney(l.unitPrice)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${chemMoney(l.totalPrice)}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table>`;
+            } else {
+                html += `<p style="color: var(--text-light); padding: 20px; text-align: center;">No invoice lines found for this product. If this product has been purchased from a supplier but not sold through any invoice, the name may differ in the AcreProfit catalog.</p>`;
+            }
+
+            body.innerHTML = html;
         }
 
         // ============ WEBHOOK EVENTS PANEL (partner+ only) ============
