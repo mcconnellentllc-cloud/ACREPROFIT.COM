@@ -84,6 +84,7 @@
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                             <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
                             <span id="chemicalLedgerNav" style="display: none;"><a href="#chemical-ledger" class="dropdown-item" data-tab="chemical-ledger">Chemical Ledger</a></span>
+                            <span id="depositMatchNav" style="display: none;"><a href="#deposit-match" class="dropdown-item" data-tab="deposit-match">Deposit Matcher</a></span>
                             <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
                         </div>
                     </div>
@@ -1288,6 +1289,19 @@
                             <div class="loading">Loading…</div>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Deposit Matcher Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="deposit-matchTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Deposit Matcher</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        Every customer deposit paired with its likely invoice. Click <strong>Mark Paid</strong> to confirm the match — the invoice updates to paid status with the deposit as the reference.
+                    </p>
+                </div>
+                <div id="depositMatchContent" style="padding: 20px;">
+                    <div class="loading">Loading deposit matcher…</div>
                 </div>
             </div>
 
@@ -3902,6 +3916,7 @@
             setDisplay('ratingsNav', 'inline');
             setDisplay('businessProfileNav', 'block');
             setDisplay('chemicalLedgerNav', 'block');
+            setDisplay('depositMatchNav', 'block');
             setDisplay('webhookEventsNav', 'block');
             document.getElementById('adminRole').textContent = 'Super Admin';
             // Show superadmin-only fields (like Super Admin Fee)
@@ -3922,6 +3937,7 @@
             setDisplay('companySettingsNav', 'block');
             setDisplay('businessProfileNav', 'block');
             setDisplay('chemicalLedgerNav', 'block');
+            setDisplay('depositMatchNav', 'block');
             setDisplay('webhookEventsNav', 'block');
             // Partners don't see rep applications or audit log (superadmin only)
             setDisplay('repAppsNav', 'none');
@@ -3943,6 +3959,7 @@
             // Distributors do NOT see the Business Profile (partner+ only)
             setDisplay('businessProfileNav', 'none');
             setDisplay('chemicalLedgerNav', 'none');
+            setDisplay('depositMatchNav', 'none');
             setDisplay('webhookEventsNav', 'none');
         } else {
             // Regular admin/representative
@@ -4302,6 +4319,7 @@
             if (tabName === 'price-mining') loadBidSheets();
             if (tabName === 'business') loadBusinessProfile();
             if (tabName === 'chemical-ledger') loadChemicalLedger();
+            if (tabName === 'deposit-match') loadDepositMatcher();
             if (tabName === 'webhook-events') loadWebhookEvents();
         }
 
@@ -10792,6 +10810,227 @@
                 renderBusinessProfile(data, slotData.slots || []);
             } catch (err) {
                 container.innerHTML = `<div class="error">Error loading business profile: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        // ============ DEPOSIT-TO-INVOICE MATCHER (partner+ only) ============
+
+        function depMoney(n) {
+            if (n === null || n === undefined || isNaN(n)) return '—';
+            return '$' + Number(n).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function depConfidenceBadge(conf) {
+            const styles = {
+                high:   'background: #dcfce7; color: #15803d;',
+                medium: 'background: #fef3c7; color: #a16207;',
+                low:    'background: #fee2e2; color: #b91c1c;',
+                none:   'background: #e5e7eb; color: #4b5563;'
+            };
+            const style = styles[conf] || styles.none;
+            return `<span style="padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 600; text-transform: uppercase; ${style}">${escapeHtml(conf || 'none')}</span>`;
+        }
+
+        function renderDepositMatcher(data) {
+            const container = document.getElementById('depositMatchContent');
+            const proposals = Array.isArray(data.proposals) ? data.proposals : [];
+            const unmatched = Array.isArray(data.unmatchedOutstanding) ? data.unmatchedOutstanding : [];
+            const loanIns = Array.isArray(data.loanIns) ? data.loanIns : [];
+
+            const toConfirm = proposals.filter(p => !p.alreadyMatched && p.suggestion);
+            const already = proposals.filter(p => p.alreadyMatched);
+            const noMatch = proposals.filter(p => !p.alreadyMatched && !p.suggestion);
+
+            let html = '';
+            // Summary
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;">`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #0f766e; border-radius: 8px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;">Customer deposits</div>
+                <div style="font-size: 22px; font-weight: 700; color: #0f766e; margin-top: 4px;">${proposals.length}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b45309; border-radius: 8px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;">Ready to confirm</div>
+                <div style="font-size: 22px; font-weight: 700; color: #b45309; margin-top: 4px;">${toConfirm.length}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #15803d; border-radius: 8px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;">Already matched</div>
+                <div style="font-size: 22px; font-weight: 700; color: #15803d; margin-top: 4px;">${already.length}</div>
+            </div>`;
+            html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b00020; border-radius: 8px; padding: 12px 16px;">
+                <div style="font-size: 12px; color: var(--text-light); text-transform: uppercase;">Open A/R not matched</div>
+                <div style="font-size: 22px; font-weight: 700; color: #b00020; margin-top: 4px;">${unmatched.length}</div>
+            </div>`;
+            html += `</div>`;
+
+            // Ready to confirm section
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 16px 20px; margin-bottom: 20px;">
+                <h3 style="font-size: 16px; margin: 0 0 10px 0;">Deposits ready to confirm</h3>`;
+            if (toConfirm.length === 0) {
+                html += `<p style="color: var(--text-light); padding: 10px 0;">Nothing waiting — all customer deposits are either already matched or have no plausible invoice candidate.</p>`;
+            } else {
+                html += `<table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Deposit</th>
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Source hint</th>
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Suggested invoice</th>
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Confidence</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Action</th>
+                    </tr></thead><tbody>`;
+                toConfirm.forEach((p, i) => {
+                    const sug = p.suggestion;
+                    const btnId = 'confirmBtn_' + i;
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 10px 12px;">
+                            <div style="font-weight: 600; font-variant-numeric: tabular-nums;">${depMoney(p.depositAmount)}</div>
+                            <div style="font-size: 12px; color: var(--text-light);">${escapeHtml(p.depositDate)}</div>
+                        </td>
+                        <td style="padding: 10px 12px; font-size: 13px;">${escapeHtml(p.sourceHint || '—')}</td>
+                        <td style="padding: 10px 12px;">
+                            <div><strong>${escapeHtml(sug.invoiceNumber)}</strong> — ${escapeHtml(sug.customerName)}</div>
+                            <div style="font-size: 12px; color: var(--text-light);">${depMoney(sug.total)} · ${escapeHtml(sug.reasons.join(' · '))}</div>
+                        </td>
+                        <td style="padding: 10px 12px;">${depConfidenceBadge(sug.confidence)}</td>
+                        <td style="padding: 10px 12px; text-align: right; white-space: nowrap;">
+                            <button class="btn btn-primary btn-sm" id="${btnId}"
+                                onclick="confirmDepositMatch('${p.depositDate}', ${p.depositAmount}, '${sug._id}', '${btnId}')">Mark Paid</button>
+                        </td>
+                    </tr>`;
+                    if (p.candidates && p.candidates.length > 1) {
+                        html += `<tr style="border-bottom: 1px solid var(--border);">
+                            <td colspan="5" style="padding: 4px 12px 8px 12px; font-size: 11px; color: var(--text-light);">
+                                Also considered: ${p.candidates.slice(1).map(c => `${escapeHtml(c.invoiceNumber)} ${escapeHtml(c.customerName)} (${depMoney(c.total)}, ${c.confidence})`).join(' · ')}
+                            </td>
+                        </tr>`;
+                    }
+                });
+                html += `</tbody></table>`;
+            }
+            html += `</div>`;
+
+            // Already matched
+            if (already.length > 0) {
+                html += `<details style="background: white; border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px; margin-bottom: 20px;">
+                    <summary style="font-weight: 600; cursor: pointer; font-size: 14px;">Already matched (${already.length})</summary>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <thead><tr style="border-bottom: 2px solid var(--border);">
+                            <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Deposit date</th>
+                            <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Amount</th>
+                            <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Invoice</th>
+                            <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Customer</th>
+                        </tr></thead><tbody>`;
+                already.forEach(p => {
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 10px; font-size: 13px;">${escapeHtml(p.depositDate)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">${depMoney(p.depositAmount)}</td>
+                        <td style="padding: 6px 10px;">${escapeHtml(p.matchedInvoice.invoiceNumber)}</td>
+                        <td style="padding: 6px 10px;">${escapeHtml(p.matchedInvoice.customerName)}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></details>`;
+            }
+
+            // No match deposits
+            if (noMatch.length > 0) {
+                html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b00020; border-radius: 8px; padding: 12px 20px; margin-bottom: 20px;">
+                    <h3 style="font-size: 14px; margin: 0 0 8px 0; color: #b00020;">Deposits with no plausible invoice (${noMatch.length})</h3>
+                    <p style="font-size: 12px; color: var(--text-light); margin: 0 0 8px 0;">Customer paid but no sent/unpaid invoice matches the amount within tolerance. Either the invoice is still a draft, it's much older than 60 days, or the customer overpaid.</p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <tbody>`;
+                noMatch.forEach(p => {
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 10px; font-size: 13px;">${escapeHtml(p.depositDate)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${depMoney(p.depositAmount)}</td>
+                        <td style="padding: 6px 10px; font-size: 12px; color: var(--text-light);">${escapeHtml(p.sourceHint || '')}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+
+            // Unmatched outstanding A/R
+            if (unmatched.length > 0) {
+                html += `<div style="background: white; border: 1px solid var(--border); border-left: 4px solid #b45309; border-radius: 8px; padding: 12px 20px; margin-bottom: 20px;">
+                    <h3 style="font-size: 14px; margin: 0 0 8px 0; color: #b45309;">Outstanding A/R not matched to any deposit (${unmatched.length})</h3>
+                    <p style="font-size: 12px; color: var(--text-light); margin: 0 0 8px 0;">Invoices that are sent/unpaid but no bank deposit paired to them. Customer owes us.</p>
+                    <table style="width: 100%; border-collapse: collapse;">
+                        <thead><tr style="border-bottom: 2px solid var(--border);">
+                            <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Invoice</th>
+                            <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Customer</th>
+                            <th style="padding: 6px 10px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Date</th>
+                            <th style="padding: 6px 10px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Amount</th>
+                        </tr></thead><tbody>`;
+                unmatched.forEach(inv => {
+                    const date = inv.date ? new Date(inv.date).toLocaleDateString() : '—';
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 10px; font-family: monospace;">${escapeHtml(inv.invoiceNumber || '—')}</td>
+                        <td style="padding: 6px 10px;">${escapeHtml(inv.customerName || '—')}</td>
+                        <td style="padding: 6px 10px; font-size: 12px; color: var(--text-light);">${escapeHtml(date)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums; font-weight: 600;">${depMoney(inv.total)}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></div>`;
+            }
+
+            // Loan-ins reference (for transparency)
+            if (loanIns.length > 0) {
+                html += `<details style="background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; padding: 12px 20px;">
+                    <summary style="font-weight: 600; cursor: pointer; font-size: 13px; color: var(--text-light);">Loan-in deposits (not customer payments, excluded from matching) · ${loanIns.length}</summary>
+                    <table style="width: 100%; border-collapse: collapse; margin-top: 10px;">
+                        <tbody>`;
+                loanIns.forEach(d => {
+                    html += `<tr style="border-bottom: 1px solid var(--border);">
+                        <td style="padding: 6px 10px; font-size: 13px;">${escapeHtml(d.date)}</td>
+                        <td style="padding: 6px 10px; text-align: right; font-variant-numeric: tabular-nums;">${depMoney(d.amount)}</td>
+                        <td style="padding: 6px 10px; font-size: 12px; color: var(--text-light);">${escapeHtml(d.source)} — ${escapeHtml(d.notes || '')}</td>
+                    </tr>`;
+                });
+                html += `</tbody></table></details>`;
+            }
+
+            html += `<p style="font-size: 12px; color: var(--text-light); margin-top: 16px;">
+                <button class="btn btn-outline btn-sm" onclick="loadDepositMatcher()">Refresh</button>
+            </p>`;
+
+            container.innerHTML = html;
+        }
+
+        async function loadDepositMatcher() {
+            const container = document.getElementById('depositMatchContent');
+            container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading deposit matcher…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/deposit-match/proposals`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const errText = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                    container.innerHTML = `<div class="error">Could not load matcher: ${escapeHtml(errText)}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                renderDepositMatcher(data);
+            } catch (err) {
+                container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
+            }
+        }
+
+        async function confirmDepositMatch(depositDate, depositAmount, invoiceId, btnId) {
+            const btn = document.getElementById(btnId);
+            if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+            try {
+                const res = await fetch(`${API_URL}/api/admin/deposit-match/confirm`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ depositDate, depositAmount, invoiceId })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+                // Reload the matcher to refresh buckets
+                loadDepositMatcher();
+            } catch (err) {
+                if (btn) { btn.disabled = false; btn.textContent = 'Mark Paid'; }
+                alert('Could not confirm match: ' + err.message);
             }
         }
 
