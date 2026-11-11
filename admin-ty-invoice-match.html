@@ -206,15 +206,114 @@
 
         async function load() {
             try {
-                const res = await fetch(`${API_URL}/api/admin/sale/ty-inventory/invoice-match`, {
-                    headers: { 'Authorization': `Bearer ${token}` }
-                });
-                if (!res.ok) throw new Error((await res.json()).error || 'failed');
-                const data = await res.json();
-                render(data);
+                const [matchRes, loanRes] = await Promise.all([
+                    fetch(`${API_URL}/api/admin/sale/ty-inventory/invoice-match`, { headers: { 'Authorization': `Bearer ${token}` } }),
+                    fetch(`${API_URL}/api/admin/sale/ty-inventory/loan-impact`, { headers: { 'Authorization': `Bearer ${token}` } })
+                ]);
+                if (!matchRes.ok) throw new Error((await matchRes.json()).error || 'match failed');
+                const matchData = await matchRes.json();
+                render(matchData);
+                if (loanRes.ok) {
+                    const loanData = await loanRes.json();
+                    renderLoanImpact(loanData);
+                }
             } catch (e) {
                 document.getElementById('root').innerHTML = `<div class="error">Failed: ${escapeHtml(e.message)}</div>`;
             }
+        }
+
+        function renderLoanImpact(d) {
+            const slot = document.getElementById('loanImpactSlot');
+            if (!slot) return;
+            const kyleDelta = (d.priorBalances.m77AgOutstanding - d.correctedBalances.m77AgOutstanding);
+            const tyDelta = (d.correctedBalances.m5AgOutstanding - d.priorBalances.m5AgOutstanding);
+            slot.innerHTML = `
+                <div style="background:#fff; border-radius:10px; padding:20px; margin-bottom:20px; box-shadow:0 2px 4px rgba(0,0,0,0.05); border-top:4px solid var(--accent);">
+                    <h2 style="margin-bottom:6px; display:flex; align-items:center; gap:8px;">💰 Corrected M5 Ag Loan Balance</h2>
+                    <p style="color:var(--mute); font-size:14px; margin-bottom:16px; max-width:900px;">
+                        Kyle's direction (2026-11-11): the 9 items Kyle bought are being transferred to Ty. Kyle's M77 Ag loan reduces; Ty's M5 Ag loan increases by the same amount. Total AcreProfit owes is unchanged — only the split between the two lenders shifts.
+                    </p>
+
+                    <table style="width:100%; border-collapse:collapse; margin-bottom:16px;">
+                        <thead>
+                            <tr style="background:#f9fafb;">
+                                <th style="padding:10px; text-align:left; font-size:12px; text-transform:uppercase; color:var(--mute);">Ledger</th>
+                                <th style="padding:10px; text-align:right; font-size:12px; text-transform:uppercase; color:var(--mute);">Before</th>
+                                <th style="padding:10px; text-align:right; font-size:12px; text-transform:uppercase; color:var(--mute);">Transfer</th>
+                                <th style="padding:10px; text-align:right; font-size:12px; text-transform:uppercase; color:var(--mute);">After (at Ty's pricing)</th>
+                                <th style="padding:10px; text-align:right; font-size:12px; text-transform:uppercase; color:var(--mute);">After (at acquisition cost)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border);"><strong>M77 Ag (Kyle)</strong></td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right;">${fmt(d.priorBalances.m77AgOutstanding)}</td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right; color:var(--accent); font-weight:700;">−${fmt(d.transferTotal)}</td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right; font-weight:700; color:var(--accent);">${fmt(d.correctedBalances.m77AgOutstanding)}</td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right; color:var(--mute);">${fmt(d.unitValuedAtKylePurchaseCost.correctedM77AgAtCost)}</td>
+                            </tr>
+                            <tr>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border);"><strong>M5 Ag (Ty)</strong></td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right;">${fmt(d.priorBalances.m5AgOutstanding)}</td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right; color:var(--sale); font-weight:700;">+${fmt(d.transferTotal)}</td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right; font-weight:700; color:var(--sale);">${fmt(d.correctedBalances.m5AgOutstanding)}</td>
+                                <td style="padding:12px 10px; border-top:1px solid var(--border); text-align:right; color:var(--mute);">${fmt(d.unitValuedAtKylePurchaseCost.correctedM5AgAtCost)}</td>
+                            </tr>
+                            <tr style="background:#f9fafb;">
+                                <td style="padding:12px 10px; border-top:2px solid var(--border);"><strong>Total outstanding</strong></td>
+                                <td style="padding:12px 10px; border-top:2px solid var(--border); text-align:right;">${fmt(d.priorBalances.m77AgOutstanding + d.priorBalances.m5AgOutstanding)}</td>
+                                <td style="padding:12px 10px; border-top:2px solid var(--border); text-align:right; color:var(--mute);">$0.00</td>
+                                <td style="padding:12px 10px; border-top:2px solid var(--border); text-align:right; font-weight:700;">${fmt(d.correctedBalances.totalOutstanding)}</td>
+                                <td style="padding:12px 10px; border-top:2px solid var(--border); text-align:right; color:var(--mute);">${fmt(d.unitValuedAtKylePurchaseCost.correctedM77AgAtCost + d.unitValuedAtKylePurchaseCost.correctedM5AgAtCost)}</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <details style="margin-bottom:12px;">
+                        <summary style="cursor:pointer; font-weight:600; font-size:14px;">Show the 9 items being transferred (${fmt(d.transferTotal)})</summary>
+                        <table style="width:100%; border-collapse:collapse; margin-top:10px; font-size:13px;">
+                            <thead>
+                                <tr style="background:#f9fafb;">
+                                    <th style="padding:6px 10px; text-align:left;">Product</th>
+                                    <th style="padding:6px 10px; text-align:right;">Qty</th>
+                                    <th style="padding:6px 10px; text-align:right;">Ty's $</th>
+                                    <th style="padding:6px 10px; text-align:right;">Line</th>
+                                    <th style="padding:6px 10px; text-align:left;">Source Invoices</th>
+                                    <th style="padding:6px 10px; text-align:left;">Billed To</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${d.transferredItems.map(it => `
+                                    <tr>
+                                        <td style="padding:6px 10px; border-top:1px solid var(--border);">${escapeHtml(it.product)}</td>
+                                        <td style="padding:6px 10px; border-top:1px solid var(--border); text-align:right;">${it.qty} ${escapeHtml(it.unit)}</td>
+                                        <td style="padding:6px 10px; border-top:1px solid var(--border); text-align:right;">${fmt(it.tyPrice)}</td>
+                                        <td style="padding:6px 10px; border-top:1px solid var(--border); text-align:right;"><strong>${fmt(it.amount)}</strong></td>
+                                        <td style="padding:6px 10px; border-top:1px solid var(--border); font-size:12px; color:var(--mute);">${escapeHtml(it.sourceInvoices)}</td>
+                                        <td style="padding:6px 10px; border-top:1px solid var(--border); font-size:12px; color:var(--mute);">${escapeHtml(it.billedTo)}</td>
+                                    </tr>
+                                `).join('')}
+                                <tr style="background:#f9fafb;">
+                                    <td colspan="3" style="padding:8px 10px; border-top:2px solid var(--border);"><strong>Transfer total (at Ty's pricing)</strong></td>
+                                    <td style="padding:8px 10px; border-top:2px solid var(--border); text-align:right;"><strong>${fmt(d.transferTotal)}</strong></td>
+                                    <td colspan="2"></td>
+                                </tr>
+                                <tr>
+                                    <td colspan="3" style="padding:8px 10px;"><strong>Same at acquisition cost</strong></td>
+                                    <td style="padding:8px 10px; text-align:right;"><strong>${fmt(d.unitValuedAtKylePurchaseCost.totalAtAcquisitionCost)}</strong></td>
+                                    <td colspan="2" style="padding:8px 10px; color:var(--mute); font-size:12px;">Difference = ${fmt(d.transferTotal - d.unitValuedAtKylePurchaseCost.totalAtAcquisitionCost)} of implied markup in Ty's PDF</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </details>
+
+                    <div style="padding:12px 14px; background:#fef3c7; border-radius:6px; font-size:13px; color:#78350f;">
+                        <strong>Kyle picks one:</strong> (A) Transfer at Ty's handoff prices — ${fmt(d.correctedBalances.m77AgOutstanding)} M77 Ag / ${fmt(d.correctedBalances.m5AgOutstanding)} M5 Ag.
+                        (B) Transfer at acquisition cost — ${fmt(d.unitValuedAtKylePurchaseCost.correctedM77AgAtCost)} M77 Ag / ${fmt(d.unitValuedAtKylePurchaseCost.correctedM5AgAtCost)} M5 Ag.
+                        The ${fmt(d.transferTotal - d.unitValuedAtKylePurchaseCost.totalAtAcquisitionCost)} gap is Ty's markup on items he didn't pay for — that's a separate question (profit split) from the loan math.
+                    </div>
+                </div>
+            `;
         }
 
         function render(data) {
@@ -226,6 +325,8 @@
                 <div class="alert">
                     <strong>Important finding.</strong> ${escapeHtml(data._meta?.importantFinding || '')}
                 </div>
+
+                <div id="loanImpactSlot"></div>
 
                 <div class="stats-row">
                     <div class="stat-card">

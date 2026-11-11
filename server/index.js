@@ -10507,6 +10507,23 @@ app.get('/api/admin/sale/ty-inventory/invoice-match', authMiddleware, adminMiddl
     }
 });
 
+// GET /api/admin/sale/ty-inventory/loan-impact
+// Returns the ledger math for transferring Kyle-funded items (the 9 "ownership
+// mismatch" rows) from the M77 Ag loan ledger to the M5 Ag loan ledger.
+// Per Kyle's direction 2026-11-11: "if kyle bought them, they need to
+// transferred to Ty, so there needs to be a reductions from Kyle's loan and
+// added to Ty's loan."
+app.get('/api/admin/sale/ty-inventory/loan-impact', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const raw = fs.readFileSync(path.join(__dirname, 'ty-handoff-loan-impact.json'), 'utf8');
+        res.json(JSON.parse(raw));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/admin/sale/ty-inventory/preview
 // Returns Ty's inventory with best-guess catalog matches for each row.
 app.get('/api/admin/sale/ty-inventory/preview', authMiddleware, adminMiddleware, async (req, res) => {
