@@ -1,0 +1,54 @@
+{
+  "_meta": {
+    "description": "Loan ledger impact of transferring the 9 Kyle-billed inventory items in Ty's 2026-11-06 handoff PDF from Kyle's side (M77 Ag loan) to Ty's side (M5 Ag loan). Per Kyle's direction 2026-11-11: 'if kyle bought them, they need to transferred to Ty, so there needs to be a reductions from Kyle's loan and added to Ty's loan.' The transfer is an intercompany ownership adjustment — physical inventory now lives under Ty's M5 Ag account, so the loan ownership moves with it.",
+    "lastUpdated": "2026-11-11",
+    "methodology": "The 9 items identified as 'ownership mismatch' in ty-inventory-invoice-match.json (Sulfen, Metrybuzin, Status, Peak, Clethodim, Flagstaff, 24D Amine, Hydrovant, Meso) totaling $72,150 were purchased on invoices billed to 'Kyle McConnell / Acre Profit' at Sims, to 'Acre Profit LLC' at Jabco, or to 'ToGo AG LLC' at Corbet. Those purchases were funded by Kyle/M77 Ag/ToGo (Kyle's side). Transferring the inventory to Ty means Kyle's side gets credit; Ty's side takes on the obligation."
+  },
+  "currentState": {
+    "m77AgOutstanding": 170619.31,
+    "m5AgOutstanding": 292699.05,
+    "totalOutstanding": 463318.36,
+    "note": "From banking.json loansFromRelatedEntities.outstandingLoanBalances as of 2026-11-11."
+  },
+  "transferredItems": [
+    { "tyIndex": 7,  "product": "Sulfen (Sulfentrazone 4SC)",     "qty": 330,   "unit": "gal", "tyPrice": 76.00, "amount": 25080.00, "sourceInvoices": "Sims 104596, 104998 + Jabco 2129", "billedTo": "Kyle / Acre Profit" },
+    { "tyIndex": 8,  "product": "Metrybuzin (Me-Try-Buzin 4L)",    "qty": 115,   "unit": "gal", "tyPrice": 42.00, "amount": 4830.00,  "sourceInvoices": "Sims 104596, 104998 + Jabco 2131", "billedTo": "Kyle / Acre Profit" },
+    { "tyIndex": 10, "product": "Hydrovant fA",                    "qty": 137.5, "unit": "gal", "tyPrice": 90.00, "amount": 12375.00, "sourceInvoices": "Corbet 364 + 7/17 ACH + 8/4 ACH",  "billedTo": "ToGo AG LLC" },
+    { "tyIndex": 12, "product": "Status",                          "qty": 1000,  "unit": "oz",  "tyPrice": 3.80,  "amount": 3800.00,  "sourceInvoices": "Sims 104703",                      "billedTo": "Kyle / Acre Profit" },
+    { "tyIndex": 13, "product": "Meso (CPD Mesotrione)",           "qty": 165,   "unit": "gal", "tyPrice": 48.00, "amount": 7920.00,  "sourceInvoices": "Jabco SO 2129",                    "billedTo": "Acre Profit LLC" },
+    { "tyIndex": 14, "product": "Peak",                            "qty": 160,   "unit": "oz",  "tyPrice": 21.25, "amount": 3400.00,  "sourceInvoices": "Sims 103938, 104156, 104322",       "billedTo": "Kyle / Acre Profit" },
+    { "tyIndex": 16, "product": "Clethodim (Apex)",                "qty": 10,    "unit": "gal", "tyPrice": 27.00, "amount": 270.00,   "sourceInvoices": "Sims 104703",                      "billedTo": "Kyle / Acre Profit" },
+    { "tyIndex": 17, "product": "Flagstaff (Fluroxypyr)",          "qty": 180,   "unit": "gal", "tyPrice": 74.00, "amount": 13320.00, "sourceInvoices": "Sims 104703",                      "billedTo": "Kyle / Acre Profit" },
+    { "tyIndex": 18, "product": "24D Amine (Drexel De-Amine 4)",   "qty": 55,    "unit": "gal", "tyPrice": 21.00, "amount": 1155.00,  "sourceInvoices": "Sims 103938, 104156",               "billedTo": "Kyle / Acre Profit" }
+  ],
+  "transferTotal": 72150.00,
+  "priorBalances": {
+    "m77AgOutstanding": 170619.31,
+    "m5AgOutstanding": 292699.05
+  },
+  "correctedBalances": {
+    "m77AgOutstanding": 98469.31,
+    "m5AgOutstanding": 364849.05,
+    "totalOutstanding": 463318.36,
+    "note": "Total outstanding unchanged ($463,318.36) — this is an intercompany reallocation. Kyle's loan reduced by $72,150; Ty's loan increased by $72,150. AcreProfit still owes the same total; who it owes it to has shifted."
+  },
+  "unitValuedAtKylePurchaseCost": {
+    "note": "If instead of valuing the transfer at Ty's handoff prices, we value it at Kyle's actual Sims/Jabco/Corbet acquisition costs (what Kyle's loan actually originated), the transfer amount is DIFFERENT. Kyle may want to use ACQUISITION COST for the loan transfer (true dollar-for-dollar), not Ty's markup prices.",
+    "items": [
+      { "product": "Sulfen",       "qty": 330,   "avgCost": 74.44, "amount": 24565.00, "costBasis": "Sims 180@$76 + Sims 180@$76 + Jabco 180@$71.50 blended for 330 gal subset" },
+      { "product": "Metrybuzin",   "qty": 115,   "avgCost": 42.00, "amount": 4830.00,  "costBasis": "Sims $42/gal (Jabco variant is $45.50 but only Sims reference used)" },
+      { "product": "Hydrovant",    "qty": 137.5, "avgCost": 48.78, "amount": 6707.25,  "costBasis": "Corbet $48.78/gal across all three invoices" },
+      { "product": "Status",       "qty": 1000,  "avgCost": 3.80,  "amount": 3800.00,  "costBasis": "Sims 104703 exact" },
+      { "product": "Meso",         "qty": 165,   "avgCost": 45.75, "amount": 7548.75,  "costBasis": "Jabco 2129 $45.75/gal" },
+      { "product": "Peak",         "qty": 160,   "avgCost": 21.25, "amount": 3400.00,  "costBasis": "Sims $21.25/oz across all three invoices" },
+      { "product": "Clethodim",    "qty": 10,    "avgCost": 27.00, "amount": 270.00,   "costBasis": "Sims 104703 exact" },
+      { "product": "Flagstaff",    "qty": 180,   "avgCost": 74.00, "amount": 13320.00, "costBasis": "Sims 104703 exact" },
+      { "product": "24D Amine",    "qty": 55,    "avgCost": 21.00, "amount": 1155.00,  "costBasis": "Sims $21/gal" }
+    ],
+    "totalAtAcquisitionCost": 65596.00,
+    "correctedM77AgAtCost": 105023.31,
+    "correctedM5AgAtCost": 358295.05,
+    "note": "At acquisition cost basis: Kyle's loan drops by $65,596 (to $105,023.31); Ty's loan rises by $65,596 (to $358,295.05). Difference between Ty's handoff price ($72,150) and acquisition cost ($65,596) = $6,554 of built-in margin on Ty's PDF — that's trading margin that would accrue to whichever side keeps the inventory."
+  },
+  "recommendation": "Kyle picks one of two options, confirms with Ty, and we lock in: (A) Transfer at Ty's handoff prices ($72,150) — easier because Ty's PDF numbers stand as-is; (B) Transfer at acquisition cost ($65,596) — fairer because it preserves the actual cash-outlay math and leaves ~$6,554 of implied margin as a separate P&L question. Either way, total outstanding stays at $463,318.36 — the question is just the split between Kyle's M77 Ag loan and Ty's M5 Ag loan."
+}
