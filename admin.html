@@ -4368,6 +4368,13 @@
             if (tabName === 'chemical-ledger') loadChemicalLedger();
             if (tabName === 'deposit-match') loadDepositMatcher();
             if (tabName === 'webhook-events') loadWebhookEvents();
+            // Tabs that had content panels but weren't wired to lazy-load on click.
+            // Kyle flagged 2026-11-11: "fix them" (the 5 tabs with content but no loader).
+            if (tabName === 'orders'      && typeof loadDashboardData === 'function') loadDashboardData();
+            if (tabName === 'commissions' && typeof loadCommissionData === 'function') loadCommissionData();
+            if (tabName === 'programs'    && typeof loadAdminPrograms === 'function') loadAdminPrograms();
+            if (tabName === 'ratings'     && typeof loadAdminRatings === 'function') loadAdminRatings('all');
+            if (tabName === 'applications' && typeof loadApplications === 'function') loadApplications();
         }
 
         // Tab navigation - regular tabs (only for tabs with data-tab attribute)
