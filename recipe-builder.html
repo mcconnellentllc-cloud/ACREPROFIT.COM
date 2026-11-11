@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2027 Recipe Builder — AcreProfit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --accent: #059669;
+            --accent-dark: #047857;
+            --sale: #dc2626;
+            --fg: #111827;
+            --fg-mute: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f9fafb;
+            --card: #fff;
+            --radius: 10px;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.5; }
+        .container { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+        .hero {
+            background: linear-gradient(135deg, #065f46 0%, #047857 100%);
+            color: #fff;
+            padding: 44px 16px 48px;
+            text-align: center;
+        }
+        .hero h1 { font-size: 38px; font-weight: 800; letter-spacing: -0.02em; margin-bottom: 10px; }
+        .hero p { font-size: 17px; opacity: 0.92; max-width: 580px; margin: 0 auto; }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.18);
+            padding: 5px 14px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+            margin-bottom: 10px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .nav-links { margin-top: 18px; display: flex; gap: 14px; justify-content: center; }
+        .nav-links a { color: #fff; text-decoration: none; border-bottom: 1px solid rgba(255,255,255,0.5); padding-bottom: 2px; font-size: 14px; }
+
+        .main { padding: 36px 0 120px; }
+
+        .step {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 24px;
+            margin-bottom: 16px;
+        }
+        .step-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 18px;
+            font-weight: 700;
+            margin-bottom: 16px;
+        }
+        .step-num {
+            background: var(--accent);
+            color: #fff;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        .crop-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+            gap: 10px;
+        }
+        .crop-btn {
+            padding: 14px;
+            background: #f3f4f6;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            cursor: pointer;
+            text-align: center;
+            font-weight: 600;
+            color: var(--fg);
+            text-transform: capitalize;
+            transition: all 0.1s;
+        }
+        .crop-btn:hover { background: #e5e7eb; }
+        .crop-btn.active { background: #d1fae5; border-color: var(--accent); color: var(--accent-dark); }
+
+        .program-list { display: grid; gap: 10px; }
+        .program-card {
+            padding: 14px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+        }
+        .program-card:hover { border-color: var(--accent); background: #f0fdf4; }
+        .program-card.active { border-color: var(--accent); background: #ecfdf5; }
+        .program-card h4 { margin-bottom: 4px; font-size: 15px; }
+        .program-card .meta { font-size: 13px; color: var(--fg-mute); text-transform: capitalize; }
+        .program-card .tier-pill {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: capitalize;
+        }
+
+        .acres-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+        .acres-row .form-field { flex: 1; min-width: 160px; }
+        .acres-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        .acres-row input {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 15px;
+        }
+
+        .btn {
+            padding: 11px 18px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 15px;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
+        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+
+        .result-summary {
+            background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);
+            padding: 20px;
+            border-radius: var(--radius);
+            margin-bottom: 16px;
+        }
+        .result-summary h2 { margin-bottom: 8px; }
+        .result-summary .meta { color: var(--fg-mute); font-size: 14px; margin-bottom: 14px; }
+        .summary-row {
+            display: flex;
+            justify-content: space-between;
+            padding: 6px 0;
+            font-size: 15px;
+        }
+        .summary-row.total {
+            font-size: 22px;
+            font-weight: 800;
+            border-top: 2px solid rgba(5,150,105,0.2);
+            margin-top: 10px;
+            padding-top: 12px;
+        }
+        .savings-badge {
+            background: var(--accent);
+            color: #fff;
+            padding: 4px 10px;
+            border-radius: 999px;
+            font-weight: 700;
+            font-size: 14px;
+        }
+
+        .line-table {
+            width: 100%;
+            background: var(--card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            border-collapse: collapse;
+            overflow: hidden;
+        }
+        .line-table th {
+            background: #f9fafb;
+            padding: 10px 12px;
+            text-align: left;
+            font-size: 13px;
+            color: var(--fg-mute);
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .line-table td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            font-size: 14px;
+        }
+        .line-table tr:last-child td { border-bottom: none; }
+        .line-table .num { text-align: right; }
+        .line-table .retail-strike { color: #9ca3af; text-decoration: line-through; font-size: 13px; }
+        .line-table .sale-price { color: var(--accent); font-weight: 700; }
+        .sale-pill {
+            background: var(--sale);
+            color: #fff;
+            font-size: 10px;
+            padding: 1px 6px;
+            border-radius: 999px;
+            font-weight: 700;
+            margin-left: 6px;
+            vertical-align: middle;
+        }
+
+        .actions { display: flex; gap: 10px; margin-top: 16px; flex-wrap: wrap; }
+        .actions .btn { flex: 1; min-width: 180px; }
+
+        .loading { text-align: center; padding: 30px; color: var(--fg-mute); }
+        .hidden { display: none; }
+        .error { background: #fee2e2; color: #991b1b; padding: 12px; border-radius: 6px; margin: 10px 0; }
+
+        .form-row { margin-top: 12px; }
+        .form-row input, .form-row select, .form-row textarea {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+        .form-row textarea { resize: vertical; min-height: 70px; }
+
+        .disclaimer {
+            background: #fef3c7;
+            color: #92400e;
+            padding: 12px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            margin-top: 12px;
+        }
+
+        @media (max-width: 720px) {
+            .hero h1 { font-size: 28px; }
+            .hero p { font-size: 15px; }
+            .line-table { font-size: 13px; }
+            .line-table th, .line-table td { padding: 8px; }
+        }
+    </style>
+</head>
+<body>
+
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge">⚡ Build Your 2027 Plan</div>
+            <h1>Recipe Builder</h1>
+            <p>Pick your crop, enter your acres, and we'll put together a complete chemical plan with locked-in sale pricing.</p>
+            <div class="nav-links">
+                <a href="/sale.html">← Shop by product</a>
+                <a href="/">AcreProfit home</a>
+            </div>
+        </div>
+    </section>
+
+    <main class="main">
+        <div class="container">
+
+            <!-- Step 1: Crop -->
+            <div class="step">
+                <div class="step-title"><span class="step-num">1</span> Pick your crop</div>
+                <div id="cropGrid" class="crop-grid">
+                    <div class="loading">Loading crops…</div>
+                </div>
+            </div>
+
+            <!-- Step 2: Program -->
+            <div class="step hidden" id="step2">
+                <div class="step-title"><span class="step-num">2</span> Choose your program</div>
+                <div id="programList" class="program-list"></div>
+            </div>
+
+            <!-- Step 3: Acres -->
+            <div class="step hidden" id="step3">
+                <div class="step-title"><span class="step-num">3</span> Enter your acreage</div>
+                <div class="acres-row">
+                    <div class="form-field">
+                        <label>Total acres</label>
+                        <input type="number" id="acresInput" min="1" value="100">
+                    </div>
+                    <div class="form-field">
+                        <label>Gallons per acre (optional)</label>
+                        <input type="number" id="gpaInput" min="1" value="15">
+                    </div>
+                    <button class="btn btn-primary" onclick="calculateRecipe()">Build my plan →</button>
+                </div>
+            </div>
+
+            <!-- Step 4: Results -->
+            <div id="step4" class="hidden">
+                <div class="result-summary">
+                    <h2 id="resultTitle">Your 2027 Plan</h2>
+                    <div class="meta" id="resultMeta"></div>
+                    <div class="summary-row"><span>Total at retail</span><span class="retail-strike" id="retailTotal">—</span></div>
+                    <div class="summary-row"><span>Total at sale price</span><span style="font-weight:700; color:var(--accent);" id="saleTotal">—</span></div>
+                    <div class="summary-row"><span>You save</span><span class="savings-badge" id="savingsAmt">—</span></div>
+                    <div class="summary-row total"><span>Cost per acre</span><span id="cpaAmt">—</span></div>
+                </div>
+
+                <div class="step">
+                    <h3 style="margin-bottom:12px;">Your shopping list</h3>
+                    <table class="line-table">
+                        <thead>
+                            <tr>
+                                <th>Product</th>
+                                <th class="num">Rate</th>
+                                <th class="num">Packages</th>
+                                <th class="num">Unit Price</th>
+                                <th class="num">Line Total</th>
+                            </tr>
+                        </thead>
+                        <tbody id="linesBody"></tbody>
+                    </table>
+                    <div id="disclaimer" class="disclaimer hidden"></div>
+                </div>
+
+                <div class="step">
+                    <h3 style="margin-bottom:12px;">Reserve it for pickup</h3>
+                    <p style="color:var(--fg-mute); font-size:14px; margin-bottom:14px;">
+                        Fill out your info — we'll confirm availability and send an invoice. Pay then pick up.
+                    </p>
+                    <form id="reserveForm" onsubmit="reserveRecipe(event)">
+                        <div class="form-row"><label>Name *</label><input type="text" id="rbName" required></div>
+                        <div class="form-row"><label>Email *</label><input type="email" id="rbEmail" required></div>
+                        <div class="form-row"><label>Phone</label><input type="tel" id="rbPhone"></div>
+                        <div class="form-row"><label>Farm / operation</label><input type="text" id="rbFarm"></div>
+                        <div class="form-row">
+                            <label>Preferred pickup</label>
+                            <select id="rbPickup">
+                                <option value="">— Select —</option>
+                                <option value="AcreProfit warehouse">AcreProfit warehouse</option>
+                                <option value="Field delivery (contact rep)">Field delivery (contact rep)</option>
+                                <option value="Other (specify in notes)">Other (specify in notes)</option>
+                            </select>
+                        </div>
+                        <div class="form-row"><label>Notes</label><textarea id="rbNotes" placeholder="Anything else we should know..."></textarea></div>
+                        <div id="rbError"></div>
+                        <div class="actions">
+                            <button type="button" class="btn btn-ghost" onclick="resetBuilder()">Start over</button>
+                            <button type="submit" class="btn btn-primary" id="rbSubmit">Reserve This Plan</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+        </div>
+    </main>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+
+        let selectedCrop = null;
+        let selectedProgramId = null;
+        let currentRecipe = null;
+
+        function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function fmt(n) { return '$' + (Number(n) || 0).toFixed(2); }
+
+        async function loadCrops() {
+            try {
+                const res = await fetch(`${API_URL}/api/sale/recipe-builder/crops`);
+                const data = await res.json();
+                const grid = document.getElementById('cropGrid');
+                if (!data.crops || !data.crops.length) {
+                    grid.innerHTML = '<div style="color:var(--fg-mute); grid-column:1/-1; padding:20px;">No programs are available yet. Check back soon or contact your sales rep.</div>';
+                    return;
+                }
+                grid.innerHTML = data.crops.map(c => `<button class="crop-btn" onclick="selectCrop('${escapeHtml(c)}')">${escapeHtml(c)}</button>`).join('');
+            } catch (e) {
+                document.getElementById('cropGrid').innerHTML = `<div class="error">${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        async function selectCrop(crop) {
+            selectedCrop = crop;
+            document.querySelectorAll('.crop-btn').forEach(b => b.classList.toggle('active', b.textContent.trim().toLowerCase() === crop.toLowerCase()));
+            selectedProgramId = null;
+            document.getElementById('step2').classList.remove('hidden');
+            document.getElementById('step3').classList.add('hidden');
+            document.getElementById('step4').classList.add('hidden');
+            const list = document.getElementById('programList');
+            list.innerHTML = '<div class="loading">Loading programs…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/sale/recipe-builder/programs?crop=${encodeURIComponent(crop)}`);
+                const data = await res.json();
+                if (!data.programs || !data.programs.length) {
+                    list.innerHTML = '<div style="color:var(--fg-mute); padding:20px;">No programs for this crop yet. Shop by product instead.</div>';
+                    return;
+                }
+                list.innerHTML = data.programs.map(p => `
+                    <div class="program-card" onclick="selectProgram('${p._id}')">
+                        <div>
+                            <h4>${escapeHtml(p.name)}</h4>
+                            <div class="meta">${escapeHtml(p.description || p.crop)}</div>
+                        </div>
+                        ${p.tier ? `<span class="tier-pill">${escapeHtml(p.tier)}</span>` : ''}
+                    </div>
+                `).join('');
+            } catch (e) { list.innerHTML = `<div class="error">${escapeHtml(e.message)}</div>`; }
+        }
+
+        function selectProgram(id) {
+            selectedProgramId = id;
+            document.querySelectorAll('.program-card').forEach(c => c.classList.remove('active'));
+            event.currentTarget.classList.add('active');
+            document.getElementById('step3').classList.remove('hidden');
+            document.getElementById('step4').classList.add('hidden');
+            document.getElementById('step3').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        async function calculateRecipe() {
+            if (!selectedProgramId) return;
+            const acres = parseFloat(document.getElementById('acresInput').value) || 0;
+            if (acres <= 0) { alert('Enter acres > 0'); return; }
+            const gpa = parseFloat(document.getElementById('gpaInput').value) || 15;
+            try {
+                const res = await fetch(`${API_URL}/api/sale/recipe-builder/calculate`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ programId: selectedProgramId, acres, gallonsPerAcre: gpa })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Calculation failed');
+                currentRecipe = data;
+                renderResults(data);
+            } catch (e) { alert(e.message); }
+        }
+
+        function renderResults(r) {
+            document.getElementById('step4').classList.remove('hidden');
+            document.getElementById('resultTitle').textContent = `${r.programName} — ${r.acres} acres`;
+            document.getElementById('resultMeta').textContent = [r.crop, r.tier].filter(Boolean).join(' · ');
+            document.getElementById('retailTotal').textContent = fmt(r.totals.retailTotal);
+            document.getElementById('saleTotal').textContent = fmt(r.totals.saleTotal);
+            document.getElementById('savingsAmt').textContent = r.saleActive && r.totals.savings > 0 ? 'Save ' + fmt(r.totals.savings) : 'Regular pricing';
+            document.getElementById('cpaAmt').textContent = fmt(r.totals.costPerAcre) + ' / acre';
+
+            document.getElementById('linesBody').innerHTML = r.lines.map(l => `
+                <tr>
+                    <td>
+                        <strong>${escapeHtml(l.productName)}</strong>
+                        ${l.onSale ? '<span class="sale-pill">SALE</span>' : ''}
+                        <div style="color:var(--fg-mute); font-size:12px;">${escapeHtml(l.packSize || '')} ${escapeHtml(l.unit || '')}${l.passes.length > 1 ? ' · ' + l.passes.length + ' passes' : ''}</div>
+                    </td>
+                    <td class="num">${l.rate} ${escapeHtml(l.rateUnit || '')}</td>
+                    <td class="num">${l.packages}</td>
+                    <td class="num">
+                        ${l.onSale ? `<span class="retail-strike">${fmt(l.retailPrice)}</span><br><span class="sale-price">${fmt(l.salePrice)}</span>` : fmt(l.retailPrice)}
+                    </td>
+                    <td class="num"><strong>${fmt(l.lineTotal)}</strong></td>
+                </tr>
+            `).join('');
+
+            if (r.disclaimer) {
+                document.getElementById('disclaimer').textContent = r.disclaimer;
+                document.getElementById('disclaimer').classList.remove('hidden');
+            }
+
+            document.getElementById('step4').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+
+        async function reserveRecipe(e) {
+            e.preventDefault();
+            if (!currentRecipe) return;
+            const btn = document.getElementById('rbSubmit');
+            const err = document.getElementById('rbError');
+            btn.disabled = true; btn.textContent = 'Reserving…'; err.innerHTML = '';
+            try {
+                const payload = {
+                    customerName: document.getElementById('rbName').value.trim(),
+                    customerEmail: document.getElementById('rbEmail').value.trim(),
+                    customerPhone: document.getElementById('rbPhone').value.trim(),
+                    farmName: document.getElementById('rbFarm').value.trim(),
+                    pickupLocation: document.getElementById('rbPickup').value,
+                    notes: `Program: ${currentRecipe.programName} for ${currentRecipe.acres} acres\n` + document.getElementById('rbNotes').value.trim(),
+                    items: currentRecipe.lines.map(l => ({ chemicalId: l.chemicalId, quantity: l.packages }))
+                };
+                const res = await fetch(`${API_URL}/api/sale/preorder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Reservation failed');
+                document.querySelector('.main .container').innerHTML = `
+                    <div class="step" style="text-align:center; padding:48px 24px;">
+                        <div style="width:72px; height:72px; background:#d1fae5; color:var(--accent); border-radius:50%; display:inline-flex; align-items:center; justify-content:center; font-size:36px; margin-bottom:16px;">✓</div>
+                        <h2 style="margin-bottom:8px;">You're set.</h2>
+                        <p style="color:var(--fg-mute); margin-bottom:16px;">Your 2027 plan is reserved. We'll email a confirmation and send an invoice once availability is confirmed.</p>
+                        <div style="font-family:monospace; font-size:22px; font-weight:700; background:#f3f4f6; padding:12px 24px; border-radius:6px; display:inline-block; margin:10px 0;">${escapeHtml(data.quoteNumber)}</div>
+                        <p style="margin-top:16px; font-size:18px;">Total: <strong>${fmt(data.total)}</strong></p>
+                        <div style="margin-top:28px;">
+                            <a href="/" class="btn btn-ghost">Back to home</a>
+                            <a href="/sale.html" class="btn btn-primary" style="margin-left:8px;">Shop more</a>
+                        </div>
+                    </div>
+                `;
+                window.scrollTo(0, 0);
+            } catch (ex) {
+                err.innerHTML = `<div class="error">${escapeHtml(ex.message)}</div>`;
+                btn.disabled = false; btn.textContent = 'Reserve This Plan';
+            }
+        }
+
+        function resetBuilder() {
+            selectedCrop = null;
+            selectedProgramId = null;
+            currentRecipe = null;
+            document.getElementById('step2').classList.add('hidden');
+            document.getElementById('step3').classList.add('hidden');
+            document.getElementById('step4').classList.add('hidden');
+            document.querySelectorAll('.crop-btn').forEach(b => b.classList.remove('active'));
+            window.scrollTo(0, 0);
+        }
+
+        loadCrops();
+    </script>
+</body>
+</html>
