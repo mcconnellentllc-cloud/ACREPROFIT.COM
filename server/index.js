@@ -5724,6 +5724,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 const BUSINESS_JSON_PATH = require('path').join(__dirname, 'business.json');
 const BANK_DEPOSITS_JSON_PATH = require('path').join(__dirname, 'bank-deposits.json');
 const CHEMICAL_PURCHASES_JSON_PATH = require('path').join(__dirname, 'chemical-purchases.json');
+const BANKING_JSON_PATH = require('path').join(__dirname, 'banking.json');
 
 app.get('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
     try {
@@ -5963,6 +5964,203 @@ app.post('/api/admin/deposit-match/confirm', authMiddleware, partnerMiddleware, 
                 amountPaid: invoice.amountPaid,
                 depositRef: invoice.depositRef
             }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ---- RECONCILIATION CENTER (partner tier) ----
+// Single page that consolidates every piece of the AcreProfit financial
+// picture Kyle and Ty need to see together: lender balances (M77 Ag,
+// M5 Ag), customer A/R, supplier A/P, chemical inventory, cash position.
+// Reads from banking.json (loans, repayments, deposits), bank-deposits.json
+// (deposits classified), chemical-purchases.json (supplier purchases),
+// and live DB for A/R + inventory.
+app.get('/api/admin/reconciliation/center', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        // Load the three static JSON sources
+        let banking = {};
+        let deposits = {};
+        let purchases = {};
+        try {
+            banking = JSON.parse(require('fs').readFileSync(BANKING_JSON_PATH, 'utf8'));
+        } catch (err) {
+            console.warn('[reconciliation] banking.json read failed:', err.message);
+        }
+        try {
+            deposits = JSON.parse(require('fs').readFileSync(BANK_DEPOSITS_JSON_PATH, 'utf8'));
+        } catch (err) {
+            console.warn('[reconciliation] bank-deposits.json read failed:', err.message);
+        }
+        try {
+            purchases = JSON.parse(require('fs').readFileSync(CHEMICAL_PURCHASES_JSON_PATH, 'utf8'));
+        } catch (err) {
+            console.warn('[reconciliation] chemical-purchases.json read failed:', err.message);
+        }
+
+        // Live A/R from Invoice collection
+        let arOutstanding = 0, arCount = 0, arPastDue = 0, arPastDueCount = 0;
+        let revenueCollected = 0, revenueCollectedCount = 0;
+        let draftCount = 0, draftAmount = 0;
+        try {
+            const invoices = await Invoice.find({ status: { $ne: 'void' } })
+                .select('total amountPaid paymentStatus status date dueDate')
+                .lean();
+            const now = new Date();
+            invoices.forEach(inv => {
+                const total = Number(inv.total) || 0;
+                const paid = Number(inv.amountPaid) || 0;
+                const outstanding = Math.max(0, total - paid);
+                if (inv.status === 'draft') {
+                    draftCount++;
+                    draftAmount += total;
+                    return;
+                }
+                if ((inv.paymentStatus || 'unpaid') === 'paid') {
+                    revenueCollected += paid || total;
+                    revenueCollectedCount++;
+                } else {
+                    arCount++;
+                    arOutstanding += outstanding;
+                    if (inv.dueDate && new Date(inv.dueDate) < now) {
+                        arPastDueCount++;
+                        arPastDue += outstanding;
+                    }
+                }
+            });
+        } catch (err) {
+            console.warn('[reconciliation] Invoice read failed:', err.message);
+        }
+
+        // Live inventory value from Chemical
+        let inventoryValue = 0, inventoryItems = 0;
+        try {
+            const chemicals = await Chemical.find({}).select('quantityOnHand averageCost lastCost').lean();
+            chemicals.forEach(c => {
+                const qty = Number(c.quantityOnHand) || 0;
+                const cost = Number(c.averageCost) || Number(c.lastCost) || 0;
+                if (qty > 0) {
+                    inventoryValue += qty * cost;
+                    inventoryItems++;
+                }
+            });
+        } catch (err) {
+            console.warn('[reconciliation] Chemical read failed:', err.message);
+        }
+
+        // Derived: supplier purchases totals from static JSON
+        const purchaseRows = Array.isArray(purchases.purchases) ? purchases.purchases : [];
+        const supplierTotals = {};
+        purchaseRows.forEach(p => {
+            const key = p.supplier || 'Unknown';
+            if (!supplierTotals[key]) {
+                supplierTotals[key] = { supplier: key, total: 0, invoiceCount: 0 };
+            }
+            supplierTotals[key].total += Number(p.totalCost) || 0;
+            supplierTotals[key].invoiceCount += 1;
+        });
+        const supplierPurchases = Object.values(supplierTotals).sort((a, b) => b.total - a.total);
+        const totalPurchased = supplierPurchases.reduce((s, r) => s + r.total, 0);
+
+        // Lender balances from banking.json
+        const lenderBalances = (banking.loanRepaymentsOut && banking.outstandingLoanBalances)
+            ? banking.outstandingLoanBalances
+            : {};
+        const m77Ag = lenderBalances.m77Ag || null;
+        const m5Ag = lenderBalances.m5Ag || null;
+
+        // Cash position from banking.json
+        const cashBalance = (banking.primaryAccount && banking.primaryAccount.currentBalance) || 0;
+        const cashAsOf = (banking.primaryAccount && banking.primaryAccount.balanceAsOf) || null;
+
+        // Deposits summary from bank-deposits.json
+        const depositRows = Array.isArray(deposits.deposits) ? deposits.deposits : [];
+        const customerDeposits = depositRows.filter(d => d.kind === 'customer');
+        const loanInDeposits   = depositRows.filter(d => d.kind === 'loanIn');
+        const totalCustomerDeposits = customerDeposits.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+        const totalLoanIns          = loanInDeposits.reduce((s, d) => s + (Number(d.amount) || 0), 0);
+
+        // Total loan paydowns out
+        const m77Paid = (m77Ag && m77Ag.repaidYTD) || 0;
+        const m5Paid  = (m5Ag && m5Ag.repaidYTD) || 0;
+        const totalLoanPaydownsOut = m77Paid + m5Paid;
+
+        // Total supplier payments out (ACH / wire out that paid suppliers directly)
+        const supplierPayments = Array.isArray(banking.supplierPayments) ? banking.supplierPayments : [];
+        const totalSupplierPaymentsOut = supplierPayments.reduce((s, r) => s + (Number(r.amount) || 0), 0);
+
+        // Equity estimate (net position)
+        // Assets: cash + inventory + A/R
+        // Liabilities: lender balances
+        // Equity = assets - liabilities
+        const m77Balance = (m77Ag && m77Ag.balanceOwed) || 0;
+        const m5Balance  = (m5Ag && m5Ag.balanceOwed) || 0;
+        const totalLenderBalance = m77Balance + m5Balance;
+        const equityEstimate = cashBalance + inventoryValue + arOutstanding - totalLenderBalance;
+
+        res.json({
+            generatedAt: new Date().toISOString(),
+            cash: {
+                balance: cashBalance,
+                asOf: cashAsOf
+            },
+            customers: {
+                revenueCollectedYTD: Math.round(revenueCollected * 100) / 100,
+                revenueCollectedCount,
+                arOutstanding: Math.round(arOutstanding * 100) / 100,
+                arCount,
+                arPastDue: Math.round(arPastDue * 100) / 100,
+                arPastDueCount,
+                drafts: draftCount,
+                draftAmount: Math.round(draftAmount * 100) / 100,
+                totalCustomerDepositsYTD: Math.round(totalCustomerDeposits * 100) / 100
+            },
+            suppliers: {
+                totalPurchased: Math.round(totalPurchased * 100) / 100,
+                bySupplier: supplierPurchases.map(r => ({
+                    supplier: r.supplier,
+                    total: Math.round(r.total * 100) / 100,
+                    invoiceCount: r.invoiceCount
+                })),
+                totalPaidDirectly: Math.round(totalSupplierPaymentsOut * 100) / 100,
+                supplierPayments
+            },
+            inventory: {
+                value: Math.round(inventoryValue * 100) / 100,
+                items: inventoryItems
+            },
+            lenders: {
+                totalBalance: Math.round(totalLenderBalance * 100) / 100,
+                totalPaidYTD: Math.round(totalLoanPaydownsOut * 100) / 100,
+                totalLoanInsYTD: Math.round(totalLoanIns * 100) / 100,
+                m77Ag: m77Ag ? {
+                    originated: m77Ag.originatedYTD_confirmed || m77Ag.originatedYTD || 0,
+                    repaid: m77Paid,
+                    balance: m77Balance,
+                    originations: (banking.loanRepaymentsOut && banking.loanRepaymentsOut.m77AgLoanRepayments && banking.loanRepaymentsOut.m77AgLoanRepayments.transactions) || []
+                } : null,
+                m5Ag: m5Ag ? {
+                    originated: m5Ag.originatedYTD_confirmed || m5Ag.originatedYTD || 0,
+                    repaid: m5Paid,
+                    balance: m5Balance,
+                    originations: (banking.loanRepaymentsOut && banking.loanRepaymentsOut.m5AgLoanRepayments && banking.loanRepaymentsOut.m5AgLoanRepayments.transactions) || []
+                } : null
+            },
+            equity: {
+                estimate: Math.round(equityEstimate * 100) / 100,
+                assets: {
+                    cash: cashBalance,
+                    inventory: Math.round(inventoryValue * 100) / 100,
+                    arOutstanding: Math.round(arOutstanding * 100) / 100,
+                    total: Math.round((cashBalance + inventoryValue + arOutstanding) * 100) / 100
+                },
+                liabilities: {
+                    lenderBalances: Math.round(totalLenderBalance * 100) / 100,
+                    total: Math.round(totalLenderBalance * 100) / 100
+                }
+            },
+            distributionPolicy: banking.distributionPolicy || null
         });
     } catch (err) {
         res.status(500).json({ error: err.message });

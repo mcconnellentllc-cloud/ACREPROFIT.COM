@@ -83,6 +83,7 @@
                             <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
                             <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
                             <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
+                            <span id="reconciliationCenterNav" style="display: none;"><a href="#reconciliation-center" class="dropdown-item" data-tab="reconciliation-center"><strong>Reconciliation Center</strong></a></span>
                             <span id="chemicalLedgerNav" style="display: none;"><a href="#chemical-ledger" class="dropdown-item" data-tab="chemical-ledger">Chemical Ledger</a></span>
                             <span id="depositMatchNav" style="display: none;"><a href="#deposit-match" class="dropdown-item" data-tab="deposit-match">Deposit Matcher</a></span>
                             <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
@@ -1260,6 +1261,19 @@
                 </div>
                 <div id="businessProfileContent" style="padding: 20px;">
                     <div class="loading">Loading business profile…</div>
+                </div>
+            </div>
+
+            <!-- Reconciliation Center Tab (Partner-tier: superadmin + admin + partner) -->
+            <div id="reconciliation-centerTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Reconciliation Center</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        One page, the full picture: cash position, customer A/R, lender balances, supplier spend, inventory, estimated equity. Pulls live from every source — banking, invoices, chemical ledger, and inventory.
+                    </p>
+                </div>
+                <div id="reconciliationCenterContent" style="padding: 20px;">
+                    <div class="loading">Loading reconciliation…</div>
                 </div>
             </div>
 
@@ -3915,6 +3929,7 @@
             setDisplay('programsNav', 'inline');
             setDisplay('ratingsNav', 'inline');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('reconciliationCenterNav', 'block');
             setDisplay('chemicalLedgerNav', 'block');
             setDisplay('depositMatchNav', 'block');
             setDisplay('webhookEventsNav', 'block');
@@ -3936,6 +3951,7 @@
             setDisplay('complianceNav', 'block');
             setDisplay('companySettingsNav', 'block');
             setDisplay('businessProfileNav', 'block');
+            setDisplay('reconciliationCenterNav', 'block');
             setDisplay('chemicalLedgerNav', 'block');
             setDisplay('depositMatchNav', 'block');
             setDisplay('webhookEventsNav', 'block');
@@ -3958,6 +3974,7 @@
             setDisplay('complianceNav', 'none');
             // Distributors do NOT see the Business Profile (partner+ only)
             setDisplay('businessProfileNav', 'none');
+            setDisplay('reconciliationCenterNav', 'none');
             setDisplay('chemicalLedgerNav', 'none');
             setDisplay('depositMatchNav', 'none');
             setDisplay('webhookEventsNav', 'none');
@@ -4318,6 +4335,7 @@
             if (tabName === 'quote-requests') loadPreorderProducts();
             if (tabName === 'price-mining') loadBidSheets();
             if (tabName === 'business') loadBusinessProfile();
+            if (tabName === 'reconciliation-center') loadReconciliationCenter();
             if (tabName === 'chemical-ledger') loadChemicalLedger();
             if (tabName === 'deposit-match') loadDepositMatcher();
             if (tabName === 'webhook-events') loadWebhookEvents();
@@ -11031,6 +11049,224 @@
             } catch (err) {
                 if (btn) { btn.disabled = false; btn.textContent = 'Mark Paid'; }
                 alert('Could not confirm match: ' + err.message);
+            }
+        }
+
+        // ============ RECONCILIATION CENTER (partner+ only) ============
+        // The one-page everything-view. Lenders, A/R, suppliers, cash,
+        // inventory, equity.
+
+        function reconM(n) {
+            if (n === null || n === undefined || isNaN(n)) return '—';
+            const num = Number(n);
+            const sign = num < 0 ? '-' : '';
+            const abs = Math.abs(num);
+            return sign + '$' + abs.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        }
+
+        function reconHeroCard(title, value, subtitle, color) {
+            const c = color || 'var(--accent)';
+            return `<div style="background: white; border: 1px solid var(--border); border-left: 6px solid ${c}; border-radius: 10px; padding: 20px 24px;">
+                <div style="font-size: 12px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--text-light); margin-bottom: 8px;">${escapeHtml(title)}</div>
+                <div style="font-size: 32px; font-weight: 700; color: ${c}; font-variant-numeric: tabular-nums; line-height: 1.1;">${value}</div>
+                <div style="font-size: 13px; color: var(--text-light); margin-top: 6px;">${subtitle}</div>
+            </div>`;
+        }
+
+        function renderReconciliationCenter(data) {
+            const container = document.getElementById('reconciliationCenterContent');
+            if (!data) {
+                container.innerHTML = '<div class="error">No reconciliation data returned.</div>';
+                return;
+            }
+            const cash = data.cash || {};
+            const customers = data.customers || {};
+            const suppliers = data.suppliers || {};
+            const inventory = data.inventory || {};
+            const lenders = data.lenders || {};
+            const equity = data.equity || {};
+            const policy = data.distributionPolicy;
+
+            let html = '';
+
+            // Four hero cards: Cash · A/R · Lender Debt · Equity
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 24px;">`;
+            html += reconHeroCard(
+                'Cash',
+                reconM(cash.balance),
+                `PWCB *9253 · as of ${escapeHtml(cash.asOf || '—')}`,
+                '#6d28d9'
+            );
+            html += reconHeroCard(
+                'Customer A/R',
+                reconM(customers.arOutstanding),
+                `${customers.arCount} open · ${customers.arPastDueCount} past due (${reconM(customers.arPastDue)})`,
+                '#b45309'
+            );
+            html += reconHeroCard(
+                'Lender debt',
+                reconM(lenders.totalBalance),
+                `M77 Ag ${reconM(lenders.m77Ag && lenders.m77Ag.balance)} · M5 Ag ${reconM(lenders.m5Ag && lenders.m5Ag.balance)}`,
+                '#b00020'
+            );
+            html += reconHeroCard(
+                'Equity (est.)',
+                reconM(equity.estimate),
+                `Assets ${reconM(equity.assets && equity.assets.total)} − Liabilities ${reconM(equity.liabilities && equity.liabilities.total)}`,
+                equity.estimate >= 0 ? '#15803d' : '#b00020'
+            );
+            html += `</div>`;
+
+            // Distribution policy banner
+            if (policy && policy.rule) {
+                html += `<div style="background: #fffbeb; border: 1px solid #fcd34d; border-left: 4px solid #d97706; border-radius: 8px; padding: 12px 18px; margin-bottom: 20px;">
+                    <strong style="color: #92400e;">Distribution policy:</strong>
+                    <span style="color: #78350f;"> ${escapeHtml(policy.rule)}</span>
+                </div>`;
+            }
+
+            // LENDERS section — the biggest story
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 18px; color: #b00020;">Lenders — who AcreProfit owes</h3>`;
+            function lenderBlock(label, data, color) {
+                if (!data) return '';
+                const origs = Array.isArray(data.originations) ? data.originations : [];
+                let rows = '';
+                origs.forEach(o => {
+                    rows += `<tr>
+                        <td style="padding: 6px 12px; font-size: 12px; white-space: nowrap;">${escapeHtml(o.date)}</td>
+                        <td style="padding: 6px 12px; font-size: 12px;">${escapeHtml(o.description || o.payeeEntity || '')}</td>
+                        <td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px;">${reconM(o.amount)}</td>
+                    </tr>`;
+                });
+                return `<div style="border: 1px solid var(--border); border-left: 4px solid ${color}; border-radius: 8px; padding: 14px 18px;">
+                    <h4 style="margin: 0 0 8px 0; font-size: 15px;">${escapeHtml(label)}</h4>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 12px;">
+                        <div><div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Originated YTD</div><div style="font-weight: 700; font-variant-numeric: tabular-nums;">${reconM(data.originated)}</div></div>
+                        <div><div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Repaid YTD</div><div style="font-weight: 700; font-variant-numeric: tabular-nums; color: #15803d;">${reconM(data.repaid)}</div></div>
+                        <div><div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Balance owed</div><div style="font-weight: 700; font-variant-numeric: tabular-nums; color: ${color};">${reconM(data.balance)}</div></div>
+                    </div>
+                    ${rows ? `<details style="font-size: 12px;"><summary style="cursor: pointer; color: var(--text-light);">Paydown history (${origs.length})</summary>
+                        <table style="width: 100%; border-collapse: collapse; margin-top: 8px;"><tbody>${rows}</tbody></table>
+                    </details>` : ''}
+                </div>`;
+            }
+            html += `<div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(380px, 1fr)); gap: 16px;">`;
+            html += lenderBlock('M77 Ag (Kyle)', lenders.m77Ag, '#b00020');
+            html += lenderBlock('M5 Ag (Ty)', lenders.m5Ag, '#1e40af');
+            html += `</div>`;
+            html += `</div>`;
+
+            // Suppliers section
+            const supplierRows = (suppliers.bySupplier || []).map(r => `<tr style="border-bottom: 1px solid var(--border);">
+                <td style="padding: 8px 12px;"><strong>${escapeHtml(r.supplier)}</strong></td>
+                <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(r.total)}</td>
+                <td style="padding: 8px 12px; text-align: right; color: var(--text-light);">${r.invoiceCount} line${r.invoiceCount === 1 ? '' : 's'}</td>
+            </tr>`).join('');
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 18px;">Suppliers — chemical bought YTD</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <thead><tr style="border-bottom: 2px solid var(--border);">
+                        <th style="padding: 8px 12px; text-align: left; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Supplier</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Total purchased</th>
+                        <th style="padding: 8px 12px; text-align: right; font-size: 11px; text-transform: uppercase; color: var(--text-light);">Lines</th>
+                    </tr></thead>
+                    <tbody>${supplierRows}</tbody>
+                    <tfoot><tr style="background: #fafafa; font-weight: 700;">
+                        <td style="padding: 8px 12px;">Total</td>
+                        <td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(suppliers.totalPurchased)}</td>
+                        <td></td>
+                    </tr></tfoot>
+                </table>
+                <p style="font-size: 12px; color: var(--text-light); margin-top: 10px;">AcreProfit's bank account paid ${reconM(suppliers.totalPaidDirectly)} to suppliers directly YTD (${(suppliers.supplierPayments || []).length} transactions). The rest was paid by M77 Ag / M5 Ag → funded by loans to AcreProfit.</p>
+            </div>`;
+
+            // Customers section
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 18px;">Customers — revenue + A/R</h3>
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                    <div style="padding: 14px 18px; background: #f0fdf4; border-left: 4px solid #15803d; border-radius: 6px;">
+                        <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Revenue collected</div>
+                        <div style="font-size: 22px; font-weight: 700; color: #15803d; font-variant-numeric: tabular-nums; margin-top: 4px;">${reconM(customers.revenueCollectedYTD)}</div>
+                        <div style="font-size: 12px; color: var(--text-light);">${customers.revenueCollectedCount} paid invoices</div>
+                    </div>
+                    <div style="padding: 14px 18px; background: #fef3c7; border-left: 4px solid #b45309; border-radius: 6px;">
+                        <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">A/R outstanding</div>
+                        <div style="font-size: 22px; font-weight: 700; color: #b45309; font-variant-numeric: tabular-nums; margin-top: 4px;">${reconM(customers.arOutstanding)}</div>
+                        <div style="font-size: 12px; color: var(--text-light);">${customers.arCount} open · ${customers.arPastDueCount} past due</div>
+                    </div>
+                    <div style="padding: 14px 18px; background: #eef2ff; border-left: 4px solid #4338ca; border-radius: 6px;">
+                        <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Drafts (not sent)</div>
+                        <div style="font-size: 22px; font-weight: 700; color: #4338ca; font-variant-numeric: tabular-nums; margin-top: 4px;">${reconM(customers.draftAmount)}</div>
+                        <div style="font-size: 12px; color: var(--text-light);">${customers.drafts} draft${customers.drafts === 1 ? '' : 's'}</div>
+                    </div>
+                    <div style="padding: 14px 18px; background: #f3e8ff; border-left: 4px solid #6d28d9; border-radius: 6px;">
+                        <div style="font-size: 11px; color: var(--text-light); text-transform: uppercase;">Customer deposits (bank)</div>
+                        <div style="font-size: 22px; font-weight: 700; color: #6d28d9; font-variant-numeric: tabular-nums; margin-top: 4px;">${reconM(customers.totalCustomerDepositsYTD)}</div>
+                        <div style="font-size: 12px; color: var(--text-light);">Confirmed cash from customers</div>
+                    </div>
+                </div>
+            </div>`;
+
+            // Inventory + Equity assembly
+            html += `<div style="background: white; border: 1px solid var(--border); border-radius: 10px; padding: 20px 24px; margin-bottom: 20px;">
+                <h3 style="margin: 0 0 12px 0; font-size: 18px;">Balance sheet snapshot</h3>
+                <table style="width: 100%; border-collapse: collapse;">
+                    <tbody>
+                        <tr><td colspan="2" style="padding: 8px 12px; font-weight: 700; background: #ecfdf5; border-left: 4px solid #15803d;">Assets</td></tr>
+                        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 12px;">Cash (PWCB *9253)</td><td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(equity.assets && equity.assets.cash)}</td></tr>
+                        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 12px;">Chemical inventory on hand (${inventory.items || 0} items)</td><td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(equity.assets && equity.assets.inventory)}</td></tr>
+                        <tr style="border-bottom: 2px solid var(--border);"><td style="padding: 6px 12px;">Customer A/R outstanding</td><td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(equity.assets && equity.assets.arOutstanding)}</td></tr>
+                        <tr style="font-weight: 700;"><td style="padding: 8px 12px;">Total assets</td><td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(equity.assets && equity.assets.total)}</td></tr>
+                        <tr><td colspan="2" style="padding: 8px 12px 4px 12px;"></td></tr>
+                        <tr><td colspan="2" style="padding: 8px 12px; font-weight: 700; background: #fef2f2; border-left: 4px solid #b00020;">Liabilities</td></tr>
+                        <tr style="border-bottom: 1px solid var(--border);"><td style="padding: 6px 12px;">M77 Ag loan balance</td><td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(lenders.m77Ag && lenders.m77Ag.balance)}</td></tr>
+                        <tr style="border-bottom: 2px solid var(--border);"><td style="padding: 6px 12px;">M5 Ag loan balance</td><td style="padding: 6px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(lenders.m5Ag && lenders.m5Ag.balance)}</td></tr>
+                        <tr style="font-weight: 700;"><td style="padding: 8px 12px;">Total liabilities</td><td style="padding: 8px 12px; text-align: right; font-variant-numeric: tabular-nums;">${reconM(equity.liabilities && equity.liabilities.total)}</td></tr>
+                        <tr><td colspan="2" style="padding: 8px 12px 4px 12px;"></td></tr>
+                        <tr style="font-weight: 700; font-size: 16px; background: ${equity.estimate >= 0 ? '#f0fdf4' : '#fef2f2'};">
+                            <td style="padding: 10px 12px;">Equity (Assets − Liabilities)</td>
+                            <td style="padding: 10px 12px; text-align: right; font-variant-numeric: tabular-nums; color: ${equity.estimate >= 0 ? '#15803d' : '#b00020'};">${reconM(equity.estimate)}</td>
+                        </tr>
+                    </tbody>
+                </table>
+                <p style="font-size: 12px; color: var(--text-light); margin-top: 10px;">
+                    Equity is AcreProfit's claim on itself, before any partner distributions. Per the distribution policy, no draws happen until M77 Ag and M5 Ag loans are both fully cleared.
+                </p>
+            </div>`;
+
+            // Loan-in reference
+            html += `<div style="background: #f9fafb; border: 1px solid var(--border); border-radius: 8px; padding: 14px 20px; margin-bottom: 20px;">
+                <h3 style="font-size: 14px; margin: 0 0 6px 0; color: var(--text-light);">Loan-in deposits referenced</h3>
+                <p style="font-size: 12px; color: var(--text-light); margin: 0;">
+                    ${reconM(lenders.totalLoanInsYTD)} of the bank-side deposits YTD were loan-ins from M77 Ag (not customer revenue). They're excluded from the revenue count and factored into the lender originations.
+                </p>
+            </div>`;
+
+            html += `<p style="font-size: 12px; color: var(--text-light); margin-top: 12px;">
+                Generated ${escapeHtml(new Date(data.generatedAt).toLocaleString())}
+                <button class="btn btn-outline btn-sm" style="margin-left: 12px;" onclick="loadReconciliationCenter()">Refresh</button>
+            </p>`;
+
+            container.innerHTML = html;
+        }
+
+        async function loadReconciliationCenter() {
+            const container = document.getElementById('reconciliationCenterContent');
+            container.innerHTML = '<div class="loading" style="padding: 40px; text-align: center;">Loading reconciliation…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/reconciliation/center`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) {
+                    const errText = res.status === 403 ? 'Partner-level access required.' : `HTTP ${res.status}`;
+                    container.innerHTML = `<div class="error">Could not load reconciliation: ${escapeHtml(errText)}</div>`;
+                    return;
+                }
+                const data = await res.json();
+                renderReconciliationCenter(data);
+            } catch (err) {
+                container.innerHTML = `<div class="error">Error: ${escapeHtml(err.message)}</div>`;
             }
         }
 
