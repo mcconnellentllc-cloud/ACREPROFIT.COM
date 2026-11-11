@@ -95,7 +95,7 @@
                         </button>
                         <div class="dropdown-menu">
                             <span id="reconciliationCenterNav" style="display: none;"><a href="#reconciliation-center" class="dropdown-item" data-tab="reconciliation-center"><strong>Reconciliation Center</strong></a></span>
-                            <a href="#ledger" class="dropdown-item" data-tab="ledger">Ledger</a>
+                            <a href="#ledger" class="dropdown-item" data-tab="ledger">Commission Ledger</a>
                             <a href="#settlements" class="dropdown-item" data-tab="settlements">Settlements</a>
                             <a href="/admin-loans.html" class="dropdown-item">Loans</a>
                             <a href="/admin-operations.html" class="dropdown-item">Operations</a>
@@ -2058,7 +2058,10 @@
             <!-- Ledger Tab -->
             <div id="ledgerTab" class="tab-content">
                 <div class="tab-header">
-                    <h2>Distributor Ledger</h2>
+                    <h2>Commission Ledger</h2>
+                    <p style="color: var(--text-light); margin-top: 4px; max-width: 760px;">
+                        Distributor margin / commission accounting — tracks the per-rep share of invoices and payouts to distributors. <strong>This is not the cash reconciliation.</strong> For the real bank, lender, and supplier picture, see <a href="#reconciliation-center" data-tab="reconciliation-center" onclick="navigateToTab('reconciliation-center'); return false;">Business → Reconciliation Center</a>.
+                    </p>
                     <div class="tab-header-actions">
                         <button class="btn btn-primary superadmin-only-ledger" onclick="openAddLedgerModal()">+ Add Entry</button>
                         <button class="btn btn-outline superadmin-only-ledger" onclick="openRecordPaymentModal()" style="border-color: #059669; color: #059669;">Record Check to Distributor</button>

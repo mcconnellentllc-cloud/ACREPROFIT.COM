@@ -6073,20 +6073,32 @@ app.get('/api/admin/reconciliation/center', authMiddleware, partnerMiddleware, a
             console.warn('[reconciliation] Invoice read failed:', err.message);
         }
 
-        // Live inventory value from Chemical
-        let inventoryValue = 0, inventoryItems = 0;
-        try {
-            const chemicals = await Chemical.find({}).select('quantityOnHand averageCost lastCost').lean();
-            chemicals.forEach(c => {
-                const qty = Number(c.quantityOnHand) || 0;
-                const cost = Number(c.averageCost) || Number(c.lastCost) || 0;
-                if (qty > 0) {
-                    inventoryValue += qty * cost;
-                    inventoryItems++;
-                }
-            });
-        } catch (err) {
-            console.warn('[reconciliation] Chemical read failed:', err.message);
+        // Inventory value: prefer the hand-counted snapshot in banking.json
+        // (from Kyle's photos + Ty's PDF). Fall back to Mongo's live catalog
+        // only if the snapshot is missing. Mongo's quantityOnHand is almost
+        // always zero because the catalog isn't maintained to match shelves.
+        let inventoryValue = 0, inventoryItems = 0, inventorySource = 'none';
+        if (banking.physicalInventoryOnHand && banking.physicalInventoryOnHand.totalValue !== undefined) {
+            inventoryValue = Number(banking.physicalInventoryOnHand.totalValue) || 0;
+            inventoryItems = Array.isArray(banking.physicalInventoryOnHand.locations)
+                ? banking.physicalInventoryOnHand.locations.length
+                : 0;
+            inventorySource = 'physical-snapshot';
+        } else {
+            try {
+                const chemicals = await Chemical.find({}).select('quantityOnHand averageCost lastCost').lean();
+                chemicals.forEach(c => {
+                    const qty = Number(c.quantityOnHand) || 0;
+                    const cost = Number(c.averageCost) || Number(c.lastCost) || 0;
+                    if (qty > 0) {
+                        inventoryValue += qty * cost;
+                        inventoryItems++;
+                    }
+                });
+                inventorySource = 'mongo-catalog';
+            } catch (err) {
+                console.warn('[reconciliation] Chemical read failed:', err.message);
+            }
         }
 
         // Derived: supplier purchases totals from static JSON
@@ -6103,12 +6115,18 @@ app.get('/api/admin/reconciliation/center', authMiddleware, partnerMiddleware, a
         const supplierPurchases = Object.values(supplierTotals).sort((a, b) => b.total - a.total);
         const totalPurchased = supplierPurchases.reduce((s, r) => s + r.total, 0);
 
-        // Lender balances from banking.json
-        const lenderBalances = (banking.loanRepaymentsOut && banking.outstandingLoanBalances)
-            ? banking.outstandingLoanBalances
-            : {};
+        // Lender balances from banking.json — the data lives nested under
+        // loansFromRelatedEntities.outstandingLoanBalances in the canonical
+        // file. Fall back to the top-level path for older snapshots.
+        const lenderBalances =
+            (banking.loansFromRelatedEntities && banking.loansFromRelatedEntities.outstandingLoanBalances) ||
+            banking.outstandingLoanBalances ||
+            {};
         const m77Ag = lenderBalances.m77Ag || null;
         const m5Ag = lenderBalances.m5Ag || null;
+        // The per-lender detail (originations list) also lives nested.
+        const m77Detail = banking.loansFromRelatedEntities && banking.loansFromRelatedEntities.outstandingLoanBalances && banking.loansFromRelatedEntities.outstandingLoanBalances.m77Ag;
+        const m5Detail  = banking.loansFromRelatedEntities && banking.loansFromRelatedEntities.outstandingLoanBalances && banking.loansFromRelatedEntities.outstandingLoanBalances.m5Ag;
 
         // Cash position from banking.json
         const cashBalance = (banking.primaryAccount && banking.primaryAccount.currentBalance) || 0;
@@ -6168,7 +6186,11 @@ app.get('/api/admin/reconciliation/center', authMiddleware, partnerMiddleware, a
             },
             inventory: {
                 value: Math.round(inventoryValue * 100) / 100,
-                items: inventoryItems
+                items: inventoryItems,
+                source: inventorySource,
+                locations: (banking.physicalInventoryOnHand && Array.isArray(banking.physicalInventoryOnHand.locations))
+                    ? banking.physicalInventoryOnHand.locations
+                    : []
             },
             lenders: {
                 totalBalance: Math.round(totalLenderBalance * 100) / 100,
