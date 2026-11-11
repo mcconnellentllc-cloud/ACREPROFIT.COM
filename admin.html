@@ -68,6 +68,7 @@
                             <a href="/distributor-invoices.html" class="dropdown-item">Invoicing (create)</a>
                             <a href="#receivables" class="dropdown-item" data-tab="receivables">Receivables (A/R)</a>
                             <a href="#quote-requests" class="dropdown-item" data-tab="quote-requests">Preorders</a>
+                            <a href="#flash-sale" class="dropdown-item" data-tab="flash-sale"><strong style="color:#059669;">Flash Sale &amp; Blasts</strong></a>
                             <span id="depositMatchNav" style="display: none;"><a href="#deposit-match" class="dropdown-item" data-tab="deposit-match">Deposit Matcher</a></span>
                             <span id="programsNav" style="display: none;"><a href="#programs" class="dropdown-item" data-tab="programs">Programs</a></span>
                             <span id="ratingsNav" style="display: none;"><a href="#ratings" class="dropdown-item" data-tab="ratings">Ratings <span id="ratingsBadge" style="display:none; background:#dc2626; color:#fff; border-radius:999px; padding:0 6px; margin-left:4px; font-size:11px;"></span></a></span>
@@ -1395,6 +1396,122 @@
                     </div>
                     <div id="webhookEventsContent" style="border: 1px solid var(--border); border-radius: 6px;">
                         <div class="loading" style="padding: 40px; text-align: center;">Load the tab to fetch events…</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Flash Sale & Email Blasts Tab -->
+            <div id="flash-saleTab" class="tab-content">
+                <div class="tab-header">
+                    <h2>Flash Sale &amp; Email Blasts</h2>
+                    <p style="color: var(--text-light); margin-top: 4px;">
+                        Toggle sale mode on your inventory, apply sale prices (max 5% off retail — the system refuses deeper cuts), and blast email to customers.
+                    </p>
+                </div>
+
+                <div style="padding: 20px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px;">
+
+                    <!-- LEFT COLUMN: Sale Mode + Pricing -->
+                    <div>
+                        <div style="background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                                <h3 style="margin: 0;">Sale Mode</h3>
+                                <label style="display: inline-flex; align-items: center; gap: 8px; cursor: pointer;">
+                                    <input type="checkbox" id="saleModeToggle" onchange="toggleSaleMode()">
+                                    <span id="saleModeLabel" style="font-weight: 600; color: #6b7280;">OFF</span>
+                                </label>
+                            </div>
+                            <div id="saleModeInfo" style="font-size: 14px; color: var(--text-light);">
+                                When ON, items with a sale price appear on the public storefront at <code>/sale.html</code> and in blast emails.
+                            </div>
+                            <div style="margin-top: 12px; display: flex; gap: 8px;">
+                                <input type="text" id="saleLabel" placeholder="Sale label (e.g. 'End of Year Flash Sale')" style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                            </div>
+                            <div id="saleModeCount" style="margin-top: 12px; padding: 10px; background: #f0fdf4; border-radius: 4px; color: #065f46; font-size: 14px;">
+                                Loading sale inventory count...
+                            </div>
+                        </div>
+
+                        <div style="background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px;">
+                            <h3 style="margin: 0 0 12px;">Apply Sale Prices</h3>
+                            <p style="font-size: 13px; color: var(--text-light); margin: 0 0 12px;">
+                                <strong style="color: #dc2626;">Hard rule:</strong> system refuses any sale price below 95% of retail. Attempts to go lower are rejected before save.
+                            </p>
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                                <button class="btn btn-primary" onclick="openBulkSaleModal()">Bulk apply by % off retail</button>
+                                <button class="btn btn-outline" onclick="loadSaleProducts()">Refresh list</button>
+                            </div>
+                            <div id="saleProductsList" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px;">
+                                <div class="loading" style="padding: 20px;">Loading products...</div>
+                            </div>
+                            <div style="margin-top: 12px;">
+                                <button class="btn btn-danger" onclick="clearAllSalePrices()" style="font-size: 13px;">Clear all sale prices (end the sale)</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RIGHT COLUMN: Email Blast Composer -->
+                    <div>
+                        <div style="background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px; margin-bottom: 16px;">
+                            <h3 style="margin: 0 0 12px;">Compose Email Blast</h3>
+
+                            <div class="form-group">
+                                <label>Campaign name (internal)</label>
+                                <input type="text" id="campaignName" placeholder="End of Year Flash Sale" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Subject line</label>
+                                <input type="text" id="campaignSubject" placeholder="⚡ Flash Sale: Lock in 2027 Pricing Now" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                            </div>
+
+                            <div class="form-group">
+                                <label>Audience</label>
+                                <div style="display: flex; gap: 12px; flex-wrap: wrap;">
+                                    <label style="display: inline-flex; align-items: center; gap: 4px;"><input type="checkbox" id="audCustomer" checked> Customers</label>
+                                    <label style="display: inline-flex; align-items: center; gap: 4px;"><input type="checkbox" id="audDistributor"> Distributors / Reps</label>
+                                    <label style="display: inline-flex; align-items: center; gap: 4px;"><input type="checkbox" id="audPartner"> Partners</label>
+                                </div>
+                                <div style="margin-top: 8px;">
+                                    <input type="text" id="audExtraEmails" placeholder="Extra emails (comma-separated), optional" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-size: 13px;">
+                                </div>
+                                <button class="btn btn-outline" onclick="previewCampaignRecipients()" style="margin-top: 8px; font-size: 13px;">Preview recipient count</button>
+                                <span id="recipientPreview" style="margin-left: 8px; color: var(--text-light); font-size: 13px;"></span>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Body (HTML allowed)</label>
+                                <textarea id="campaignBody" rows="8" style="width: 100%; padding: 8px; border: 1px solid var(--border); border-radius: 4px; font-family: inherit;" placeholder="Hi there,
+
+We're running an end-of-year flash sale on our full chemical inventory. Prices are locked for 2027 planning — click below to browse the sale, build your recipes, and reserve what you need. Pay online or on account, and we'll have it ready for pickup.
+
+— Kyle"></textarea>
+                                <div style="margin-top: 6px; font-size: 13px;">
+                                    <label><input type="checkbox" id="appendSaleInventory" checked> Auto-append current sale inventory table</label>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label>Call-to-action button</label>
+                                <div style="display: flex; gap: 8px;">
+                                    <input type="text" id="campaignCtaLabel" value="Browse Sale Inventory" style="flex: 1; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                                    <input type="text" id="campaignCtaUrl" value="" placeholder="/sale.html (default)" style="flex: 2; padding: 8px; border: 1px solid var(--border); border-radius: 4px;">
+                                </div>
+                            </div>
+
+                            <div style="display: flex; gap: 8px;">
+                                <button class="btn btn-primary" onclick="sendCampaign()">Send Blast</button>
+                                <button class="btn btn-outline" onclick="loadPastCampaigns()">View past campaigns</button>
+                            </div>
+                            <div id="campaignResult" style="margin-top: 12px;"></div>
+                        </div>
+
+                        <div style="background: #fff; border: 1px solid var(--border); border-radius: 8px; padding: 20px;">
+                            <h3 style="margin: 0 0 12px;">Past Campaigns</h3>
+                            <div id="pastCampaignsList">
+                                <div style="color: var(--text-light); font-size: 13px;">Click "View past campaigns" to load.</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -4377,6 +4494,7 @@
             if (tabName === 'applications' && typeof loadApplications === 'function') loadApplications();
             if (tabName === 'customers' && typeof loadCustomers === 'function') loadCustomers();
             if (tabName === 'company-settings' && typeof loadCompanySettings === 'function') loadCompanySettings();
+            if (tabName === 'flash-sale' && typeof loadFlashSale === 'function') loadFlashSale();
         }
 
         // Tab navigation - regular tabs (only for tabs with data-tab attribute)
@@ -11582,6 +11700,237 @@
             const parts = Object.keys(counts).map(k => `${k}: ${counts[k]}`);
             const summaryEl = document.getElementById('webhookEventsSummary');
             summaryEl.textContent = `${data.count} shown${data.count >= data.cap ? ' (capped)' : ''} · ${parts.join(' · ')}`;
+        }
+
+        // ============ FLASH SALE & EMAIL BLASTS ============
+
+        async function loadFlashSale() {
+            // Sale mode state
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/mode`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                const toggle = document.getElementById('saleModeToggle');
+                const label = document.getElementById('saleModeLabel');
+                const countEl = document.getElementById('saleModeCount');
+                const labelInput = document.getElementById('saleLabel');
+                toggle.checked = !!data.active;
+                label.textContent = data.active ? 'ON' : 'OFF';
+                label.style.color = data.active ? '#059669' : '#6b7280';
+                if (data.label) labelInput.value = data.label;
+                countEl.textContent = `${data.onSaleCount || 0} product(s) currently have a sale price set.`;
+            } catch (e) { console.error('loadFlashSale mode:', e); }
+            loadSaleProducts();
+        }
+
+        async function toggleSaleMode() {
+            const toggle = document.getElementById('saleModeToggle');
+            const labelInput = document.getElementById('saleLabel');
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/mode`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ active: toggle.checked, label: labelInput.value || null })
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+                toast(toggle.checked ? 'Sale mode is ON' : 'Sale mode is OFF', 'success');
+                loadFlashSale();
+            } catch (e) {
+                toggle.checked = !toggle.checked;
+                toast('Error: ' + e.message, 'error');
+            }
+        }
+
+        async function loadSaleProducts() {
+            const container = document.getElementById('saleProductsList');
+            container.innerHTML = '<div class="loading" style="padding: 20px;">Loading products…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/inventory?includeAll=true`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                const products = (data.inventory || data || []).filter(p => p.sellPrice > 0);
+                if (!products.length) {
+                    container.innerHTML = '<div style="padding: 20px; color: #6b7280;">No products with retail price set.</div>';
+                    return;
+                }
+                container.innerHTML = products.map(p => {
+                    const retail = Number(p.sellPrice) || 0;
+                    const sale = Number(p.salePrice) || 0;
+                    const floor = Math.round(retail * 0.95 * 100) / 100;
+                    const onSale = !!p.onSale && sale > 0;
+                    return `
+                        <div style="padding: 10px 12px; border-bottom: 1px solid #e5e7eb; display: grid; grid-template-columns: 1fr 100px 110px 80px; gap: 8px; align-items: center;">
+                            <div>
+                                <strong>${_sh(p.productName || '')}</strong>
+                                <div style="font-size: 12px; color: #6b7280;">${_sh(p.packSize || '')} ${_sh(p.unit || '')}</div>
+                            </div>
+                            <div style="font-size: 13px;">Retail: <strong>$${retail.toFixed(2)}</strong><br><span style="color: #9ca3af; font-size: 11px;">Floor: $${floor.toFixed(2)}</span></div>
+                            <input type="number" step="0.01" min="${floor}" value="${sale > 0 ? sale.toFixed(2) : ''}" placeholder="Sale $" id="sale-${p._id || p.id}" style="padding: 6px; border: 1px solid var(--border); border-radius: 4px;">
+                            <button class="btn ${onSale ? 'btn-outline' : 'btn-primary'}" style="padding: 6px 10px; font-size: 12px;" onclick="setItemSalePrice('${p._id || p.id}', ${floor}, ${retail})">${onSale ? 'Update' : 'Set'}</button>
+                        </div>
+                    `;
+                }).join('');
+            } catch (e) {
+                container.innerHTML = '<div style="padding: 20px; color: #dc2626;">Error: ' + e.message + '</div>';
+            }
+        }
+
+        function _sh(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+        async function setItemSalePrice(id, floor, retail) {
+            const input = document.getElementById('sale-' + id);
+            const salePrice = parseFloat(input.value);
+            if (!salePrice || salePrice <= 0) {
+                // Clear the sale
+                try {
+                    const res = await fetch(`${API_URL}/api/admin/chemicals/${id}/sale-price`, {
+                        method: 'PUT',
+                        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ salePrice: null })
+                    });
+                    if (!res.ok) throw new Error((await res.json()).error || 'Failed');
+                    toast('Sale cleared for this item', 'success');
+                    loadFlashSale();
+                } catch (e) { toast(e.message, 'error'); }
+                return;
+            }
+            if (salePrice < floor) {
+                toast(`Rejected: $${salePrice.toFixed(2)} is below the 95% floor of $${floor.toFixed(2)}`, 'error');
+                return;
+            }
+            try {
+                const res = await fetch(`${API_URL}/api/admin/chemicals/${id}/sale-price`, {
+                    method: 'PUT',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ salePrice, onSale: true })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed');
+                toast(`Sale price set: $${salePrice.toFixed(2)} (save $${(retail - salePrice).toFixed(2)})`, 'success');
+                loadFlashSale();
+            } catch (e) { toast(e.message, 'error'); }
+        }
+
+        async function openBulkSaleModal() {
+            const pctStr = window.prompt('Enter a % off retail to apply to ALL products with a retail price set.\nMax 5% (anything higher is rejected by the server).', '5');
+            if (!pctStr) return;
+            const pct = parseFloat(pctStr);
+            if (!pct || pct <= 0 || pct > 5) {
+                toast('Discount must be between 0 and 5 (inclusive).', 'error');
+                return;
+            }
+            try {
+                // Load all products, build the batch
+                const res = await fetch(`${API_URL}/api/admin/inventory?includeAll=true`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                const products = (data.inventory || data || []).filter(p => p.sellPrice > 0);
+                const items = products.map(p => ({
+                    chemicalId: p._id || p.id,
+                    salePrice: Math.round(Number(p.sellPrice) * (1 - pct / 100) * 100) / 100
+                }));
+                const apply = await fetch(`${API_URL}/api/admin/sale/bulk-apply`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ items, note: `${pct}% off flash sale` })
+                });
+                const r = await apply.json();
+                if (!apply.ok) throw new Error(r.error || 'Failed');
+                toast(`Applied ${pct}% off to ${r.applied} products`, 'success');
+                loadFlashSale();
+            } catch (e) { toast(e.message, 'error'); }
+        }
+
+        async function clearAllSalePrices() {
+            if (!await confirmDialog('End the sale — clear every sale price on every product?', { danger: true, ok: 'Clear all' })) return;
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/clear-all`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed');
+                toast(`Cleared sale on ${data.cleared} product(s)`, 'success');
+                loadFlashSale();
+            } catch (e) { toast(e.message, 'error'); }
+        }
+
+        function _collectAudience() {
+            const roles = [];
+            if (document.getElementById('audCustomer').checked) roles.push('customer');
+            if (document.getElementById('audDistributor').checked) roles.push('distributor');
+            if (document.getElementById('audPartner').checked) roles.push('partner');
+            const extra = (document.getElementById('audExtraEmails').value || '')
+                .split(/[,\s]+/).map(s => s.trim()).filter(s => s.includes('@'));
+            return { roles, extraEmails: extra };
+        }
+
+        async function previewCampaignRecipients() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/campaigns/preview-recipients`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ audience: _collectAudience() })
+                });
+                const data = await res.json();
+                document.getElementById('recipientPreview').textContent = `${data.count} recipient(s) matched`;
+            } catch (e) {
+                document.getElementById('recipientPreview').textContent = 'Error: ' + e.message;
+            }
+        }
+
+        async function sendCampaign() {
+            const subject = document.getElementById('campaignSubject').value.trim();
+            const body = document.getElementById('campaignBody').value.trim();
+            const name = document.getElementById('campaignName').value.trim() || subject;
+            const audience = _collectAudience();
+            const appendSaleInventory = document.getElementById('appendSaleInventory').checked;
+            const ctaLabel = document.getElementById('campaignCtaLabel').value.trim();
+            const ctaUrl = document.getElementById('campaignCtaUrl').value.trim();
+
+            if (!subject) { toast('Subject is required', 'error'); return; }
+            if (!body) { toast('Body is required', 'error'); return; }
+            if (!audience.roles.length && !audience.extraEmails.length) { toast('Pick at least one audience', 'error'); return; }
+
+            // Convert plain-text body to simple HTML (preserve line breaks)
+            const bodyHtml = body.split('\n\n').map(p => `<p style="margin:0 0 16px;line-height:1.6;">${_sh(p).replace(/\n/g, '<br>')}</p>`).join('');
+
+            if (!await confirmDialog(`Send "${subject}" to ${audience.roles.join(', ') || 'extra emails'}?\n\nThis will deliver via SendGrid. Delivery cannot be undone.`, { ok: 'Send blast', danger: true })) return;
+
+            const resultEl = document.getElementById('campaignResult');
+            resultEl.innerHTML = '<div style="padding: 10px; background: #fef3c7; border-radius: 4px;">Sending…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/campaigns/send`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, subject, bodyHtml, audience, appendSaleInventory, ctaLabel, ctaUrl: ctaUrl || null })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed');
+                resultEl.innerHTML = `<div style="padding: 10px; background: #d1fae5; border-radius: 4px; color: #065f46;"><strong>Sent.</strong> ${data.sent} delivered, ${data.failed} failed out of ${data.totalRecipients}.</div>`;
+                toast(`Blast sent to ${data.sent} recipients`, 'success');
+            } catch (e) {
+                resultEl.innerHTML = `<div style="padding: 10px; background: #fee2e2; border-radius: 4px; color: #991b1b;"><strong>Error:</strong> ${_sh(e.message)}</div>`;
+            }
+        }
+
+        async function loadPastCampaigns() {
+            const container = document.getElementById('pastCampaignsList');
+            container.innerHTML = '<div style="color: #6b7280;">Loading…</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/campaigns?limit=20`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const data = await res.json();
+                if (!data.campaigns || !data.campaigns.length) {
+                    container.innerHTML = '<div style="color: #6b7280;">No campaigns sent yet.</div>';
+                    return;
+                }
+                container.innerHTML = data.campaigns.map(c => `
+                    <div style="padding: 10px; border-bottom: 1px solid #e5e7eb; font-size: 13px;">
+                        <strong>${_sh(c.name || c.subject)}</strong>
+                        <div style="color: #6b7280; font-size: 12px;">${new Date(c.sentAt || c.createdAt).toLocaleString()}</div>
+                        <div>${c.stats?.sent || 0} sent · ${c.stats?.failed || 0} failed · ${c.stats?.totalRecipients || 0} recipients</div>
+                    </div>
+                `).join('');
+            } catch (e) { container.innerHTML = '<div style="color: #dc2626;">Error: ' + e.message + '</div>'; }
         }
 
         async function loadWebhookEvents() {

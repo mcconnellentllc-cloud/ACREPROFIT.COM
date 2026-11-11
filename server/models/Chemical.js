@@ -74,6 +74,19 @@ const chemicalSchema = new mongoose.Schema({
     marginDollars: { type: Number, default: 0 },
     sellPrice: { type: Number },
     priceIsSpeculated: { type: Boolean, default: false },
+
+    // ============ SALE PRICING (flash sale) ============
+    // salePrice: temporary price offered during a sale. If set AND > 0, the
+    // storefront shows it as the active price when `onSale: true`. The
+    // pre-validate hook below ENFORCES salePrice >= 0.95 * sellPrice, so
+    // it is impossible to accidentally discount deeper than 5% of retail.
+    // Clearing a sale: set salePrice = null, onSale = false.
+    salePrice: { type: Number, default: null },
+    onSale: { type: Boolean, default: false, index: true },
+    saleStartedAt: { type: Date, default: null },
+    saleEndsAt: { type: Date, default: null },
+    saleNote: { type: String, default: null }, // Optional label, e.g. "End-of-year flash sale"
+
     // Legacy fields (kept for backward compatibility)
     adminMargin: { type: Number, default: 0 },
     regularMargin: { type: Number, default: 0 },
@@ -275,6 +288,31 @@ const CHEMICAL_MONEY_PATHS = {
     'sellPrice': 4,
 };
 chemicalSchema.set('toJSON', { transform: decimalToJSONTransform });
-chemicalSchema.pre('validate', function (next) { coerceMoneyFields(this, CHEMICAL_MONEY_PATHS); next(); });
+chemicalSchema.pre('validate', function (next) {
+    coerceMoneyFields(this, CHEMICAL_MONEY_PATHS);
+
+    // ============ SALE PRICE FLOOR — HARD RULE ============
+    // Kyle's policy (2026-11-11): "do not drop any price by more than 5% of
+    // retail price" → system refuses to save any salePrice below 95% of
+    // sellPrice. This runs on EVERY save path (admin UI, bulk import, API,
+    // even direct Chemical.findByIdAndUpdate IF they use { runValidators:
+    // true }). For findOneAndUpdate without runValidators, the floor is
+    // ALSO enforced at the two /sale endpoints that accept a salePrice.
+    if (this.salePrice !== null && this.salePrice !== undefined && Number(this.salePrice) > 0) {
+        const retail = Number(this.sellPrice);
+        const sale = Number(this.salePrice);
+        if (!retail || retail <= 0) {
+            return next(new Error('SALE_FLOOR: cannot set a sale price before the regular retail price (sellPrice) is set.'));
+        }
+        const floor = Math.round(retail * 0.95 * 100) / 100;
+        if (sale < floor) {
+            return next(new Error(
+                `SALE_FLOOR: sale price $${sale.toFixed(2)} is below the 95% floor of $${floor.toFixed(2)} ` +
+                `(retail $${retail.toFixed(2)}). The maximum discount allowed is 5% of retail.`
+            ));
+        }
+    }
+    next();
+});
 
 module.exports = mongoose.models.Chemical || mongoose.model('Chemical', chemicalSchema);

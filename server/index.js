@@ -4844,6 +4844,53 @@ const emailLogSchema = new mongoose.Schema({
 emailLogSchema.index({ sentAt: -1 });
 const EmailLog = mongoose.model('EmailLog', emailLogSchema);
 
+// ============================================================================
+// EmailCampaign — mass-mail campaigns (flash sale, newsletters, announcements)
+// ============================================================================
+// Unlike EmailLog (one row per transactional send), a campaign is the thing
+// the admin composes ONCE and fans out to many recipients. The per-recipient
+// EmailLog rows are still written (so bounce/open tracking still works), but
+// the campaign row holds the single source of truth: what was sent, to whom
+// it was aimed, by whom, when, and the delivery stats.
+const emailCampaignSchema = new mongoose.Schema({
+    name: { type: String, required: true },            // Admin-facing label, e.g. "End of year flash sale"
+    subject: { type: String, required: true },
+    bodyHtml: { type: String, required: true },         // Full rendered HTML that went out
+    bodyText: { type: String },                         // Plain-text fallback (optional)
+    // Who received it. Resolved at send time from `audience`.
+    audience: {
+        roles: [{ type: String, enum: ['customer', 'distributor', 'partner', 'admin', 'superadmin'] }],
+        includeArchived: { type: Boolean, default: false },
+        userIds: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }], // explicit list override
+        extraEmails: [String]                           // one-off addresses not in User table
+    },
+    // Attached sale snapshot — frozen at send time so the campaign is reproducible.
+    // Shape: [{ productName, packSize, unit, retailPrice, salePrice, savings }]
+    saleSnapshot: [mongoose.Schema.Types.Mixed],
+    // Delivery stats — updated during and after send.
+    stats: {
+        totalRecipients: { type: Number, default: 0 },
+        sent: { type: Number, default: 0 },
+        failed: { type: Number, default: 0 },
+        bounced: { type: Number, default: 0 },
+        opened: { type: Number, default: 0 },
+        clicked: { type: Number, default: 0 }
+    },
+    status: {
+        type: String,
+        enum: ['draft', 'sending', 'sent', 'failed'],
+        default: 'draft',
+        index: true
+    },
+    sentBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
+    sentByName: String,
+    sentAt: { type: Date, index: true },
+    createdAt: { type: Date, default: Date.now },
+    updatedAt: Date
+});
+emailCampaignSchema.index({ sentAt: -1 });
+const EmailCampaign = mongoose.model('EmailCampaign', emailCampaignSchema);
+
 // Raw transport - returns a nodemailer-compatible transporter (or null).
 // SendGrid path returns a shim matching the nodemailer sendMail signature;
 // SMTP/Gmail paths return actual nodemailer transporters. Never called
@@ -9889,6 +9936,519 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
         res.json(chemical);
     } catch (error) {
         res.status(400).json({ error: error.message });
+    }
+});
+
+// ============================================================================
+// FLASH SALE — admin-controlled sale mode with 95% price floor (HARD RULE)
+// ============================================================================
+// Kyle policy (2026-11-11): never discount more than 5% off retail. The floor
+// is enforced in the Chemical.pre('validate') hook on the model itself, so it
+// applies on every save path. These endpoints apply the floor explicitly too
+// for better error messages, and so a bulk update that would violate the floor
+// fails fast with a list of offenders instead of saving some and rejecting
+// others mid-stream.
+
+// Global sale-mode toggle. When true, the public storefront (retail-prices,
+// catalog pages) shows salePrice as the active price for any item with
+// onSale=true. When false, the storefront ignores salePrice entirely.
+let _saleModeCache = null;
+async function getSaleMode() {
+    if (_saleModeCache !== null) return _saleModeCache;
+    // Settings is a KV-ish doc stored in business.json. For simplicity we
+    // store the sale-mode flag in a dedicated small collection keyed by
+    // name='saleMode'. Falls back to false if nothing is set.
+    try {
+        const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+            key: { type: String, required: true, unique: true },
+            value: mongoose.Schema.Types.Mixed,
+            updatedAt: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }));
+        const doc = await SaleSetting.findOne({ key: 'saleMode' });
+        _saleModeCache = doc ? !!doc.value?.active : false;
+        return _saleModeCache;
+    } catch (e) {
+        return false;
+    }
+}
+function _invalidateSaleModeCache() { _saleModeCache = null; }
+
+// GET /api/admin/sale/mode — read current sale mode
+app.get('/api/admin/sale/mode', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+            key: { type: String, required: true, unique: true },
+            value: mongoose.Schema.Types.Mixed,
+            updatedAt: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }));
+        const doc = await SaleSetting.findOne({ key: 'saleMode' });
+        const onSaleCount = await Chemical.countDocuments({ onSale: true, isActive: true });
+        res.json({
+            active: doc ? !!doc.value?.active : false,
+            label: doc?.value?.label || null,
+            startsAt: doc?.value?.startsAt || null,
+            endsAt: doc?.value?.endsAt || null,
+            updatedAt: doc?.updatedAt || null,
+            onSaleCount
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/admin/sale/mode — toggle sale mode on/off
+app.put('/api/admin/sale/mode', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { active, label, startsAt, endsAt } = req.body;
+        if (typeof active !== 'boolean') {
+            return res.status(400).json({ error: 'active (boolean) is required' });
+        }
+        const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+            key: { type: String, required: true, unique: true },
+            value: mongoose.Schema.Types.Mixed,
+            updatedAt: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }));
+        const doc = await SaleSetting.findOneAndUpdate(
+            { key: 'saleMode' },
+            {
+                key: 'saleMode',
+                value: { active, label: label || null, startsAt: startsAt || null, endsAt: endsAt || null },
+                updatedAt: new Date(),
+                updatedBy: req.user._id
+            },
+            { upsert: true, new: true }
+        );
+        _invalidateSaleModeCache();
+        res.json({ ok: true, active, label: doc.value?.label, startsAt: doc.value?.startsAt, endsAt: doc.value?.endsAt });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/admin/chemicals/:id/sale-price — set/clear sale price for one chemical
+// Request body: { salePrice: number|null, onSale: boolean, note: string }
+// Sending salePrice=null OR onSale=false clears the sale.
+// Floor rule: salePrice must be >= 0.95 * sellPrice (enforced here AND in model).
+app.put('/api/admin/chemicals/:id/sale-price', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { salePrice, onSale, note } = req.body;
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) return res.status(404).json({ error: 'Chemical not found' });
+
+        // Clear sale
+        if (salePrice === null || salePrice === undefined || onSale === false || Number(salePrice) <= 0) {
+            chemical.salePrice = null;
+            chemical.onSale = false;
+            chemical.saleStartedAt = null;
+            chemical.saleEndsAt = null;
+            chemical.saleNote = null;
+            await chemical.save();
+            return res.json({ ok: true, cleared: true, chemical });
+        }
+
+        // Set sale — enforce floor explicitly for a clear error before save
+        const retail = Number(chemical.sellPrice);
+        const sale = Number(salePrice);
+        if (!retail || retail <= 0) {
+            return res.status(400).json({
+                error: 'Cannot set a sale price before the regular retail price (sellPrice) is set on this product.'
+            });
+        }
+        const floor = Math.round(retail * 0.95 * 100) / 100;
+        if (sale < floor) {
+            return res.status(400).json({
+                error: `Sale price $${sale.toFixed(2)} is below the 95% floor of $${floor.toFixed(2)} (retail $${retail.toFixed(2)}). Maximum discount is 5% of retail.`,
+                floor,
+                retail,
+                attempted: sale
+            });
+        }
+
+        chemical.salePrice = sale;
+        chemical.onSale = true;
+        if (!chemical.saleStartedAt) chemical.saleStartedAt = new Date();
+        if (note !== undefined) chemical.saleNote = note || null;
+        await chemical.save();
+        res.json({ ok: true, chemical });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/sale/bulk-apply — apply a sale across many products at once
+// Request body: { items: [{chemicalId, salePrice}], note }
+// Validates the entire batch first. If any item violates the 95% floor, the
+// whole batch is rejected with the list of offenders — no partial saves.
+app.post('/api/admin/sale/bulk-apply', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { items, note } = req.body;
+        if (!Array.isArray(items) || !items.length) {
+            return res.status(400).json({ error: 'items must be a non-empty array of {chemicalId, salePrice}' });
+        }
+
+        // Validate the whole batch up front
+        const ids = items.map(i => i.chemicalId).filter(Boolean);
+        const chemicals = await Chemical.find({ _id: { $in: ids } });
+        const byId = new Map(chemicals.map(c => [String(c._id), c]));
+        const violations = [];
+
+        for (const item of items) {
+            const c = byId.get(String(item.chemicalId));
+            if (!c) {
+                violations.push({ chemicalId: item.chemicalId, reason: 'not found' });
+                continue;
+            }
+            const retail = Number(c.sellPrice);
+            const sale = Number(item.salePrice);
+            if (!retail || retail <= 0) {
+                violations.push({ chemicalId: item.chemicalId, productName: c.productName, reason: 'retail price not set' });
+                continue;
+            }
+            if (!sale || sale <= 0) {
+                violations.push({ chemicalId: item.chemicalId, productName: c.productName, reason: 'sale price must be > 0' });
+                continue;
+            }
+            const floor = Math.round(retail * 0.95 * 100) / 100;
+            if (sale < floor) {
+                violations.push({
+                    chemicalId: item.chemicalId,
+                    productName: c.productName,
+                    retail,
+                    floor,
+                    attempted: sale,
+                    reason: `below 95% floor of $${floor.toFixed(2)}`
+                });
+            }
+        }
+
+        if (violations.length) {
+            return res.status(400).json({
+                error: `Batch rejected — ${violations.length} item(s) violate the 95% floor or are otherwise invalid. No prices were changed.`,
+                violations
+            });
+        }
+
+        // All clean — apply
+        const now = new Date();
+        let applied = 0;
+        for (const item of items) {
+            const c = byId.get(String(item.chemicalId));
+            c.salePrice = Number(item.salePrice);
+            c.onSale = true;
+            if (!c.saleStartedAt) c.saleStartedAt = now;
+            if (note) c.saleNote = note;
+            await c.save();
+            applied++;
+        }
+        res.json({ ok: true, applied, note: note || null });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/sale/clear-all — clear sale pricing on every chemical.
+// Use this at the end of a sale to wipe salePrice back to null everywhere.
+app.post('/api/admin/sale/clear-all', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const result = await Chemical.updateMany(
+            { onSale: true },
+            { $set: { salePrice: null, onSale: false, saleEndsAt: new Date(), saleNote: null } }
+        );
+        res.json({ ok: true, cleared: result.modifiedCount || 0 });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/sale/active — PUBLIC endpoint. Lists all products currently on sale.
+// Shape matches what the public /sale page needs: id, productName, packSize,
+// unit, sellPrice (crossed out), salePrice, discount %, inventory available.
+app.get('/api/sale/active', async (req, res) => {
+    try {
+        const saleMode = await getSaleMode();
+        if (!saleMode) return res.json({ active: false, items: [] });
+        const items = await Chemical.find({
+            onSale: true,
+            isActive: true,
+            availableForOrder: true,
+            status: 'approved'
+        }).select('productName tradeName manufacturer packSize unit sellPrice salePrice saleNote category').lean();
+
+        const formatted = items.map(i => ({
+            id: i._id,
+            productName: i.productName,
+            tradeName: i.tradeName,
+            manufacturer: i.manufacturer,
+            packSize: i.packSize,
+            unit: i.unit,
+            retailPrice: i.sellPrice,
+            salePrice: i.salePrice,
+            discountPercent: i.sellPrice ? Math.round(((i.sellPrice - i.salePrice) / i.sellPrice) * 100 * 10) / 10 : 0,
+            savings: i.sellPrice && i.salePrice ? Math.round((i.sellPrice - i.salePrice) * 100) / 100 : 0,
+            category: i.category,
+            saleNote: i.saleNote
+        }));
+        res.json({ active: true, count: formatted.length, items: formatted });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============================================================================
+// EMAIL CAMPAIGNS — sale blasts, announcements, newsletter-style sends
+// ============================================================================
+// Admin composes a message, picks an audience (customers / distributors /
+// all / explicit list), optionally auto-appends the current sale inventory
+// table, and fires. Delivery goes through the same createEmailTransporter()
+// used by every other send on the site, so SendGrid is the default transport,
+// test mode is honored, and every per-recipient delivery is written to the
+// EmailLog audit trail. The EmailCampaign row carries the single source of
+// truth for the blast: subject, body, audience, counts, status.
+
+// Helper: resolve an audience spec to a de-duped list of {email, name}
+async function _resolveAudience(audience = {}) {
+    const recipients = new Map(); // email → {email, name}
+
+    // 1) Role-based pull from User collection
+    if (Array.isArray(audience.roles) && audience.roles.length) {
+        const query = { role: { $in: audience.roles }, email: { $exists: true, $ne: null, $ne: '' } };
+        if (!audience.includeArchived) query.isActive = { $ne: false };
+        // Honor opt-out flags if present
+        query.$or = [{ emailOptOut: { $ne: true } }, { emailOptOut: { $exists: false } }];
+        const users = await User.find(query).select('email name firstName lastName').lean();
+        for (const u of users) {
+            const email = (u.email || '').trim().toLowerCase();
+            if (!email) continue;
+            if (!recipients.has(email)) {
+                recipients.set(email, { email, name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || '' });
+            }
+        }
+    }
+
+    // 2) Explicit user IDs
+    if (Array.isArray(audience.userIds) && audience.userIds.length) {
+        const users = await User.find({ _id: { $in: audience.userIds }, email: { $exists: true, $ne: null, $ne: '' } })
+            .select('email name firstName lastName').lean();
+        for (const u of users) {
+            const email = (u.email || '').trim().toLowerCase();
+            if (!email) continue;
+            if (!recipients.has(email)) {
+                recipients.set(email, { email, name: u.name || [u.firstName, u.lastName].filter(Boolean).join(' ') || '' });
+            }
+        }
+    }
+
+    // 3) Extra raw emails — admin-pasted addresses not in the User table
+    if (Array.isArray(audience.extraEmails)) {
+        for (const raw of audience.extraEmails) {
+            const email = String(raw || '').trim().toLowerCase();
+            if (!email || !email.includes('@')) continue;
+            if (!recipients.has(email)) recipients.set(email, { email, name: '' });
+        }
+    }
+
+    return Array.from(recipients.values());
+}
+
+// Helper: build the sale snapshot HTML table that gets appended to blasts
+async function _buildSaleHtmlSnapshot() {
+    const items = await Chemical.find({
+        onSale: true, isActive: true, availableForOrder: true, status: 'approved'
+    }).select('productName packSize unit sellPrice salePrice manufacturer').lean();
+
+    if (!items.length) return { html: '', text: '', items: [] };
+
+    const rows = items.map(i => {
+        const retail = Number(i.sellPrice) || 0;
+        const sale = Number(i.salePrice) || 0;
+        const savings = Math.max(0, retail - sale);
+        return { productName: i.productName, packSize: i.packSize, unit: i.unit, manufacturer: i.manufacturer, retailPrice: retail, salePrice: sale, savings };
+    });
+
+    const htmlRows = rows.map(r => `
+        <tr>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;">
+                <strong>${_escapeHtml(r.productName)}</strong>
+                ${r.manufacturer ? `<br><span style="color:#6b7280;font-size:13px;">${_escapeHtml(r.manufacturer)}</span>` : ''}
+                <br><span style="color:#6b7280;font-size:13px;">${_escapeHtml(r.packSize)} ${_escapeHtml(r.unit || '')}</span>
+            </td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#9ca3af;text-decoration:line-through;">$${r.retailPrice.toFixed(2)}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#059669;font-weight:700;font-size:16px;">$${r.salePrice.toFixed(2)}</td>
+            <td style="padding:10px 12px;border-bottom:1px solid #e5e7eb;text-align:right;color:#059669;">You save $${r.savings.toFixed(2)}</td>
+        </tr>
+    `).join('');
+
+    const html = `
+        <h3 style="margin:24px 0 12px;font-size:18px;color:#111827;">Current Sale Inventory</h3>
+        <table style="width:100%;border-collapse:collapse;border:1px solid #e5e7eb;border-radius:6px;overflow:hidden;">
+            <thead><tr style="background:#f9fafb;">
+                <th style="padding:10px 12px;text-align:left;font-size:13px;color:#374151;">Product</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#374151;">Retail</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#374151;">Sale</th>
+                <th style="padding:10px 12px;text-align:right;font-size:13px;color:#374151;">Savings</th>
+            </tr></thead>
+            <tbody>${htmlRows}</tbody>
+        </table>
+    `;
+
+    const text = rows.map(r => `${r.productName} (${r.packSize} ${r.unit || ''}) — Retail $${r.retailPrice.toFixed(2)} → Sale $${r.salePrice.toFixed(2)} (save $${r.savings.toFixed(2)})`).join('\n');
+
+    return { html, text, items: rows };
+}
+
+function _escapeHtml(s) {
+    return String(s || '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+}
+
+// POST /api/admin/campaigns/preview-recipients — how many would we send to?
+app.post('/api/admin/campaigns/preview-recipients', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const recipients = await _resolveAudience(req.body?.audience || {});
+        res.json({ count: recipients.length, sample: recipients.slice(0, 10) });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/campaigns/send — compose and send a blast
+// Body: {
+//   name, subject, bodyHtml, [bodyText], audience: {roles, userIds, extraEmails, includeArchived},
+//   appendSaleInventory: boolean, ctaUrl: string, ctaLabel: string
+// }
+app.post('/api/admin/campaigns/send', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { name, subject, bodyHtml, bodyText, audience, appendSaleInventory, ctaUrl, ctaLabel } = req.body || {};
+        if (!subject) return res.status(400).json({ error: 'subject is required' });
+        if (!bodyHtml) return res.status(400).json({ error: 'bodyHtml is required' });
+
+        const recipients = await _resolveAudience(audience || {});
+        if (!recipients.length) {
+            return res.status(400).json({ error: 'No recipients matched the audience filter. Refusing to send.' });
+        }
+
+        // Build sale snapshot if requested
+        let saleSnapshot = [];
+        let saleHtml = '';
+        if (appendSaleInventory) {
+            const snap = await _buildSaleHtmlSnapshot();
+            saleSnapshot = snap.items;
+            saleHtml = snap.html;
+        }
+
+        const siteUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+        const saleUrl = ctaUrl || `${siteUrl}/sale.html`;
+        const label = ctaLabel || 'Browse Sale Inventory';
+        const ctaButton = `
+            <div style="margin:28px 0;text-align:center;">
+                <a href="${_escapeHtml(saleUrl)}" style="display:inline-block;background:#059669;color:#fff;padding:14px 28px;border-radius:6px;text-decoration:none;font-weight:600;font-size:16px;">${_escapeHtml(label)} →</a>
+            </div>
+        `;
+
+        const fullHtml = `
+            <div style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;max-width:640px;margin:0 auto;padding:24px;color:#111827;">
+                ${bodyHtml}
+                ${saleHtml}
+                ${ctaButton}
+                <hr style="margin:32px 0;border:none;border-top:1px solid #e5e7eb;">
+                <p style="font-size:12px;color:#6b7280;line-height:1.5;">
+                    You're receiving this because you're a customer of AcreProfit LLC.
+                    Questions? Reply to this email or call your sales rep.
+                </p>
+            </div>
+        `;
+
+        // Create the campaign record up front so we have an audit trail even if send partially fails
+        const campaign = await EmailCampaign.create({
+            name: name || subject,
+            subject,
+            bodyHtml: fullHtml,
+            bodyText: bodyText || '',
+            audience: audience || {},
+            saleSnapshot,
+            stats: { totalRecipients: recipients.length, sent: 0, failed: 0 },
+            status: 'sending',
+            sentBy: req.user._id,
+            sentByName: req.user.name,
+            sentAt: new Date(),
+            createdAt: new Date(),
+            updatedAt: new Date()
+        });
+
+        const transporter = createEmailTransporter();
+        if (!transporter) {
+            campaign.status = 'failed';
+            await campaign.save();
+            return res.status(500).json({ error: 'No email transport configured (SENDGRID_API_KEY, SMTP, or Gmail).' });
+        }
+
+        const from = process.env.FROM_EMAIL || 'no-reply@acreprofit.com';
+        let sent = 0, failed = 0;
+        // Send one-by-one so SendGrid keeps per-recipient tracking + the EmailLog
+        // transactional audit works (the transporter wraps each sendMail into
+        // its own EmailLog row).
+        for (const r of recipients) {
+            try {
+                await transporter.sendMail({
+                    from,
+                    to: r.email,
+                    subject,
+                    html: fullHtml,
+                    text: bodyText || undefined
+                });
+                sent++;
+            } catch (e) {
+                failed++;
+                console.error(`[Campaign ${campaign._id}] send failed to ${r.email}:`, e.message);
+            }
+        }
+
+        campaign.stats.sent = sent;
+        campaign.stats.failed = failed;
+        campaign.status = failed === recipients.length ? 'failed' : 'sent';
+        campaign.updatedAt = new Date();
+        await campaign.save();
+
+        res.json({
+            ok: true,
+            campaignId: campaign._id,
+            totalRecipients: recipients.length,
+            sent,
+            failed,
+            status: campaign.status
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/campaigns — list past campaigns
+app.get('/api/admin/campaigns', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const limit = Math.min(Number(req.query.limit) || 25, 100);
+        const campaigns = await EmailCampaign.find({})
+            .sort({ sentAt: -1, createdAt: -1 })
+            .limit(limit)
+            .select('-bodyHtml -saleSnapshot')  // keep list payload small
+            .lean();
+        res.json({ campaigns });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/admin/campaigns/:id — full campaign including rendered body + snapshot
+app.get('/api/admin/campaigns/:id', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const campaign = await EmailCampaign.findById(req.params.id).lean();
+        if (!campaign) return res.status(404).json({ error: 'Campaign not found' });
+        res.json({ campaign });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
     }
 });
 
