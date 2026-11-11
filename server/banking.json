@@ -34,7 +34,7 @@
     { "month": "2026-06", "endingDate": "2026-06-30", "begin": 3638.15,    "credits": 75000.00,  "debits": 75045.00,   "ending": 3593.15,   "notes": "Alumax $75,000 in, $75,045 loan repayment to Kyle (telephone transfer) same day." },
     { "month": "2026-07", "endingDate": "2026-07-31", "begin": 3593.15,    "credits": 71843.11,  "debits": 18440.41,   "ending": 56995.85,  "notes": "Corbet ACH out $18,440.41. Customer deposits: Seger, Ardmore, Tabric Group, GSV Pharms." },
     { "month": "2026-08", "endingDate": "2026-08-31", "begin": 56995.85,   "credits": 35261.72,  "debits": 62439.40,   "ending": 29818.17,  "notes": "Corbet ACH $18,439.40. $44,000 wire to M77 Ag (confirmed 2026-11-11 via wire-debit image; memo 'Principal' = loan paydown). 2 Stripe transfers in: $1,092.67 + $8,069.05." },
-    { "month": "2026-09", "endingDate": "2026-09-30", "begin": 29818.17,   "credits": 93399.20,  "debits": 29800.00,   "ending": 93417.37,  "notes": "Stripe $36,020.40 in. 3-check deposit $57,378.80. $29,800 LOAN PAYMENT to Kyle." },
+    { "month": "2026-09", "endingDate": "2026-09-30", "begin": 29818.17,   "credits": 93399.20,  "debits": 29800.00,   "ending": 93417.37,  "notes": "Stripe $36,020.40 in. 3-check deposit $57,378.80. $29,800 LOAN PAYMENT to M77 Ag (confirmed 2026-11-11 via wire-debit image, memo 'Principal')." },
     { "month": "2026-10", "endingDate": "2026-10-30", "begin": 93417.37,   "credits": 25645.00,  "debits": 93419.20,   "ending": 25643.17,  "notes": "Check #2300 $57,378.80 to M5 Ag + $36,040.40 wire to M5 Ag/Ty — both M5 Ag loan paydowns ($93,419.20 combined). $1,000 reclass from M77 Ag (9047→9253)." }
   ],
   "yearToDate": {
@@ -58,20 +58,19 @@
       ]
     },
     "m77AgLoanRepayments": {
-      "confirmed": 71500.00,
-      "note": "Confirmed M77 Ag loan paydowns. Account ownership of 9047 confirmed by Kyle 2026-11-10. 8/3 wire confirmed by Kyle 2026-11-11 via wire-debit image (memo 'Principal').",
+      "confirmed": 101300.00,
+      "note": "All M77 Ag loan paydowns confirmed via wire debit images from Kyle 2026-11-11. Account 9047 = M77 Ag (confirmed 2026-11-10).",
       "transactions": [
-        { "date": "2026-04-27", "amount": 12500.00, "method": "Online transfer 9253 → 9047",         "description": "Loan Repayment",    "verified": true, "payeeEntity": "M77 Ag" },
+        { "date": "2026-04-27", "amount": 12500.00, "method": "Online transfer 9253 → 9047",         "description": "Loan Repayment",     "verified": true, "payeeEntity": "M77 Ag" },
         { "date": "2026-05-08", "amount": 15000.00, "method": "Online transfer 9253 → 9047",         "description": "Loan Reimbursement", "verified": true, "payeeEntity": "M77 Ag" },
-        { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire) 9253 → M77", "description": "Wire memo: 'Principal'", "verified": true, "payeeEntity": "M77 Ag" }
+        { "date": "2026-08-03", "amount": 44000.00, "method": "TELEPHONE TRANSFER (wire) 9253 → M77", "description": "Wire memo: 'Principal'", "verified": true, "payeeEntity": "M77 Ag" },
+        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit 9253 → M77",              "description": "Wire memo: 'Principal'. Stmt description: 'LOAN PAYMENT'.", "verified": true, "payeeEntity": "M77 Ag" }
       ]
     },
     "wiresOutPendingPayeeClassification": {
-      "subtotal": 29800.00,
-      "note": "One remaining Other Debit outflow whose payee entity isn't on the statement. 6/11 was reclassified as a Sims supplier payment; 8/3 is now confirmed as M77 Ag loan paydown.",
-      "transactions": [
-        { "date": "2026-09-11", "amount": 29800.00, "method": "Other Debit", "description": "LOAN PAYMENT", "verified": true, "payeeEntity": "PENDING", "notes": "Could be loan repayment to M77 Ag/M5 Ag/other. Statement explicitly says 'LOAN PAYMENT'." }
-      ]
+      "subtotal": 0.00,
+      "note": "All AcreProfit outflows are now classified. Every wire/transfer has a confirmed destination as of 2026-11-11.",
+      "transactions": []
     }
   },
   "paymentsToPartners": {
@@ -102,13 +101,14 @@
           { "date": "2026-04-30", "amount": 84807.00, "route": "Deposit into 9253 → AcreProfit wires Jabco $84,827 same day", "supplierInvoice": "Jabco SO 2129 + 2131 $84,807", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-10 — 'wire in is loan from M77 ag to Acre Profit to pay for JabCO order'" },
           { "date": "2026-06-11", "amount": 75000.00, "route": "Deposit into 9253 → AcreProfit wires Sims $75,045 same day", "supplierInvoice": "Sims Invoice 103475 $75,025 (billed to M5 Ag at Sims, but AcreProfit paid with M77 Ag's money)", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-10 — '6/11 deposit is a loan from M77 ag to Acre Profit - the 75045.00 is a payment to sims or jabco'" }
         ],
-        "repaidYTD": 71500.00,
+        "repaidYTD": 101300.00,
         "repayments": [
-          { "date": "2026-04-27", "amount": 12500.00, "route": "9253 → 9047 online transfer",     "description": "Loan Repayment" },
-          { "date": "2026-05-08", "amount": 15000.00, "route": "9253 → 9047 online transfer",     "description": "Loan Reimbursement" },
-          { "date": "2026-08-03", "amount": 44000.00, "route": "9253 → M77 Ag via TELEPHONE TRANSFER (wire)", "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image)." }
+          { "date": "2026-04-27", "amount": 12500.00, "route": "9253 → 9047 online transfer",            "description": "Loan Repayment" },
+          { "date": "2026-05-08", "amount": 15000.00, "route": "9253 → 9047 online transfer",            "description": "Loan Reimbursement" },
+          { "date": "2026-08-03", "amount": 44000.00, "route": "9253 → M77 Ag via TELEPHONE TRANSFER",   "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image)." },
+          { "date": "2026-09-11", "amount": 29800.00, "route": "9253 → M77 Ag via Other Debit",          "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image). Statement description was 'LOAN PAYMENT'." }
         ],
-        "balanceOwed": 163539.50,
+        "balanceOwed": 133739.50,
         "notes": "Kyle's March screenshot showed $75,232.50 originated with a $47,732.50 ending balance. Kyle later confirmed 4/30 $84,807 AND 6/11 $75,000 were also M77 Ag loan-ins (fund-and-wire pattern). True originated total YTD: $235,039.50. True balance owed: $207,539.50. Kyle's original screenshot was a partial view."
       },
       "m5Ag":                 { "originatedYTD": "PENDING",                                             "repaidYTD": 93419.20, "balance": "PENDING" },
