@@ -322,8 +322,13 @@
             const mismatchCount = (data.summary?.ownershipMismatchRows || []).length;
 
             document.getElementById('root').innerHTML = `
+                <div class="alert" style="background:#fef2f2; border-left-color:var(--sale); color:#991b1b;">
+                    <strong>⚠️ CORRECTED 2026-11-11:</strong> The "ownership mismatch" analysis on this page used Sims billing labels to decide who funded each item — that's the wrong method. Kyle flagged that ownership must follow the cash trail (bank withdrawals), not the Sims label. The same billing-label-vs-funder mismatch already proved itself out on Sims 103475 (billed to Ty, actually paid from AP via M77 Ag). The corrected analysis is at
+                    <a href="/admin-invoice-payment-match.html" style="color:#991b1b; text-decoration:underline; font-weight:700;">Invoice ↔ Withdrawal Match</a>.
+                    Only ~31% of YTD chemical purchases are confirmed by actual bank withdrawals — the rest needs source-account confirmation from Kyle before any loan reallocation.
+                </div>
                 <div class="alert">
-                    <strong>Important finding.</strong> ${escapeHtml(data._meta?.importantFinding || '')}
+                    <strong>Original finding (keep for reference, but don't rely on it for loan math).</strong> ${escapeHtml(data._meta?.importantFinding || '')}
                 </div>
 
                 <div id="loanImpactSlot"></div>
