@@ -5722,6 +5722,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // file is tiny and version-controlled with the server deploy.
 // ========================================================================
 const BUSINESS_JSON_PATH = require('path').join(__dirname, 'business.json');
+const BANK_DEPOSITS_JSON_PATH = require('path').join(__dirname, 'bank-deposits.json');
 const CHEMICAL_PURCHASES_JSON_PATH = require('path').join(__dirname, 'chemical-purchases.json');
 
 app.get('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
@@ -5748,6 +5749,223 @@ app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, re
         res.json({ ok: true, business: incoming });
     } catch (err) {
         res.status(500).json({ error: 'Could not save business profile: ' + err.message });
+    }
+});
+
+// ---- DEPOSIT-TO-INVOICE MATCHER (partner tier) ----
+// For each customer bank deposit (parsed from Points West statements),
+// propose the best-match unpaid invoice based on amount + date proximity.
+// Partner confirms with one click → the matched invoice is marked
+// paymentStatus=paid with the deposit as the reference.
+
+function _scoreMatch(deposit, invoice) {
+    // Returns {score, confidence, reasons} for one candidate pair.
+    const depAmt = Number(deposit.amount) || 0;
+    const invAmt = Number(invoice.total) || 0;
+    const outstandingAmt = Math.max(0, invAmt - (Number(invoice.amountPaid) || 0));
+    const diff = Math.abs(outstandingAmt - depAmt);
+    const depDate = new Date(deposit.date);
+    const invDate = new Date(invoice.date || invoice.createdAt);
+    const daysAfter = (depDate - invDate) / (1000 * 60 * 60 * 24);
+    const reasons = [];
+    let score = 0;
+    let confidence = 'none';
+
+    // Deposit must come on/after invoice date; allow 3-day grace for same-day timing
+    if (daysAfter < -3) {
+        return { score: 0, confidence: 'none', reasons: ['Deposit earlier than invoice date'] };
+    }
+
+    // Amount match tiers
+    if (diff < 0.01) {
+        score += 100;
+        reasons.push('Exact amount match');
+    } else if (diff < 10) {
+        score += 70;
+        reasons.push(`Within $${diff.toFixed(2)} (likely Stripe/card fee deducted)`);
+    } else if (diff < 50) {
+        score += 30;
+        reasons.push(`Within $${diff.toFixed(2)}`);
+    } else {
+        return { score: 0, confidence: 'none', reasons: ['Amount off by $' + diff.toFixed(2)] };
+    }
+
+    // Date proximity
+    if (daysAfter <= 14) {
+        score += 30;
+        reasons.push(`${Math.round(daysAfter)} day(s) after invoice`);
+    } else if (daysAfter <= 60) {
+        score += 15;
+        reasons.push(`${Math.round(daysAfter)} day(s) after invoice`);
+    } else {
+        score += 0;
+        reasons.push(`${Math.round(daysAfter)} day(s) after invoice (stale)`);
+    }
+
+    // Classify confidence
+    if (score >= 115) confidence = 'high';
+    else if (score >= 85) confidence = 'medium';
+    else if (score >= 30) confidence = 'low';
+    else confidence = 'none';
+
+    return { score, confidence, reasons };
+}
+
+app.get('/api/admin/deposit-match/proposals', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        // Load deposit list
+        let depositData;
+        try {
+            depositData = JSON.parse(require('fs').readFileSync(BANK_DEPOSITS_JSON_PATH, 'utf8'));
+        } catch (err) {
+            return res.status(500).json({ error: 'Could not read bank deposits: ' + err.message });
+        }
+        const allDeposits = Array.isArray(depositData.deposits) ? depositData.deposits : [];
+        const customerDeposits = allDeposits.filter(d => d.kind === 'customer' && !d.skipMatch);
+        const loanInDeposits   = allDeposits.filter(d => d.kind === 'loanIn');
+        const internalDeposits = allDeposits.filter(d => d.kind === 'internal' || d.kind === 'capital');
+
+        // Load unpaid/draft invoices (and read-back paid ones so we can show already-matched state)
+        let invoices = [];
+        try {
+            invoices = await Invoice.find({ status: { $ne: 'void' } })
+                .select('invoiceNumber customerId customerName total amountPaid paymentStatus status date createdAt depositRef')
+                .lean();
+        } catch (err) {
+            console.warn('[deposit-match] Invoice read failed:', err.message);
+        }
+
+        // Candidate invoices for matching: paymentStatus not paid
+        const unpaid = invoices.filter(inv => (inv.paymentStatus || 'unpaid') !== 'paid');
+
+        // Build proposals
+        const proposals = customerDeposits.map(deposit => {
+            // Already-matched? Look for an invoice whose depositRef points at this deposit date+amount.
+            const matchedInvoice = invoices.find(inv =>
+                inv.depositRef &&
+                inv.depositRef.date === deposit.date &&
+                Math.abs((inv.depositRef.amount || 0) - deposit.amount) < 0.01
+            );
+
+            if (matchedInvoice) {
+                return {
+                    depositDate: deposit.date,
+                    depositAmount: deposit.amount,
+                    sourceHint: deposit.sourceHint,
+                    notes: deposit.notes,
+                    alreadyMatched: true,
+                    matchedInvoice: {
+                        _id: matchedInvoice._id,
+                        invoiceNumber: matchedInvoice.invoiceNumber,
+                        customerName: matchedInvoice.customerName,
+                        total: matchedInvoice.total,
+                        paymentStatus: matchedInvoice.paymentStatus
+                    },
+                    candidates: []
+                };
+            }
+
+            // Score every unpaid invoice
+            const scored = unpaid.map(inv => ({
+                invoice: inv,
+                ...(_scoreMatch(deposit, inv))
+            })).filter(c => c.score > 0)
+              .sort((a, b) => b.score - a.score)
+              .slice(0, 5);
+
+            const top = scored[0];
+            return {
+                depositDate: deposit.date,
+                depositAmount: deposit.amount,
+                sourceHint: deposit.sourceHint,
+                notes: deposit.notes,
+                alreadyMatched: false,
+                suggestion: top ? {
+                    _id: top.invoice._id,
+                    invoiceNumber: top.invoice.invoiceNumber,
+                    customerName: top.invoice.customerName,
+                    total: top.invoice.total,
+                    paymentStatus: top.invoice.paymentStatus,
+                    invoiceDate: top.invoice.date || top.invoice.createdAt,
+                    score: top.score,
+                    confidence: top.confidence,
+                    reasons: top.reasons
+                } : null,
+                candidates: scored.map(c => ({
+                    _id: c.invoice._id,
+                    invoiceNumber: c.invoice.invoiceNumber,
+                    customerName: c.invoice.customerName,
+                    total: c.invoice.total,
+                    paymentStatus: c.invoice.paymentStatus,
+                    score: c.score,
+                    confidence: c.confidence,
+                    reasons: c.reasons
+                }))
+            };
+        });
+
+        // Unmatched outstanding invoices: sent/draft/unpaid that haven't been matched to any deposit
+        const matchedInvoiceIds = new Set();
+        proposals.forEach(p => {
+            if (p.alreadyMatched && p.matchedInvoice) matchedInvoiceIds.add(String(p.matchedInvoice._id));
+        });
+        const unmatchedOutstanding = unpaid
+            .filter(inv => !matchedInvoiceIds.has(String(inv._id)))
+            .map(inv => ({
+                _id: inv._id,
+                invoiceNumber: inv.invoiceNumber,
+                customerName: inv.customerName,
+                total: inv.total,
+                paymentStatus: inv.paymentStatus,
+                date: inv.date || inv.createdAt
+            }));
+
+        res.json({
+            generatedAt: new Date().toISOString(),
+            depositCount: customerDeposits.length,
+            loanInCount: loanInDeposits.length,
+            internalCount: internalDeposits.length,
+            proposals,
+            unmatchedOutstanding,
+            loanIns: loanInDeposits.map(d => ({ date: d.date, amount: d.amount, source: d.sourceHint, notes: d.notes }))
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+app.post('/api/admin/deposit-match/confirm', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const { depositDate, depositAmount, invoiceId } = req.body || {};
+        if (!depositDate || !depositAmount || !invoiceId) {
+            return res.status(400).json({ error: 'depositDate, depositAmount, invoiceId required' });
+        }
+        const invoice = await Invoice.findById(invoiceId);
+        if (!invoice) return res.status(404).json({ error: 'Invoice not found' });
+
+        invoice.paymentStatus = 'paid';
+        invoice.amountPaid = Number(invoice.total) || 0;
+        invoice.paidAt = new Date();
+        invoice.depositRef = {
+            date: depositDate,
+            amount: Number(depositAmount),
+            confirmedBy: req.user.name || req.user.email,
+            confirmedAt: new Date().toISOString()
+        };
+        await invoice.save();
+
+        res.json({
+            ok: true,
+            invoice: {
+                _id: invoice._id,
+                invoiceNumber: invoice.invoiceNumber,
+                paymentStatus: invoice.paymentStatus,
+                amountPaid: invoice.amountPaid,
+                depositRef: invoice.depositRef
+            }
+        });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
     }
 });
 

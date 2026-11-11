@@ -1,0 +1,30 @@
+{
+  "_meta": {
+    "description": "Line-item ledger of every deposit into AcreProfit's Points West Community Bank account 9253 in 2026, parsed from monthly statements. Each row carries date, amount, source hint (check memo or Stripe ref), and classification (customer payment vs lender loan-in vs internal transfer). Feeds the Deposit-to-Invoice Matcher.",
+    "lastUpdated": "2026-11-11",
+    "sourceDocuments": [
+      "Points West Community Bank statements 3/2026 through 10/2026 — AcreProfit LLC account 9253"
+    ]
+  },
+  "deposits": [
+    { "date": "2026-03-17", "amount": 100.00,     "kind": "capital",      "sourceHint": "Opening deposit",             "notes": "Account opening",                      "skipMatch": true },
+    { "date": "2026-04-22", "amount": 12571.50,   "kind": "customer",     "sourceHint": "Michaelis (check memo)",      "notes": "Check deposit" },
+    { "date": "2026-04-28", "amount": 1350.00,    "kind": "customer",     "sourceHint": "Lynn Seger (check memo)",     "notes": "Check deposit" },
+    { "date": "2026-04-30", "amount": 84807.00,   "kind": "loanIn",       "sourceHint": "M77 Ag",                       "notes": "M77 Ag loan-in to fund Jabco SO 2129+2131 wire-out same day", "skipMatch": true },
+    { "date": "2026-05-01", "amount": 14936.65,   "kind": "customer",     "sourceHint": "GV Farms (check memo)",       "notes": "Check deposit" },
+    { "date": "2026-05-08", "amount": 2200.00,    "kind": "customer",     "sourceHint": "Robbins (check memo)",        "notes": "Check deposit" },
+    { "date": "2026-06-11", "amount": 75000.00,   "kind": "loanIn",       "sourceHint": "M77 Ag",                       "notes": "M77 Ag loan-in (slip memo: 'Alumax' was the check from), funded Sims Invoice 103475 wire-out same day", "skipMatch": true },
+    { "date": "2026-07-16", "amount": 4655.00,    "kind": "customer",     "sourceHint": "Lynn Seger (check memo)",     "notes": "Check deposit" },
+    { "date": "2026-07-17", "amount": 18440.41,   "kind": "loanIn",       "sourceHint": "M77 Ag",                       "notes": "M77 Ag loan-in (slip memo: 'Advance'), funded Corbet ACH same day", "skipMatch": true },
+    { "date": "2026-07-20", "amount": 35322.00,   "kind": "customer",     "sourceHint": "Tabric Group (check memo)",   "notes": "Check deposit" },
+    { "date": "2026-07-21", "amount": 13425.70,   "kind": "customer",     "sourceHint": "GSV Pharms + Transfer from Savings", "notes": "Combined deposit — check + savings transfer" },
+    { "date": "2026-08-03", "amount": 7130.00,    "kind": "customer",     "sourceHint": "Paul Brown Farms (check memo)", "notes": "Check deposit" },
+    { "date": "2026-08-10", "amount": 1092.67,    "kind": "customer",     "sourceHint": "STRIPE TRANSFER ST-Z4R3N2H6N9M2", "notes": "Stripe card/ACH deposit (net of fees)" },
+    { "date": "2026-08-13", "amount": 18970.00,   "kind": "customer",     "sourceHint": "Jayma Michael + Simon Kent (check memos)", "notes": "Combined deposit of two checks" },
+    { "date": "2026-08-24", "amount": 8069.05,    "kind": "customer",     "sourceHint": "STRIPE TRANSFER ST-B1A4L1D9B5T4", "notes": "Stripe card/ACH deposit (net of fees)" },
+    { "date": "2026-09-21", "amount": 36020.40,   "kind": "customer",     "sourceHint": "STRIPE TRANSFER ST-R3Y4E7W1U7X1", "notes": "Stripe card/ACH deposit (net of fees)" },
+    { "date": "2026-09-30", "amount": 57378.80,   "kind": "customer",     "sourceHint": "3-check deposit",             "notes": "Combined deposit of three checks" },
+    { "date": "2026-10-16", "amount": 1000.00,    "kind": "internal",     "sourceHint": "9047 → 9253 Fixing Transfers", "notes": "Intra-account correction",            "skipMatch": true },
+    { "date": "2026-10-28", "amount": 24645.00,   "kind": "customer",     "sourceHint": "Check deposit (memo not transcribed)", "notes": "Check deposit" }
+  ]
+}
