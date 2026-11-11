@@ -5758,6 +5758,28 @@ app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, re
 // Partner confirms with one click → the matched invoice is marked
 // paymentStatus=paid with the deposit as the reference.
 
+// Normalize a name string for fuzzy match — lowercase, strip punctuation and
+// common entity suffixes (LLC, Inc, Farms, Ranch, Corp, Co, Ltd) so
+// "Seven Road LLC" matches "Seven Road" and "Jared Firme" matches
+// "Seven Road / Jared Firme (check)".
+function _normalizeNameForMatch(s) {
+    return String(s || '')
+        .toLowerCase()
+        .replace(/\b(llc|inc|incorporated|corp|corporation|co|ltd|limited|farms?|ranch|group|ag)\b/g, '')
+        .replace(/[^\w\s]/g, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+}
+
+// Scan one string for the presence of another's significant words.
+// Returns true if any word (length ≥ 3) from needle appears in haystack.
+function _nameContainsAny(haystackNorm, needleNorm) {
+    if (!haystackNorm || !needleNorm) return false;
+    const needleWords = needleNorm.split(/\s+/).filter(w => w.length >= 3);
+    const haystackWords = new Set(haystackNorm.split(/\s+/));
+    return needleWords.some(w => haystackWords.has(w));
+}
+
 function _scoreMatch(deposit, invoice) {
     // Returns {score, confidence, reasons} for one candidate pair.
     const depAmt = Number(deposit.amount) || 0;
@@ -5788,6 +5810,24 @@ function _scoreMatch(deposit, invoice) {
         reasons.push(`Within $${diff.toFixed(2)}`);
     } else {
         return { score: 0, confidence: 'none', reasons: ['Amount off by $' + diff.toFixed(2)] };
+    }
+
+    // Name-match tiebreaker — critical when multiple invoices share the same
+    // amount. If the deposit's source hint names the invoice's customer,
+    // boost the score substantially. If it names a DIFFERENT customer,
+    // penalize so another candidate with name match wins.
+    const srcNorm = _normalizeNameForMatch(deposit.sourceHint);
+    const custNorm = _normalizeNameForMatch(invoice.customerName);
+    if (srcNorm && custNorm) {
+        if (_nameContainsAny(srcNorm, custNorm) || _nameContainsAny(custNorm, srcNorm)) {
+            score += 100;
+            reasons.push(`Name match: "${invoice.customerName}" in deposit source`);
+        } else {
+            // Different named customers — downrank this candidate so a true
+            // name match wins when amounts collide.
+            score -= 50;
+            reasons.push(`Name mismatch: deposit from "${deposit.sourceHint}" vs invoice "${invoice.customerName}"`);
+        }
     }
 
     // Date proximity
