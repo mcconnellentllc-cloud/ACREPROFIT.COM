@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ty Inventory ↔ Invoice Match | AcreProfit Admin</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --accent: #059669;
+            --sale: #dc2626;
+            --warn: #d97706;
+            --fg: #111827;
+            --mute: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f3f4f6;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--fg); padding: 20px; line-height: 1.5; }
+        .container { max-width: 1280px; margin: 0 auto; }
+        h1 { margin-bottom: 8px; }
+        .lede { color: var(--mute); margin-bottom: 20px; font-size: 15px; max-width: 900px; }
+        .lede a { color: var(--accent); }
+
+        .alert {
+            background: #fef3c7;
+            border-left: 4px solid var(--warn);
+            padding: 14px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            color: #78350f;
+        }
+        .alert strong { color: #92400e; }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat-card {
+            background: #fff;
+            padding: 16px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .stat-card h3 { font-size: 12px; text-transform: uppercase; color: var(--mute); letter-spacing: 0.3px; margin-bottom: 4px; }
+        .stat-card .value { font-size: 22px; font-weight: 800; color: var(--accent); }
+        .stat-card.warn .value { color: var(--warn); }
+        .stat-card.danger .value { color: var(--sale); }
+
+        .row {
+            background: #fff;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            overflow: hidden;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.04);
+        }
+        .row-header {
+            padding: 14px 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 12px;
+            flex-wrap: wrap;
+            cursor: pointer;
+            border-bottom: 1px solid var(--border);
+        }
+        .row-header:hover { background: #fafafa; }
+        .row-title { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+        .row-title .idx {
+            background: var(--bg);
+            color: var(--mute);
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 12px;
+            font-weight: 700;
+        }
+        .row-title h3 { font-size: 16px; }
+        .row-qty { color: var(--mute); font-size: 13px; }
+        .row-prices { display: flex; align-items: center; gap: 14px; font-size: 14px; }
+        .row-prices .ty { color: var(--accent); font-weight: 700; }
+        .pill {
+            padding: 2px 10px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+        }
+        .pill.exact { background: #d1fae5; color: #065f46; }
+        .pill.high { background: #dbeafe; color: #1e3a8a; }
+        .pill.mismatch { background: #fecaca; color: #991b1b; }
+        .pill.mixed { background: #fed7aa; color: #7c2d12; }
+        .pill.clean { background: #d1fae5; color: #065f46; }
+
+        .row-body { padding: 16px 18px; background: #fafafa; }
+        .row-body.collapsed { display: none; }
+        .inv-table { width: 100%; border-collapse: collapse; background: #fff; border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
+        .inv-table th {
+            background: #f3f4f6;
+            padding: 8px 10px;
+            text-align: left;
+            font-size: 11px;
+            text-transform: uppercase;
+            color: var(--mute);
+            letter-spacing: 0.3px;
+        }
+        .inv-table td { padding: 8px 10px; border-top: 1px solid var(--border); font-size: 13px; }
+        .inv-table .num { text-align: right; white-space: nowrap; }
+        .inv-table .flag {
+            color: var(--warn);
+            font-style: italic;
+            font-size: 12px;
+            display: block;
+            margin-top: 2px;
+        }
+        .delta-note {
+            background: #fff;
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: var(--mute);
+        }
+        .delta-note strong { color: var(--fg); }
+        .ownership-flag {
+            background: #fef2f2;
+            border-left: 3px solid var(--sale);
+            padding: 10px 12px;
+            border-radius: 6px;
+            font-size: 13px;
+            color: #991b1b;
+            margin-top: 8px;
+        }
+
+        .funder-m5 { color: #0369a1; font-weight: 600; }
+        .funder-ap { color: var(--sale); font-weight: 600; }
+        .funder-togo { color: #7c2d12; font-weight: 600; }
+
+        .toolbar {
+            background: #fff;
+            padding: 12px 16px;
+            border-radius: 10px;
+            margin-bottom: 14px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            padding: 8px 14px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--fg);
+            text-decoration: none;
+        }
+        .btn:hover { background: #f9fafb; }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { background: #047857; }
+
+        .loading { padding: 40px; text-align: center; background: #fff; border-radius: 10px; color: var(--mute); }
+        .error { padding: 20px; background: #fef2f2; color: var(--sale); border-radius: 10px; }
+
+        @media print {
+            body { background: #fff; }
+            .toolbar, .row-header { cursor: auto; }
+            .row-body { display: block !important; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Ty Inventory ↔ Invoice Match</h1>
+        <p class="lede">
+            Every row of Ty's 2026-11-06 inventory handoff traced back to the specific supplier invoices the product came from. Flags call out rows where the chemical was actually purchased on Kyle's/AP's Sims account (not M5 Ag) — those shouldn't be treated as a transfer from Ty.
+            <br><a href="/admin-ty-sale-import.html">← Back to Flash Sale Import</a> · <a href="/admin.html#flash-sale">Flash Sale admin</a>
+        </p>
+
+        <div id="root">
+            <div class="loading">Loading reconciliation…</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('acreprofit_token') || localStorage.getItem('token');
+
+        if (!token) {
+            document.getElementById('root').innerHTML = '<div class="error">Not logged in. Log in and try again.</div>';
+        }
+
+        function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function fmt(n) { return '$' + (Number(n) || 0).toFixed(2); }
+        function fmtInt(n) { return Number(n || 0).toLocaleString(); }
+
+        function funderClass(f) {
+            if (/M5 Ag/i.test(f) && !/via/i.test(f)) return 'funder-m5';
+            if (/M77 Ag|Acre Profit|Kyle|AP/i.test(f) && !/M5/i.test(f)) return 'funder-ap';
+            if (/ToGo/i.test(f)) return 'funder-togo';
+            return '';
+        }
+
+        async function load() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/ty-inventory/invoice-match`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'failed');
+                const data = await res.json();
+                render(data);
+            } catch (e) {
+                document.getElementById('root').innerHTML = `<div class="error">Failed: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function render(data) {
+            const cleanCount = (data.summary?.cleanM5AgRows || []).length;
+            const mixedCount = (data.summary?.mixedOwnershipRows || []).length;
+            const mismatchCount = (data.summary?.ownershipMismatchRows || []).length;
+
+            document.getElementById('root').innerHTML = `
+                <div class="alert">
+                    <strong>Important finding.</strong> ${escapeHtml(data._meta?.importantFinding || '')}
+                </div>
+
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <h3>Ty's Handoff Total</h3>
+                        <div class="value">${fmt(data.summary?.tyHandoffTotal || 0)}</div>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Clean M5 Ag Rows</h3>
+                        <div class="value">${cleanCount} / 19</div>
+                    </div>
+                    <div class="stat-card warn">
+                        <h3>Mixed Ownership Rows</h3>
+                        <div class="value">${mixedCount} / 19</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <h3>Ownership Mismatch</h3>
+                        <div class="value">${mismatchCount} / 19</div>
+                    </div>
+                    <div class="stat-card danger">
+                        <h3>AP-Owned $ in Handoff</h3>
+                        <div class="value">${fmt(data.summary?.ownershipMismatchDollars || 0)}</div>
+                    </div>
+                </div>
+
+                <div class="toolbar">
+                    <button class="btn" onclick="expandAll()">Expand all</button>
+                    <button class="btn" onclick="collapseAll()">Collapse all</button>
+                    <button class="btn" onclick="window.print()">Print report</button>
+                    <a href="/admin-ty-sale-import.html" class="btn primary">Continue to Import →</a>
+                </div>
+
+                ${data.matches.map(m => renderRow(m)).join('')}
+            `;
+        }
+
+        function renderRow(m) {
+            const pillMap = {
+                'exact': 'exact', 'high': 'high'
+            };
+            let ownerPill = '';
+            if (m.ownershipFlag) {
+                if (/MISMATCH/.test(m.ownershipFlag)) ownerPill = '<span class="pill mismatch">AP-owned</span>';
+                else ownerPill = '<span class="pill mixed">Mixed</span>';
+            } else {
+                ownerPill = '<span class="pill clean">M5 Ag</span>';
+            }
+
+            return `
+                <div class="row" id="row-${m.tyIndex}">
+                    <div class="row-header" onclick="toggleRow(${m.tyIndex})">
+                        <div class="row-title">
+                            <span class="idx">#${m.tyIndex + 1}</span>
+                            <h3>${escapeHtml(m.tyProduct)}</h3>
+                            <span class="row-qty">${m.tyQuantity} ${escapeHtml(m.tyUnit)} @ ${fmt(m.tyPrice)} = <strong>${fmt(m.tyLineTotal)}</strong></span>
+                            ${ownerPill}
+                            <span class="pill ${pillMap[m.confidence] || 'high'}">${escapeHtml(m.confidence || '')} match</span>
+                        </div>
+                        <div class="row-prices">
+                            <span>▼</span>
+                        </div>
+                    </div>
+                    <div class="row-body">
+                        <table class="inv-table">
+                            <thead>
+                                <tr>
+                                    <th>Supplier</th>
+                                    <th>Invoice</th>
+                                    <th>Date</th>
+                                    <th>Product (as on invoice)</th>
+                                    <th class="num">Qty</th>
+                                    <th class="num">Unit $</th>
+                                    <th class="num">Line Total</th>
+                                    <th>Billed To</th>
+                                    <th>Funded By</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(m.sourceInvoices || []).map(inv => `
+                                    <tr>
+                                        <td><strong>${escapeHtml(inv.supplier)}</strong></td>
+                                        <td>${escapeHtml(inv.invoice)}</td>
+                                        <td>${escapeHtml(inv.date)}</td>
+                                        <td>
+                                            ${escapeHtml(inv.product)}
+                                            ${inv.flag ? `<span class="flag">⚠ ${escapeHtml(inv.flag)}</span>` : ''}
+                                        </td>
+                                        <td class="num">${fmtInt(inv.qty)} ${escapeHtml(m.tyUnit)}</td>
+                                        <td class="num">${fmt(inv.unitCost)}</td>
+                                        <td class="num">${fmt(inv.total)}</td>
+                                        <td>${escapeHtml(inv.billedTo)}</td>
+                                        <td class="${funderClass(inv.fundedBy)}">${escapeHtml(inv.fundedBy)}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                            <tfoot>
+                                <tr style="background:#f9fafb;">
+                                    <td colspan="4"><strong>Totals</strong></td>
+                                    <td class="num"><strong>${fmtInt((m.sourceInvoices || []).reduce((s,i) => s + Number(i.qty), 0))} ${escapeHtml(m.tyUnit)}</strong></td>
+                                    <td></td>
+                                    <td class="num"><strong>${fmt((m.sourceInvoices || []).reduce((s,i) => s + Number(i.total), 0))}</strong></td>
+                                    <td colspan="2"></td>
+                                </tr>
+                            </tfoot>
+                        </table>
+                        <div class="delta-note">
+                            <strong>Ty handoff:</strong> ${m.tyQuantity} ${escapeHtml(m.tyUnit)} @ ${fmt(m.tyPrice)} =
+                            ${fmt(m.tyLineTotal)}.
+                            ${m.deltaFromHandoff > 0 ? `<strong>Delta:</strong> ${fmtInt(m.deltaFromHandoff)} ${escapeHtml(m.tyUnit)} sold or used between purchase and handoff.` : ''}
+                            ${m.deltaNote ? ` ${escapeHtml(m.deltaNote)}` : ''}
+                        </div>
+                        ${m.ownershipFlag ? `<div class="ownership-flag"><strong>⚠ Ownership flag:</strong> ${escapeHtml(m.ownershipFlag)}</div>` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleRow(idx) {
+            const body = document.querySelector(`#row-${idx} .row-body`);
+            body.classList.toggle('collapsed');
+        }
+        function expandAll() {
+            document.querySelectorAll('.row-body').forEach(b => b.classList.remove('collapsed'));
+        }
+        function collapseAll() {
+            document.querySelectorAll('.row-body').forEach(b => b.classList.add('collapsed'));
+        }
+
+        if (token) load();
+    </script>
+</body>
+</html>

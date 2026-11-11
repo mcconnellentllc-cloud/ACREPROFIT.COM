@@ -1,0 +1,348 @@
+{
+  "_meta": {
+    "description": "Line-by-line reconciliation of Ty Mollohan's 2026-11-06 inventory handoff PDF against the actual chemical-purchases.json ledger. For each of Ty's 19 inventory rows, lists the specific supplier invoices the product came from, who funded the original purchase (M5 Ag / Kyle+AP / M77 Ag), and whether Ty's handoff quantity is plausible given purchase history minus sales. Prepared by Claude with explicit Kyle review needed on 3 flagged rows.",
+    "importantFinding": "Several of Ty's 'handoff' line items were actually purchased on Kyle's/AcreProfit's Sims account, not Ty's M5 Ag account — Sulfen, Metribuzin, Status, Peak, Clethodim, Flagstaff, 24D Amine, and Hydrovant all trace back to Kyle/AP or ToGo AG LLC invoices. Ty may be consolidating ALL on-hand inventory into one list rather than only M5 Ag-funded material. Confirm with Ty before treating the handoff as a transfer of ownership.",
+    "lastUpdated": "2026-11-11"
+  },
+  "matches": [
+    {
+      "tyIndex": 0,
+      "tyProduct": "LV6",
+      "tyQuantity": 530,
+      "tyUnit": "gal",
+      "tyPrice": 21.88,
+      "tyLineTotal": 11596.40,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "102210", "date": "2026-04-15", "product": "LV6 De-Ester (Drexel)", "qty": 1060, "unitCost": 22.75, "total": 24115.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "105239", "date": "2026-08-26", "product": "LV6 (Lima 6)", "qty": 265, "unitCost": 21.00, "total": 5565.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 1325,
+      "deltaFromHandoff": 795,
+      "deltaNote": "795 gal appears to have been sold or transferred before the handoff. Ty's blended price $21.88 sits between the Drexel $22.75 and Lima $21.00 rates.",
+      "confidence": "high"
+    },
+    {
+      "tyIndex": 1,
+      "tyProduct": "Dicamba",
+      "tyQuantity": 795,
+      "tyUnit": "gal",
+      "tyPrice": 25.25,
+      "tyLineTotal": 20073.75,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "102210", "date": "2026-04-15", "product": "Dicamba DMA (Tigris) 265 gal", "qty": 1060, "unitCost": 25.50, "total": 27030.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "103383", "date": "2026-06-05", "product": "Dicamba DMA (Tigris) 265 gal", "qty": 1325, "unitCost": 25.50, "total": 33787.50, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 2385,
+      "deltaFromHandoff": 1590,
+      "deltaNote": "1,590 gal sold before handoff. Blended $25.25 lines up with Sims $25.50 rate (slight discount applied).",
+      "confidence": "high"
+    },
+    {
+      "tyIndex": 2,
+      "tyProduct": "LV6",
+      "tyQuantity": 180,
+      "tyUnit": "gal",
+      "tyPrice": 25.00,
+      "tyLineTotal": 4500.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "105376", "date": "2026-09-09", "product": "LV6 2-4-D (Alligare)", "qty": 180, "unitCost": 25.00, "total": 4500.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 180,
+      "deltaFromHandoff": 0,
+      "deltaNote": "EXACT MATCH — one-shot Alligare LV6 purchase, none sold, full 180 gal in handoff.",
+      "confidence": "exact"
+    },
+    {
+      "tyIndex": 3,
+      "tyProduct": "Dicamba",
+      "tyQuantity": 180,
+      "tyUnit": "gal",
+      "tyPrice": 27.00,
+      "tyLineTotal": 4860.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "103383", "date": "2026-06-05", "product": "Dicamba DMA (Tigris) 2x2.5 gal", "qty": 360, "unitCost": 27.00, "total": 9720.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 360,
+      "deltaFromHandoff": 180,
+      "deltaNote": "Half the 2x2.5 case pack still on hand. Unit cost exact.",
+      "confidence": "exact"
+    },
+    {
+      "tyIndex": 4,
+      "tyProduct": "Glypex",
+      "tyQuantity": 2475,
+      "tyUnit": "gal",
+      "tyPrice": 14.25,
+      "tyLineTotal": 35268.75,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "102015", "date": "2026-04-02", "product": "Glypex 5 Extra 275 gal", "qty": 4125, "unitCost": 12.50, "total": 51562.50, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "102210", "date": "2026-04-15", "product": "Glypex 5 Extra 275 gal", "qty": 825, "unitCost": 13.25, "total": 10931.25, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "103383", "date": "2026-06-05", "product": "Glypex 5 Extra 275 gal", "qty": 1100, "unitCost": 14.25, "total": 15675.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "103475", "date": "2026-06-10", "product": "Glypex 5 Extra 275 gal", "qty": 1100, "unitCost": 14.25, "total": 15675.00, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "Ty Mollohan / M5 Ag", "flag": "AcreProfit paid this via the M77 Ag 6/11 wire — 1,100 of these gallons belong to AP, not Ty." }
+      ],
+      "totalPurchasedForTy": 7150,
+      "deltaFromHandoff": 4675,
+      "deltaNote": "4,675 gal sold. Ty's $14.25 = Sims most recent rate.",
+      "confidence": "high",
+      "ownershipFlag": "1,100 gal of the 2,475 in Ty's handoff may actually be AP-owned (M77 Ag 6/11 wire funded Sims 103475). Needs reconciliation."
+    },
+    {
+      "tyIndex": 5,
+      "tyProduct": "Atrazine",
+      "tyQuantity": 1855,
+      "tyUnit": "gal",
+      "tyPrice": 12.75,
+      "tyLineTotal": 23651.25,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "102143", "date": "2026-04-09", "product": "Atrazine 4L Tote", "qty": 4240, "unitCost": 12.50, "total": 53000.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "102210", "date": "2026-04-15", "product": "Atrazine 4L Tote", "qty": 1060, "unitCost": 12.50, "total": 13250.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "103475", "date": "2026-06-10", "product": "Atrazine 4L Tote", "qty": 530, "unitCost": 12.50, "total": 6625.00, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "Ty Mollohan / M5 Ag", "flag": "AP-funded portion." }
+      ],
+      "totalPurchasedForTy": 5830,
+      "deltaFromHandoff": 3975,
+      "deltaNote": "3,975 gal sold or used. $12.75 is slightly above Sims $12.50 rate (markup).",
+      "confidence": "high",
+      "ownershipFlag": "530 gal of the 1,855 in Ty's handoff may be AP-owned (M77 Ag 6/11 wire)."
+    },
+    {
+      "tyIndex": 6,
+      "tyProduct": "Flumi",
+      "tyQuantity": 995,
+      "tyUnit": "lbs",
+      "tyPrice": 12.75,
+      "tyLineTotal": 12686.25,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "103383", "date": "2026-06-05", "product": "Flumioxazin 51%WDG (Red Eagle)", "qty": 1440, "unitCost": 12.75, "total": 18360.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 1440,
+      "deltaFromHandoff": 445,
+      "deltaNote": "445 lbs sold. Unit cost exact match.",
+      "confidence": "exact"
+    },
+    {
+      "tyIndex": 7,
+      "tyProduct": "Sulfen",
+      "tyQuantity": 330,
+      "tyUnit": "gal",
+      "tyPrice": 76.00,
+      "tyLineTotal": 25080.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "104596", "date": "2026-07-16", "product": "Sulfen 4SC (Tigris)", "qty": 180, "unitCost": 76.00, "total": 13680.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Purchased on Kyle's/AP account, NOT M5 Ag." },
+        { "supplier": "Sims", "invoice": "104998", "date": "2026-08-10", "product": "Sulfen 4SC (Tigris)", "qty": 180, "unitCost": 76.00, "total": 13680.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Purchased on Kyle's/AP account, NOT M5 Ag." },
+        { "supplier": "Jabco", "invoice": "SO 2129", "date": "2026-03-30", "product": "Sulfentrazone 4SC", "qty": 180, "unitCost": 71.50, "total": 12870.00, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "Acre Profit LLC", "flag": "AP-billed Jabco order." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 540,
+      "deltaFromHandoff": 210,
+      "deltaNote": "ZERO Sulfentrazone was purchased on Ty's M5 Ag account. All 540 gal was AP-billed. Ty's 330 gal in the handoff list is AP inventory — this should NOT be a transfer from Ty, it already belongs to AcreProfit.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 330 gal of Sulfen in Ty's handoff was purchased by Kyle/AP. Treat as AP inventory, not a Ty transfer."
+    },
+    {
+      "tyIndex": 8,
+      "tyProduct": "Metrybuzin",
+      "tyQuantity": 115,
+      "tyUnit": "gal",
+      "tyPrice": 42.00,
+      "tyLineTotal": 4830.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "104596", "date": "2026-07-16", "product": "Me-Try-Buzin 4L", "qty": 100, "unitCost": 42.00, "total": 4200.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Sims", "invoice": "104998", "date": "2026-08-10", "product": "Me-Try-Buzin 4L", "qty": 177.5, "unitCost": 42.00, "total": 7455.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Jabco", "invoice": "SO 2131", "date": "2026-04-01", "product": "Metribuzin 4F", "qty": 180, "unitCost": 45.50, "total": 8190.00, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "Acre Profit LLC" }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 457.5,
+      "deltaFromHandoff": 342.5,
+      "deltaNote": "ZERO Metribuzin on Ty's M5 Ag account. All 457.5 gal AP-purchased.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 115 gal in Ty's handoff is AP inventory."
+    },
+    {
+      "tyIndex": 9,
+      "tyProduct": "Mesulfuron",
+      "tyQuantity": 3600,
+      "tyUnit": "oz",
+      "tyPrice": 2.25,
+      "tyLineTotal": 8100.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "102210", "date": "2026-04-15", "product": "Mivum (Metsulfuron)", "qty": 3600, "unitCost": 2.25, "total": 8100.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 3600,
+      "deltaFromHandoff": 0,
+      "deltaNote": "EXACT MATCH — one Sims purchase, nothing sold, full 3,600 oz in handoff.",
+      "confidence": "exact"
+    },
+    {
+      "tyIndex": 10,
+      "tyProduct": "Hydrovant",
+      "tyQuantity": 137.5,
+      "tyUnit": "gal",
+      "tyPrice": 90.00,
+      "tyLineTotal": 12375.00,
+      "sourceInvoices": [
+        { "supplier": "Corbet", "invoice": "364", "date": "2026-03-05", "product": "Hydrovant fA", "qty": 360, "unitCost": 48.78, "total": 17560.80, "fundedBy": "M77 Ag", "billedTo": "ToGo AG LLC", "flag": "Different entity — ToGo AG LLC, M77 Ag funded." },
+        { "supplier": "Corbet", "invoice": "CORBET 7-17 ACH", "date": "2026-07-17", "product": "Hydrovant fA", "qty": 360, "unitCost": 48.78, "total": 17560.80, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "ToGo AG LLC" },
+        { "supplier": "Corbet", "invoice": "CORBET 8-4 ACH", "date": "2026-08-04", "product": "Hydrovant fA", "qty": 360, "unitCost": 48.78, "total": 17560.80, "fundedBy": "M77 Ag", "billedTo": "ToGo AG LLC" }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForToGo": 1080,
+      "deltaFromHandoff": 942.5,
+      "deltaNote": "ZERO Hydrovant on M5 Ag account — all purchased via ToGo AG LLC by M77 Ag. Ty's $90 handoff price is a markup over Corbet's $48.78 cost (as negotiated).",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: 137.5 gal in Ty's handoff is actually ToGo AG LLC / M77 Ag inventory. Price gap between $48.78 cost and $90 handoff = $41.22/gal implied intercompany margin."
+    },
+    {
+      "tyIndex": 11,
+      "tyProduct": "Parapex",
+      "tyQuantity": 630,
+      "tyUnit": "gal",
+      "tyPrice": 15.50,
+      "tyLineTotal": 9765.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "104596", "date": "2026-07-16", "product": "Parapex", "qty": 530, "unitCost": 15.50, "total": 8215.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Sims", "invoice": "103475", "date": "2026-06-10", "product": "Parapex", "qty": 1590, "unitCost": 15.50, "total": 24645.00, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "Ty Mollohan / M5 Ag", "flag": "AP-funded portion on Ty's bill." },
+        { "supplier": "Sims", "invoice": "105239", "date": "2026-08-26", "product": "Parapex", "qty": 2120, "unitCost": 15.50, "total": 32860.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "105339", "date": "2026-09-02", "product": "Parapex", "qty": 1060, "unitCost": 15.50, "total": 16430.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 3180,
+      "totalPurchasedForAP": 2120,
+      "deltaFromHandoff": 4670,
+      "deltaNote": "Large volume sold through the year. Ty's 630 gal handoff represents remaining stock. $15.50 exact.",
+      "confidence": "high",
+      "ownershipFlag": "Mixed ownership — 2,120 gal of total Parapex purchased was AP-funded (Kyle 530 + M77 via AP 1,590). Allocation of the 630 gal remaining between AP and M5 Ag needs reconciliation."
+    },
+    {
+      "tyIndex": 12,
+      "tyProduct": "Status",
+      "tyQuantity": 1000,
+      "tyUnit": "oz",
+      "tyPrice": 3.80,
+      "tyLineTotal": 3800.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "104703", "date": "2026-07-21", "product": "Status", "qty": 1000, "unitCost": 3.80, "total": 3800.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 1000,
+      "deltaFromHandoff": 0,
+      "deltaNote": "EXACT MATCH — but purchased by Kyle/AP, not M5 Ag.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 1,000 oz is AP inventory, not Ty's."
+    },
+    {
+      "tyIndex": 13,
+      "tyProduct": "Meso",
+      "tyQuantity": 165,
+      "tyUnit": "gal",
+      "tyPrice": 48.00,
+      "tyLineTotal": 7920.00,
+      "sourceInvoices": [
+        { "supplier": "Jabco", "invoice": "SO 2129", "date": "2026-03-30", "product": "CPD Mesotrione", "qty": 720, "unitCost": 45.75, "total": 32940.00, "fundedBy": "M77 Ag (via AcreProfit)", "billedTo": "Acre Profit LLC", "flag": "AP-billed Jabco order." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 720,
+      "deltaFromHandoff": 555,
+      "deltaNote": "ZERO Meso on M5 Ag account. All 720 gal AP-purchased via Jabco. Ty's $48 vs Jabco $45.75 = $2.25/gal markup.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 165 gal is AP inventory."
+    },
+    {
+      "tyIndex": 14,
+      "tyProduct": "Peak",
+      "tyQuantity": 160,
+      "tyUnit": "oz",
+      "tyPrice": 21.25,
+      "tyLineTotal": 3400.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "103938", "date": "2026-06-26", "product": "Peak", "qty": 100, "unitCost": 21.25, "total": 2125.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Sims", "invoice": "104156", "date": "2026-07-06", "product": "Peak", "qty": 140, "unitCost": 21.25, "total": 2975.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Sims", "invoice": "104322", "date": "2026-07-08", "product": "Peak", "qty": 60, "unitCost": 21.25, "total": 1275.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 300,
+      "deltaFromHandoff": 140,
+      "deltaNote": "ZERO Peak on M5 Ag account. 140 oz sold out of 300 oz AP-purchased.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 160 oz is AP inventory."
+    },
+    {
+      "tyIndex": 15,
+      "tyProduct": "Anthem NXT",
+      "tyQuantity": 12.5,
+      "tyUnit": "gal",
+      "tyPrice": 476.00,
+      "tyLineTotal": 5950.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "102974", "date": "2026-05-20", "product": "Anthem NXT", "qty": 70, "unitCost": 476.00, "total": 33320.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account at $476." },
+        { "supplier": "Sims", "invoice": "102210", "date": "2026-04-15", "product": "Anthem NXT", "qty": 90, "unitCost": 430.00, "total": 38700.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" },
+        { "supplier": "Sims", "invoice": "103383", "date": "2026-06-05", "product": "Anthem NXT", "qty": 40, "unitCost": 476.00, "total": 19040.00, "fundedBy": "M5 Ag", "billedTo": "Ty Mollohan / M5 Ag" }
+      ],
+      "totalPurchasedForTy": 130,
+      "totalPurchasedForAP": 70,
+      "deltaFromHandoff": 187.5,
+      "deltaNote": "12.5 gal remaining of 200 gal total purchased. Ty's $476 matches current rate.",
+      "confidence": "high",
+      "ownershipFlag": "Mixed — 70 of 200 gal purchased was AP's. Remaining 12.5 gal could be either side."
+    },
+    {
+      "tyIndex": 16,
+      "tyProduct": "Clethodim",
+      "tyQuantity": 10,
+      "tyUnit": "gal",
+      "tyPrice": 27.00,
+      "tyLineTotal": 270.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "104703", "date": "2026-07-21", "product": "Clethodim (Apex)", "qty": 10, "unitCost": 27.00, "total": 270.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 10,
+      "deltaFromHandoff": 0,
+      "deltaNote": "EXACT MATCH — Kyle/AP purchase, 10 gal.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 10 gal is AP inventory."
+    },
+    {
+      "tyIndex": 17,
+      "tyProduct": "Flagstaff Fluroxipure",
+      "tyQuantity": 180,
+      "tyUnit": "gal",
+      "tyPrice": 74.00,
+      "tyLineTotal": 13320.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "104703", "date": "2026-07-21", "product": "Flagstaff", "qty": 180, "unitCost": 74.00, "total": 13320.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Sims", "invoice": "104156", "date": "2026-07-06", "product": "Flurox (Sharda)", "qty": 100, "unitCost": 75.00, "total": 7500.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Also Kyle/AP." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 280,
+      "deltaFromHandoff": 100,
+      "deltaNote": "EXACT MATCH on Flagstaff Sharda 180 gal.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 180 gal is AP inventory."
+    },
+    {
+      "tyIndex": 18,
+      "tyProduct": "24D Amine",
+      "tyQuantity": 55,
+      "tyUnit": "gal",
+      "tyPrice": 21.00,
+      "tyLineTotal": 1155.00,
+      "sourceInvoices": [
+        { "supplier": "Sims", "invoice": "103938", "date": "2026-06-26", "product": "Amine (Drexel De-Amine 4)", "qty": 50, "unitCost": 21.00, "total": 1050.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." },
+        { "supplier": "Sims", "invoice": "104156", "date": "2026-07-06", "product": "Amine (Drexel De-Amine 4)", "qty": 50, "unitCost": 21.00, "total": 1050.00, "fundedBy": "Kyle (or M77 Ag)", "billedTo": "Kyle McConnell / Acre Profit", "flag": "Kyle/AP account." }
+      ],
+      "totalPurchasedForTy": 0,
+      "totalPurchasedForAP": 100,
+      "deltaFromHandoff": 45,
+      "deltaNote": "45 gal sold of 100 gal AP-purchased. Unit cost exact.",
+      "confidence": "exact",
+      "ownershipFlag": "OWNERSHIP MISMATCH: all 55 gal is AP inventory."
+    }
+  ],
+  "summary": {
+    "tyHandoffTotal": 208601.40,
+    "cleanM5AgRows": [2, 3, 6, 9],
+    "mixedOwnershipRows": [0, 1, 4, 5, 11, 15],
+    "ownershipMismatchRows": [7, 8, 10, 12, 13, 14, 16, 17, 18],
+    "ownershipMismatchDollars": 72250.00,
+    "ownershipMismatchNote": "Approximately $72,250 of Ty's handoff list is inventory already owned by AcreProfit (purchased on Kyle's Sims account or through M77 Ag / ToGo AG LLC). These should NOT be treated as a transfer from Ty — they already belong to AP."
+  }
+}
