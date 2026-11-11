@@ -26,6 +26,6 @@
     { "date": "2026-09-21", "amount": 36020.40,   "kind": "customer",     "sourceHint": "STRIPE TRANSFER ST-R3Y4E7W1U7X1", "notes": "Stripe card/ACH deposit (net of fees)" },
     { "date": "2026-09-30", "amount": 57378.80,   "kind": "customer",     "sourceHint": "3-check deposit",             "notes": "Combined deposit of three checks" },
     { "date": "2026-10-16", "amount": 1000.00,    "kind": "internal",     "sourceHint": "9047 → 9253 Fixing Transfers", "notes": "Intra-account correction",            "skipMatch": true },
-    { "date": "2026-10-28", "amount": 24645.00,   "kind": "customer",     "sourceHint": "Check deposit (memo not transcribed)", "notes": "Check deposit" }
+    { "date": "2026-10-28", "amount": 24645.00,   "kind": "customer",     "sourceHint": "Five Star Ag (= Scott Cunningham)", "notes": "Check deposit. Confirmed by Kyle 2026-11-11 via deposit slip image. Matches INV-00055 Scott Cunningham $24,645 exactly." }
   ]
 }
