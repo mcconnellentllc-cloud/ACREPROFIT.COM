@@ -10437,6 +10437,238 @@ app.post('/api/sale/preorder', salePreorderLimiter, async (req, res) => {
 });
 
 // ============================================================================
+// TY'S FLASH SALE INVENTORY IMPORT
+// ============================================================================
+// Ty Mollohan (M5 Ag) handed off his inventory for the end-of-year flash
+// sale. These are bulk chemicals he already paid for; AcreProfit is now
+// selling them. Price in ty-inventory.json is the acquisition cost from
+// Ty to AcreProfit. Admin picks a catalog match + confirms retail in the
+// import UI (admin-ty-sale-import.html). The 95% floor still applies on
+// apply.
+const TY_INVENTORY_JSON_PATH = require('path').join(__dirname, 'ty-inventory.json');
+
+// Fuzzy-match a Ty product name to a Chemical doc. Returns the best match
+// candidates ranked by score. Matching is intentionally lenient — Ty's PDF
+// uses shorthand ("Glypex" for Glyphosate, "Flumi" for Flumioxazin), so we
+// need the UI to show 2-3 candidates and let Kyle pick.
+function _tyProductMatches(tyName, allChemicals) {
+    const norm = s => String(s || '').toLowerCase().replace(/[^a-z0-9]/g, '');
+    const nTy = norm(tyName);
+    // Hardcoded aliases for Ty's shorthand → canonical name tokens
+    const aliases = {
+        'lv6': ['lv6', 'lv 6', 'defylv6', '24dester', '24-dester'],
+        'dicamba': ['dicamba'],
+        'glypex': ['glyphosate', 'xsate', 'glypex'],
+        'atrazine': ['atrazine', 'aatrex'],
+        'flumi': ['flumioxazin', 'valor', 'flumi'],
+        'sulfen': ['sulfentrazone', 'sulfen'],
+        'metrybuzin': ['metribuzin', 'rancor', 'tricor'],
+        'mesulfuron': ['metsulfuron', 'escort', 'ally'],
+        'hydrovant': ['hydrovant'],
+        'parapex': ['paraquat', 'parapex', 'gramoxone'],
+        'status': ['status', 'diflufenzopyr'],
+        'meso': ['mesotrione', 'meso', 'callisto'],
+        'peak': ['prosulfuron', 'peak'],
+        'anthemnxt': ['anthemnxt', 'anthem'],
+        'clethodim': ['clethodim', 'select'],
+        'flagstafffluroxipure': ['fluroxypyr', 'fluroxipure', 'starane', 'flagstaff'],
+        '24damine': ['24damine', '24-damine', 'amine4']
+    };
+    const tokens = aliases[nTy] || [nTy];
+    const candidates = [];
+    for (const c of allChemicals) {
+        const nName = norm(c.productName);
+        const nTrade = norm(c.tradeName);
+        let score = 0;
+        for (const t of tokens) {
+            if (nName.includes(t) || nTrade.includes(t)) score += 10;
+            if (nName === t || nTrade === t) score += 20;
+        }
+        // Also consider substring match against raw ty name
+        if (nTy && (nName.includes(nTy) || nTrade.includes(nTy))) score += 5;
+        if (score > 0) candidates.push({ id: c._id, productName: c.productName, tradeName: c.tradeName, packSize: c.packSize, unit: c.unit, costPrice: c.costPrice, adminPrice: c.adminPrice, sellPrice: c.sellPrice, score });
+    }
+    return candidates.sort((a, b) => b.score - a.score).slice(0, 4);
+}
+
+// GET /api/admin/sale/ty-inventory/preview
+// Returns Ty's inventory with best-guess catalog matches for each row.
+app.get('/api/admin/sale/ty-inventory/preview', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const fs = require('fs');
+        const raw = fs.readFileSync(TY_INVENTORY_JSON_PATH, 'utf8');
+        const ty = JSON.parse(raw);
+
+        // Pull every active chemical name to run fuzzy matches against
+        const allChems = await Chemical.find({ isActive: true })
+            .select('productName tradeName packSize unit costPrice adminPrice sellPrice salePrice onSale')
+            .lean();
+
+        const rows = ty.items.map((item, idx) => {
+            const candidates = _tyProductMatches(item.productName, allChems);
+            return {
+                index: idx,
+                date: item.date,
+                tyProductName: item.productName,
+                quantity: item.quantity,
+                unit: item.unit,
+                tyPrice: item.tyPrice,
+                lineTotal: item.lineTotal,
+                notes: item.notes || null,
+                candidates,
+                suggestedMatchId: candidates[0]?.id || null
+            };
+        });
+
+        res.json({
+            meta: ty._meta,
+            rows,
+            totalValueAtTyPricing: ty._meta?.totalValueAtTyPricing || null
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/sale/ty-inventory/apply
+// Body: { rows: [{ index, chemicalId, retailPrice, salePrice, createNew?: {productName, packSize, unit, costPrice}, skip?: boolean }] }
+// For each row Kyle maps:
+//   - If skip: do nothing
+//   - If chemicalId provided: use existing Chemical. Update salePrice (enforced 95% floor), mark onSale, add Ty's quantity as inventory batch at tyPrice as cost.
+//   - If createNew provided: create a new Chemical with specified retail pricing, then do the same.
+// Returns per-row result (ok/failed + reason).
+app.post('/api/admin/sale/ty-inventory/apply', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const fs = require('fs');
+        const raw = fs.readFileSync(TY_INVENTORY_JSON_PATH, 'utf8');
+        const ty = JSON.parse(raw);
+
+        const results = [];
+        const { rows = [] } = req.body || {};
+
+        for (const row of rows) {
+            const tyItem = ty.items[row.index];
+            if (!tyItem) {
+                results.push({ index: row.index, ok: false, reason: 'ty item not found by index' });
+                continue;
+            }
+            if (row.skip) {
+                results.push({ index: row.index, ok: true, skipped: true });
+                continue;
+            }
+
+            try {
+                let chemical = null;
+
+                if (row.createNew) {
+                    // Create a new Chemical entry from Kyle's inputs
+                    const { productName, packSize, unit, retailPrice, adminPrice, costPrice } = row.createNew;
+                    if (!productName || !packSize || !unit) {
+                        throw new Error('createNew requires productName, packSize, unit');
+                    }
+                    if (!retailPrice || retailPrice <= 0) {
+                        throw new Error('retailPrice is required for new product');
+                    }
+                    const cost = Number(costPrice) || Number(tyItem.tyPrice) || 0;
+                    const admin = Number(adminPrice) || Math.round((cost + (retailPrice - cost) * 0.5) * 100) / 100;
+                    chemical = new Chemical({
+                        productName,
+                        packSize,
+                        unit,
+                        costPrice: cost,
+                        adminPrice: admin,
+                        sellPrice: Number(retailPrice),
+                        adminMarginDollars: Math.round((admin - cost) * 100) / 100,
+                        marginDollars: Math.round((retailPrice - admin) * 100) / 100,
+                        category: 'herbicide',
+                        isActive: true,
+                        availableForOrder: true,
+                        status: 'approved',
+                        addedBy: `Ty-import:${req.user.name}`,
+                        sourceSupplier: 'M5 Ag (Ty)',
+                        notes: `Added via Ty flash-sale import. Acquisition cost from Ty: $${tyItem.tyPrice}/${tyItem.unit}.`
+                    });
+                    await chemical.save();
+                } else if (row.chemicalId) {
+                    chemical = await Chemical.findById(row.chemicalId);
+                    if (!chemical) throw new Error('chemicalId not found');
+                    // Allow Kyle to override retail price (e.g. he wants to raise it before the sale)
+                    if (row.retailPrice && Number(row.retailPrice) > 0) {
+                        chemical.sellPrice = Number(row.retailPrice);
+                    }
+                } else {
+                    throw new Error('either chemicalId or createNew must be provided');
+                }
+
+                // Set sale price — 95% floor enforced in Chemical.pre('validate')
+                if (row.salePrice && Number(row.salePrice) > 0) {
+                    chemical.salePrice = Number(row.salePrice);
+                    chemical.onSale = true;
+                    if (!chemical.saleStartedAt) chemical.saleStartedAt = new Date();
+                    chemical.saleNote = chemical.saleNote || 'End-of-year flash sale (Ty inventory)';
+                }
+                await chemical.save();
+
+                // Add Ty's physical quantity to inventory
+                // Inventory doc is keyed by chemicalId+location. Add Ty's qty to quantityOnHand and quantityAvailable.
+                const Inventory = mongoose.models.Inventory;
+                if (Inventory) {
+                    let inv = await Inventory.findOne({ chemicalId: chemical._id, location: 'main' });
+                    if (!inv) {
+                        inv = new Inventory({
+                            chemicalId: chemical._id,
+                            productName: chemical.productName,
+                            packSize: chemical.packSize,
+                            unit: chemical.unit,
+                            location: 'main',
+                            quantityOnHand: 0,
+                            quantityReserved: 0,
+                            quantityAvailable: 0,
+                            averageCost: 0,
+                            lastCost: 0
+                        });
+                    }
+                    const addQty = Number(tyItem.quantity) || 0;
+                    const addCost = Number(tyItem.tyPrice) || 0;
+                    // Weighted-average cost
+                    const prevQty = Number(inv.quantityOnHand) || 0;
+                    const prevAvgCost = Number(inv.averageCost) || 0;
+                    const newQty = prevQty + addQty;
+                    inv.quantityOnHand = newQty;
+                    inv.quantityAvailable = (Number(inv.quantityAvailable) || 0) + addQty;
+                    inv.averageCost = newQty > 0 ? Math.round(((prevQty * prevAvgCost) + (addQty * addCost)) / newQty * 10000) / 10000 : addCost;
+                    inv.lastCost = addCost;
+                    inv.updatedAt = new Date();
+                    await inv.save();
+                }
+
+                results.push({
+                    index: row.index,
+                    ok: true,
+                    chemicalId: chemical._id,
+                    productName: chemical.productName,
+                    retailPrice: chemical.sellPrice,
+                    salePrice: chemical.salePrice,
+                    onSale: chemical.onSale,
+                    quantityAdded: tyItem.quantity,
+                    created: !!row.createNew
+                });
+            } catch (e) {
+                results.push({ index: row.index, ok: false, reason: e.message });
+            }
+        }
+
+        const okCount = results.filter(r => r.ok && !r.skipped).length;
+        const skipped = results.filter(r => r.skipped).length;
+        const failed = results.filter(r => !r.ok).length;
+
+        res.json({ ok: failed === 0, applied: okCount, skipped, failed, results });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============================================================================
 // PUBLIC RECIPE BUILDER — 2027 pre-order planning tool
 // ============================================================================
 // Customer picks crop + acres, we return a per-acre recipe with sale pricing
