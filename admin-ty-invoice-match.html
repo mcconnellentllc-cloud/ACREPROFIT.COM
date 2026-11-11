@@ -322,13 +322,8 @@
             const mismatchCount = (data.summary?.ownershipMismatchRows || []).length;
 
             document.getElementById('root').innerHTML = `
-                <div class="alert" style="background:#fef2f2; border-left-color:var(--sale); color:#991b1b;">
-                    <strong>⚠️ CORRECTED 2026-11-11:</strong> The "ownership mismatch" analysis on this page used Sims billing labels to decide who funded each item — that's the wrong method. Kyle flagged that ownership must follow the cash trail (bank withdrawals), not the Sims label. The same billing-label-vs-funder mismatch already proved itself out on Sims 103475 (billed to Ty, actually paid from AP via M77 Ag). The corrected analysis is at
-                    <a href="/admin-invoice-payment-match.html" style="color:#991b1b; text-decoration:underline; font-weight:700;">Invoice ↔ Withdrawal Match</a>.
-                    Only ~31% of YTD chemical purchases are confirmed by actual bank withdrawals — the rest needs source-account confirmation from Kyle before any loan reallocation.
-                </div>
                 <div class="alert">
-                    <strong>Original finding (keep for reference, but don't rely on it for loan math).</strong> ${escapeHtml(data._meta?.importantFinding || '')}
+                    <strong>Confirmed by Kyle 2026-11-11:</strong> the $386,118 of Ty-billed Sims invoices IS the M5 Ag loan (correct). The 9 items in Ty's handoff that were purchased on Kyle's Sims/Jabco/Corbet accounts are being physically transferred to Ty's warehouse — Kyle's M77 Ag loan gets reduced, Ty's M5 Ag loan grows by the same amount. See the Corrected Loan Balance card below.
                 </div>
 
                 <div id="loanImpactSlot"></div>
