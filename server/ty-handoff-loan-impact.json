@@ -50,5 +50,14 @@
     "correctedM5AgAtCost": 358295.05,
     "note": "At acquisition cost basis: Kyle's loan drops by $65,596 (to $105,023.31); Ty's loan rises by $65,596 (to $358,295.05). Difference between Ty's handoff price ($72,150) and acquisition cost ($65,596) = $6,554 of built-in margin on Ty's PDF — that's trading margin that would accrue to whichever side keeps the inventory."
   },
-  "recommendation": "Kyle picks one of two options, confirms with Ty, and we lock in: (A) Transfer at Ty's handoff prices ($72,150) — easier because Ty's PDF numbers stand as-is; (B) Transfer at acquisition cost ($65,596) — fairer because it preserves the actual cash-outlay math and leaves ~$6,554 of implied margin as a separate P&L question. Either way, total outstanding stays at $463,318.36 — the question is just the split between Kyle's M77 Ag loan and Ty's M5 Ag loan."
+  "recommendation": "RESOLVED 2026-11-11. Kyle picked Option B (acquisition cost): the loan transfer is $65,596 — what AP actually paid Sims/Jabco/Corbet for these 9 items. This preserves the 3-tier pricing model Kyle described: costPrice (= COGS, locked at invoice) → +adminMargin → adminPrice → +distributorMargin → sellPrice → ×0.95 → salePrice (5% floor). Ty's $6,554 markup on the handoff PDF is trading margin that gets recognized when the items sell, NOT in the loan transfer. Final balances written to banking.json: M77 Ag $105,023.31, M5 Ag $358,295.05, total unchanged at $463,318.36.",
+  "finalDecision": {
+    "chosen": "acquisition-cost",
+    "transferAmount": 65596.00,
+    "newM77AgBalance": 105023.31,
+    "newM5AgBalance": 358295.05,
+    "totalOutstanding": 463318.36,
+    "margin": 6554.00,
+    "marginNote": "Recognized as P&L when items sell at retail, not in the loan transfer. Will flow through the 50/50 commission split logic if sold during the flash sale."
+  }
 }

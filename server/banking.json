@@ -103,7 +103,13 @@
     "outstandingLoanBalances": {
       "note": "Running balance owed by AcreProfit to each lender. Originations per lender from Kyle's ledger plus bank-statement detection. Math: Originations YTD - Repayments YTD = Balance.",
       "m77Ag": {
-        "originatedYTD_confirmed": 271919.31,
+        "originatedYTD_confirmed": 206323.31,
+        "_tyTransferApplied": {
+          "appliedOn": "2026-11-11",
+          "note": "Kyle's direction 2026-11-11: 9 items in Ty's handoff ($65,596 at COGS — Sulfen, Metrybuzin, Hydrovant, Status, Meso, Peak, Clethodim, Flagstaff, 24D Amine) were purchased on Kyle's side (M77 Ag / Corbet-ToGo). They're physically moving to Ty's warehouse, so Kyle's loan drops by their COGS. Original originatedYTD before transfer was $271,919.31; after transfer is $206,323.31. See admin-ty-invoice-match.html for item-by-item breakdown.",
+          "transferAmountAtCost": 65596.00,
+          "originatedBeforeTransfer": 271919.31
+        },
         "originations": [
           { "date": "2026-03-20", "amount": 56200.00, "route": "Direct wire 9047 → Jabco",   "supplierInvoice": "Jabco SO 2119 $56,180 (Glyphosate)",  "fromKylesLedger": true },
           { "date": "2026-03-20", "amount": 19032.50, "route": "Direct wire 9047 → Corbet",  "supplierInvoice": "Corbet Invoice 364 $19,012.50 (Hydrovant)", "fromKylesLedger": true },
@@ -119,12 +125,18 @@
           { "date": "2026-08-03", "amount": 44000.00, "route": "9253 → M77 Ag via TELEPHONE TRANSFER",   "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image)." },
           { "date": "2026-09-11", "amount": 29800.00, "route": "9253 → M77 Ag via Other Debit",          "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image). Statement description was 'LOAN PAYMENT'." }
         ],
-        "balanceOwed": 170619.31,
-        "notes": "Kyle's March screenshot showed $75,232.50 originated with a $47,732.50 ending balance. Kyle later confirmed 4/30 $84,807 AND 6/11 $75,000 were also M77 Ag loan-ins (fund-and-wire pattern). True originated total YTD: $235,039.50. True balance owed: $207,539.50. Kyle's original screenshot was a partial view."
+        "balanceOwed": 105023.31,
+        "notes": "Kyle's March screenshot showed $75,232.50 originated with a $47,732.50 ending balance. Kyle later confirmed 4/30 $84,807 AND 6/11 $75,000 were also M77 Ag loan-ins (fund-and-wire pattern). Pre-transfer originated: $271,919.31 / balance $170,619.31. Post-transfer (Kyle→Ty 9 items at COGS $65,596): originated $206,323.31 / balance $105,023.31."
       },
       "m5Ag": {
-        "originatedYTD_confirmed": 386118.25,
-        "originationsMethod": "Per Kyle 2026-11-11: 'the invoices that were paid for by ty need to be totalled up and considered a loan from M5 ag'. Ty's full Sims M5 Ag YTD invoice total ($461,143.25) minus Sims Invoice 103475 ($75,025 — paid by AcreProfit using M77 Ag loan funds on 6/11, not by M5 Ag).",
+        "originatedYTD_confirmed": 451714.25,
+        "_tyTransferApplied": {
+          "appliedOn": "2026-11-11",
+          "note": "Kyle's direction 2026-11-11: 9 items originally purchased on Kyle's side ($65,596 at COGS) are being transferred to Ty's warehouse — M5 Ag loan grows by the same amount. Original originatedYTD before transfer was $386,118.25; after transfer is $451,714.25. The $6,554 markup gap between Ty's handoff pricing and acquisition cost is trading margin, recognized when the items sell, NOT in the loan transfer.",
+          "transferAmountAtCost": 65596.00,
+          "originatedBeforeTransfer": 386118.25
+        },
+        "originationsMethod": "Per Kyle 2026-11-11: 'the invoices that were paid for by ty need to be totalled up and considered a loan from M5 ag'. Ty's full Sims M5 Ag YTD invoice total ($461,143.25) minus Sims Invoice 103475 ($75,025 — paid by AcreProfit using M77 Ag loan funds on 6/11, not by M5 Ag) = $386,118.25. Plus $65,596 transferred in from Kyle's side at COGS = $451,714.25.",
         "originations": [
           { "simsInvoice": "102015", "date": "2026-04-02", "amount": 51562.50,  "products": "Glypex 5 Extra 4,125 gal @ $12.50" },
           { "simsInvoice": "102143", "date": "2026-04-09", "amount": 53000.00,  "products": "Atrazine 4L Tote 4,240 gal @ $12.50" },
@@ -143,7 +155,7 @@
           { "date": "2026-10-15", "amount": 57378.80, "route": "AcreProfit 9253 → M5 Ag check #2300",            "description": "Loan paydown" },
           { "date": "2026-10-19", "amount": 36040.40, "route": "AcreProfit 9253 → M5 Ag via TELEPHONE TRANSFER", "description": "Loan paydown" }
         ],
-        "balanceOwed": 292699.05
+        "balanceOwed": 358295.05
       },
       "kyleMcConnellPersonal":{ "originatedYTD": "PENDING",                                             "repaidYTD": 0.00,     "balance": "PENDING", "notes": "No confirmed direct Kyle-personal repayments found yet." },
       "togoAgLlc":            { "originatedYTD": "PENDING",                                             "repaidYTD": 0.00,     "balance": "PENDING", "notes": "Corbet Invoice 364 was billed to ToGo AG LLC, but Kyle's M77 Ag ledger shows the 3/20 Corbet wire ($19,032.50) came from 9047 (M77 Ag). So ToGo AG may not have originated anything in cash yet — the Corbet billing was M77 Ag's cash. Confirm." },
