@@ -9892,6 +9892,264 @@ app.put('/api/chemicals/:id', authMiddleware, adminMiddleware, async (req, res) 
     }
 });
 
+// ============================================================================
+// FLASH SALE — admin-controlled sale mode with 95% price floor (HARD RULE)
+// ============================================================================
+// Kyle policy (2026-11-11): never discount more than 5% off retail. The floor
+// is enforced in the Chemical.pre('validate') hook on the model itself, so it
+// applies on every save path. These endpoints apply the floor explicitly too
+// for better error messages, and so a bulk update that would violate the floor
+// fails fast with a list of offenders instead of saving some and rejecting
+// others mid-stream.
+
+// Global sale-mode toggle. When true, the public storefront (retail-prices,
+// catalog pages) shows salePrice as the active price for any item with
+// onSale=true. When false, the storefront ignores salePrice entirely.
+let _saleModeCache = null;
+async function getSaleMode() {
+    if (_saleModeCache !== null) return _saleModeCache;
+    // Settings is a KV-ish doc stored in business.json. For simplicity we
+    // store the sale-mode flag in a dedicated small collection keyed by
+    // name='saleMode'. Falls back to false if nothing is set.
+    try {
+        const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+            key: { type: String, required: true, unique: true },
+            value: mongoose.Schema.Types.Mixed,
+            updatedAt: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }));
+        const doc = await SaleSetting.findOne({ key: 'saleMode' });
+        _saleModeCache = doc ? !!doc.value?.active : false;
+        return _saleModeCache;
+    } catch (e) {
+        return false;
+    }
+}
+function _invalidateSaleModeCache() { _saleModeCache = null; }
+
+// GET /api/admin/sale/mode — read current sale mode
+app.get('/api/admin/sale/mode', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+            key: { type: String, required: true, unique: true },
+            value: mongoose.Schema.Types.Mixed,
+            updatedAt: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }));
+        const doc = await SaleSetting.findOne({ key: 'saleMode' });
+        const onSaleCount = await Chemical.countDocuments({ onSale: true, isActive: true });
+        res.json({
+            active: doc ? !!doc.value?.active : false,
+            label: doc?.value?.label || null,
+            startsAt: doc?.value?.startsAt || null,
+            endsAt: doc?.value?.endsAt || null,
+            updatedAt: doc?.updatedAt || null,
+            onSaleCount
+        });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/admin/sale/mode — toggle sale mode on/off
+app.put('/api/admin/sale/mode', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { active, label, startsAt, endsAt } = req.body;
+        if (typeof active !== 'boolean') {
+            return res.status(400).json({ error: 'active (boolean) is required' });
+        }
+        const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+            key: { type: String, required: true, unique: true },
+            value: mongoose.Schema.Types.Mixed,
+            updatedAt: { type: Date, default: Date.now },
+            updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+        }));
+        const doc = await SaleSetting.findOneAndUpdate(
+            { key: 'saleMode' },
+            {
+                key: 'saleMode',
+                value: { active, label: label || null, startsAt: startsAt || null, endsAt: endsAt || null },
+                updatedAt: new Date(),
+                updatedBy: req.user._id
+            },
+            { upsert: true, new: true }
+        );
+        _invalidateSaleModeCache();
+        res.json({ ok: true, active, label: doc.value?.label, startsAt: doc.value?.startsAt, endsAt: doc.value?.endsAt });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// PUT /api/admin/chemicals/:id/sale-price — set/clear sale price for one chemical
+// Request body: { salePrice: number|null, onSale: boolean, note: string }
+// Sending salePrice=null OR onSale=false clears the sale.
+// Floor rule: salePrice must be >= 0.95 * sellPrice (enforced here AND in model).
+app.put('/api/admin/chemicals/:id/sale-price', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { salePrice, onSale, note } = req.body;
+        const chemical = await Chemical.findById(req.params.id);
+        if (!chemical) return res.status(404).json({ error: 'Chemical not found' });
+
+        // Clear sale
+        if (salePrice === null || salePrice === undefined || onSale === false || Number(salePrice) <= 0) {
+            chemical.salePrice = null;
+            chemical.onSale = false;
+            chemical.saleStartedAt = null;
+            chemical.saleEndsAt = null;
+            chemical.saleNote = null;
+            await chemical.save();
+            return res.json({ ok: true, cleared: true, chemical });
+        }
+
+        // Set sale — enforce floor explicitly for a clear error before save
+        const retail = Number(chemical.sellPrice);
+        const sale = Number(salePrice);
+        if (!retail || retail <= 0) {
+            return res.status(400).json({
+                error: 'Cannot set a sale price before the regular retail price (sellPrice) is set on this product.'
+            });
+        }
+        const floor = Math.round(retail * 0.95 * 100) / 100;
+        if (sale < floor) {
+            return res.status(400).json({
+                error: `Sale price $${sale.toFixed(2)} is below the 95% floor of $${floor.toFixed(2)} (retail $${retail.toFixed(2)}). Maximum discount is 5% of retail.`,
+                floor,
+                retail,
+                attempted: sale
+            });
+        }
+
+        chemical.salePrice = sale;
+        chemical.onSale = true;
+        if (!chemical.saleStartedAt) chemical.saleStartedAt = new Date();
+        if (note !== undefined) chemical.saleNote = note || null;
+        await chemical.save();
+        res.json({ ok: true, chemical });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/sale/bulk-apply — apply a sale across many products at once
+// Request body: { items: [{chemicalId, salePrice}], note }
+// Validates the entire batch first. If any item violates the 95% floor, the
+// whole batch is rejected with the list of offenders — no partial saves.
+app.post('/api/admin/sale/bulk-apply', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const { items, note } = req.body;
+        if (!Array.isArray(items) || !items.length) {
+            return res.status(400).json({ error: 'items must be a non-empty array of {chemicalId, salePrice}' });
+        }
+
+        // Validate the whole batch up front
+        const ids = items.map(i => i.chemicalId).filter(Boolean);
+        const chemicals = await Chemical.find({ _id: { $in: ids } });
+        const byId = new Map(chemicals.map(c => [String(c._id), c]));
+        const violations = [];
+
+        for (const item of items) {
+            const c = byId.get(String(item.chemicalId));
+            if (!c) {
+                violations.push({ chemicalId: item.chemicalId, reason: 'not found' });
+                continue;
+            }
+            const retail = Number(c.sellPrice);
+            const sale = Number(item.salePrice);
+            if (!retail || retail <= 0) {
+                violations.push({ chemicalId: item.chemicalId, productName: c.productName, reason: 'retail price not set' });
+                continue;
+            }
+            if (!sale || sale <= 0) {
+                violations.push({ chemicalId: item.chemicalId, productName: c.productName, reason: 'sale price must be > 0' });
+                continue;
+            }
+            const floor = Math.round(retail * 0.95 * 100) / 100;
+            if (sale < floor) {
+                violations.push({
+                    chemicalId: item.chemicalId,
+                    productName: c.productName,
+                    retail,
+                    floor,
+                    attempted: sale,
+                    reason: `below 95% floor of $${floor.toFixed(2)}`
+                });
+            }
+        }
+
+        if (violations.length) {
+            return res.status(400).json({
+                error: `Batch rejected — ${violations.length} item(s) violate the 95% floor or are otherwise invalid. No prices were changed.`,
+                violations
+            });
+        }
+
+        // All clean — apply
+        const now = new Date();
+        let applied = 0;
+        for (const item of items) {
+            const c = byId.get(String(item.chemicalId));
+            c.salePrice = Number(item.salePrice);
+            c.onSale = true;
+            if (!c.saleStartedAt) c.saleStartedAt = now;
+            if (note) c.saleNote = note;
+            await c.save();
+            applied++;
+        }
+        res.json({ ok: true, applied, note: note || null });
+    } catch (e) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+// POST /api/admin/sale/clear-all — clear sale pricing on every chemical.
+// Use this at the end of a sale to wipe salePrice back to null everywhere.
+app.post('/api/admin/sale/clear-all', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const result = await Chemical.updateMany(
+            { onSale: true },
+            { $set: { salePrice: null, onSale: false, saleEndsAt: new Date(), saleNote: null } }
+        );
+        res.json({ ok: true, cleared: result.modifiedCount || 0 });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/sale/active — PUBLIC endpoint. Lists all products currently on sale.
+// Shape matches what the public /sale page needs: id, productName, packSize,
+// unit, sellPrice (crossed out), salePrice, discount %, inventory available.
+app.get('/api/sale/active', async (req, res) => {
+    try {
+        const saleMode = await getSaleMode();
+        if (!saleMode) return res.json({ active: false, items: [] });
+        const items = await Chemical.find({
+            onSale: true,
+            isActive: true,
+            availableForOrder: true,
+            status: 'approved'
+        }).select('productName tradeName manufacturer packSize unit sellPrice salePrice saleNote category').lean();
+
+        const formatted = items.map(i => ({
+            id: i._id,
+            productName: i.productName,
+            tradeName: i.tradeName,
+            manufacturer: i.manufacturer,
+            packSize: i.packSize,
+            unit: i.unit,
+            retailPrice: i.sellPrice,
+            salePrice: i.salePrice,
+            discountPercent: i.sellPrice ? Math.round(((i.sellPrice - i.salePrice) / i.sellPrice) * 100 * 10) / 10 : 0,
+            savings: i.sellPrice && i.salePrice ? Math.round((i.sellPrice - i.salePrice) * 100) / 100 : 0,
+            category: i.category,
+            saleNote: i.saleNote
+        }));
+        res.json({ active: true, count: formatted.length, items: formatted });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // Bulk import chemicals (admin only)
 app.post('/api/chemicals/bulk', authMiddleware, adminMiddleware, async (req, res) => {
     try {
