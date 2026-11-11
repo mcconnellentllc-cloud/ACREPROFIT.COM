@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Finalize Ty Import | AcreProfit Admin</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --accent: #059669;
+            --accent-dark: #047857;
+            --sale: #dc2626;
+            --warn: #d97706;
+            --fg: #111827;
+            --mute: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f3f4f6;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--fg); padding: 20px; line-height: 1.5; }
+        .container { max-width: 1280px; margin: 0 auto; }
+        h1 { margin-bottom: 8px; }
+        h2 { margin: 24px 0 12px; }
+        .lede { color: var(--mute); margin-bottom: 20px; font-size: 15px; max-width: 900px; }
+        .lede a { color: var(--accent); }
+
+        .pricing-model {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+            border-left: 4px solid var(--accent);
+        }
+        .pricing-model h3 { margin-bottom: 10px; }
+        .formula {
+            background: #f9fafb;
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-family: ui-monospace, "SF Mono", Menlo, monospace;
+            font-size: 13px;
+            line-height: 1.8;
+        }
+        .formula .op { color: var(--sale); font-weight: 700; }
+        .formula .final { color: var(--accent); font-weight: 700; }
+
+        .actions {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        .btn {
+            padding: 11px 20px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: #fff;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 14px;
+            color: var(--fg);
+            text-decoration: none;
+            display: inline-block;
+        }
+        .btn:hover { background: #f9fafb; }
+        .btn.primary { background: var(--accent); color: #fff; border-color: var(--accent); }
+        .btn.primary:hover { background: var(--accent-dark); }
+        .btn.danger { background: var(--sale); color: #fff; border-color: var(--sale); }
+        .btn:disabled { background: #d1d5db; cursor: not-allowed; color: #6b7280; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+        .stat {
+            background: #fff;
+            padding: 16px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .stat h3 { font-size: 11px; text-transform: uppercase; color: var(--mute); margin-bottom: 4px; letter-spacing: 0.3px; }
+        .stat .v { font-size: 22px; font-weight: 800; color: var(--accent); }
+        .stat.cost .v { color: #92400e; }
+        .stat.retail .v { color: var(--accent); }
+        .stat.sale .v { color: var(--sale); }
+
+        table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; border-collapse: collapse; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 16px; }
+        th { background: #f9fafb; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: var(--mute); letter-spacing: 0.3px; }
+        td { padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; }
+        .num { text-align: right; white-space: nowrap; }
+        .product-cell { min-width: 180px; }
+        .status-pill {
+            padding: 2px 8px; border-radius: 999px;
+            font-size: 11px; font-weight: 700; text-transform: uppercase;
+        }
+        .status-pill.matched { background: #d1fae5; color: #065f46; }
+        .status-pill.new { background: #fef3c7; color: #92400e; }
+        .status-pill.failed { background: #fecaca; color: #991b1b; }
+
+        .cogs-source { font-size: 11px; color: var(--mute); font-style: italic; margin-top: 2px; }
+        .loading { padding: 40px; text-align: center; background: #fff; border-radius: 10px; color: var(--mute); }
+        .error { padding: 20px; background: #fef2f2; color: var(--sale); border-radius: 10px; }
+        .success-panel {
+            background: #ecfdf5;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            border-left: 4px solid var(--accent);
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>⚡ Finalize Ty's Flash Sale Import</h1>
+        <p class="lede">
+            One click: compute 3-tier pricing from invoice COGS, match to catalog (create new where needed), add Ty's quantities to Otis warehouse inventory, set sale prices at 95% of retail, and turn sale mode ON.
+            <br><a href="/admin-ty-invoice-match.html">← Invoice reconciliation</a> · <a href="/admin.html#flash-sale">Flash Sale admin</a>
+        </p>
+
+        <div class="pricing-model">
+            <h3>🧮 Pricing model (Kyle 2026-11-11)</h3>
+            <div class="formula">
+                <strong>costPrice</strong>          = COGS from invoice <span style="color:var(--mute);">(locked, invariant)</span><br>
+                <span class="op">+ adminMargin</span>        <span style="color:var(--mute);">(15% of cost by default)</span><br>
+                = <strong>adminPrice</strong>           <span style="color:var(--mute);">(what distributors pay)</span><br>
+                <span class="op">+ distributorMargin</span>  <span style="color:var(--mute);">(20% of cost by default)</span><br>
+                = <strong>sellPrice</strong>            <span style="color:var(--mute);">(retail)</span><br>
+                <span class="op">× 0.95</span>                <span style="color:var(--mute);">(flash sale floor — hard rule)</span><br>
+                = <strong class="final">salePrice</strong>           <span style="color:var(--mute);">(what customers see on /sale.html)</span>
+            </div>
+            <p style="margin-top: 10px; font-size: 13px; color: var(--mute);">
+                For items already in the catalog with a retail price set, that retail price is kept — only the sale price gets recomputed. The 95% floor is enforced server-side; the system refuses to save anything below it.
+            </p>
+        </div>
+
+        <div id="root">
+            <div class="loading">Loading Ty's inventory + computing pricing preview…</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('acreprofit_token') || localStorage.getItem('token');
+        if (!token) {
+            document.getElementById('root').innerHTML = '<div class="error">Not logged in.</div>';
+        }
+
+        function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function fmt(n) { return '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+        function fmtInt(n) { return Number(n || 0).toLocaleString(); }
+
+        async function loadPreview() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/ty-inventory/finalize`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dryRun: true })
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'failed');
+                render(await res.json(), 'preview');
+            } catch (e) {
+                document.getElementById('root').innerHTML = `<div class="error">Failed: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        async function applyFinalize() {
+            if (!confirm('Finalize Ty\'s import for real?\n\nThis will:\n• Add Ty\'s quantities to Otis warehouse inventory\n• Set retail + sale prices on all 19 items\n• Create new Chemical records for anything not in the catalog\n• Turn sale mode ON (storefront goes live)\n\nContinue?')) return;
+            document.getElementById('root').innerHTML = '<div class="loading">Applying… don\'t close the tab.</div>';
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/ty-inventory/finalize`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ dryRun: false })
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'failed');
+                render(await res.json(), 'applied');
+            } catch (e) {
+                document.getElementById('root').innerHTML = `<div class="error">Failed: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function render(data, mode) {
+            const rows = data.results || [];
+            const totals = data.totals || {};
+            const headerHtml = mode === 'applied'
+                ? `<div class="success-panel">
+                     <h2 style="margin:0 0 6px;">✅ Finalize complete</h2>
+                     <p>${data.applied} of ${rows.length} items applied. ${data.createdNewProducts} new Chemical records created. Sale mode is now <strong>ON</strong>. Head to <a href="/sale.html" style="color:var(--accent); font-weight:600;">/sale.html</a> to verify.</p>
+                   </div>`
+                : `<div class="actions">
+                     <strong style="color:var(--mute);">Preview below shows what will happen. Nothing is saved yet.</strong>
+                     <button class="btn primary" onclick="applyFinalize()" style="margin-left:auto;">⚡ Apply All 19 Items</button>
+                     <a href="/admin-ty-sale-import.html" class="btn">Per-row review instead</a>
+                   </div>`;
+
+            document.getElementById('root').innerHTML = `
+                ${headerHtml}
+                <div class="stats">
+                    <div class="stat cost">
+                        <h3>Inventory at COGS</h3>
+                        <div class="v">${fmt(totals.cogsBasis)}</div>
+                        <div style="font-size:11px; color:var(--mute); margin-top:2px;">What AP paid Sims/Jabco/Corbet</div>
+                    </div>
+                    <div class="stat retail">
+                        <h3>At Retail</h3>
+                        <div class="v">${fmt(totals.retailBasis)}</div>
+                        <div style="font-size:11px; color:var(--mute); margin-top:2px;">Full catalog price</div>
+                    </div>
+                    <div class="stat sale">
+                        <h3>At Sale Price (95%)</h3>
+                        <div class="v">${fmt(totals.saleBasis)}</div>
+                        <div style="font-size:11px; color:var(--mute); margin-top:2px;">What customers pay during the flash sale</div>
+                    </div>
+                    <div class="stat">
+                        <h3>Potential Margin</h3>
+                        <div class="v">${fmt(totals.saleBasis - totals.cogsBasis)}</div>
+                        <div style="font-size:11px; color:var(--mute); margin-top:2px;">If everything sells at sale price</div>
+                    </div>
+                </div>
+
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th class="product-cell">Product</th>
+                            <th class="num">Qty</th>
+                            <th class="num">COGS</th>
+                            <th class="num">Admin $</th>
+                            <th class="num">Retail $</th>
+                            <th class="num">Sale $ (95%)</th>
+                            <th class="num">Line @ sale</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(r => {
+                            if (!r.ok) {
+                                return `<tr>
+                                    <td><span class="status-pill failed">failed</span></td>
+                                    <td colspan="7">${escapeHtml(r.product || '')} — <strong>${escapeHtml(r.reason)}</strong></td>
+                                </tr>`;
+                            }
+                            const statusPill = r.createdNew ? '<span class="status-pill new">new</span>' : '<span class="status-pill matched">matched</span>';
+                            const lineAtSale = (Number(r.salePrice) || 0) * (Number(r.tyQty) || 0);
+                            return `<tr>
+                                <td>${statusPill}</td>
+                                <td class="product-cell">
+                                    <strong>${escapeHtml(r.product || '')}</strong>
+                                    ${r.existingProduct && r.existingProduct !== r.product ? `<div style="font-size:11px; color:var(--mute);">→ ${escapeHtml(r.existingProduct)}</div>` : ''}
+                                    <div class="cogs-source">${escapeHtml(r.cogsSource || '')}</div>
+                                </td>
+                                <td class="num">${fmtInt(r.tyQty)} ${escapeHtml(r.unit || '')}</td>
+                                <td class="num" style="color:#92400e;">${fmt(r.cogs)}</td>
+                                <td class="num">${fmt(r.adminPrice)}</td>
+                                <td class="num">${fmt(r.retail)}</td>
+                                <td class="num" style="color:var(--sale); font-weight:700;">${fmt(r.salePrice)}</td>
+                                <td class="num"><strong>${fmt(lineAtSale)}</strong></td>
+                            </tr>`;
+                        }).join('')}
+                        <tr style="background:#f9fafb; border-top: 2px solid var(--border);">
+                            <td colspan="7" style="padding:12px;"><strong>Totals</strong></td>
+                            <td class="num"><strong>${fmt(totals.saleBasis)}</strong></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                ${mode === 'applied' ? `
+                    <div style="margin-top:20px; display:flex; gap:10px; justify-content:center;">
+                        <a href="/sale.html" class="btn primary">→ View public sale page</a>
+                        <a href="/admin.html#flash-sale" class="btn">→ Flash Sale admin</a>
+                    </div>
+                ` : ''}
+            `;
+        }
+
+        if (token) loadPreview();
+    </script>
+</body>
+</html>

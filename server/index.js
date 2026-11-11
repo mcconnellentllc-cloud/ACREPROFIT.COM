@@ -10579,6 +10579,228 @@ app.get('/api/admin/sale/ty-inventory/preview', authMiddleware, adminMiddleware,
     }
 });
 
+// POST /api/admin/sale/ty-inventory/finalize
+// Body: { dryRun: boolean, markupPercent?: number }
+// One-click finalize for all 19 of Ty's items. For each row:
+//   - COGS = invoice unit cost from ty-inventory.json (locked at the actual
+//     supplier invoice price — Kyle's 3-tier rule: cost is invariant)
+//   - Finds best catalog match by fuzzy name alias
+//   - If match exists AND has a non-zero sellPrice: use existing retail;
+//     salePrice = retail * 0.95 (max 5% off)
+//   - If match exists but no retail set: compute retail = COGS * (1 + markup);
+//     split: admin margin = COGS * 0.15, distributor margin = COGS * 0.20
+//   - If no match: create new Chemical with the computed 3-tier pricing
+//   - Adds Ty's quantity to Inventory at location 'otis' (Ty's warehouse)
+// Returns a per-row report. With dryRun=true, nothing is saved.
+app.post('/api/admin/sale/ty-inventory/finalize', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const { dryRun = false, markupPercent = 35 } = req.body || {};
+        const ty = JSON.parse(fs.readFileSync(path.join(__dirname, 'ty-inventory.json'), 'utf8'));
+
+        // Pull every active chemical name to match against
+        const allChems = await Chemical.find({ isActive: true })
+            .select('productName tradeName packSize unit costPrice adminPrice sellPrice salePrice onSale unitsPerPack category')
+            .lean();
+
+        const results = [];
+        const Inventory = mongoose.models.Inventory;
+        // Category guesses by product name — helps when creating new Chemicals
+        const categoryGuess = (name) => {
+            const n = String(name || '').toLowerCase();
+            if (/glyph|gly|dicamba|24d|2,4|lv6|atrazine|sulfen|flumi|parapex|paraquat|clethodim|flagstaff|fluroxy|starane|metrybuzin|metribuz|mesulf|metsulf|meso|mesotri|peak|anthem|status|valor|chem/.test(n)) return 'herbicide';
+            if (/flumi|fungi/.test(n)) return 'fungicide';
+            if (/insect/.test(n)) return 'insecticide';
+            if (/ams|hydrovant|adjuvant|surfactant/.test(n)) return 'adjuvant';
+            return 'herbicide';
+        };
+
+        for (const [idx, item] of ty.items.entries()) {
+            try {
+                const cogs = Number(item.cogs) || Number(item.tyPrice) || 0;
+                if (!cogs) {
+                    results.push({ index: idx, ok: false, product: item.productName, reason: 'no COGS available' });
+                    continue;
+                }
+
+                // Find best match (reuse the alias table)
+                const candidates = _tyProductMatches(item.productName, allChems);
+                const match = candidates[0];
+
+                let chemical;
+                let createdNew = false;
+                let retail;
+                let adminPrice;
+
+                if (match && Number(match.sellPrice) > 0) {
+                    // Matched with existing retail — keep it
+                    chemical = await Chemical.findById(match.id);
+                    retail = Number(chemical.sellPrice);
+                    adminPrice = Number(chemical.adminPrice) || Math.round((cogs + (retail - cogs) * 0.4) * 100) / 100;
+                } else {
+                    // Compute retail from COGS using 3-tier markup
+                    // Admin margin: 15% of cost; Distributor margin: 20% of cost; total markup ~35%
+                    const adminMarginDollars = Math.round(cogs * 0.15 * 100) / 100;
+                    const distMarginDollars = Math.round(cogs * 0.20 * 100) / 100;
+                    adminPrice = Math.round((cogs + adminMarginDollars) * 100) / 100;
+                    retail = Math.round((adminPrice + distMarginDollars) * 100) / 100;
+                }
+
+                const salePrice = Math.round(retail * 0.95 * 100) / 100;
+
+                if (dryRun) {
+                    results.push({
+                        index: idx,
+                        ok: true,
+                        dryRun: true,
+                        product: item.productName,
+                        tyQty: item.quantity,
+                        unit: item.unit,
+                        cogs,
+                        cogsSource: item.cogsSource,
+                        matched: !!match,
+                        existingProduct: match?.productName || null,
+                        createdNew: !match,
+                        retail,
+                        adminPrice,
+                        salePrice,
+                        margin: {
+                            adminMarginDollars: Math.round((adminPrice - cogs) * 100) / 100,
+                            distributorMarginDollars: Math.round((retail - adminPrice) * 100) / 100
+                        }
+                    });
+                    continue;
+                }
+
+                // Apply for real
+                if (match) {
+                    chemical = await Chemical.findById(match.id);
+                    chemical.costPrice = cogs;
+                    chemical.adminPrice = adminPrice;
+                    chemical.sellPrice = retail;
+                    chemical.adminMarginDollars = Math.round((adminPrice - cogs) * 100) / 100;
+                    chemical.marginDollars = Math.round((retail - adminPrice) * 100) / 100;
+                } else {
+                    chemical = new Chemical({
+                        productName: item.productName,
+                        packSize: item.unit === 'gal' ? '1 gal' : item.unit === 'lbs' ? '1 lb' : '1 oz',
+                        unit: item.unit,
+                        costPrice: cogs,
+                        adminPrice,
+                        sellPrice: retail,
+                        adminMarginDollars: Math.round((adminPrice - cogs) * 100) / 100,
+                        marginDollars: Math.round((retail - adminPrice) * 100) / 100,
+                        category: categoryGuess(item.productName),
+                        isActive: true,
+                        availableForOrder: true,
+                        status: 'approved',
+                        addedBy: `TyFinalize:${req.user.name}`,
+                        sourceSupplier: 'M5 Ag (Ty handoff)',
+                        notes: `Added via Ty flash-sale finalize. COGS from ${item.cogsSource || 'Ty PDF'}.`
+                    });
+                    createdNew = true;
+                }
+
+                // Set sale price (pre('validate') hook will enforce 95% floor)
+                chemical.salePrice = salePrice;
+                chemical.onSale = true;
+                if (!chemical.saleStartedAt) chemical.saleStartedAt = new Date();
+                chemical.saleNote = 'End-of-year flash sale (Ty inventory)';
+
+                await chemical.save();
+
+                // Add Ty's qty to Inventory at Otis location
+                if (Inventory) {
+                    let inv = await Inventory.findOne({ chemicalId: chemical._id, location: 'otis' });
+                    if (!inv) {
+                        inv = new Inventory({
+                            chemicalId: chemical._id,
+                            productName: chemical.productName,
+                            packSize: chemical.packSize,
+                            unit: chemical.unit,
+                            location: 'otis',
+                            quantityOnHand: 0,
+                            quantityReserved: 0,
+                            quantityAvailable: 0,
+                            averageCost: 0,
+                            lastCost: 0
+                        });
+                    }
+                    const addQty = Number(item.quantity) || 0;
+                    const prevQty = Number(inv.quantityOnHand) || 0;
+                    const prevAvg = Number(inv.averageCost) || 0;
+                    const newQty = prevQty + addQty;
+                    inv.quantityOnHand = newQty;
+                    inv.quantityAvailable = (Number(inv.quantityAvailable) || 0) + addQty;
+                    inv.averageCost = newQty > 0 ? Math.round(((prevQty * prevAvg) + (addQty * cogs)) / newQty * 10000) / 10000 : cogs;
+                    inv.lastCost = cogs;
+                    inv.updatedAt = new Date();
+                    await inv.save();
+                }
+
+                results.push({
+                    index: idx,
+                    ok: true,
+                    product: chemical.productName,
+                    tyQty: item.quantity,
+                    unit: item.unit,
+                    cogs,
+                    retail,
+                    adminPrice,
+                    salePrice,
+                    onSale: true,
+                    location: 'otis',
+                    createdNew
+                });
+            } catch (e) {
+                results.push({ index: idx, ok: false, product: item.productName, reason: e.message });
+            }
+        }
+
+        // Also flip the global sale-mode ON so the storefront picks up these items immediately
+        if (!dryRun) {
+            try {
+                const SaleSetting = mongoose.models.SaleSetting || mongoose.model('SaleSetting', new mongoose.Schema({
+                    key: { type: String, required: true, unique: true },
+                    value: mongoose.Schema.Types.Mixed,
+                    updatedAt: { type: Date, default: Date.now },
+                    updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' }
+                }));
+                await SaleSetting.findOneAndUpdate(
+                    { key: 'saleMode' },
+                    { key: 'saleMode', value: { active: true, label: 'End-of-year flash sale' }, updatedAt: new Date(), updatedBy: req.user._id },
+                    { upsert: true }
+                );
+                _invalidateSaleModeCache();
+            } catch (e) {
+                console.warn('[ty finalize] could not auto-enable sale mode:', e.message);
+            }
+        }
+
+        const okCount = results.filter(r => r.ok).length;
+        const failedCount = results.filter(r => !r.ok).length;
+        const createdCount = results.filter(r => r.ok && r.createdNew).length;
+
+        res.json({
+            ok: failedCount === 0,
+            dryRun,
+            applied: okCount,
+            failed: failedCount,
+            createdNewProducts: createdCount,
+            totals: {
+                cogsBasis: results.reduce((s, r) => s + (r.ok ? (Number(r.cogs) || 0) * (Number(r.tyQty) || 0) : 0), 0),
+                retailBasis: results.reduce((s, r) => s + (r.ok ? (Number(r.retail) || 0) * (Number(r.tyQty) || 0) : 0), 0),
+                saleBasis: results.reduce((s, r) => s + (r.ok ? (Number(r.salePrice) || 0) * (Number(r.tyQty) || 0) : 0), 0)
+            },
+            results
+        });
+    } catch (e) {
+        console.error('[ty finalize] fatal:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // POST /api/admin/sale/ty-inventory/apply
 // Body: { rows: [{ index, chemicalId, retailPrice, salePrice, createNew?: {productName, packSize, unit, costPrice}, skip?: boolean }] }
 // For each row Kyle maps:
