@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flash Sale — AcreProfit</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --accent: #059669;
+            --accent-dark: #047857;
+            --sale: #dc2626;
+            --fg: #111827;
+            --fg-mute: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f9fafb;
+            --card: #fff;
+            --radius: 10px;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; color: var(--fg); background: var(--bg); line-height: 1.5; }
+        .container { max-width: 1120px; margin: 0 auto; padding: 0 16px; }
+
+        .hero {
+            background: linear-gradient(135deg, #059669 0%, #065f46 100%);
+            color: #fff;
+            padding: 48px 16px 56px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+        .hero::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: radial-gradient(circle at 20% 50%, rgba(255,255,255,0.08) 0%, transparent 50%),
+                              radial-gradient(circle at 80% 30%, rgba(255,255,255,0.06) 0%, transparent 50%);
+            pointer-events: none;
+        }
+        .hero-badge {
+            display: inline-block;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(6px);
+            padding: 6px 16px;
+            border-radius: 999px;
+            font-size: 13px;
+            font-weight: 600;
+            margin-bottom: 12px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+        .hero h1 { font-size: 40px; font-weight: 800; margin-bottom: 10px; letter-spacing: -0.02em; position: relative; }
+        .hero p { font-size: 18px; opacity: 0.9; max-width: 640px; margin: 0 auto; position: relative; }
+
+        .stats {
+            max-width: 1120px;
+            margin: -28px auto 0;
+            padding: 0 16px;
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            position: relative;
+            z-index: 2;
+        }
+        .stat {
+            background: var(--card);
+            border-radius: var(--radius);
+            padding: 16px;
+            text-align: center;
+            box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+            border: 1px solid var(--border);
+        }
+        .stat-value { font-size: 28px; font-weight: 800; color: var(--accent); }
+        .stat-label { font-size: 12px; color: var(--fg-mute); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        @media (max-width: 720px) {
+            .stats { grid-template-columns: 1fr; }
+            .hero h1 { font-size: 30px; }
+            .hero p { font-size: 16px; }
+        }
+
+        .main { padding: 40px 0 120px; }
+        .toolbar {
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            margin-bottom: 20px;
+            flex-wrap: wrap;
+        }
+        .toolbar input, .toolbar select {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 14px;
+            background: var(--card);
+        }
+        .toolbar input { flex: 1; min-width: 200px; }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 16px;
+        }
+        .card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            transition: all 0.15s;
+            position: relative;
+        }
+        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); border-color: var(--accent); }
+        .card-badge {
+            position: absolute;
+            top: 12px;
+            right: 12px;
+            background: var(--sale);
+            color: #fff;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 999px;
+        }
+        .card h3 { font-size: 16px; font-weight: 700; margin-bottom: 4px; padding-right: 60px; }
+        .card .meta { font-size: 13px; color: var(--fg-mute); margin-bottom: 12px; }
+        .price-row { display: flex; align-items: baseline; gap: 10px; margin-bottom: 4px; }
+        .price-retail { color: #9ca3af; text-decoration: line-through; font-size: 15px; }
+        .price-sale { color: var(--accent); font-weight: 800; font-size: 22px; }
+        .savings { color: var(--accent); font-size: 13px; font-weight: 600; margin-bottom: 12px; }
+        .qty-row { display: flex; gap: 8px; align-items: center; }
+        .qty-row input { flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 14px; }
+        .btn {
+            padding: 10px 14px;
+            border: none;
+            border-radius: 6px;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.15s;
+        }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: var(--accent-dark); }
+        .btn-ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+        .btn-ghost:hover { background: #ecfdf5; }
+        .btn-full { width: 100%; }
+
+        .cart-fab {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background: var(--accent);
+            color: #fff;
+            border-radius: 999px;
+            padding: 14px 20px;
+            box-shadow: 0 6px 20px rgba(5,150,105,0.4);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 700;
+            z-index: 100;
+            border: none;
+            font-size: 15px;
+        }
+        .cart-fab:hover { background: var(--accent-dark); }
+        .cart-badge {
+            background: #fff;
+            color: var(--accent);
+            border-radius: 999px;
+            padding: 2px 8px;
+            font-size: 13px;
+            font-weight: 800;
+        }
+
+        .drawer-backdrop {
+            position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+            z-index: 200; display: none;
+        }
+        .drawer-backdrop.open { display: block; }
+        .drawer {
+            position: fixed;
+            top: 0; right: 0; bottom: 0;
+            width: 100%;
+            max-width: 480px;
+            background: #fff;
+            z-index: 201;
+            transform: translateX(100%);
+            transition: transform 0.25s;
+            display: flex;
+            flex-direction: column;
+            box-shadow: -4px 0 20px rgba(0,0,0,0.15);
+        }
+        .drawer.open { transform: translateX(0); }
+        .drawer-header {
+            padding: 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .drawer-header h2 { margin: 0; font-size: 20px; }
+        .drawer-close {
+            background: transparent;
+            border: none;
+            cursor: pointer;
+            font-size: 24px;
+            color: var(--fg-mute);
+            padding: 0;
+        }
+        .drawer-body { flex: 1; overflow-y: auto; padding: 16px 20px; }
+        .drawer-footer { padding: 16px 20px; border-top: 1px solid var(--border); }
+        .cart-item {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 12px;
+            padding: 12px 0;
+            border-bottom: 1px solid var(--border);
+        }
+        .cart-item:last-child { border: 0; }
+        .cart-item-name { font-weight: 600; font-size: 14px; }
+        .cart-item-meta { color: var(--fg-mute); font-size: 12px; margin: 2px 0 6px; }
+        .cart-item-qty { display: flex; align-items: center; gap: 6px; font-size: 13px; }
+        .cart-item-qty input { width: 56px; padding: 4px 6px; border: 1px solid var(--border); border-radius: 4px; text-align: center; }
+        .cart-item-total { font-weight: 700; color: var(--accent); white-space: nowrap; }
+        .cart-remove { background: transparent; border: 0; color: var(--sale); cursor: pointer; font-size: 18px; }
+
+        .form-row { margin-bottom: 14px; }
+        .form-row label { display: block; font-size: 13px; font-weight: 600; margin-bottom: 4px; color: var(--fg); }
+        .form-row input, .form-row select, .form-row textarea {
+            width: 100%;
+            padding: 9px 11px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-size: 14px;
+            font-family: inherit;
+        }
+        .form-row textarea { resize: vertical; min-height: 70px; }
+        .form-row .required { color: var(--sale); }
+
+        .summary-row { display: flex; justify-content: space-between; padding: 6px 0; font-size: 14px; }
+        .summary-row.total { font-size: 18px; font-weight: 800; border-top: 1px solid var(--border); margin-top: 8px; padding-top: 10px; }
+
+        .empty-cart { text-align: center; padding: 40px 20px; color: var(--fg-mute); }
+        .empty-state { text-align: center; padding: 60px 20px; color: var(--fg-mute); grid-column: 1 / -1; }
+        .confirm {
+            padding: 24px;
+            text-align: center;
+        }
+        .confirm-icon {
+            width: 64px; height: 64px;
+            background: #d1fae5;
+            color: var(--accent);
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 32px;
+            margin-bottom: 16px;
+        }
+        .confirm-num {
+            font-family: monospace;
+            font-size: 20px;
+            font-weight: 700;
+            background: #f3f4f6;
+            padding: 10px 20px;
+            border-radius: 6px;
+            display: inline-block;
+            margin: 10px 0;
+        }
+
+        .loading { text-align: center; padding: 60px 20px; color: var(--fg-mute); }
+        .error-banner {
+            background: #fee2e2;
+            color: #991b1b;
+            padding: 12px 16px;
+            border-radius: 6px;
+            margin-bottom: 16px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+
+    <section class="hero">
+        <div class="container">
+            <div class="hero-badge" id="saleBadge">⚡ Flash Sale</div>
+            <h1 id="saleTitle">End of Year Flash Sale</h1>
+            <p id="saleSubtitle">Lock in 2027 pricing today. Pay now or on account — pick up when you're ready.</p>
+        </div>
+    </section>
+
+    <div class="stats">
+        <div class="stat">
+            <div class="stat-value" id="statItems">—</div>
+            <div class="stat-label">Products on Sale</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value" id="statSavings">—</div>
+            <div class="stat-label">Average Savings</div>
+        </div>
+        <div class="stat">
+            <div class="stat-value">Pickup</div>
+            <div class="stat-label">No Shipping Required</div>
+        </div>
+    </div>
+
+    <main class="main">
+        <div class="container">
+            <div class="toolbar">
+                <input type="text" id="searchInput" placeholder="Search products...">
+                <select id="categoryFilter">
+                    <option value="">All categories</option>
+                    <option value="herbicide">Herbicide</option>
+                    <option value="fungicide">Fungicide</option>
+                    <option value="insecticide">Insecticide</option>
+                    <option value="adjuvant">Adjuvant</option>
+                    <option value="fertilizer">Fertilizer</option>
+                </select>
+            </div>
+            <div id="productGrid" class="grid">
+                <div class="loading">Loading sale inventory…</div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Floating cart button -->
+    <button class="cart-fab" id="cartFab" onclick="openCart()" style="display:none;">
+        🛒 Cart <span class="cart-badge" id="cartBadge">0</span>
+    </button>
+
+    <!-- Cart drawer -->
+    <div class="drawer-backdrop" id="drawerBackdrop" onclick="closeCart()"></div>
+    <aside class="drawer" id="cartDrawer">
+        <div class="drawer-header">
+            <h2 id="drawerTitle">Your Cart</h2>
+            <button class="drawer-close" onclick="closeCart()" aria-label="Close">✕</button>
+        </div>
+        <div class="drawer-body" id="drawerBody">
+            <div class="empty-cart">Your cart is empty. Add some products to get started.</div>
+        </div>
+        <div class="drawer-footer" id="drawerFooter" style="display:none;">
+            <button class="btn btn-primary btn-full" onclick="showCheckout()">Continue to Checkout →</button>
+        </div>
+    </aside>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        let products = [];
+        let cart = JSON.parse(localStorage.getItem('acreprofit_sale_cart') || '[]');
+
+        function saveCart() {
+            localStorage.setItem('acreprofit_sale_cart', JSON.stringify(cart));
+            updateCartBadge();
+        }
+
+        function updateCartBadge() {
+            const count = cart.reduce((s, i) => s + i.quantity, 0);
+            const fab = document.getElementById('cartFab');
+            const badge = document.getElementById('cartBadge');
+            badge.textContent = count;
+            fab.style.display = count > 0 ? 'flex' : 'none';
+        }
+
+        function escapeHtml(s) {
+            return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+        }
+
+        function fmt(n) { return '$' + (Number(n) || 0).toFixed(2); }
+
+        async function loadProducts() {
+            try {
+                const res = await fetch(`${API_URL}/api/sale/active`);
+                const data = await res.json();
+                if (!data.active) {
+                    document.querySelector('.hero h1').textContent = 'No Active Sale';
+                    document.getElementById('saleSubtitle').textContent = 'Check back soon — our next sale launches shortly.';
+                    document.getElementById('productGrid').innerHTML = '<div class="empty-state"><h3>The sale isn\'t running right now.</h3><p>Follow along at <a href="/">acreprofit.com</a> for the next announcement.</p></div>';
+                    return;
+                }
+                products = data.items || [];
+                document.getElementById('statItems').textContent = products.length;
+                const avgDiscount = products.length ? Math.round(products.reduce((s, p) => s + (p.discountPercent || 0), 0) / products.length * 10) / 10 : 0;
+                document.getElementById('statSavings').textContent = avgDiscount + '% off';
+                renderProducts();
+            } catch (e) {
+                document.getElementById('productGrid').innerHTML = `<div class="error-banner">Could not load sale inventory: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function renderProducts() {
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            const cat = document.getElementById('categoryFilter').value;
+            const grid = document.getElementById('productGrid');
+            const filtered = products.filter(p => {
+                if (search && !(`${p.productName} ${p.manufacturer || ''}`.toLowerCase().includes(search))) return false;
+                if (cat && p.category !== cat) return false;
+                return true;
+            });
+            if (!filtered.length) {
+                grid.innerHTML = '<div class="empty-state">No products match your filter.</div>';
+                return;
+            }
+            grid.innerHTML = filtered.map(p => `
+                <div class="card">
+                    ${p.discountPercent > 0 ? `<div class="card-badge">${p.discountPercent}% OFF</div>` : ''}
+                    <h3>${escapeHtml(p.productName)}</h3>
+                    <div class="meta">${escapeHtml(p.manufacturer || '')} · ${escapeHtml(p.packSize || '')} ${escapeHtml(p.unit || '')}</div>
+                    <div class="price-row">
+                        <span class="price-retail">${fmt(p.retailPrice)}</span>
+                        <span class="price-sale">${fmt(p.salePrice)}</span>
+                    </div>
+                    <div class="savings">You save ${fmt(p.savings)}</div>
+                    <div class="qty-row">
+                        <input type="number" min="1" value="1" id="qty-${p.id}" aria-label="Quantity">
+                        <button class="btn btn-primary" onclick="addToCart('${p.id}')">Add</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function addToCart(id) {
+            const p = products.find(x => String(x.id) === String(id));
+            if (!p) return;
+            const qty = Math.max(1, parseInt(document.getElementById('qty-' + id).value) || 1);
+            const existing = cart.find(c => String(c.chemicalId) === String(id));
+            if (existing) {
+                existing.quantity += qty;
+            } else {
+                cart.push({
+                    chemicalId: p.id,
+                    productName: p.productName,
+                    packSize: p.packSize,
+                    unit: p.unit,
+                    salePrice: p.salePrice,
+                    retailPrice: p.retailPrice,
+                    savings: p.savings,
+                    quantity: qty
+                });
+            }
+            saveCart();
+            // Mini confirmation
+            const fab = document.getElementById('cartFab');
+            fab.style.transform = 'scale(1.1)';
+            setTimeout(() => fab.style.transform = '', 150);
+        }
+
+        function openCart() {
+            renderCart();
+            document.getElementById('drawerBackdrop').classList.add('open');
+            document.getElementById('cartDrawer').classList.add('open');
+        }
+
+        function closeCart() {
+            document.getElementById('drawerBackdrop').classList.remove('open');
+            document.getElementById('cartDrawer').classList.remove('open');
+        }
+
+        function renderCart() {
+            const body = document.getElementById('drawerBody');
+            const footer = document.getElementById('drawerFooter');
+            document.getElementById('drawerTitle').textContent = 'Your Cart';
+            if (!cart.length) {
+                body.innerHTML = '<div class="empty-cart">Your cart is empty.</div>';
+                footer.style.display = 'none';
+                return;
+            }
+            const total = cart.reduce((s, i) => s + i.salePrice * i.quantity, 0);
+            const totalSavings = cart.reduce((s, i) => s + i.savings * i.quantity, 0);
+            body.innerHTML = `
+                ${cart.map((item, idx) => `
+                    <div class="cart-item">
+                        <div>
+                            <div class="cart-item-name">${escapeHtml(item.productName)}</div>
+                            <div class="cart-item-meta">${escapeHtml(item.packSize || '')} ${escapeHtml(item.unit || '')} · ${fmt(item.salePrice)} each</div>
+                            <div class="cart-item-qty">
+                                Qty:
+                                <input type="number" min="1" value="${item.quantity}" onchange="updateQty(${idx}, this.value)">
+                                <button class="cart-remove" onclick="removeFromCart(${idx})" aria-label="Remove">✕</button>
+                            </div>
+                        </div>
+                        <div class="cart-item-total">${fmt(item.salePrice * item.quantity)}</div>
+                    </div>
+                `).join('')}
+                <div style="margin-top: 20px; padding-top: 16px; border-top: 2px solid var(--border);">
+                    <div class="summary-row"><span>Subtotal</span><span>${fmt(total)}</span></div>
+                    <div class="summary-row" style="color: var(--accent);"><span>You saved</span><span>${fmt(totalSavings)}</span></div>
+                    <div class="summary-row total"><span>Total</span><span>${fmt(total)}</span></div>
+                </div>
+            `;
+            footer.style.display = 'block';
+        }
+
+        function updateQty(idx, v) {
+            const q = Math.max(1, parseInt(v) || 1);
+            cart[idx].quantity = q;
+            saveCart();
+            renderCart();
+        }
+
+        function removeFromCart(idx) {
+            cart.splice(idx, 1);
+            saveCart();
+            renderCart();
+        }
+
+        function showCheckout() {
+            const body = document.getElementById('drawerBody');
+            const footer = document.getElementById('drawerFooter');
+            document.getElementById('drawerTitle').textContent = 'Checkout';
+            const total = cart.reduce((s, i) => s + i.salePrice * i.quantity, 0);
+            body.innerHTML = `
+                <p style="color: var(--fg-mute); font-size: 13px; margin-bottom: 16px;">
+                    Fill out your contact info — we'll confirm availability and send an invoice. Pay then pick up.
+                </p>
+                <form id="checkoutForm" onsubmit="submitPreorder(event)">
+                    <div class="form-row">
+                        <label>Name <span class="required">*</span></label>
+                        <input type="text" id="coName" required>
+                    </div>
+                    <div class="form-row">
+                        <label>Email <span class="required">*</span></label>
+                        <input type="email" id="coEmail" required>
+                    </div>
+                    <div class="form-row">
+                        <label>Phone</label>
+                        <input type="tel" id="coPhone">
+                    </div>
+                    <div class="form-row">
+                        <label>Farm / Operation name</label>
+                        <input type="text" id="coFarm">
+                    </div>
+                    <div class="form-row">
+                        <label>Preferred pickup location</label>
+                        <select id="coPickup">
+                            <option value="">— Select —</option>
+                            <option value="AcreProfit warehouse">AcreProfit warehouse</option>
+                            <option value="Field delivery (contact rep)">Field delivery (contact rep)</option>
+                            <option value="Other (specify in notes)">Other (specify in notes)</option>
+                        </select>
+                    </div>
+                    <div class="form-row">
+                        <label>Notes</label>
+                        <textarea id="coNotes" placeholder="Anything else we should know..."></textarea>
+                    </div>
+                    <div style="margin: 20px 0; padding: 14px; background: #f0fdf4; border-radius: 6px; font-size: 13px;">
+                        Order total: <strong style="color: var(--accent); font-size: 18px;">${fmt(total)}</strong><br>
+                        <span style="color: var(--fg-mute);">This is a preorder — Kyle will confirm availability then invoice you.</span>
+                    </div>
+                    <div id="checkoutError"></div>
+                    <button type="button" class="btn btn-ghost btn-full" onclick="openCart()" style="margin-bottom: 8px;">← Back to Cart</button>
+                    <button type="submit" class="btn btn-primary btn-full" id="submitBtn">Submit Preorder</button>
+                </form>
+            `;
+            footer.style.display = 'none';
+        }
+
+        async function submitPreorder(e) {
+            e.preventDefault();
+            const btn = document.getElementById('submitBtn');
+            const errEl = document.getElementById('checkoutError');
+            btn.disabled = true;
+            btn.textContent = 'Submitting…';
+            errEl.innerHTML = '';
+
+            try {
+                const payload = {
+                    customerName: document.getElementById('coName').value.trim(),
+                    customerEmail: document.getElementById('coEmail').value.trim(),
+                    customerPhone: document.getElementById('coPhone').value.trim(),
+                    farmName: document.getElementById('coFarm').value.trim(),
+                    pickupLocation: document.getElementById('coPickup').value,
+                    notes: document.getElementById('coNotes').value.trim(),
+                    items: cart.map(c => ({ chemicalId: c.chemicalId, quantity: c.quantity }))
+                };
+                const res = await fetch(`${API_URL}/api/sale/preorder`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Submission failed');
+
+                // Clear cart + show confirmation
+                cart = [];
+                saveCart();
+                document.getElementById('drawerTitle').textContent = 'Preorder Received';
+                document.getElementById('drawerBody').innerHTML = `
+                    <div class="confirm">
+                        <div class="confirm-icon">✓</div>
+                        <h2 style="margin-bottom: 8px;">Thanks — we've got it.</h2>
+                        <p style="color: var(--fg-mute); margin-bottom: 16px;">
+                            Your preorder number is below. We'll email a confirmation and send an invoice once we confirm availability.
+                        </p>
+                        <div class="confirm-num">${escapeHtml(data.quoteNumber)}</div>
+                        <p style="margin-top: 16px;">Total: <strong>${fmt(data.total)}</strong></p>
+                        ${data.rejected && data.rejected.length ? `<p style="color: var(--sale); font-size: 13px; margin-top: 12px;">${data.rejected.length} item(s) were skipped (no longer on sale).</p>` : ''}
+                        <div style="margin-top: 24px;">
+                            <button class="btn btn-ghost" onclick="closeCart(); window.scrollTo(0,0);">Keep shopping</button>
+                        </div>
+                    </div>
+                `;
+                document.getElementById('drawerFooter').style.display = 'none';
+            } catch (err) {
+                errEl.innerHTML = `<div class="error-banner">${escapeHtml(err.message)}</div>`;
+                btn.disabled = false;
+                btn.textContent = 'Submit Preorder';
+            }
+        }
+
+        async function loadSaleMetadata() {
+            try {
+                const res = await fetch(`${API_URL}/api/sale/active`);
+                const data = await res.json();
+                if (data.active && data.items && data.items.length) {
+                    const anyNote = data.items.find(i => i.saleNote)?.saleNote;
+                    if (anyNote) {
+                        document.getElementById('saleTitle').textContent = anyNote;
+                    }
+                }
+            } catch (e) {}
+        }
+
+        // Event listeners
+        document.getElementById('searchInput').addEventListener('input', renderProducts);
+        document.getElementById('categoryFilter').addEventListener('change', renderProducts);
+
+        // Initialize
+        loadProducts();
+        updateCartBadge();
+    </script>
+</body>
+</html>
