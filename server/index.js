@@ -596,6 +596,55 @@ const RepCommission = mongoose.model('RepCommission', repCommissionSchema);
 // rejectPendingChemicalOrders middleware keyed on status !== 'approved'.
 const Chemical = require('./models/Chemical');
 
+// ============================================================================
+// Sale-aware commission math
+// ============================================================================
+// Normal retail:
+//   rep commission per line = marginDollars × qty           (sellPrice - adminPrice)
+//   admin revenue per line  = adminMarginDollars × qty      (adminPrice - costPrice)
+//
+// Flash sale (Kyle's policy, 2026-11-11): when an item sells BELOW retail,
+// the discount is split 50/50 between the rep and the house. The rep gives
+// up half the discount, the house gives up the other half. Neither side can
+// go below zero — if the normal margin was already thin, the full margin
+// is kept at zero rather than inverted.
+//
+// Example: retail $16, adminPrice $14.50, marginDollars $1.50, adminMarginDollars $1.25
+//   Sold at $15.20 (5% off):  discount = $0.80, half = $0.40
+//     rep line = ($1.50 - $0.40) × qty = $1.10 × qty
+//     admin line = ($1.25 - $0.40) × qty = $0.85 × qty
+//
+// Called from every Order commission site. actualUnitPrice can come from
+// normalizedChemicals[].pricePerUnit (create path) or order.chemicals[].
+// pricePerPackage (update path) — either is fine; if missing/zero we treat
+// the line as full retail (no split).
+function computeSaleAwareLineCommission(pricing, qty, actualUnitPrice) {
+    const marginD = Number(pricing.marginDollars) || 0;
+    const adminMarginD = Number(pricing.adminMarginDollars) || 0;
+    const retail = Number(pricing.sellPrice) || 0;
+    const unit = Number(actualUnitPrice) || 0;
+    const q = Number(qty) || 0;
+    // No retail set, or unit price missing/at-or-above retail → normal math
+    if (!retail || !unit || unit >= retail) {
+        return {
+            repCommissionLine: marginD * q,
+            adminRevenueLine: adminMarginD * q,
+            saleSplitApplied: false
+        };
+    }
+    // Sold below retail — split the discount 50/50, clamped at zero.
+    const discount = retail - unit;
+    const halfDiscount = discount / 2;
+    const repLine = Math.max(0, marginD - halfDiscount) * q;
+    const adminLine = Math.max(0, adminMarginD - halfDiscount) * q;
+    return {
+        repCommissionLine: Math.round(repLine * 100) / 100,
+        adminRevenueLine: Math.round(adminLine * 100) / 100,
+        saleSplitApplied: true,
+        discountPerUnit: discount
+    };
+}
+
 // Chemical Price History Model (for tracking price changes over time)
 const chemicalPriceHistorySchema = new mongoose.Schema({
     chemicalId: { type: mongoose.Schema.Types.ObjectId, ref: 'Chemical', required: true },
@@ -7198,7 +7247,7 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
                 const chemicalIds = (chemicals || []).map(c => c.chemicalId).filter(Boolean);
                 if (chemicalIds.length > 0) {
                     const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
-                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars')
+                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars salePrice onSale')
                         .session(dbSession);
 
                     const pricingMap = {};
@@ -7223,12 +7272,10 @@ app.post('/api/admin/orders/for-customer', authMiddleware, adminMiddleware, asyn
 
                             const pricing = pricingMap[chem.chemicalId.toString()];
                             if (pricing) {
-                                totalRepCommissionDec = totalRepCommissionDec.plus(
-                                    new Decimal(pricing.marginDollars || 0).times(qty)
-                                );
-                                totalAdminRevenueDec = totalAdminRevenueDec.plus(
-                                    new Decimal(pricing.adminMarginDollars || 0).times(qty)
-                                );
+                                const { repCommissionLine, adminRevenueLine } =
+                                    computeSaleAwareLineCommission(pricing, qty, chem.pricePerUnit);
+                                totalRepCommissionDec = totalRepCommissionDec.plus(new Decimal(repCommissionLine));
+                                totalAdminRevenueDec = totalAdminRevenueDec.plus(new Decimal(adminRevenueLine));
                             }
                         }
                     }
@@ -7384,7 +7431,7 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
                 const chemicalIds = chemicals.map(c => c.chemicalId).filter(Boolean);
                 if (chemicalIds.length > 0) {
                     const chemicalPricing = await Chemical.find({ _id: { $in: chemicalIds } })
-                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars');
+                        .select('productName costPrice adminPrice sellPrice marginDollars adminMarginDollars salePrice onSale');
 
                     const pricingMap = {};
                     chemicalPricing.forEach(c => {
@@ -7399,12 +7446,10 @@ app.put('/api/admin/orders/:orderId', authMiddleware, adminMiddleware, async (re
                         if (chem.chemicalId && qty > 0) {
                             const pricing = pricingMap[chem.chemicalId.toString()];
                             if (pricing) {
-                                totalRepCommissionDec = totalRepCommissionDec.plus(
-                                    new Decimal(pricing.marginDollars || 0).times(qty)
-                                );
-                                totalAdminRevenueDec = totalAdminRevenueDec.plus(
-                                    new Decimal(pricing.adminMarginDollars || 0).times(qty)
-                                );
+                                const { repCommissionLine, adminRevenueLine } =
+                                    computeSaleAwareLineCommission(pricing, qty, chem.pricePerPackage || chem.pricePerUnit);
+                                totalRepCommissionDec = totalRepCommissionDec.plus(new Decimal(repCommissionLine));
+                                totalAdminRevenueDec = totalAdminRevenueDec.plus(new Decimal(adminRevenueLine));
                             }
                         }
                     }
@@ -10387,6 +10432,167 @@ app.post('/api/sale/preorder', salePreorderLimiter, async (req, res) => {
         });
     } catch (e) {
         console.error('[sale preorder] error:', e);
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============================================================================
+// PUBLIC RECIPE BUILDER — 2027 pre-order planning tool
+// ============================================================================
+// Customer picks crop + acres, we return a per-acre recipe with sale pricing
+// and a cart-ready shopping list. Feeds /recipe-builder.html — the "savings,
+// savings, savings" long-form funnel Kyle described.
+
+// GET /api/sale/recipe-builder/crops — distinct crop list from public programs
+app.get('/api/sale/recipe-builder/crops', async (req, res) => {
+    try {
+        const crops = await SprayProgram.distinct('crop', { isPublic: true });
+        res.json({ crops: crops.filter(Boolean).sort() });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// GET /api/sale/recipe-builder/programs?crop=xxx — public programs for a crop
+app.get('/api/sale/recipe-builder/programs', async (req, res) => {
+    try {
+        const { crop } = req.query;
+        const query = { isPublic: true };
+        if (crop) query.crop = crop;
+        const programs = await SprayProgram.find(query)
+            .select('name crop tier roundNumber description passes applications disclaimer')
+            .sort({ crop: 1, tier: 1, name: 1 })
+            .lean();
+        res.json({ programs });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// POST /api/sale/recipe-builder/calculate
+// Body: { programId, acres, gallonsPerAcre? }
+// Returns a shopping list with per-product quantities, sale prices (if the
+// item is on sale AND sale mode is on), and totals. No auth required.
+app.post('/api/sale/recipe-builder/calculate', async (req, res) => {
+    try {
+        const { programId, acres, gallonsPerAcre = 15 } = req.body || {};
+        if (!programId) return res.status(400).json({ error: 'programId is required' });
+        const acresN = Math.max(1, parseFloat(acres) || 0);
+        if (!acresN) return res.status(400).json({ error: 'acres must be > 0' });
+
+        const program = await SprayProgram.findById(programId).lean();
+        if (!program) return res.status(404).json({ error: 'Program not found' });
+
+        // Flatten all chemicals across passes[] and applications[]
+        const rows = [];
+        const addRow = (c, passName) => {
+            const rate = Number(c.rate || c.suggestedRate) || 0;
+            if (!rate || !c.chemicalId) return;
+            rows.push({
+                chemicalId: String(c.chemicalId),
+                productName: c.productName,
+                rate,
+                rateUnit: c.rateUnit || 'oz/acre',
+                passName: passName || c.notes || '',
+                optional: !!c.optional,
+                defaultOn: c.defaultOn !== false
+            });
+        };
+        (program.passes || []).forEach(p => (p.chemicals || []).forEach(c => addRow(c, p.name || `Pass ${p.passNumber}`)));
+        (program.applications || []).forEach(a => (a.chemicals || []).forEach(c => addRow(c, a.name || a.timing)));
+
+        // Pull sale-aware pricing from Chemical
+        const saleActive = await getSaleMode();
+        const ids = [...new Set(rows.map(r => r.chemicalId))];
+        const chems = await Chemical.find({ _id: { $in: ids } })
+            .select('productName packSize unit unitsPerPack sellPrice salePrice onSale isActive availableForOrder status')
+            .lean();
+        const byId = new Map(chems.map(c => [String(c._id), c]));
+
+        // Build the shopping list — combine duplicate products across passes
+        const lineMap = new Map(); // chemicalId → { line }
+        for (const row of rows) {
+            if (!row.defaultOn) continue;
+            const c = byId.get(row.chemicalId);
+            if (!c || !c.isActive) continue;
+
+            // Convert rate to total volume for this acreage
+            // Simple model: rate is per acre in rateUnit. Total = rate × acres.
+            // This matches how the existing calculator math is used elsewhere.
+            const totalNeeded = row.rate * acresN;
+            // Convert to packages — unitsPerPack holds the gal/lb per package
+            const unitsPerPack = Number(c.unitsPerPack) || 1;
+            // Rate unit heuristic: 'oz/acre' → divide by 128 to get gallons
+            let totalInUnit = totalNeeded;
+            if (/oz/i.test(row.rateUnit) && /gal/i.test(c.unit || '')) {
+                totalInUnit = totalNeeded / 128;
+            } else if (/pt/i.test(row.rateUnit) && /gal/i.test(c.unit || '')) {
+                totalInUnit = totalNeeded / 8;
+            } else if (/qt/i.test(row.rateUnit) && /gal/i.test(c.unit || '')) {
+                totalInUnit = totalNeeded / 4;
+            }
+            const packages = Math.ceil(totalInUnit / unitsPerPack);
+
+            // Pricing
+            const retail = Number(c.sellPrice) || 0;
+            const salePx = saleActive && c.onSale && Number(c.salePrice) > 0 ? Number(c.salePrice) : null;
+            const activePrice = salePx || retail;
+            const lineTotal = Math.round(packages * activePrice * 100) / 100;
+            const lineSavings = salePx ? Math.round(packages * (retail - salePx) * 100) / 100 : 0;
+
+            // Merge if the same product appears in multiple passes
+            if (lineMap.has(row.chemicalId)) {
+                const prev = lineMap.get(row.chemicalId);
+                prev.packages += packages;
+                prev.totalInUnit += totalInUnit;
+                prev.lineTotal = Math.round(prev.packages * activePrice * 100) / 100;
+                prev.savings = salePx ? Math.round(prev.packages * (retail - salePx) * 100) / 100 : 0;
+                prev.passes.push(row.passName);
+            } else {
+                lineMap.set(row.chemicalId, {
+                    chemicalId: row.chemicalId,
+                    productName: c.productName,
+                    packSize: c.packSize,
+                    unit: c.unit,
+                    unitsPerPack,
+                    rate: row.rate,
+                    rateUnit: row.rateUnit,
+                    totalInUnit: Math.round(totalInUnit * 100) / 100,
+                    packages,
+                    retailPrice: retail,
+                    salePrice: salePx,
+                    activePrice,
+                    onSale: !!salePx,
+                    lineTotal,
+                    savings: lineSavings,
+                    passes: [row.passName]
+                });
+            }
+        }
+
+        const lines = Array.from(lineMap.values()).sort((a, b) => a.productName.localeCompare(b.productName));
+        const totalRetail = lines.reduce((s, l) => s + l.packages * l.retailPrice, 0);
+        const totalSale = lines.reduce((s, l) => s + l.lineTotal, 0);
+        const totalSavings = Math.round((totalRetail - totalSale) * 100) / 100;
+
+        res.json({
+            programId,
+            programName: program.name,
+            crop: program.crop,
+            tier: program.tier,
+            acres: acresN,
+            saleActive,
+            lines,
+            totals: {
+                retailTotal: Math.round(totalRetail * 100) / 100,
+                saleTotal: Math.round(totalSale * 100) / 100,
+                savings: totalSavings,
+                costPerAcre: Math.round((totalSale / acresN) * 100) / 100
+            },
+            disclaimer: program.disclaimer
+        });
+    } catch (e) {
+        console.error('[recipe-builder calculate]', e);
         res.status(500).json({ error: e.message });
     }
 });
