@@ -1437,8 +1437,9 @@
                             <p style="font-size: 13px; color: var(--text-light); margin: 0 0 12px;">
                                 <strong style="color: #dc2626;">Hard rule:</strong> system refuses any sale price below 95% of retail. Attempts to go lower are rejected before save.
                             </p>
-                            <div style="display: flex; gap: 8px; margin-bottom: 12px;">
+                            <div style="display: flex; gap: 8px; margin-bottom: 12px; flex-wrap: wrap;">
                                 <button class="btn btn-primary" onclick="openBulkSaleModal()">Bulk apply by % off retail</button>
+                                <a href="/admin-ty-sale-import.html" class="btn btn-outline" style="text-decoration:none;">Import Ty's Inventory →</a>
                                 <button class="btn btn-outline" onclick="loadSaleProducts()">Refresh list</button>
                             </div>
                             <div id="saleProductsList" style="max-height: 400px; overflow-y: auto; border: 1px solid var(--border); border-radius: 4px;">

@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Import Ty's Flash Sale Inventory | AcreProfit Admin</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --accent: #059669;
+            --sale: #dc2626;
+            --fg: #111827;
+            --mute: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f3f4f6;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--fg); padding: 20px; }
+        .container { max-width: 1400px; margin: 0 auto; }
+        h1 { margin-bottom: 8px; }
+        .lede { color: var(--mute); margin-bottom: 20px; font-size: 15px; }
+        .lede a { color: var(--accent); }
+
+        .toolbar {
+            background: #fff;
+            padding: 16px 20px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            display: flex;
+            gap: 12px;
+            align-items: center;
+            flex-wrap: wrap;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .toolbar .stat { padding: 6px 12px; border-right: 1px solid var(--border); font-size: 14px; }
+        .toolbar .stat:last-of-type { border-right: 0; }
+        .toolbar .stat strong { color: var(--accent); font-size: 16px; }
+        .toolbar .actions { margin-left: auto; display: flex; gap: 8px; }
+
+        .btn { padding: 10px 16px; border: none; border-radius: 6px; cursor: pointer; font-weight: 600; font-size: 14px; }
+        .btn-primary { background: var(--accent); color: #fff; }
+        .btn-primary:hover { background: #047857; }
+        .btn-primary:disabled { background: #d1d5db; cursor: not-allowed; }
+        .btn-ghost { background: transparent; border: 1px solid var(--border); color: var(--fg); }
+        .btn-ghost:hover { background: #f9fafb; }
+
+        table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; box-shadow: 0 2px 4px rgba(0,0,0,0.05); border-collapse: collapse; }
+        th { background: #f9fafb; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: var(--mute); letter-spacing: 0.3px; }
+        td { padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+        tr.skip td { opacity: 0.4; }
+        tr.new td { background: #fef3c7; }
+        tr.matched td { background: #f0fdf4; }
+
+        .ty-name { font-weight: 700; }
+        .ty-note { color: var(--mute); font-size: 11px; display: block; margin-top: 2px; font-style: italic; }
+        .nowrap { white-space: nowrap; }
+
+        input[type=number], select, input[type=text] {
+            padding: 6px 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 13px;
+            font-family: inherit;
+            background: #fff;
+            width: 100%;
+        }
+        input[disabled] { background: #f9fafb; color: var(--mute); }
+        .inline-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; }
+
+        .row-status {
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 999px;
+            text-transform: uppercase;
+            font-weight: 700;
+            letter-spacing: 0.3px;
+            display: inline-block;
+        }
+        .row-status.matched { background: #d1fae5; color: #065f46; }
+        .row-status.new { background: #fef3c7; color: #92400e; }
+        .row-status.skipped { background: #e5e7eb; color: #6b7280; }
+
+        .floor-warn { color: var(--sale); font-size: 11px; display: block; }
+        .pricing-strip { font-size: 11px; color: var(--mute); }
+
+        .results-panel {
+            background: #fff;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .result-item {
+            padding: 10px;
+            border-bottom: 1px solid var(--border);
+            display: flex;
+            gap: 10px;
+            align-items: center;
+        }
+        .result-item:last-child { border-bottom: 0; }
+        .result-item .ok { color: var(--accent); }
+        .result-item .fail { color: var(--sale); }
+
+        .loading, .error { padding: 20px; text-align: center; background: #fff; border-radius: 10px; }
+        .error { color: var(--sale); }
+
+        #logoutMsg { font-size: 13px; color: var(--mute); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Import Ty's Flash Sale Inventory</h1>
+        <p class="lede">
+            Ty's PDF prices are his <strong>handoff cost</strong> to AcreProfit. Confirm the catalog match (or create a new product) and the retail price for each row — the sale price auto-fills at 95% of retail (Kyle's hard rule, max 5% off). Hit <strong>Apply All</strong> to add Ty's quantities as inventory batches and turn on sale pricing.
+            <br><a href="/admin.html#flash-sale">← Back to Flash Sale admin</a>
+        </p>
+
+        <div id="root">
+            <div class="loading">Loading Ty's inventory...</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('acreprofit_token') || localStorage.getItem('token');
+
+        if (!token) {
+            document.getElementById('root').innerHTML = '<div class="error">Not logged in. <a href="/login.html">Log in</a> and come back.</div>';
+        }
+
+        let previewData = null;
+        let rowMap = {}; // index → row state
+
+        function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function fmt(n) { return '$' + (Number(n) || 0).toFixed(2); }
+
+        async function load() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/ty-inventory/preview`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error(`${res.status}: ${(await res.json()).error || 'failed'}`);
+                previewData = await res.json();
+                initRowMap();
+                render();
+            } catch (e) {
+                document.getElementById('root').innerHTML = `<div class="error">Failed to load: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function initRowMap() {
+            for (const r of previewData.rows) {
+                const c = r.candidates[0];
+                rowMap[r.index] = {
+                    mode: c ? 'match' : 'new',
+                    chemicalId: c?.id || null,
+                    retailPrice: c?.sellPrice || 0,
+                    salePrice: c?.sellPrice ? Math.round(c.sellPrice * 0.95 * 100) / 100 : 0,
+                    createNew: {
+                        productName: r.tyProductName,
+                        packSize: r.unit === 'gal' ? '1 gal' : r.unit === 'lbs' ? '1 lb' : '1 oz',
+                        unit: r.unit,
+                        costPrice: r.tyPrice
+                    }
+                };
+            }
+        }
+
+        function updateRow(idx, patch) {
+            Object.assign(rowMap[idx], patch);
+            // Recompute sale price = 95% of retail when retail changes
+            if (patch.retailPrice !== undefined && patch.salePrice === undefined) {
+                rowMap[idx].salePrice = Math.round(patch.retailPrice * 0.95 * 100) / 100;
+            }
+            // Re-render just the summary stats and row state
+            renderStats();
+            renderRow(idx);
+        }
+
+        function render() {
+            const rows = previewData.rows;
+            document.getElementById('root').innerHTML = `
+                <div class="toolbar">
+                    <div class="stat">Items: <strong>${rows.length}</strong></div>
+                    <div class="stat">Ty inventory value: <strong>${fmt(previewData.totalValueAtTyPricing || 0)}</strong></div>
+                    <div class="stat" id="statMatched">Matched: <strong>0</strong></div>
+                    <div class="stat" id="statNew">New: <strong>0</strong></div>
+                    <div class="stat" id="statSkipped">Skipped: <strong>0</strong></div>
+                    <div class="actions">
+                        <button class="btn btn-ghost" onclick="loadPage()">Reload</button>
+                        <button class="btn btn-primary" onclick="applyAll()">Apply All →</button>
+                    </div>
+                </div>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Status</th>
+                            <th>Ty's Product</th>
+                            <th class="nowrap">Qty / Unit</th>
+                            <th class="nowrap">Ty's Price</th>
+                            <th>Catalog Match</th>
+                            <th class="nowrap">Retail $</th>
+                            <th class="nowrap">Sale $ (95%)</th>
+                            <th class="nowrap">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${rows.map(r => renderRowHtml(r)).join('')}
+                    </tbody>
+                </table>
+                <div id="resultsPanel"></div>
+            `;
+            renderStats();
+        }
+
+        function renderRowHtml(r) {
+            const state = rowMap[r.index];
+            const trCls = state.mode === 'skip' ? 'skip' : state.mode === 'new' ? 'new' : 'matched';
+            const statusLbl = state.mode === 'skip' ? 'skipped' : state.mode === 'new' ? 'new' : 'matched';
+            const matchSelect = `
+                <select onchange="handleMatchChange(${r.index}, this.value)">
+                    ${r.candidates.map(c => `<option value="${c.id}" ${state.chemicalId === c.id && state.mode === 'match' ? 'selected' : ''}>${escapeHtml(c.productName)} · ${escapeHtml(c.packSize || '')} ${escapeHtml(c.unit || '')} · retail ${fmt(c.sellPrice || 0)}</option>`).join('')}
+                    <option value="__NEW__" ${state.mode === 'new' ? 'selected' : ''}>-- Create new Chemical --</option>
+                    <option value="__SKIP__" ${state.mode === 'skip' ? 'selected' : ''}>-- Skip this row --</option>
+                </select>
+            `;
+            let detailCell;
+            if (state.mode === 'new') {
+                detailCell = `
+                    <div class="inline-inputs">
+                        <input type="text" placeholder="Product name" value="${escapeHtml(state.createNew.productName)}" onchange="updateRow(${r.index}, { createNew: { ...rowMap[${r.index}].createNew, productName: this.value } })">
+                        <input type="text" placeholder="Pack size" value="${escapeHtml(state.createNew.packSize)}" onchange="updateRow(${r.index}, { createNew: { ...rowMap[${r.index}].createNew, packSize: this.value } })">
+                    </div>
+                    <div class="pricing-strip">Cost: ${fmt(state.createNew.costPrice)} (Ty's handoff)</div>
+                `;
+            } else if (state.mode === 'skip') {
+                detailCell = '<em style="color:var(--mute);">Skipped</em>';
+            } else {
+                const match = r.candidates.find(c => c.id === state.chemicalId);
+                detailCell = match ? `<div class="pricing-strip">Current retail: ${fmt(match.sellPrice || 0)} · Admin: ${fmt(match.adminPrice || 0)} · Cost: ${fmt(match.costPrice || 0)}</div>` : '';
+            }
+
+            const floorLine = state.retailPrice > 0 ? `
+                <span class="floor-warn" ${state.salePrice >= Math.round(state.retailPrice * 0.95 * 100) / 100 ? 'style="color:var(--mute);"' : ''}>Floor: ${fmt(Math.round(state.retailPrice * 0.95 * 100) / 100)}</span>
+            ` : '';
+
+            return `
+                <tr id="row-${r.index}" class="${trCls}">
+                    <td><span class="row-status ${statusLbl}">${statusLbl}</span></td>
+                    <td>
+                        <span class="ty-name">${escapeHtml(r.tyProductName)}</span>
+                        ${r.notes ? `<span class="ty-note">${escapeHtml(r.notes)}</span>` : ''}
+                    </td>
+                    <td class="nowrap">${r.quantity} ${escapeHtml(r.unit)}</td>
+                    <td class="nowrap">${fmt(r.tyPrice)}<br><small>= ${fmt(r.lineTotal)}</small></td>
+                    <td>${matchSelect}<br>${detailCell}</td>
+                    <td class="nowrap"><input type="number" step="0.01" min="0" value="${state.retailPrice || ''}" ${state.mode === 'skip' ? 'disabled' : ''} onchange="updateRow(${r.index}, { retailPrice: parseFloat(this.value) || 0 })"></td>
+                    <td class="nowrap">
+                        <input type="number" step="0.01" min="0" value="${state.salePrice || ''}" ${state.mode === 'skip' ? 'disabled' : ''} onchange="updateRow(${r.index}, { salePrice: parseFloat(this.value) || 0 })">
+                        ${floorLine}
+                    </td>
+                    <td class="nowrap">
+                        <button class="btn btn-ghost" style="padding:4px 8px; font-size:12px;" onclick="handleMatchChange(${r.index}, '__SKIP__')">Skip</button>
+                    </td>
+                </tr>
+            `;
+        }
+
+        function renderRow(idx) {
+            const r = previewData.rows.find(x => x.index === idx);
+            if (!r) return;
+            const tr = document.getElementById('row-' + idx);
+            if (tr) tr.outerHTML = renderRowHtml(r);
+        }
+
+        function renderStats() {
+            const states = Object.values(rowMap);
+            document.getElementById('statMatched').innerHTML = `Matched: <strong>${states.filter(s => s.mode === 'match').length}</strong>`;
+            document.getElementById('statNew').innerHTML = `New: <strong>${states.filter(s => s.mode === 'new').length}</strong>`;
+            document.getElementById('statSkipped').innerHTML = `Skipped: <strong>${states.filter(s => s.mode === 'skip').length}</strong>`;
+        }
+
+        function handleMatchChange(idx, value) {
+            const r = previewData.rows.find(x => x.index === idx);
+            if (value === '__NEW__') {
+                updateRow(idx, { mode: 'new', chemicalId: null, retailPrice: 0, salePrice: 0 });
+            } else if (value === '__SKIP__') {
+                updateRow(idx, { mode: 'skip' });
+            } else {
+                const c = r.candidates.find(x => x.id === value);
+                updateRow(idx, {
+                    mode: 'match',
+                    chemicalId: value,
+                    retailPrice: c?.sellPrice || 0,
+                    salePrice: c?.sellPrice ? Math.round(c.sellPrice * 0.95 * 100) / 100 : 0
+                });
+            }
+        }
+
+        async function applyAll() {
+            if (!confirm('Apply all mapped rows? This will add Ty\'s quantities to inventory and set sale prices. Hard rule: sale price must be ≥ 95% of retail.')) return;
+            const btn = document.querySelector('.btn-primary');
+            btn.disabled = true; btn.textContent = 'Applying...';
+            const rows = [];
+            for (const [idx, state] of Object.entries(rowMap)) {
+                if (state.mode === 'skip') { rows.push({ index: parseInt(idx), skip: true }); continue; }
+                const payload = { index: parseInt(idx), retailPrice: state.retailPrice, salePrice: state.salePrice };
+                if (state.mode === 'new') payload.createNew = state.createNew;
+                else payload.chemicalId = state.chemicalId;
+                rows.push(payload);
+            }
+            try {
+                const res = await fetch(`${API_URL}/api/admin/sale/ty-inventory/apply`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ rows })
+                });
+                const data = await res.json();
+                renderResults(data);
+            } catch (e) {
+                alert('Error: ' + e.message);
+            } finally {
+                btn.disabled = false; btn.textContent = 'Apply All →';
+            }
+        }
+
+        function renderResults(data) {
+            const panel = document.getElementById('resultsPanel');
+            panel.innerHTML = `
+                <div class="results-panel">
+                    <h2 style="margin-bottom:12px;">Import ${data.ok ? 'complete' : 'finished with errors'}</h2>
+                    <p style="margin-bottom:16px;">Applied: <strong>${data.applied}</strong> · Skipped: <strong>${data.skipped}</strong> · Failed: <strong style="color:${data.failed > 0 ? 'var(--sale)' : 'var(--mute)'};">${data.failed}</strong></p>
+                    ${data.results.map(r => {
+                        const ty = previewData.rows.find(x => x.index === r.index);
+                        const name = ty?.tyProductName || `Row ${r.index}`;
+                        if (r.skipped) return `<div class="result-item"><span>⊘</span><span>${escapeHtml(name)} — skipped</span></div>`;
+                        if (r.ok) return `<div class="result-item"><span class="ok">✓</span><span>${escapeHtml(name)} → ${escapeHtml(r.productName || '')} · retail ${fmt(r.retailPrice)} · sale ${fmt(r.salePrice)} · +${ty.quantity} ${ty.unit} to inventory${r.created ? ' (new product)' : ''}</span></div>`;
+                        return `<div class="result-item"><span class="fail">✗</span><span>${escapeHtml(name)} — <strong>${escapeHtml(r.reason)}</strong></span></div>`;
+                    }).join('')}
+                    <div style="margin-top:16px;"><a href="/admin.html#flash-sale" class="btn btn-primary" style="text-decoration:none; display:inline-block;">→ Back to Flash Sale admin</a></div>
+                </div>
+            `;
+            panel.scrollIntoView({ behavior: 'smooth' });
+        }
+
+        function loadPage() { location.reload(); }
+
+        if (token) load();
+    </script>
+</body>
+</html>

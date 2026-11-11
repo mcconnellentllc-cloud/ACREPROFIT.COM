@@ -1,0 +1,28 @@
+{
+  "_meta": {
+    "description": "Ty Mollohan's (M5 Ag) inventory available for the 2026 end-of-year flash sale. Prices in this file are Ty's handoff price to AcreProfit (acquisition cost). Admin picks a catalog match + confirms retail during the import flow; the system enforces salePrice >= 0.95 * sellPrice on apply.",
+    "source": "Acre_Profit_Inventory_-_TY.pdf, received from Kyle 2026-11-11",
+    "totalValueAtTyPricing": 208601.40
+  },
+  "items": [
+    { "date": "2026-11-06", "productName": "LV6",                   "quantity": 530,   "unit": "gal", "tyPrice": 21.88, "lineTotal": 11596.40, "notes": "2,4-D ester" },
+    { "date": "2026-11-06", "productName": "Dicamba",               "quantity": 795,   "unit": "gal", "tyPrice": 25.25, "lineTotal": 20073.75 },
+    { "date": null,         "productName": "LV6",                   "quantity": 180,   "unit": "gal", "tyPrice": 25.00, "lineTotal": 4500.00,  "notes": "Second LV6 batch, different pack" },
+    { "date": null,         "productName": "Dicamba",               "quantity": 180,   "unit": "gal", "tyPrice": 27.00, "lineTotal": 4860.00,  "notes": "Second Dicamba batch" },
+    { "date": null,         "productName": "Glypex",                "quantity": 2475,  "unit": "gal", "tyPrice": 14.25, "lineTotal": 35268.75, "notes": "Glyphosate 5.4 (generic)" },
+    { "date": null,         "productName": "Atrazine",              "quantity": 1855,  "unit": "gal", "tyPrice": 12.75, "lineTotal": 23651.25 },
+    { "date": null,         "productName": "Flumi",                 "quantity": 995,   "unit": "lbs", "tyPrice": 12.75, "lineTotal": 12686.25, "notes": "Flumioxazin 51% WDG" },
+    { "date": null,         "productName": "Sulfen",                "quantity": 330,   "unit": "gal", "tyPrice": 76.00, "lineTotal": 25080.00, "notes": "Sulfentrazone" },
+    { "date": null,         "productName": "Metrybuzin",            "quantity": 115,   "unit": "gal", "tyPrice": 42.00, "lineTotal": 4830.00,  "notes": "Metribuzin — likely matches Rancor 4F" },
+    { "date": null,         "productName": "Mesulfuron",            "quantity": 3600,  "unit": "oz",  "tyPrice": 2.25,  "lineTotal": 8100.00,  "notes": "Metsulfuron-methyl" },
+    { "date": null,         "productName": "Hydrovant",             "quantity": 137.5, "unit": "gal", "tyPrice": 90.00, "lineTotal": 12375.00 },
+    { "date": null,         "productName": "Parapex",               "quantity": 630,   "unit": "gal", "tyPrice": 15.50, "lineTotal": 9765.00,  "notes": "Likely a Paraquat variant" },
+    { "date": null,         "productName": "Status",                "quantity": 1000,  "unit": "oz",  "tyPrice": 3.80,  "lineTotal": 3800.00,  "notes": "BASF Status (dicamba + diflufenzopyr)" },
+    { "date": null,         "productName": "Meso",                  "quantity": 165,   "unit": "gal", "tyPrice": 48.00, "lineTotal": 7920.00,  "notes": "Mesotrione" },
+    { "date": null,         "productName": "Peak",                  "quantity": 160,   "unit": "oz",  "tyPrice": 21.25, "lineTotal": 3400.00,  "notes": "Prosulfuron" },
+    { "date": null,         "productName": "Anthem NXT",            "quantity": 12.5,  "unit": "gal", "tyPrice": 476.00, "lineTotal": 5950.00 },
+    { "date": null,         "productName": "Clethodim",             "quantity": 10,    "unit": "gal", "tyPrice": 27.00, "lineTotal": 270.00 },
+    { "date": null,         "productName": "Flagstaff Fluroxipure", "quantity": 180,   "unit": "gal", "tyPrice": 74.00, "lineTotal": 13320.00, "notes": "Fluroxypyr (Starane equivalent)" },
+    { "date": null,         "productName": "24D Amine",             "quantity": 55,    "unit": "gal", "tyPrice": 21.00, "lineTotal": 1155.00,  "notes": "2,4-D Amine" }
+  ]
+}
