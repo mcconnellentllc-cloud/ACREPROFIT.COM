@@ -10491,6 +10491,22 @@ function _tyProductMatches(tyName, allChemicals) {
     return candidates.sort((a, b) => b.score - a.score).slice(0, 4);
 }
 
+// GET /api/admin/sale/ty-inventory/invoice-match
+// Returns the pre-built reconciliation of Ty's 19 handoff items back to the
+// specific supplier invoices they came from. See ty-inventory-invoice-match.json
+// for the full analysis. Each row is tagged with ownership (M5 Ag vs AP vs
+// ToGo AG LLC) and a confidence rating (exact / high).
+app.get('/api/admin/sale/ty-inventory/invoice-match', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const raw = fs.readFileSync(path.join(__dirname, 'ty-inventory-invoice-match.json'), 'utf8');
+        res.json(JSON.parse(raw));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/admin/sale/ty-inventory/preview
 // Returns Ty's inventory with best-guess catalog matches for each row.
 app.get('/api/admin/sale/ty-inventory/preview', authMiddleware, adminMiddleware, async (req, res) => {
