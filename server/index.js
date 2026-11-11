@@ -162,6 +162,13 @@ const passwordResetLimiter = rateLimit({
     standardHeaders: true,
     legacyHeaders: false
 });
+const salePreorderLimiter = rateLimit({
+    windowMs: 10 * 60 * 1000,
+    max: 5,                                                 // 5 preorders / 10 min / IP — stops bot flood
+    message: { error: 'Too many preorder submissions. Please try again shortly.' },
+    standardHeaders: true,
+    legacyHeaders: false
+});
 
 // MongoDB Connection
 const connectDB = async () => {
@@ -1784,6 +1791,10 @@ const quoteRequestSchema = new mongoose.Schema({
     // Delivery info for quote
     deliveryLocation: String,
     preferredDeliveryDate: Date,
+
+    // Preorder source — 'sale-preorder' tags submissions from the public
+    // /sale.html page (flash sale intake). Omitted/null for regular quotes.
+    source: { type: String, default: null, index: true },
 
     // Metadata
     createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
@@ -10193,6 +10204,189 @@ app.get('/api/sale/active', async (req, res) => {
         }));
         res.json({ active: true, count: formatted.length, items: formatted });
     } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ============================================================================
+// PUBLIC SALE PREORDER — the "click → purchase → pay → pickup" intake
+// ============================================================================
+// Visitors arrive from the email blast CTA, browse /sale.html, add items to
+// a cart, fill out contact info + pickup preference, and submit. We create
+// a QuoteRequest tagged source='sale-preorder' so Kyle sees it in the
+// existing Preorders admin tab. Kyle reviews, confirms availability, issues
+// an invoice (existing flow), customer pays, customer picks up.
+//
+// Hardening:
+//   - rate limited (5/10min/IP) to stop bot floods
+//   - server re-reads salePrice from DB for each item; client-posted price
+//     is a hint only, never trusted
+//   - server also re-enforces the 95% floor: if a client somehow posts a
+//     price below the floor, the submission is rejected
+//   - items must actually be onSale AND sale mode must be ON; otherwise
+//     the preorder is rejected (no stealth orders at sale prices after a
+//     sale ends)
+
+app.post('/api/sale/preorder', salePreorderLimiter, async (req, res) => {
+    try {
+        const saleActive = await getSaleMode();
+        if (!saleActive) {
+            return res.status(400).json({ error: 'The sale is not currently active. Please check back soon.' });
+        }
+
+        const { customerName, customerEmail, customerPhone, farmName, pickupLocation, notes, items } = req.body || {};
+        if (!customerName || !customerEmail) {
+            return res.status(400).json({ error: 'Name and email are required.' });
+        }
+        if (!Array.isArray(items) || !items.length) {
+            return res.status(400).json({ error: 'Your cart is empty.' });
+        }
+
+        // Server-authoritative pricing — ignore client-posted prices, pull from DB
+        const ids = items.map(i => i.chemicalId).filter(Boolean);
+        const chemicals = await Chemical.find({ _id: { $in: ids } });
+        const byId = new Map(chemicals.map(c => [String(c._id), c]));
+
+        const resolvedItems = [];
+        let total = 0;
+        const errors = [];
+
+        for (const i of items) {
+            const c = byId.get(String(i.chemicalId));
+            if (!c) { errors.push({ item: i, reason: 'not found' }); continue; }
+            if (!c.onSale || !c.salePrice || c.salePrice <= 0) {
+                errors.push({ item: i, productName: c.productName, reason: 'no longer on sale' });
+                continue;
+            }
+            const retail = Number(c.sellPrice) || 0;
+            const sale = Number(c.salePrice);
+            const floor = Math.round(retail * 0.95 * 100) / 100;
+            if (sale < floor) {
+                // Shouldn't happen — model hook enforces it — but double-check
+                errors.push({ item: i, productName: c.productName, reason: 'price below floor (admin fix needed)' });
+                continue;
+            }
+            const qty = Math.max(1, parseInt(i.quantity) || 1);
+            const lineTotal = Math.round(sale * qty * 100) / 100;
+            total += lineTotal;
+            resolvedItems.push({
+                chemicalId: c._id,
+                productName: c.productName,
+                category: c.category,
+                packSize: c.packSize,
+                unit: c.unit,
+                quantityNeeded: qty,
+                sellPrice: sale,       // frozen at sale price
+                totalPrice: lineTotal,
+                isPriced: true
+            });
+        }
+
+        if (!resolvedItems.length) {
+            return res.status(400).json({
+                error: 'None of the items in your cart are available at a sale price right now. The sale may have just ended.',
+                errors
+            });
+        }
+
+        // Create the QuoteRequest (reuse the existing admin Preorders tab)
+        const quoteRequest = new QuoteRequest({
+            customerName,
+            customerEmail: String(customerEmail).trim().toLowerCase(),
+            customerPhone: customerPhone || '',
+            items: resolvedItems,
+            customerNotes: [
+                farmName ? `Farm: ${farmName}` : null,
+                pickupLocation ? `Pickup: ${pickupLocation}` : null,
+                notes ? `Notes: ${notes}` : null
+            ].filter(Boolean).join('\n'),
+            deliveryLocation: pickupLocation || 'Pickup — location TBD',
+            estimatedTotal: Math.round(total * 100) / 100,
+            status: 'submitted',
+            // Tag it so admin can filter sale preorders from regular quotes
+            source: 'sale-preorder'
+        });
+        await quoteRequest.save();
+
+        // Fire-and-forget confirmation emails (customer + admin). We don't
+        // block the response on email delivery — the preorder is already saved.
+        (async () => {
+            try {
+                const transporter = createEmailTransporter();
+                if (!transporter) return;
+                const from = process.env.FROM_EMAIL || 'no-reply@acreprofit.com';
+                const siteUrl = process.env.FRONTEND_URL || 'https://acreprofit.com';
+                const itemsHtml = resolvedItems.map(it => `
+                    <tr>
+                        <td style="padding:8px;border-bottom:1px solid #e5e7eb;">${_escapeHtml(it.productName)}<br><span style="color:#6b7280;font-size:12px;">${_escapeHtml(it.packSize)} ${_escapeHtml(it.unit || '')}</span></td>
+                        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">${it.quantityNeeded}</td>
+                        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">$${it.sellPrice.toFixed(2)}</td>
+                        <td style="padding:8px;border-bottom:1px solid #e5e7eb;text-align:right;">$${it.totalPrice.toFixed(2)}</td>
+                    </tr>
+                `).join('');
+                const summary = `
+                    <table style="width:100%;border-collapse:collapse;">
+                        <thead><tr style="background:#f9fafb;">
+                            <th style="padding:8px;text-align:left;">Product</th>
+                            <th style="padding:8px;text-align:right;">Qty</th>
+                            <th style="padding:8px;text-align:right;">Sale Price</th>
+                            <th style="padding:8px;text-align:right;">Line Total</th>
+                        </tr></thead>
+                        <tbody>${itemsHtml}</tbody>
+                        <tfoot><tr><td colspan="3" style="padding:8px;text-align:right;font-weight:700;">Total:</td><td style="padding:8px;text-align:right;font-weight:700;">$${(Math.round(total * 100) / 100).toFixed(2)}</td></tr></tfoot>
+                    </table>
+                `;
+
+                // Customer confirmation
+                await transporter.sendMail({
+                    from,
+                    to: customerEmail,
+                    subject: `Preorder received — ${quoteRequest.quoteNumber}`,
+                    html: `
+                        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:640px;margin:0 auto;padding:24px;">
+                            <h2 style="color:#059669;">Thanks — we've got your preorder.</h2>
+                            <p>Hi ${_escapeHtml(customerName)},</p>
+                            <p>We received your flash sale preorder <strong>${_escapeHtml(quoteRequest.quoteNumber)}</strong>. Kyle will confirm availability and send an invoice. Once paid, your products will be ready for pickup.</p>
+                            ${summary}
+                            <p style="margin-top:20px;">Questions? Just reply to this email, or call your sales rep.</p>
+                            <p style="color:#6b7280;font-size:12px;margin-top:24px;">AcreProfit LLC</p>
+                        </div>
+                    `
+                });
+
+                // Admin notification
+                const adminTo = process.env.SALE_PREORDER_NOTIFY_EMAIL || process.env.ADMIN_NOTIFY_EMAIL || 'mcconnellentllc@gmail.com';
+                await transporter.sendMail({
+                    from,
+                    to: adminTo,
+                    subject: `New sale preorder — ${quoteRequest.quoteNumber} — ${customerName}`,
+                    html: `
+                        <div style="font-family:system-ui,-apple-system,sans-serif;max-width:640px;margin:0 auto;padding:24px;">
+                            <h2>New flash sale preorder</h2>
+                            <p><strong>${_escapeHtml(customerName)}</strong> &lt;${_escapeHtml(customerEmail)}&gt;${customerPhone ? ' · ' + _escapeHtml(customerPhone) : ''}</p>
+                            ${farmName ? `<p>Farm: ${_escapeHtml(farmName)}</p>` : ''}
+                            ${pickupLocation ? `<p>Pickup: ${_escapeHtml(pickupLocation)}</p>` : ''}
+                            ${notes ? `<p>Notes: ${_escapeHtml(notes)}</p>` : ''}
+                            ${summary}
+                            <p><a href="${siteUrl}/admin.html#quote-requests" style="color:#059669;">Open in admin →</a></p>
+                        </div>
+                    `
+                });
+            } catch (e) {
+                console.error('[sale preorder] confirmation email failed:', e.message);
+            }
+        })();
+
+        res.json({
+            ok: true,
+            quoteNumber: quoteRequest.quoteNumber,
+            preorderId: quoteRequest._id,
+            total: Math.round(total * 100) / 100,
+            itemCount: resolvedItems.length,
+            rejected: errors
+        });
+    } catch (e) {
+        console.error('[sale preorder] error:', e);
         res.status(500).json({ error: e.message });
     }
 });
