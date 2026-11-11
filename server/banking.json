@@ -33,7 +33,7 @@
     { "month": "2026-05", "endingDate": "2026-05-29", "begin": 1501.50,    "credits": 17136.65,  "debits": 15000.00,   "ending": 3638.15,   "notes": "GV Farms $14,936.65, Robbins $2,200. $15,000 loan paydown to M77 Ag (9253→9047)." },
     { "month": "2026-06", "endingDate": "2026-06-30", "begin": 3638.15,    "credits": 75000.00,  "debits": 75045.00,   "ending": 3593.15,   "notes": "Alumax $75,000 in, $75,045 loan repayment to Kyle (telephone transfer) same day." },
     { "month": "2026-07", "endingDate": "2026-07-31", "begin": 3593.15,    "credits": 71843.11,  "debits": 18440.41,   "ending": 56995.85,  "notes": "M77 Ag loan-in $18,440.41 on 7/17 (slip memo 'Advance') → Corbet ACH out $18,440.41 same day. Customer deposits: Seger $4,655, Tabric Group $35,322, GSV Pharms partial $13,425.70." },
-    { "month": "2026-08", "endingDate": "2026-08-31", "begin": 56995.85,   "credits": 35261.72,  "debits": 62439.40,   "ending": 29818.17,  "notes": "Corbet ACH $18,439.40. $44,000 wire to M77 Ag (confirmed 2026-11-11 via wire-debit image; memo 'Principal' = loan paydown). 2 Stripe transfers in: $1,092.67 + $8,069.05." },
+    { "month": "2026-08", "endingDate": "2026-08-31", "begin": 56995.85,   "credits": 35261.72,  "debits": 62439.40,   "ending": 29818.17,  "notes": "Corbet ACH $18,439.40 on 8/4 — Kyle confirms M77 Ag economically funded this (adds to M77 Ag loan balance even though no same-day deposit). $44,000 wire to M77 Ag on 8/3 (loan paydown, memo 'Principal'). 2 Stripe transfers in: $1,092.67 + $8,069.05." },
     { "month": "2026-09", "endingDate": "2026-09-30", "begin": 29818.17,   "credits": 93399.20,  "debits": 29800.00,   "ending": 93417.37,  "notes": "Stripe $36,020.40 in. 3-check deposit $57,378.80. $29,800 LOAN PAYMENT to M77 Ag (confirmed 2026-11-11 via wire-debit image, memo 'Principal')." },
     { "month": "2026-10", "endingDate": "2026-10-30", "begin": 93417.37,   "credits": 25645.00,  "debits": 93419.20,   "ending": 25643.17,  "notes": "Check #2300 $57,378.80 to M5 Ag + $36,040.40 wire to M5 Ag/Ty — both M5 Ag loan paydowns ($93,419.20 combined). $1,000 reclass from M77 Ag (9047→9253)." }
   ],
@@ -94,13 +94,14 @@
     "outstandingLoanBalances": {
       "note": "Running balance owed by AcreProfit to each lender. Originations per lender from Kyle's ledger plus bank-statement detection. Math: Originations YTD - Repayments YTD = Balance.",
       "m77Ag": {
-        "originatedYTD_confirmed": 253479.91,
+        "originatedYTD_confirmed": 271919.31,
         "originations": [
           { "date": "2026-03-20", "amount": 56200.00, "route": "Direct wire 9047 → Jabco",   "supplierInvoice": "Jabco SO 2119 $56,180 (Glyphosate)",  "fromKylesLedger": true },
           { "date": "2026-03-20", "amount": 19032.50, "route": "Direct wire 9047 → Corbet",  "supplierInvoice": "Corbet Invoice 364 $19,012.50 (Hydrovant)", "fromKylesLedger": true },
           { "date": "2026-04-30", "amount": 84807.00, "route": "Deposit into 9253 → AcreProfit wires Jabco $84,827 same day", "supplierInvoice": "Jabco SO 2129 + 2131 $84,807", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-10 — 'wire in is loan from M77 ag to Acre Profit to pay for JabCO order'" },
           { "date": "2026-06-11", "amount": 75000.00, "route": "Deposit into 9253 → AcreProfit wires Sims $75,045 same day", "supplierInvoice": "Sims Invoice 103475 $75,025 (billed to M5 Ag at Sims, but AcreProfit paid with M77 Ag's money)", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-10 — '6/11 deposit is a loan from M77 ag to Acre Profit - the 75045.00 is a payment to sims or jabco'" },
-          { "date": "2026-07-17", "amount": 18440.41, "route": "Deposit into 9253 (slip memo: 'Advance') → Corbet ACHs out $18,440.41 same day", "supplierInvoice": "Corbet Scientific ACH Sale $18,440.41 (Hydrovant)", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-11 — 'actually it says advance .. it is a loan from m77 ag to acre profit'" }
+          { "date": "2026-07-17", "amount": 18440.41, "route": "Deposit into 9253 (slip memo: 'Advance') → Corbet ACHs out $18,440.41 same day", "supplierInvoice": "Corbet Scientific ACH Sale $18,440.41 (Hydrovant)", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-11 — 'actually it says advance .. it is a loan from m77 ag to acre profit'" },
+          { "date": "2026-08-04", "amount": 18439.40, "route": "Implicit — Corbet ACHs $18,439.40 out of 9253; no same-day M77 Ag deposit, but Kyle confirms M77 Ag economically funded this Corbet invoice", "supplierInvoice": "Corbet Scientific ACH Sale $18,439.40 (Hydrovant)", "fromKylesLedger": false, "confirmedBy": "Kyle 2026-11-11 — '8/4 funded by m77 ag.'", "notes": "No matching same-day deposit from M77 Ag; AcreProfit's cash balance at the time covered it. Kyle's position: this Corbet obligation is M77 Ag's economically, so it increases M77 Ag's loan balance against AcreProfit regardless of which account's cash physically paid Corbet. Equivalent accounting: M77 Ag made a loan of $18,439.40 to AcreProfit on 8/4 and AcreProfit used it to pay Corbet." }
         ],
         "repaidYTD": 101300.00,
         "repayments": [
@@ -109,7 +110,7 @@
           { "date": "2026-08-03", "amount": 44000.00, "route": "9253 → M77 Ag via TELEPHONE TRANSFER",   "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image)." },
           { "date": "2026-09-11", "amount": 29800.00, "route": "9253 → M77 Ag via Other Debit",          "description": "Wire memo: 'Principal'. Confirmed by Kyle 2026-11-11 (wire debit image). Statement description was 'LOAN PAYMENT'." }
         ],
-        "balanceOwed": 152179.91,
+        "balanceOwed": 170619.31,
         "notes": "Kyle's March screenshot showed $75,232.50 originated with a $47,732.50 ending balance. Kyle later confirmed 4/30 $84,807 AND 6/11 $75,000 were also M77 Ag loan-ins (fund-and-wire pattern). True originated total YTD: $235,039.50. True balance owed: $207,539.50. Kyle's original screenshot was a partial view."
       },
       "m5Ag":                 { "originatedYTD": "PENDING",                                             "repaidYTD": 93419.20, "balance": "PENDING" },
