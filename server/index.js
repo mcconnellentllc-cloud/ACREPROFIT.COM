@@ -5722,6 +5722,7 @@ app.put('/api/orders/:orderId/submit', authMiddleware, async (req, res) => {
 // file is tiny and version-controlled with the server deploy.
 // ========================================================================
 const BUSINESS_JSON_PATH = require('path').join(__dirname, 'business.json');
+const BANKING_JSON_PATH = require('path').join(__dirname, 'banking.json');
 
 app.get('/api/admin/business', authMiddleware, partnerMiddleware, async (req, res) => {
     try {
@@ -5747,6 +5748,36 @@ app.put('/api/admin/business', authMiddleware, partnerMiddleware, async (req, re
         res.json({ ok: true, business: incoming });
     } catch (err) {
         res.status(500).json({ error: 'Could not save business profile: ' + err.message });
+    }
+});
+
+// ---- BANKING (partner tier) ----
+// Parsed-statement snapshot of the AcreProfit LLC operating account at
+// Points West Community Bank. Partner-tier gated — this is member-level
+// cash-position info. Edited by hand from each month's statement PDF.
+app.get('/api/admin/banking/summary', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const raw = require('fs').readFileSync(BANKING_JSON_PATH, 'utf8');
+        res.json(JSON.parse(raw));
+    } catch (err) {
+        res.status(500).json({ error: 'Could not read banking data: ' + err.message });
+    }
+});
+
+app.put('/api/admin/banking/summary', authMiddleware, partnerMiddleware, async (req, res) => {
+    try {
+        const incoming = req.body;
+        if (!incoming || typeof incoming !== 'object') {
+            return res.status(400).json({ error: 'Request body must be a JSON object' });
+        }
+        if (incoming._meta) {
+            incoming._meta.lastUpdated = new Date().toISOString().slice(0, 10);
+            incoming._meta.editedBy = req.user.name || req.user.email;
+        }
+        require('fs').writeFileSync(BANKING_JSON_PATH, JSON.stringify(incoming, null, 2));
+        res.json({ ok: true, banking: incoming });
+    } catch (err) {
+        res.status(500).json({ error: 'Could not save banking data: ' + err.message });
     }
 });
 
