@@ -1,0 +1,127 @@
+{
+  "_meta": {
+    "description": "Every supplier invoice from chemical-purchases.json cross-referenced against actual bank withdrawals in banking.json. Each invoice carries one of three statuses: PAID_FROM_KNOWN (we have the withdrawal line proving the payment account), BILLED_NOT_PAYMENT_CONFIRMED (we know whose Sims/Jabco account was billed, but not which bank account cut the check), UNKNOWN. The real loan-ownership math follows the CASH TRAIL, not the Sims billing name. Kyle noted 2026-11-11 that the earlier ownership-mismatch analysis was wrong because it used Sims billing labels instead of bank withdrawals.",
+    "lastUpdated": "2026-11-11",
+    "method": "Walk every row of chemical-purchases.json. For each distinct (supplier, invoice, date), check banking.json for a matching outflow by date + amount. If found, record the funding account. If not, flag as BILLED_NOT_PAYMENT_CONFIRMED and name the billing account. Grand totals at bottom show what we can account for and what still needs clarification."
+  },
+  "paymentsConfirmedViaBankWithdrawal": [
+    {
+      "supplier": "Jabco",
+      "invoice": "SO 2119",
+      "date": "2026-03-09",
+      "amount": 56180.00,
+      "paidFrom": "M77 Ag 9047 (direct wire)",
+      "paidDate": "2026-03-20",
+      "paidAmount": 56200.00,
+      "evidence": "banking.json → m77AgLoanLedger.originations[0]: 'date 2026-03-20 amount 56200 paidTo Jabco'",
+      "variance": 20.00,
+      "varianceNote": "$20 likely wire fee"
+    },
+    {
+      "supplier": "Corbet",
+      "invoice": "364",
+      "date": "2026-03-05",
+      "amount": 19012.50,
+      "paidFrom": "M77 Ag 9047 (direct wire)",
+      "paidDate": "2026-03-20",
+      "paidAmount": 19032.50,
+      "evidence": "banking.json → m77AgLoanLedger.originations[1]: 'date 2026-03-20 amount 19032.50 paidTo Corbet'",
+      "variance": 20.00,
+      "varianceNote": "$20 likely wire fee"
+    },
+    {
+      "supplier": "Jabco",
+      "invoice": "SO 2129 + SO 2131",
+      "date": "2026-03-30 / 2026-04-01",
+      "amount": 84807.00,
+      "paidFrom": "AcreProfit 9253 (funded by same-day M77 Ag deposit $84,807)",
+      "paidDate": "2026-04-30",
+      "paidAmount": 84827.00,
+      "evidence": "banking.json → supplierPayments[0] + loansFromRelatedEntities.loansIn[0]",
+      "variance": 20.00,
+      "effect": "Increases M77 Ag loan by $84,807. Jabco invoices bill 'Acre Profit LLC' — matches physical funder."
+    },
+    {
+      "supplier": "Sims",
+      "invoice": "103475",
+      "date": "2026-06-10",
+      "amount": 75025.00,
+      "paidFrom": "AcreProfit 9253 (funded by same-day M77 Ag deposit $75,000)",
+      "paidDate": "2026-06-11",
+      "paidAmount": 75045.00,
+      "evidence": "banking.json → supplierPayments[1] + loansFromRelatedEntities.loansIn[1]",
+      "variance": 20.00,
+      "effect": "Sims invoice BILLED TO 'Ty Mollohan / M5 Ag' but PAID from AcreProfit's account using M77 Ag loan money. Current math credits this to M77 Ag loan, not M5 Ag. This is the precedent — billing name ≠ funder."
+    },
+    {
+      "supplier": "Corbet",
+      "invoice": "CORBET 7-17 ACH",
+      "date": "2026-07-17",
+      "amount": 18440.41,
+      "paidFrom": "AcreProfit 9253 (funded by same-day M77 Ag deposit $18,440.41)",
+      "paidDate": "2026-07-17",
+      "paidAmount": 18440.41,
+      "evidence": "banking.json → supplierPayments[2] + loansFromRelatedEntities.loansIn[2]",
+      "variance": 0.00,
+      "effect": "Increases M77 Ag loan by $18,440.41."
+    },
+    {
+      "supplier": "Corbet",
+      "invoice": "CORBET 8-4 ACH",
+      "date": "2026-08-04",
+      "amount": 18439.40,
+      "paidFrom": "AcreProfit 9253 (no same-day M77 Ag deposit — Kyle confirms M77 Ag economically funded)",
+      "paidDate": "2026-08-04",
+      "paidAmount": 18439.40,
+      "evidence": "banking.json → supplierPayments[3] + m77Ag.originations[5] 'Implicit — Corbet ACHs $18,439.40 out of 9253'",
+      "variance": 0.00,
+      "effect": "Treated as M77 Ag loan increase per Kyle's direction."
+    }
+  ],
+  "paymentsNotConfirmed_needKyleToSayWhichAccountPaid": {
+    "note": "These invoices show up in the Sims Volume Reports but have no matching outflow in banking.json's AP 9253 statements (through 10/30). They weren't paid from AcreProfit — so they must have been paid from Kyle personal (9705), McConnell Enterprises (8309), M77 Ag 9047 (beyond what's in the m77 ledger screenshot), M5 Ag (Ty's account), or ToGo AG (8831). Kyle needs to tell us the source for each, or upload those account statements.",
+    "simsInvoicesBilledToKyle_Acre_Profit_notYetTracedToAWithdrawal": [
+      { "simsInvoice": "102522", "date": "2026-04-29", "amount": 73425.00,  "products": "Atrazine 795 + Dicamba 1,325 + Glypex 2,200 gal", "possibleSources": ["Kyle personal", "M77 Ag 9047", "M5 Ag (Ty)", "McConnell Enterprises"] },
+      { "simsInvoice": "102599", "date": "2026-05-08", "amount": 19125.00,  "products": "Atrazine 530 + Flumi 1,000 lbs" },
+      { "simsInvoice": "102974", "date": "2026-05-20", "amount": 65282.50,  "products": "Anthem NXT 70 + Atrazine 1,060 + Dicamba 265 + Glypex 825" },
+      { "simsInvoice": "103938", "date": "2026-06-26", "amount": 3175.00,   "products": "Amine 50 + Peak 100 oz" },
+      { "simsInvoice": "104156", "date": "2026-07-06", "amount": 11525.00,  "products": "Amine 50 + Flurox 100 + Peak 140 oz" },
+      { "simsInvoice": "104322", "date": "2026-07-08", "amount": 1275.00,   "products": "Peak 60 oz" },
+      { "simsInvoice": "104596", "date": "2026-07-16", "amount": 27435.16,  "products": "Longbow 384 oz + Me-Try-Buzin 100 + Parapex 530 + Sulfen 180 gal" },
+      { "simsInvoice": "104703", "date": "2026-07-21", "amount": 23085.68,  "products": "Clethodim 10 + Flagstaff 180 + Longbow 1,632 oz + Status 1,000 oz" },
+      { "simsInvoice": "104998", "date": "2026-08-10", "amount": 21135.00,  "products": "Me-Try-Buzin 177.5 + Sulfen 180 gal" }
+    ],
+    "kyleBilledSimsTotal": 245463.34,
+    "simsInvoicesBilledToM5Ag_notYetTracedToAWithdrawal": [
+      { "simsInvoice": "102015", "date": "2026-04-02", "amount": 51562.50,  "products": "Glypex 5 Extra 4,125 gal" },
+      { "simsInvoice": "102143", "date": "2026-04-09", "amount": 53000.00,  "products": "Atrazine 4L Tote 4,240 gal" },
+      { "simsInvoice": "102210", "date": "2026-04-15", "amount": 122126.25, "products": "Anthem 90 + Atrazine 1060 + Dicamba 1060 + Glypex 825 + LV6 1060 gal + Mivum 3600 oz" },
+      { "simsInvoice": "103383", "date": "2026-06-05", "amount": 105942.50, "products": "Anthem 40 + Dicamba 360 + Dicamba 1325 + Flumi 1440 lb + Glypex 1100 + Moccasin 260 gal" },
+      { "simsInvoice": "104620", "date": "2026-07-16", "amount": -9360.00,  "products": "Moccasin RETURN -260 gal" },
+      { "simsInvoice": "104704", "date": "2026-07-21", "amount": -9360.00,  "products": "Moccasin RETURN -260 gal" },
+      { "simsInvoice": "105239", "date": "2026-08-26", "amount": 38425.00,  "products": "LV6 Lima 6 265 + Parapex 2,120 gal" },
+      { "simsInvoice": "105339", "date": "2026-09-02", "amount": 16430.00,  "products": "Parapex 1,060 gal" },
+      { "simsInvoice": "105376", "date": "2026-09-09", "amount": 4500.00,   "products": "LV6 2-4-D Alligare 180 gal" },
+      { "simsInvoice": "105533", "date": "2026-09-25", "amount": 12852.00,  "products": "AMS NeuAG 42,840 lbs" }
+    ],
+    "m5AgBilledSimsTotal": 386118.25,
+    "assumedButNotProvenByWithdrawal": "We've been assuming all $386,118.25 of M5 Ag-billed Sims invoices were paid by M5 Ag from Ty's bank account. The exact same reasoning (billing label = funder) is what failed on Sims 103475. These need actual withdrawal confirmation from Ty / M5 Ag's bank statements too."
+  },
+  "grandTotals": {
+    "chemicalsPurchasedYTD_fromChemicalPurchasesJson": 866606.09,
+    "confirmedByWithdrawalEvidence": 272164.72,
+    "percentConfirmed": "31.4%",
+    "unconfirmed_pendingKyleOrBankStatements": 594441.37,
+    "percentUnconfirmed": "68.6%",
+    "breakdown": {
+      "m77Ag_confirmedByWithdrawal": 272164.72,
+      "m5Ag_assumedButUnconfirmed": 386118.25,
+      "kyleSide_assumedButUnconfirmed": 208323.12
+    }
+  },
+  "whatKyleNeedsToProvide": [
+    "Which bank account cut the check for each of the 9 Kyle-billed Sims invoices (102522, 102599, 102974, 103938, 104156, 104322, 104596, 104703, 104998) — Kyle personal 9705, M77 Ag 9047, McConnell Enterprises 8309, or something else?",
+    "Does Ty have Sims payment statements showing the M5 Ag outflows for 102015, 102143, 102210, 103383, 105239, 105339, 105376, 105533? Or should we assume M5 Ag paid these and move on?",
+    "If ANY of the Sims invoices were paid from AcreProfit 9253 through a withdrawal I missed, flag it — that would shift the owner to AP."
+  ]
+}

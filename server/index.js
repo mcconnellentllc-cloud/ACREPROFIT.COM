@@ -10507,6 +10507,22 @@ app.get('/api/admin/sale/ty-inventory/invoice-match', authMiddleware, adminMiddl
     }
 });
 
+// GET /api/admin/reconciliation/invoice-payment-match
+// Every supplier invoice cross-referenced against actual bank withdrawals
+// in banking.json. Kyle flagged 2026-11-11 that ownership must follow the
+// CASH TRAIL (which account paid), not the Sims billing label. This endpoint
+// surfaces which invoices are confirmed by a withdrawal and which aren't.
+app.get('/api/admin/reconciliation/invoice-payment-match', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const fs = require('fs');
+        const path = require('path');
+        const raw = fs.readFileSync(path.join(__dirname, 'supplier-invoice-payment-match.json'), 'utf8');
+        res.json(JSON.parse(raw));
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 // GET /api/admin/sale/ty-inventory/loan-impact
 // Returns the ledger math for transferring Kyle-funded items (the 9 "ownership
 // mismatch" rows) from the M77 Ag loan ledger to the M5 Ag loan ledger.

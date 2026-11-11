@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Invoice ↔ Withdrawal Match | AcreProfit Admin</title>
+    <link rel="icon" type="image/svg+xml" href="logo-icon.svg">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --accent: #059669;
+            --sale: #dc2626;
+            --warn: #d97706;
+            --fg: #111827;
+            --mute: #6b7280;
+            --border: #e5e7eb;
+            --bg: #f3f4f6;
+        }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif; background: var(--bg); color: var(--fg); padding: 20px; line-height: 1.5; }
+        .container { max-width: 1280px; margin: 0 auto; }
+        h1 { margin-bottom: 8px; }
+        h2 { margin: 24px 0 12px; }
+        .lede { color: var(--mute); margin-bottom: 20px; font-size: 15px; max-width: 920px; }
+        .lede a { color: var(--accent); }
+
+        .callout {
+            background: #fef3c7;
+            border-left: 4px solid var(--warn);
+            padding: 14px 16px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            color: #78350f;
+            font-size: 14px;
+        }
+        .callout strong { color: #92400e; }
+
+        .stats {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 12px;
+            margin-bottom: 24px;
+        }
+        .stat {
+            background: #fff;
+            padding: 16px;
+            border-radius: 10px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+        }
+        .stat h3 { font-size: 11px; text-transform: uppercase; color: var(--mute); margin-bottom: 4px; letter-spacing: 0.3px; }
+        .stat .v { font-size: 22px; font-weight: 800; color: var(--accent); }
+        .stat.warn .v { color: var(--warn); }
+        .stat.danger .v { color: var(--sale); }
+
+        table { width: 100%; background: #fff; border-radius: 10px; overflow: hidden; border-collapse: collapse; box-shadow: 0 2px 4px rgba(0,0,0,0.05); margin-bottom: 20px; }
+        th { background: #f9fafb; padding: 10px 12px; text-align: left; font-size: 12px; text-transform: uppercase; color: var(--mute); letter-spacing: 0.3px; }
+        td { padding: 10px 12px; border-top: 1px solid var(--border); font-size: 13px; vertical-align: top; }
+        .num { text-align: right; white-space: nowrap; }
+        .status-pill {
+            padding: 2px 8px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+        }
+        .status-pill.confirmed { background: #d1fae5; color: #065f46; }
+        .status-pill.pending { background: #fef3c7; color: #92400e; }
+
+        .muted { color: var(--mute); font-size: 12px; }
+        .evidence { color: var(--mute); font-size: 12px; font-family: ui-monospace, monospace; }
+
+        .loading, .error { padding: 30px; text-align: center; background: #fff; border-radius: 10px; }
+        .error { color: var(--sale); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Invoice ↔ Bank Withdrawal Match</h1>
+        <p class="lede">
+            The right way to determine loan ownership is to follow the cash trail — not the supplier billing label. This report walks every chemical purchase invoice, shows which bank account's withdrawal paid it (where we have proof), and flags everything else as pending Kyle's confirmation.
+            <br><a href="/admin.html#reconciliation-center">← Reconciliation Center</a> · <a href="/admin-ty-invoice-match.html">Ty inventory match</a>
+        </p>
+
+        <div id="root">
+            <div class="loading">Loading match data…</div>
+        </div>
+    </div>
+
+    <script>
+        const API_URL = window.location.hostname === 'localhost' ? 'http://localhost:3000' : 'https://acreprofit-com.onrender.com';
+        const token = localStorage.getItem('acreprofit_token') || localStorage.getItem('token');
+        if (!token) {
+            document.getElementById('root').innerHTML = '<div class="error">Not logged in.</div>';
+        }
+
+        function escapeHtml(s) { return String(s || '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+        function fmt(n) { return '$' + (Number(n) || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
+        async function load() {
+            try {
+                const res = await fetch(`${API_URL}/api/admin/reconciliation/invoice-payment-match`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                if (!res.ok) throw new Error((await res.json()).error || 'failed');
+                render(await res.json());
+            } catch (e) {
+                document.getElementById('root').innerHTML = `<div class="error">Failed: ${escapeHtml(e.message)}</div>`;
+            }
+        }
+
+        function render(d) {
+            const totals = d.grandTotals || {};
+            const kylePending = d.paymentsNotConfirmed_needKyleToSayWhichAccountPaid?.simsInvoicesBilledToKyle_Acre_Profit_notYetTracedToAWithdrawal || [];
+            const m5Pending = d.paymentsNotConfirmed_needKyleToSayWhichAccountPaid?.simsInvoicesBilledToM5Ag_notYetTracedToAWithdrawal || [];
+
+            document.getElementById('root').innerHTML = `
+                <div class="callout">
+                    <strong>⚠️ Correction (2026-11-11).</strong> Kyle flagged that the earlier Ty-handoff ownership analysis used Sims billing labels instead of actual bank withdrawals. That's the same mistake Sims 103475 already proved wrong (billed to Ty at Sims, paid from AP via M77 Ag loan).
+                    This report resets to the correct method: every invoice is only "proven" when a matching bank withdrawal confirms it. The rest is pending Kyle's clarification on which account paid.
+                </div>
+
+                <div class="stats">
+                    <div class="stat">
+                        <h3>Total Chemical Purchases YTD</h3>
+                        <div class="v">${fmt(totals.chemicalsPurchasedYTD_fromChemicalPurchasesJson || 0)}</div>
+                    </div>
+                    <div class="stat">
+                        <h3>Confirmed by Withdrawal</h3>
+                        <div class="v">${fmt(totals.confirmedByWithdrawalEvidence || 0)}</div>
+                        <div class="muted">${escapeHtml(totals.percentConfirmed || '')}</div>
+                    </div>
+                    <div class="stat warn">
+                        <h3>Unconfirmed / Assumed</h3>
+                        <div class="v">${fmt(totals.unconfirmed_pendingKyleOrBankStatements || 0)}</div>
+                        <div class="muted">${escapeHtml(totals.percentUnconfirmed || '')}</div>
+                    </div>
+                    <div class="stat danger">
+                        <h3>Kyle-side Unconfirmed</h3>
+                        <div class="v">${fmt(totals.breakdown?.kyleSide_assumedButUnconfirmed || 0)}</div>
+                        <div class="muted">${kylePending.length} Sims invoices need bank account source</div>
+                    </div>
+                </div>
+
+                <h2>✅ Confirmed by bank-withdrawal evidence</h2>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Supplier</th>
+                            <th>Invoice</th>
+                            <th>Date</th>
+                            <th class="num">Invoice $</th>
+                            <th>Paid From</th>
+                            <th>Paid Date / $</th>
+                            <th>Evidence</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${(d.paymentsConfirmedViaBankWithdrawal || []).map(p => `
+                            <tr>
+                                <td><strong>${escapeHtml(p.supplier)}</strong></td>
+                                <td>${escapeHtml(p.invoice)}</td>
+                                <td>${escapeHtml(p.date)}</td>
+                                <td class="num">${fmt(p.amount)}</td>
+                                <td>${escapeHtml(p.paidFrom)}</td>
+                                <td>${escapeHtml(p.paidDate)} · ${fmt(p.paidAmount)}${p.variance ? ` <span class="muted">(+$${p.variance} fee)</span>` : ''}</td>
+                                <td class="evidence">${escapeHtml(p.evidence)}</td>
+                            </tr>
+                            ${p.effect ? `<tr><td colspan="7" class="muted" style="background:#f9fafb; padding:6px 12px 10px;">↳ ${escapeHtml(p.effect)}</td></tr>` : ''}
+                        `).join('')}
+                    </tbody>
+                </table>
+
+                <h2>⏳ Sims invoices BILLED TO Kyle / Acre Profit — bank account source pending</h2>
+                <p class="muted" style="margin-bottom:10px;">None of these appear in AcreProfit 9253 withdrawals. They were paid from one of: Kyle personal 9705, M77 Ag 9047 (beyond the ledger screenshot), McConnell Enterprises 8309, M5 Ag (Ty), or ToGo AG 8831. Kyle needs to confirm the source for each.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sims Invoice</th>
+                            <th>Date</th>
+                            <th class="num">Amount</th>
+                            <th>Products</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${kylePending.map(p => `
+                            <tr>
+                                <td><strong>${escapeHtml(p.simsInvoice)}</strong></td>
+                                <td>${escapeHtml(p.date)}</td>
+                                <td class="num">${fmt(p.amount)}</td>
+                                <td class="muted">${escapeHtml(p.products)}</td>
+                            </tr>
+                        `).join('')}
+                        <tr style="background:#f9fafb;">
+                            <td colspan="2"><strong>Total pending (Kyle-billed)</strong></td>
+                            <td class="num"><strong>${fmt(d.paymentsNotConfirmed_needKyleToSayWhichAccountPaid?.kyleBilledSimsTotal || 0)}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h2>⏳ Sims invoices BILLED TO Ty / M5 Ag — bank account source pending</h2>
+                <p class="muted" style="margin-bottom:10px;">Assumed to be M5 Ag-funded (because Ty's Sims account was billed), but we don't have Ty's bank withdrawals to prove it. Sims 103475 is already excluded here — that one AP paid using M77 Ag loan funds.</p>
+                <table>
+                    <thead>
+                        <tr>
+                            <th>Sims Invoice</th>
+                            <th>Date</th>
+                            <th class="num">Amount</th>
+                            <th>Products</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${m5Pending.map(p => `
+                            <tr>
+                                <td><strong>${escapeHtml(p.simsInvoice)}</strong></td>
+                                <td>${escapeHtml(p.date)}</td>
+                                <td class="num" style="${p.amount < 0 ? 'color:var(--accent);' : ''}">${fmt(p.amount)}</td>
+                                <td class="muted">${escapeHtml(p.products)}</td>
+                            </tr>
+                        `).join('')}
+                        <tr style="background:#f9fafb;">
+                            <td colspan="2"><strong>Total pending (M5 Ag-billed)</strong></td>
+                            <td class="num"><strong>${fmt(d.paymentsNotConfirmed_needKyleToSayWhichAccountPaid?.m5AgBilledSimsTotal || 0)}</strong></td>
+                            <td></td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <h2>What Kyle needs to confirm</h2>
+                <ol style="margin-left: 20px; background:#fff; padding: 20px; border-radius: 10px; box-shadow:0 2px 4px rgba(0,0,0,0.05);">
+                    ${(d.whatKyleNeedsToProvide || []).map(q => `<li style="margin-bottom:10px;">${escapeHtml(q)}</li>`).join('')}
+                </ol>
+            `;
+        }
+
+        if (token) load();
+    </script>
+</body>
+</html>
