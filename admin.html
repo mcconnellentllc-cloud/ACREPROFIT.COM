@@ -39,59 +39,85 @@
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="15 18 9 12 15 6"></polyline></svg>
                 </button>
                 <div class="admin-tabs" id="adminTabs">
+                    <!-- IA v2 (2026-11-11): 6 top-level sections instead of 19 scattered tabs.
+                         Tab hashes are preserved so bookmarks still work — only the grouping changed. -->
                     <a href="#dashboard" class="admin-tab active" data-tab="dashboard">Overview</a>
-                    <a href="#orders" class="admin-tab" data-tab="orders">Orders</a>
 
-                    <!-- Inventory Dropdown -->
+                    <!-- Suppliers: where chemical comes from -->
+                    <div class="admin-tab-dropdown">
+                        <button class="admin-tab dropdown-trigger">
+                            Suppliers <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <span id="suppliersNavTop"><a href="#suppliers" class="dropdown-item" data-tab="suppliers">Suppliers</a></span>
+                            <a href="#purchase-orders" class="dropdown-item" data-tab="purchase-orders">Purchase Orders</a>
+                            <span id="chemicalLedgerNav" style="display: none;"><a href="#chemical-ledger" class="dropdown-item" data-tab="chemical-ledger">Chemical Ledger</a></span>
+                            <a href="#price-mining" class="dropdown-item" data-tab="price-mining">Price Mining</a>
+                            <a href="/admin-inventory-lifecycle.html" class="dropdown-item">Receive Shipments</a>
+                        </div>
+                    </div>
+
+                    <!-- Customers: where it goes, who pays -->
+                    <div class="admin-tab-dropdown">
+                        <button class="admin-tab dropdown-trigger">
+                            Customers <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <a href="#customers" class="dropdown-item" data-tab="customers">Customers</a>
+                            <a href="#orders" class="dropdown-item" data-tab="orders">Orders</a>
+                            <a href="/distributor-invoices.html" class="dropdown-item">Invoicing (create)</a>
+                            <a href="#receivables" class="dropdown-item" data-tab="receivables">Receivables (A/R)</a>
+                            <a href="#quote-requests" class="dropdown-item" data-tab="quote-requests">Preorders</a>
+                            <span id="depositMatchNav" style="display: none;"><a href="#deposit-match" class="dropdown-item" data-tab="deposit-match">Deposit Matcher</a></span>
+                            <span id="programsNav" style="display: none;"><a href="#programs" class="dropdown-item" data-tab="programs">Programs</a></span>
+                            <span id="ratingsNav" style="display: none;"><a href="#ratings" class="dropdown-item" data-tab="ratings">Ratings <span id="ratingsBadge" style="display:none; background:#dc2626; color:#fff; border-radius:999px; padding:0 6px; margin-left:4px; font-size:11px;"></span></a></span>
+                        </div>
+                    </div>
+
+                    <!-- Inventory: what we have -->
                     <div class="admin-tab-dropdown">
                         <button class="admin-tab dropdown-trigger" id="inventoryDropdown">
                             Inventory <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
                         <div class="dropdown-menu">
-                            <a href="#products" class="dropdown-item" data-tab="products">Products Catalog</a>
                             <a href="#inventory" class="dropdown-item" data-tab="inventory">Stock Levels</a>
-                            <a href="#purchase-orders" class="dropdown-item" data-tab="purchase-orders">Purchase Orders</a>
+                            <a href="#products" class="dropdown-item" data-tab="products">Products Catalog</a>
                             <a href="/admin-warehouse.html" class="dropdown-item">Warehouse Balance</a>
                             <a href="/admin-transfers.html" class="dropdown-item">Product Transfers</a>
-                            <a href="/admin-inventory-lifecycle.html" class="dropdown-item">Receive Shipments</a>
                             <a href="/quoter.html" class="dropdown-item" target="_blank">Price Quoter Tool</a>
                         </div>
                     </div>
 
-                    <a href="/admin-operations.html" class="admin-tab" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white;">Operations</a>
-                    <a href="/admin-loans.html" class="admin-tab" style="background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%); color: white;">Loans</a>
-
-                    <a href="#customers" class="admin-tab" data-tab="customers">Customers</a>
-                    <span id="distributorsNav"><a href="#distributors" class="admin-tab" data-tab="distributors">Distributors</a></span>
-                    <span id="suppliersNavTop"><a href="#suppliers" class="admin-tab" data-tab="suppliers">Suppliers</a></span>
-                    <a href="#ledger" class="admin-tab" data-tab="ledger">Ledger</a>
-                    <a href="#settlements" class="admin-tab" data-tab="settlements">Settlements</a>
-                    <a href="#receivables" class="admin-tab" data-tab="receivables">Receivables</a>
-                    <a href="/distributor-invoices.html" class="admin-tab" style="background: linear-gradient(135deg, #16a34a 0%, #15803d 100%); color: white;">Invoicing</a>
-                    <a href="#quote-requests" class="admin-tab" data-tab="quote-requests" style="background: #7c3aed; color: white;">Preorders</a>
-                    <a href="#price-mining" class="admin-tab" data-tab="price-mining" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white;">Price Mining</a>
-                    <span id="programsNav" style="display: none;"><a href="#programs" class="admin-tab" data-tab="programs" style="background: linear-gradient(135deg, #059669 0%, #047857 100%); color: white;">Programs</a></span>
-                    <span id="ratingsNav" style="display: none;"><a href="#ratings" class="admin-tab" data-tab="ratings" style="background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white;">Ratings <span id="ratingsBadge" style="display:none; background:#dc2626; color:#fff; border-radius:999px; padding:0 6px; margin-left:4px; font-size:11px;"></span></a></span>
-
-                    <!-- AcreProfit Business Dropdown -->
+                    <!-- Business: money + entity + operations -->
                     <div class="admin-tab-dropdown">
                         <button class="admin-tab dropdown-trigger" id="businessDropdown">
-                            AcreProfit Business <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                            Business <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
                         </button>
                         <div class="dropdown-menu">
-                            <span id="complianceNav"><a href="#compliance" class="dropdown-item tab-warning-item" data-tab="compliance">Compliance</a></span>
-                            <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
-                            <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
-                            <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
                             <span id="reconciliationCenterNav" style="display: none;"><a href="#reconciliation-center" class="dropdown-item" data-tab="reconciliation-center"><strong>Reconciliation Center</strong></a></span>
-                            <span id="chemicalLedgerNav" style="display: none;"><a href="#chemical-ledger" class="dropdown-item" data-tab="chemical-ledger">Chemical Ledger</a></span>
-                            <span id="depositMatchNav" style="display: none;"><a href="#deposit-match" class="dropdown-item" data-tab="deposit-match">Deposit Matcher</a></span>
+                            <a href="#ledger" class="dropdown-item" data-tab="ledger">Ledger</a>
+                            <a href="#settlements" class="dropdown-item" data-tab="settlements">Settlements</a>
+                            <a href="/admin-loans.html" class="dropdown-item">Loans</a>
+                            <a href="/admin-operations.html" class="dropdown-item">Operations</a>
+                            <span id="businessProfileNav" style="display: none;"><a href="#business" class="dropdown-item" data-tab="business">Business Profile</a></span>
+                            <span id="companySettingsNav"><a href="#company-settings" class="dropdown-item" data-tab="company-settings">Company Settings</a></span>
+                            <span id="auditLogNav" style="display: none;"><a href="#audit-log" class="dropdown-item" data-tab="audit-log">Audit Log</a></span>
                             <span id="webhookEventsNav" style="display: none;"><a href="#webhook-events" class="dropdown-item" data-tab="webhook-events">Webhook Events</a></span>
                         </div>
                     </div>
 
-                    <span id="repAppsNav" style="display: none;"><a href="#applications" class="admin-tab" data-tab="applications">Rep Apps</a></span>
-                    <span id="auditLogNav" style="display: none;"><a href="#audit-log" class="admin-tab" data-tab="audit-log">Audit Log</a></span>
+                    <!-- Team: your people -->
+                    <div class="admin-tab-dropdown">
+                        <button class="admin-tab dropdown-trigger">
+                            Team <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="6 9 12 15 18 9"></polyline></svg>
+                        </button>
+                        <div class="dropdown-menu">
+                            <span id="distributorsNav"><a href="#distributors" class="dropdown-item" data-tab="distributors">Distributors</a></span>
+                            <span id="commissionsNav" style="display: none;"><a href="#commissions" class="dropdown-item" data-tab="commissions">Commissions</a></span>
+                            <span id="repAppsNav" style="display: none;"><a href="#applications" class="dropdown-item" data-tab="applications">Rep Applications</a></span>
+                            <span id="complianceNav"><a href="#compliance" class="dropdown-item tab-warning-item" data-tab="compliance">Compliance</a></span>
+                        </div>
+                    </div>
                 </div>
                 <button class="admin-tabs-scroll-btn right" onclick="scrollTabs(200)" aria-label="Scroll tabs right">
                     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="9 18 15 12 9 6"></polyline></svg>
