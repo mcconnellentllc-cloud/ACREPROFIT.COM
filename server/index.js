@@ -6761,6 +6761,30 @@ app.post('/api/admin/customers', authMiddleware, adminMiddleware, async (req, re
     }
 });
 
+// Quick diagnostic — counts only, no payload. Returns active/archived/
+// unassigned/by-rep tallies so admin can tell at a glance whether "No
+// customers yet" means "DB is empty" or "they're archived" or "they're on
+// a different rep". Superadmin only.
+app.get('/api/admin/customers/count', authMiddleware, adminMiddleware, async (req, res) => {
+    try {
+        const total = await User.countDocuments({ role: 'customer' });
+        const active = await User.countDocuments({ role: 'customer', isActive: { $ne: false } });
+        const archived = await User.countDocuments({ role: 'customer', isActive: false });
+        const unassigned = await User.countDocuments({
+            role: 'customer',
+            isActive: { $ne: false },
+            $or: [{ representative: { $exists: false } }, { representative: null }]
+        });
+        const byRep = await User.aggregate([
+            { $match: { role: 'customer', isActive: { $ne: false }, representative: { $ne: null } } },
+            { $group: { _id: '$representative', count: { $sum: 1 } } }
+        ]);
+        res.json({ total, active, archived, unassigned, byRep });
+    } catch (e) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
 app.get('/api/admin/customers', authMiddleware, adminMiddleware, async (req, res) => {
     try {
         const { search } = req.query;
@@ -10399,9 +10423,14 @@ app.post('/api/sale/preorder', salePreorderLimiter, async (req, res) => {
                     `
                 });
 
-                // Admin notification
-                const adminTo = process.env.SALE_PREORDER_NOTIFY_EMAIL || process.env.ADMIN_NOTIFY_EMAIL || 'mcconnellentllc@gmail.com';
-                await transporter.sendMail({
+                // Admin notification — only sent if an env var names a recipient.
+                // We intentionally do NOT hardcode a fallback address: the admin
+                // can set SALE_PREORDER_NOTIFY_EMAIL (or ADMIN_NOTIFY_EMAIL) in
+                // Render env, or wire a superadmin lookup here later. Without
+                // one, the preorder is saved and the customer confirmation
+                // still goes out; we just skip the internal notification.
+                const adminTo = process.env.SALE_PREORDER_NOTIFY_EMAIL || process.env.ADMIN_NOTIFY_EMAIL;
+                if (adminTo) await transporter.sendMail({
                     from,
                     to: adminTo,
                     subject: `New sale preorder — ${quoteRequest.quoteNumber} — ${customerName}`,
