@@ -5586,13 +5586,19 @@ We're running an end-of-year flash sale on our full chemical inventory. Prices a
         // non-superadmin callers. Sets allCustomers, renders the grid, and
         // reveals the archived toggle label when the current user is a superadmin.
         async function loadCustomers() {
+            const grid = document.getElementById('customersGrid');
+            if (grid) grid.innerHTML = '<p class="loading">Loading customers…</p>';
             try {
                 const showArchived = document.getElementById('showArchivedCustomers')?.checked;
                 const url = `${API_URL}/api/admin/customers${showArchived ? '?includeArchived=true' : ''}`;
                 const res = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` }
                 });
-                if (!res.ok) throw new Error('Failed to load customers');
+                if (!res.ok) {
+                    let detail = `HTTP ${res.status}`;
+                    try { const b = await res.json(); if (b && b.error) detail += ` — ${b.error}`; } catch (_) {}
+                    throw new Error(detail);
+                }
                 const customers = await res.json();
                 allCustomers = customers;
                 const totalCustomersEl = document.getElementById('totalCustomers');
@@ -5605,6 +5611,14 @@ We're running an end-of-year flash sale on our full chemical inventory. Prices a
                 if (wrapper) wrapper.style.display = currentUser.role === 'superadmin' ? 'flex' : 'none';
             } catch (err) {
                 console.error('loadCustomers error:', err);
+                if (grid) {
+                    grid.innerHTML = `
+                        <div class="empty" style="padding:30px; text-align:center;">
+                            <p style="color:#dc2626;"><strong>Could not load customers.</strong></p>
+                            <p style="font-size:0.85rem; color:#666; margin-top:6px;">${String(err.message || err)}</p>
+                            <button class="btn btn-outline" style="margin-top:12px;" onclick="loadCustomers()">Retry</button>
+                        </div>`;
+                }
             }
         }
 
@@ -5771,7 +5785,28 @@ We're running an end-of-year flash sale on our full chemical inventory. Prices a
         function renderCustomers(customers) {
             const grid = document.getElementById('customersGrid');
             if (!customers || customers.length === 0) {
-                grid.innerHTML = '<p class="empty">No customers yet</p>';
+                // Distinguish three cases: (a) search filter matched nothing,
+                // (b) no active customers but some are archived, (c) truly empty.
+                const searchTerm = document.getElementById('customerSearch')?.value?.trim() || '';
+                const totalLoaded = (allCustomers || []).length;
+                const showArchived = document.getElementById('showArchivedCustomers')?.checked;
+                if (searchTerm && totalLoaded > 0) {
+                    grid.innerHTML = `
+                        <div class="empty" style="padding:30px; text-align:center;">
+                            <p>No customers match "<strong>${searchTerm}</strong>".</p>
+                            <p style="font-size:0.85rem; color:#666; margin-top:8px;">${totalLoaded} customer${totalLoaded === 1 ? '' : 's'} loaded in total.</p>
+                            <button class="btn btn-outline" style="margin-top:12px;" onclick="document.getElementById('customerSearch').value=''; document.getElementById('customerSearch').dispatchEvent(new Event('input'));">Clear search</button>
+                        </div>`;
+                } else if (!showArchived) {
+                    grid.innerHTML = `
+                        <div class="empty" style="padding:30px; text-align:center;">
+                            <p>No active customers showing.</p>
+                            <p style="font-size:0.85rem; color:#666; margin-top:8px;">If you expect customers here, they may be archived — try the <strong>Show archived</strong> toggle above, or check that representatives haven't been reassigned.</p>
+                            <button class="btn btn-outline" style="margin-top:12px;" onclick="document.getElementById('showArchivedCustomers').checked=true; loadCustomers();">Show archived customers</button>
+                        </div>`;
+                } else {
+                    grid.innerHTML = '<p class="empty">No customers (active or archived) in the system.</p>';
+                }
                 return;
             }
 
@@ -5819,12 +5854,29 @@ We're running an end-of-year flash sale on our full chemical inventory. Prices a
                 renderCustomers(allCustomers);
                 return;
             }
-            const filtered = allCustomers.filter(c =>
-                c.name.toLowerCase().includes(searchTerm) ||
-                c.email.toLowerCase().includes(searchTerm) ||
-                (c.farm && c.farm.toLowerCase().includes(searchTerm)) ||
-                (c.state && c.state.toLowerCase().includes(searchTerm))
-            );
+            // farm is a nested object {name, state} in the User schema — not a string.
+            // Flatten the fields we search on, each guarded so the filter can't throw.
+            const haystack = (c) => {
+                const parts = [
+                    c.name,
+                    c.email,
+                    c.phone,
+                    c.state,
+                    c.farm && (c.farm.name || c.farm),         // tolerate both shapes
+                    c.farm && c.farm.state,
+                    c.farm && c.farm.city,
+                    c.representative && c.representative.name
+                ];
+                return parts
+                    .filter(Boolean)
+                    .map(String)
+                    .join(' ')
+                    .toLowerCase();
+            };
+            const filtered = allCustomers.filter(c => {
+                try { return haystack(c).includes(searchTerm); }
+                catch (e) { console.warn('search filter skipped a row', e); return false; }
+            });
             renderCustomers(filtered);
         });
 
